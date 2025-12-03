@@ -11,6 +11,8 @@
          ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚══════╝
 ```
 
+**A**ttributed **N**ode **V**ariadic **L**anguage
+
 > “JSON died so Anvil could live.”  
 > ~ Badkraft, 2025
 
@@ -19,7 +21,7 @@ Anvil is the **end** of config formats.
 
 Zero-copy · Typeless · Human-first · Blazing fast · Dual-dialect · Immutable AST · Perfect round-tripping · Resolver-pluggable · Built to replace every legacy data language in existence.
 
-This repository contains the **reference implementation of Anvil in pure C (the One True Core), with official first-class bindings for the only languages that matter.
+This repository contains the **reference implementation of Anvil in pure C**, with official first-class bindings for the only languages that matter.
 
 ## Repository Structure
 
@@ -64,11 +66,13 @@ Anvil/                     ← this repo (private)
 
 | Binding   | Language     | Status            | Repository       |
 |-----------|--------------|-------------------|------------------|
-| Anvil.J   | Java 21+     | Production (v0.1.7) | `bindings/Anvil.J` |
+| Anvil.J   | Java 21+     | Production (v0.1.7) | [`anvil-engine`] |
 | Anvil.CS  | C# / .NET 8  | Planned Q1 2026   | —                |
 | Anvil.CPP  | C++20/23     | Planned           | —                |
 | Anvil.PY  | Python 3.12+ | Planned           | —                |
 | Anvil.R   | Rust 1.75+   | Planned           | —                |
+
+The `anvil-engine` in Java is a _proof of concept_ library. It is free to be replicated, forked, clones, modified, and distributed.
 
 All bindings consume the exact same C interface. No exceptions. No sugar in core.
 
@@ -76,7 +80,7 @@ All bindings consume the exact same C interface. No exceptions. No sugar in core
 
 | Metric                       | Java 21 (warm) | C Target (2026) |
 |------------------------------|----------------|-----------------|
-| 8 KB real-world config parse | ~120 µs        | < 30 µs         |
+| 8 KB real-world config parse | ~25 µs        | < 15 µs         |
 | Heap allocations (hot path)   | 0              | 0               |
 | Memory peak                  | < 64 KB        | < 32 KB         |
 
@@ -91,6 +95,24 @@ C version will be faster, smaller, and run on bare metal without a JVM.
 | Anvil 2.0         | 2026    | Multi-file modules, package system, VM       |
 | Anvil Everywhere  | 2027+   | Every major language has an official binding |
 
+---
+
+> “We didn’t open-source Anvil. For a good reason ...
+> - You want a data structure? ANVL
+> - You want a message packet? ANVL
+> - You want a minifiable configuration? ANVL
+> - You want a secure, encrypted envelope? ANVL
+> If Anvil cannot give you the data structure you want, you don't need the structure.
+>
+> We didn't just create a variadic structure for you data ... we weaponized your data.”
+>
+> ~ Badkraft · December 2025
+
+Welcome to the future.  
+Your data will never be the same.
+
+---
+
 ## License
 
 **Copyright © 2025 Quantum Override. All rights reserved.**
@@ -101,13 +123,4 @@ Unauthorized copying, distribution, modification, or use of this software, via a
 The core C implementation and specification are released under a source-available license for internal and partnered use only.  
 External distribution requires explicit licensing.
 
-> “We didn’t open-source Anvil.  
-> We weaponized it.”
-
-— Badkraft & Grok · December 2025
-
-Anvil has no competitors.  
-Only corpses.
-
-Welcome to the future.  
-Your data will never be the same.
+[`anvil-engine`]: https://github.com/TheBadkraft/anvil-engine
