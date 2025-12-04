@@ -1,0 +1,29 @@
+// attributes.aml
+#!aml
+
+// exhaustive attribute test suite
+
+// context attributes
+@[version=0.1, build=2, author="Anvil Tester", log=true]
+
+// 1. Object
+mod @[version="1.0.0", mc_version="1.21.10"] := {
+    // context with attributes
+    name := "Test Module"
+    description := "A context to test attributes"
+    bonus_items @[rarity="legendary", count=3] := [
+        minecraft:diamond_sword,
+        minecraft:enchanted_golden_apple
+    ]
+}
+
+// 2. Array
+blocks @[mineable] := [
+    minecraft:stone,
+    minecraft:dirt,
+    minecraft:grass_block,
+    minecraft:iron_ore,
+]
+
+// 3. Tuple
+coordinates @[dimension="overworld", biome="plains"] := (100, 64, -200)

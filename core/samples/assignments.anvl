@@ -1,0 +1,18 @@
+#!aml
+
+// simple value assignments
+title := "Test \"Document\" for AML",
+color := #FF5733,
+flag := 0x1A2B3C
+count := 10,
+pi := 3.14159,
+range := 4.2e5,             // 420,000
+small_pi := 2.5E-3,         // 0.0025
+sci_fi_small := -7.89e-10,  // -0.000000000789
+sci_fi_large := 1.23E+45,   // 1.23 x 10^45
+is_active := true
+debug := false
+data := null,
+header := @md`**Welcome** to the test document!`,
+bare := unquoted_value,
+dotted.key := minecraft:blocks.stone

@@ -1,0 +1,19 @@
+#!aml
+
+// Simple tuples
+color_rgb := (255, 128, 0)
+velocity := (-0.1, 0.0, 0.3)
+origin := (0, 0, 0)
+
+// Deeply nested
+nested := (((1, 2), (3, 4)), ((5, 6), (7, 8)))
+
+// 3×3 matrix
+transform @[matrix] := (
+    (1.0, 0.0, 0.0),
+    (0.0, 1.0, 0.0),
+    (0.0, 0.0, 1.0)
+)
+
+// Mixed content
+mixed_tuple := (stone, "hello", 42, (true, false), null)

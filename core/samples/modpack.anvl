@@ -1,0 +1,311 @@
+#!aml
+@[mod="anvil_test", version="1.0.0", author="Generated", debug=true, size_target="7KB"]
+
+// Massive Anvil benchmark file — 100% valid syntax
+// Generated at 475672
+
+base_block @[ tier=1, rarity=common ] := {
+    name := "Base Block"
+    type := block
+    hardness := 1.5
+}
+
+derived_block:base_block @[ tier=2, rarity=uncommon ] := {
+    name := "Derived Block"
+    hardness := 2.5
+}
+
+shadow_soul @[ enchantable=true, durability=2643 ] := {
+    name := "Prismatic Sun"
+    type := shovel
+}
+
+frozen_jungle_planks @[ rarity=rare, durability=2539 ] := {
+    name := "Shadow Void"
+    type := sword
+    damage := 5.0
+}
+
+sapphire_orb @[ rarity=common, durability=593 ] := {
+    name := "Lunar Mangrove Planks"
+    type := chestplate
+    damage := 9.6
+    durability := 241
+}
+
+amethyst_axe @[ tier=5, enchantable=true, cursed=true ] := {
+    name := "Diamond Crown"
+    type := wand
+    damage := 7.7
+}
+
+onyx_amulet @[ tier=3, durability=2421 ] := {
+    name := "Shadow leggings"
+    type := dagger
+    durability := 775
+    tags := [ "occludes", "flammable", "needs_iron_tool" ]
+}
+
+frozen_cherry_planks @[ tier=4, fireproof=true ] := {
+    name := "Mythical Echo"
+    type := boots
+    durability := 1060
+    tags := [ "occludes" ]
+}
+
+burning_crossbow @[ tier=3, durability=140 ] := {
+    name := "Topaz Crown"
+    type := crossbow
+    durability := 2014
+}
+
+netherite_wand @[ rarity=epic, enchantable=true, damage=13.5, durability=2760, soulbound=true ] := {
+    name := "Toxic Moon"
+    type := hammer
+    damage := 13.7
+}
+
+onyx_amulet @[ tier=4, rarity=common, damage=14.3, durability=2423, fireproof=true ] := {
+    name := "Redstone wand"
+    type := shovel
+    damage := 4.4
+}
+
+sapphire_scepter @[ tier=2 ] := {
+    name := "Toxic boots"
+    type := staff
+    durability := 1420
+    tags := [ "mineable:pickaxe", "occludes" ]
+}
+
+solar_blade @[ tier=3, rarity=epic, enchantable=true, damage=6.9 ] := {
+    name := "Prismatic pickaxe"
+    type := sword
+    damage := 6.9
+    durability := 1162
+}
+
+emerald_wand @[ tier=5, rarity=uncommon, enchantable=true, durability=1335, cursed=true ] := {
+    name := "Divine chestplate"
+    type := spear
+    damage := 7.5
+}
+
+arcane_mangrove_planks @[ tier=3, rarity=common, enchantable=true, durability=2427 ] := {
+    name := "Opal Amulet"
+    type := bow
+    durability := 204
+    tags := [ "mineable:pickaxe", "flammable" ]
+}
+
+copper_shovel := {
+    name := "Quartz sword"
+    type := ore
+    damage := 7.1
+    durability := 1149
+}
+
+gold_sword @[ tier=4, rarity=common, durability=1749 ] := {
+    name := "Enchanted Bamboo Planks"
+    type := crossbow
+    durability := 1762
+    tags := [ "needs_iron_tool", "flammable", "mineable:pickaxe" ]
+}
+
+burning_birch_planks @[ tier=2, rarity=epic, enchantable=true ] := {
+    name := "Prismatic sword"
+    type := hoe
+    damage := 11.8
+    tags := [ "mineable:pickaxe" ]
+}
+
+celestial_spruce_planks @[ damage=6.8, fireproof=true ] := {
+    name := "Diamond Amulet"
+    type := boots
+    damage := 6.9
+    durability := 2366
+}
+
+onyx_orb @[ tier=2, enchantable=true, durability=2372, cursed=true ] := {
+    name := "Infernal hammer"
+    type := staff
+}
+
+cursed_cherry_planks @[ tier=2, enchantable=true ] := {
+    name := "Infernal Acacia Planks"
+    type := hoe
+    damage := 14.6
+    durability := 1858
+}
+
+onyx_amulet @[ rarity=rare, soulbound=true ] := {
+    name := "Amethyst bow"
+    type := shovel
+    tags := [ "needs_iron_tool", "occludes", "flammable" ]
+}
+
+netherite_boots @[ enchantable=true, fireproof=true ] := {
+    name := "Quartz wand"
+    type := pickaxe
+    damage := 8.1
+}
+
+redstone_dagger @[ tier=3, durability=673, soulbound=true ] := {
+    name := "Cursed Frost"
+    type := boots
+}
+
+prismatic_spear := {
+    name := "Iron axe"
+    type := shovel
+    damage := 10.6
+    durability := 818
+}
+
+shadow_dagger @[ tier=5, rarity=rare, damage=11.1 ] := {
+    name := "Infernal Dark_oak Planks"
+    type := leggings
+    damage @[target=zombie] := {
+        base := 3.9
+        modifier := 1.2
+    }
+    durability := 2392
+}
+
+void_acacia_planks @[ tier=5, enchantable=true, durability=912 ] := {
+    name := "Onyx Scepter"
+    type := axe
+    damage := 12.9
+}
+
+enchanted_pickaxe @[ rarity=epic, enchantable=true ] := {
+    name := "Mythical Heart"
+    type := hoe
+    damage := 9.4
+}
+
+topaz_scepter @[ tier=5, rarity=epic, fireproof=true ] := {
+    name := "Diamond Crown"
+    type := crossbow
+    durability := 250
+}
+
+emerald_staff @[ tier=2 ] := {
+    name := "Arcane Bamboo Planks"
+    type := ore
+    damage := 3.4
+    durability := 798
+}
+
+opal_amulet @[ tier=2, enchantable=true ] := {
+    name := "Cursed Moon"
+    type := crossbow
+}
+
+lapis_boots @[ enchantable=true, damage=10.0 ] := {
+    name := "Demonic chestplate"
+    type := gem
+    damage := 12.3
+    tags := [ "occludes" ]
+}
+
+radiant_sun @[ tier=5, enchantable=true, durability=855 ] := {
+    name := "Enchanted wand"
+    type := boots
+    durability := 380
+}
+
+cursed_crossbow @[ rarity=common, enchantable=true, durability=1400, soulbound=true ] := {
+    name := "Frozen Dark_oak Planks"
+    type := bow
+    damage := 11.5
+    durability := 666
+}
+
+prismatic_nexus @[ tier=1, damage=8.3, durability=2996 ] := {
+    name := "Frozen wand"
+    type := gem
+    damage := 3.2
+    tags := [ "occludes", "mineable:pickaxe", "needs_iron_tool" ]
+}
+
+iron_shovel @[ tier=4, rarity=uncommon, enchantable=true, fireproof=true ] := {
+    name := "Netherite leggings"
+    type := sword
+    damage := 9.3
+    durability := 2270
+}
+
+solar_cherry_planks := {
+    name := "Legendary Abyss"
+    type := wand
+    durability := 2055
+    tags := [ "needs_iron_tool", "mineable:pickaxe", "flammable" ]
+}
+
+ancient_leggings @[ rarity=rare, enchantable=true, damage=4.2, durability=1730, fireproof=true ] := {
+    name := "Diamond wand"
+    type := wand
+    damage := 4.8
+    durability := 1027
+}
+
+netherite_boots @[ tier=2, fireproof=true, cursed=true ] := {
+    name := "Topaz Scepter"
+    type := crossbow
+    damage := 14.5
+    durability := 2419
+    tags := [ "flammable", "needs_iron_tool" ]
+}
+
+shadow_shovel @[ tier=2, rarity=common, cursed=true ] := {
+    name := "Emerald shovel"
+    type := staff
+    damage := 13.9
+}
+
+legendary_star @[ tier=2, rarity=common, durability=341 ] := {
+    name := "Quartz helmet"
+    type := boots
+}
+
+emerald_leggings @[ tier=4, rarity=common, enchantable=true, durability=1530 ] := {
+    name := "Emerald boots"
+    type := pickaxe
+    damage := 10.6
+    durability := 701
+}
+
+shadow_echo @[ tier=3, rarity=epic, damage=4.9 ] := {
+    name := "Topaz Crown"
+    type := spear
+    damage := 3.6
+    durability := 910
+}
+
+cursed_whisper @[ tier=5, rarity=common, durability=2177, cursed=true ] := {
+    name := "Mythical Shard"
+    type := hammer
+    damage := 5.4
+}
+
+legendary_mangrove_planks @[ tier=3, rarity=uncommon, damage=12.6 ] := {
+    name := "Gold shovel"
+    type := axe
+    tags := [ "mineable:pickaxe" ]
+}
+
+enchanted_cherry_planks @[ rarity=rare, cursed=true ] := {
+    name := "Radiant staff"
+    type := spear
+    damage := 12.4
+}
+
+mythical_birch_planks @[ tier=4, damage=13.9 ] := {
+    name := "Divine dagger"
+    type := block
+    damage := 7.3
+    durability := 570
+}
+
+// END — 45 items, ~6 KB

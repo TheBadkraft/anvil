@@ -1,0 +1,34 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build libanvil.a (static)",
+            "type": "shell",
+            "command": "make -C core libanvil.a",
+            "group": "build"
+        },
+        {
+            "label": "Build libanvil.so (shared)",
+            "type": "shell",
+            "command": "make -C core libanvil.so",
+            "group": "build"
+        },
+        {
+            "label": "Build CLI",
+            "type": "shell",
+            "command": "make -C core cli",
+            "group": "build"
+        },
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "make -C core test",
+            "group": "test"
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "make -C core clean"
+        }
+    ]
+}

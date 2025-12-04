@@ -1,0 +1,83 @@
+// test/arrays.aml
+#!aml
+
+// Simple arrays
+numbers := [1, 2, 3, 4, 5]
+colors  := [#FF0000, #00FF00, #0000FF]
+flags   := [true, false, true]
+
+// Mixed types (allowed – Anvil is typeless)
+mixed   := [
+    "alice",
+    42,
+    true,
+    0XDEADBEEF,
+    #7F7F7F,
+    null,
+    unquoted_symbol
+]
+
+// Nested arrays
+matrix  := [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1]
+]
+
+grid    := [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+]
+
+// Real-world style
+permissions := [
+    "player.join",
+    "player.leave",
+    "block.place",
+    "block.break"
+]
+
+rgb_colors := [
+    [1.0, 0.0, 0.0],   // red
+    [0.0, 1.0, 0.0],   // green
+    [0.0, 0.0, 1.0]    // blue
+]
+
+// With comments and spacing
+spawn_points := [
+    // x, y, z, yaw, pitch
+    [100.5, 64.0, -200.3, 90.0, 0.0],
+    [-50.0, 80.0, 300.0, -45.0, 15.0],
+    [0.0, 72.0, 0.0, 180.0, -20.0]
+]
+
+/*
+chunks := [
+    (0, 0),
+    (1, 0),
+    (0, 1),
+    (-1, 2)
+]
+
+entities := [
+    (player, "Steve"),
+    (zombie, null),
+    (cow, "Bessie")
+]
+
+settings := [
+    default := {
+        resolution := (800, 600),
+        console := false,
+        volume := 5,
+        bonus_chest := false
+    },
+    custom := {
+        resolution := (1920, 1080),
+        console := true,
+        volume := 7,
+        bonus_chest := true
+    }
+]
+*/
