@@ -7,7 +7,7 @@
             "command": "sh",
             "args": [
                 "-c",
-                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && ar rcs bin/libanvil.a build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/utils.o"
+                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/operators.c -o build/operators.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/symbols.c -o build/symbols.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/errors.c -o build/errors.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && ar rcs bin/libanvil.a build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/operators.o build/symbols.o build/errors.o build/utils.o"
             ],
             "group": "build"
         },
@@ -17,7 +17,7 @@
             "command": "sh",
             "args": [
                 "-c",
-                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && gcc -shared -o bin/libanvil.so build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/utils.o"
+                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/operators.c -o build/operators.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/symbols.c -o build/symbols.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/errors.c -o build/errors.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && gcc -shared -o bin/libanvil.so build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/operators.o build/symbols.o build/errors.o build/utils.o"
             ],
             "group": "build"
         },
@@ -120,6 +120,12 @@
             "label": "Run test_anvil",
             "type": "shell",
             "command": "./build/test/test_anvil",
+            "group": "test"
+        },
+        {
+            "label": "Run test_parser",
+            "type": "shell",
+            "command": "./bin/test_parser",
             "group": "test"
         },
         {

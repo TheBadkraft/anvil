@@ -21,6 +21,9 @@
 #pragma once
 
 #include "constants.h"
+#include "errors.h"
+#include "operators.h"
+#include "symbols.h"
 #include "types.h"
 #include <sigcore/types.h>
 #include <stdbool.h>
@@ -73,8 +76,15 @@ typedef struct anvl_source_i {
    bool (*is_identifier_start)(char);
    bool (*is_identifier_part)(char);
 
+   // Operator & Symbol classification
+   anvl_operator (*is_operator)(source);
+   anvl_symbol (*is_symbol)(source);
+
    // Consume
    usize (*consume)(source, usize);
+
+   // Substring extraction
+   char *(*substring)(source, usize, usize);
 
    // Whitespace & comments
    usize (*skip_whitespace_and_comments)(source);
@@ -103,6 +113,12 @@ struct anvl_context_t {
       usize count;           // number of statements
       usize capacity;        // allocated capacity
    } stmt_list;
+   // List of module attributes
+   struct {
+      attribute *attributes; // array of attribute pointers
+      usize count;           // number of attributes
+      usize capacity;        // allocated capacity
+   } attr_list;
 };
 
 /* ------------------------------------------------------------------ */
@@ -128,7 +144,12 @@ typedef struct anvl_context_i {
    usize (*statement_count)(context self);
    statement (*get_statement)(context self, usize index);
    bool (*add_statement)(context self, statement stmt);
+   usize (*attribute_count)(context self);
+   attribute (*get_attribute)(context self, usize index);
+   bool (*add_attribute)(context self, attribute attr);
    void (*dispose)(context self);
+   // Parser
+   bool (*parse)(context self);
 } anvl_context_i;
 extern const anvl_context_i Context;
 
@@ -138,6 +159,11 @@ extern const anvl_context_i Context;
 typedef struct anvl_root_t *root;
 
 /* ------------------------------------------------------------------ */
+/* Parser Interface                                                  */
+/* ------------------------------------------------------------------ */
+bool anvl_parse(context ctx);
+
+/* ------------------------------------------------------------------ */
 /* The global Anvil interface                                         */
 /* ------------------------------------------------------------------ */
 typedef struct anvl_i {
@@ -145,5 +171,9 @@ typedef struct anvl_i {
    root (*read)(const char *source, usize len);
    void (*dispose)(root root);
    void (*cleanup)(void);
+   // Error handling
+   bool (*error_is_set)(void);
+   const anvl_error_state *(*error_get)(void);
+   void (*error_clear)(void);
 } anvl_i;
 extern const anvl_i Anvil;

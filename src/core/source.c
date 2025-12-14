@@ -26,6 +26,22 @@
 // Forward declarations for functions used in source_create
 static usize source_skip_whitespace_and_comments(source self);
 static usize source_consume(source self, usize n);
+static char *source_substring(source self, usize start, usize len);
+
+// --- Substring extraction ---
+static char *source_substring(source self, usize start, usize len) {
+   if (start >= (usize)(self->buffer.end - self->buffer.bucket) || len == 0) {
+      return NULL;
+   }
+
+   usize available = (usize)(self->buffer.end - self->buffer.bucket) - start;
+   usize actual_len = len < available ? len : available;
+
+   char *result = Memory.alloc(actual_len + 1, false);
+   memcpy(result, self->buffer.bucket + start, actual_len);
+   result[actual_len] = '\0';
+   return result;
+}
 static bool source_is_shebang(source self);
 static usize source_match_length(source self, const char *s, usize slen);
 static void source_reset(source self);
@@ -70,8 +86,12 @@ static source source_create(const char *data, usize len) {
             src->dialect = ANVL_DIALECT_ASL;
          }
       }
-      // Reset position after dialect detection
-      source_reset(src);
+      // do not reset position after shebang ... prep. why scan the preamble again?
+      // in fact, be kind and skip ws/comments
+      skip_len = source_skip_whitespace_and_comments(src);
+      if (skip_len > 0) {
+         source_consume(src, skip_len);
+      }
    }
 
    return src;
@@ -85,18 +105,6 @@ static void source_dispose(source self) {
 }
 
 static anvl_dialect source_get_dialect(source self) {
-   // const char *data = (const char *)self->buffer.bucket;
-   // usize len = self->buffer.end - self->buffer.bucket;
-
-   // // Check shebang first (highest precedence)
-   // anvl_dialect shebang_dialect = detect_dialect_from_source(data, len);
-   // if (shebang_dialect != ANVL_DIALECT_ASL) {
-   //    return shebang_dialect;
-   // }
-
-   // // Default to ASL
-   // return ANVL_DIALECT_ASL;
-
    return self->dialect;
 }
 
@@ -169,8 +177,57 @@ static bool source_is_identifier_part(char c) {
    return source_is_alpha(c) || source_is_digit(c) || c == '.';
 }
 
+// --- Operator & Symbol classification ---
+static anvl_operator source_is_operator(source self) {
+   // Try operators in order of length (longest first)
+   const char *pos = self->buffer.bucket + self->pos;
+   usize remaining = (usize)(self->buffer.end - self->buffer.bucket) - self->pos;
+
+   // Check for 2-character operators first
+   if (remaining >= 2) {
+      if (anvl_is_operator(pos, 2)) {
+         return anvl_operator_from_symbol(pos, 2);
+      }
+   }
+
+   // Check for 1-character operators
+   if (remaining >= 1) {
+      if (anvl_is_operator(pos, 1)) {
+         return anvl_operator_from_symbol(pos, 1);
+      }
+   }
+
+   return ANVL_OP_INVALID;
+}
+
+static anvl_symbol source_is_symbol(source self) {
+   // Try symbols in order of length (longest first)
+   const char *pos = self->buffer.bucket + self->pos;
+   usize remaining = (usize)(self->buffer.end - self->buffer.bucket) - self->pos;
+
+   // Check for 2-character symbols first
+   if (remaining >= 2) {
+      if (anvl_is_symbol(pos, 2)) {
+         return anvl_symbol_from_symbol(pos, 2);
+      }
+   }
+
+   // Check for 1-character symbols
+   if (remaining >= 1) {
+      if (anvl_is_symbol(pos, 1)) {
+         return anvl_symbol_from_symbol(pos, 1);
+      }
+   }
+
+   return ANVL_SYM_INVALID;
+}
+
 // --- Consume ---
 static usize source_consume(source self, usize n) {
+   // why are we doing this with a for loop??? for line & col adjustment?
+   // just make sure our pos + n doesn't exceed the buffer end and then
+   // do a single add to pos. but how do we adjust line & col then?
+   // we have to scan the consumed characters for newlines anyway...
    for (usize i = 0; i < n; i++) {
       if (source_is_eof(self))
          break;
@@ -247,16 +304,15 @@ static usize source_scan_block_comment_length(source self, usize offset) {
 
 // --- Whitespace & comments ---
 static usize source_skip_whitespace_and_comments(source self) {
-   usize len = 0;
    while (true) {
-      usize ws = source_scan_whitespace_length(self, len);
-      usize line_comment = source_scan_line_comment_length(self, len + ws);
-      usize block_comment = source_scan_block_comment_length(self, len + ws + line_comment);
+      usize ws = source_scan_whitespace_length(self, 0);
+      usize line_comment = source_scan_line_comment_length(self, ws);
+      usize block_comment = source_scan_block_comment_length(self, ws + line_comment);
       if (ws + line_comment + block_comment == 0)
          break;
-      len += ws + line_comment + block_comment;
+      source_consume(self, ws + line_comment + block_comment);
    }
-   return len;
+   return self->pos;
 }
 
 // --- Shebang ---
@@ -267,8 +323,7 @@ static bool source_is_shebang(source self) {
 
 // --- Dialect parsing ---
 static anvl_dialect source_parse_dialect(source self, anvl_dialect hint) {
-   usize ws_len = source_skip_whitespace_and_comments(self);
-   source_consume(self, ws_len);
+   source_skip_whitespace_and_comments(self);
 
    if (source_is_shebang(self)) {
       if (source_match_length(self, "#!aml", 5) == 5) {
@@ -313,7 +368,10 @@ const anvl_source_i Source = {
     .is_hex_digit = source_is_hex_digit,
     .is_identifier_start = source_is_identifier_start,
     .is_identifier_part = source_is_identifier_part,
+    .is_operator = source_is_operator,
+    .is_symbol = source_is_symbol,
     .consume = source_consume,
+    .substring = source_substring,
     .skip_whitespace_and_comments = source_skip_whitespace_and_comments,
     .is_shebang = source_is_shebang,
     .parse_dialect = source_parse_dialect,

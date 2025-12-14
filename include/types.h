@@ -55,8 +55,20 @@ typedef enum {
    ANVL_VALUE_SCALAR,
    ANVL_VALUE_OBJECT,
    ANVL_VALUE_ARRAY,
-   ANVL_VALUE_TUPLE
+   ANVL_VALUE_TUPLE,
+   ANVL_VALUE_BLOB
 } anvl_value_type;
+
+/* ------------------------------------------------------------------ */
+/* Attribute Structure                                               */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_attribute *attribute;
+struct anvl_attribute {
+   usize key_pos;   // key position in source
+   usize key_len;   // key length
+   usize value_pos; // value position (0 if no value)
+   usize value_len; // value length (0 if no value)
+};
 
 /* ------------------------------------------------------------------ */
 /* Statement Structure                                               */
