@@ -35,19 +35,48 @@
 #define ANVIL_BUILD_CANDIDATE "dev" // dev, alpha, beta, rc, stable
 
 /* ------------------------------------------------------------------ */
-/* Dialect: AML vs ASL                                                */
-/* ------------------------------------------------------------------ */
-typedef enum {
-   ANVL_DIALECT_AML,
-   ANVL_DIALECT_ASL
-} anvl_dialect;
-
-/* ------------------------------------------------------------------ */
 /* Constants                                                          */
 /* ------------------------------------------------------------------ */
 #define ANVL_SHEBANG_LEN 5
 #define ANVL_EXT_LEN 4
 #define ANVL_SHEBANG_AML "#!aml"
-#define ANVL_SHEBANG_ASL "#!asl"
-#define ANVL_EXT_AML ".aml"
-#define ANVL_EXT_ASL ".asl"
+/* ------------------------------------------------------------------ */
+/* Statement Types                                                   */
+/* ------------------------------------------------------------------ */
+typedef enum {
+   ANVL_STMT_ASSN, // assignment statement
+   ANVL_STMT_FUNC  // function statement (future use)
+} anvl_stmt_type;
+
+/* ------------------------------------------------------------------ */
+/* Value Types (for expanded VALUE descriptor)                       */
+/* ------------------------------------------------------------------ */
+typedef enum {
+   ANVL_VALUE_SCALAR,
+   ANVL_VALUE_OBJECT,
+   ANVL_VALUE_ARRAY,
+   ANVL_VALUE_TUPLE
+} anvl_value_type;
+
+/* ------------------------------------------------------------------ */
+/* Statement Structure                                               */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_statement *statement;
+struct anvl_statement {
+   anvl_stmt_type type; // statement type
+   usize stmt_len;      // total statement length
+
+   // Identifier info
+   usize ident_pos; // identifier position in source
+   usize ident_len; // identifier length
+
+   // Attributes (optional)
+   usize attribs_len;   // total attributes length (0 if none)
+   usize attribs_count; // number of attributes
+   // Followed by attribs_count pairs of (pos, len) for each attribute
+
+   // Value info
+   anvl_value_type value_type; // type of value
+   usize value_pos;            // value position in source
+   usize value_len;            // value length
+};

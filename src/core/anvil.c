@@ -99,16 +99,59 @@ static anvl_dialect context_dialect(context self) {
    return Source.dialect(self->source);
 }
 
-static void context_dispose(context self) {
-   if (self && self->source) {
-      Source.dispose(self->source);
+static usize context_statement_count(context self) {
+   if (!self)
+      return 0;
+   return self->stmt_list.count;
+}
+
+static statement context_get_statement(context self, usize index) {
+   if (!self || index >= self->stmt_list.count)
+      return NULL;
+   return self->stmt_list.statements[index];
+}
+
+static bool context_add_statement(context self, statement stmt) {
+   if (!self || !stmt)
+      return false;
+
+   // Add to statement list
+   if (self->stmt_list.count >= self->stmt_list.capacity) {
+      usize new_capacity = self->stmt_list.capacity == 0 ? 8 : self->stmt_list.capacity * 2;
+      statement *new_statements = Memory.alloc(sizeof(statement) * new_capacity, false);
+      if (self->stmt_list.statements) {
+         memcpy(new_statements, self->stmt_list.statements, sizeof(statement) * self->stmt_list.count);
+         Memory.dispose(self->stmt_list.statements);
+      }
+      self->stmt_list.statements = new_statements;
+      self->stmt_list.capacity = new_capacity;
    }
-   Memory.dispose(self);
+   self->stmt_list.statements[self->stmt_list.count++] = stmt;
+   return true;
+}
+
+static void context_dispose(context self) {
+   if (self) {
+      if (self->source) {
+         Source.dispose(self->source);
+      }
+      // Dispose statements
+      for (usize i = 0; i < self->stmt_list.count; i++) {
+         Memory.dispose(self->stmt_list.statements[i]);
+      }
+      if (self->stmt_list.statements) {
+         Memory.dispose(self->stmt_list.statements);
+      }
+      Memory.dispose(self);
+   }
 }
 
 const struct anvl_context_i Context = {
     .get_builder = context_get_builder,
     .dialect = context_dialect,
+    .statement_count = context_statement_count,
+    .get_statement = context_get_statement,
+    .add_statement = context_add_statement,
     .dispose = context_dispose,
 };
 

@@ -21,6 +21,7 @@
 #pragma once
 
 #include "constants.h"
+#include "types.h"
 #include <sigcore/types.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -49,7 +50,44 @@ typedef struct anvl_source_i {
    source (*create)(const char *, usize);
    void (*dispose)(source self);
    anvl_dialect (*dialect)(source);
-   // future interrogator methods
+
+   // Position & EOF
+   usize (*position)(source);
+   usize (*line)(source);
+   usize (*column)(source);
+   bool (*is_eof)(source);
+   bool (*is_eof_offset)(source, usize);
+
+   // Character peek
+   char (*peek)(source);
+   char (*peek_offset)(source, usize);
+
+   // String matching (returns length if matches, 0 if not)
+   usize (*match_length)(source, const char *, usize);
+   usize (*match_operator)(source, const char *, usize);
+
+   // Character classification
+   bool (*is_alpha)(char);
+   bool (*is_digit)(char);
+   bool (*is_hex_digit)(char);
+   bool (*is_identifier_start)(char);
+   bool (*is_identifier_part)(char);
+
+   // Consume
+   usize (*consume)(source, usize);
+
+   // Whitespace & comments
+   usize (*skip_whitespace_and_comments)(source);
+
+   // Shebang
+   bool (*is_shebang)(source);
+
+   // Dialect parsing
+   anvl_dialect (*parse_dialect)(source, anvl_dialect);
+
+   // Position management
+   void (*set_position)(source, usize, usize, usize);
+   void (*reset)(source);
 } anvl_source_i;
 extern const anvl_source_i Source;
 
@@ -59,6 +97,12 @@ extern const anvl_source_i Source;
 typedef struct anvl_context_t *context;
 struct anvl_context_t {
    source source;
+   // List of parsed statements
+   struct {
+      statement *statements; // array of statement pointers
+      usize count;           // number of statements
+      usize capacity;        // allocated capacity
+   } stmt_list;
 };
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +125,9 @@ extern anvl_ctx_builder_i CtxBuilder;
 typedef struct anvl_context_i {
    struct anvl_ctx_builder_i *(*get_builder)(void);
    anvl_dialect (*dialect)(context self);
+   usize (*statement_count)(context self);
+   statement (*get_statement)(context self, usize index);
+   bool (*add_statement)(context self, statement stmt);
    void (*dispose)(context self);
 } anvl_context_i;
 extern const anvl_context_i Context;
