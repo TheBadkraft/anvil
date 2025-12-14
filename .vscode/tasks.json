@@ -4,31 +4,129 @@
         {
             "label": "Build libanvil.a (static)",
             "type": "shell",
-            "command": "make -C core libanvil.a",
+            "command": "sh",
+            "args": [
+                "-c",
+                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && ar rcs bin/libanvil.a build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/utils.o"
+            ],
             "group": "build"
         },
         {
             "label": "Build libanvil.so (shared)",
             "type": "shell",
-            "command": "make -C core libanvil.so",
+            "command": "sh",
+            "args": [
+                "-c",
+                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/source.c -o build/source.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && gcc -shared -o bin/libanvil.so build/anvil.o build/parser.o build/resolver.o build/source.o build/types.o build/writer.o build/utils.o"
+            ],
             "group": "build"
         },
         {
             "label": "Build CLI",
             "type": "shell",
-            "command": "make -C core cli",
+            "command": "make",
+            "args": [
+                "cli"
+            ],
             "group": "build"
         },
         {
             "label": "Run Tests",
             "type": "shell",
-            "command": "make -C core test",
+            "command": "make",
+            "args": [
+                "test_anvil"
+            ],
             "group": "test"
         },
         {
             "label": "Clean",
             "type": "shell",
-            "command": "make -C core clean"
+            "command": "make",
+            "args": [
+                "clean"
+            ]
+        },
+        {
+            "label": "gcc: compile active test",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-Wall",
+                "-Wextra",
+                "-g",
+                "-fPIC",
+                "-std=c2x",
+                "-Iinclude",
+                "-Iinclude/test",
+                "-I/usr/include/sigtest",
+                "-I/usr/include/sigcore",
+                "-DTSTDBG",
+                "-c",
+                "${file}",
+                "-o",
+                "build/test/${fileBasenameNoExtension}.o"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "Build test utils.o",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "-c",
+                "mkdir -p build/test && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -Iinclude/test -I/usr/include/sigtest -I/usr/include/sigcore -DTSTDBG -c test/utilities/helpers.c -o build/test/utils.o"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "gcc: link active test",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "build/test/${fileBasenameNoExtension}.o",
+                "bin/libanvil.so",
+                "build/test/utils.o",
+                "-o",
+                "build/test/${fileBasenameNoExtension}",
+                "-lsigcore",
+                "-lstest",
+                "-L/usr/lib",
+                "-Wl,--wrap=malloc",
+                "-Wl,--wrap=free",
+                "-Wl,--wrap=calloc",
+                "-Wl,--wrap=realloc"
+            ],
+            "dependsOn": [
+                "gcc: compile active test",
+                "Build libanvil.so (shared)",
+                "Build test utils.o"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run test_anvil",
+            "type": "shell",
+            "command": "./build/test/test_anvil",
+            "group": "test"
+        },
+        {
+            "label": "Run test_bool",
+            "type": "shell",
+            "command": "./build/test/test_bool",
+            "group": "test"
         }
     ]
 }

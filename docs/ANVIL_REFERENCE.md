@@ -32,43 +32,91 @@
 ## 3. Directory Layout (final, forever)
 
 ```
-anvil-c/
+anvil/
+├── bin/
+├── build/
 ├── include/
 │   └── anvil.h                  ← only public header
 ├── src/
-│   ├── anvil.c                  ← defines the global Anvil interface table
-│   ├── parser.c
-│   ├── types.c
-│   ├── resolver.c
-│   └── writer.c
-├── tests/                       ← 24+ golden .anvl files + C test harness
+│   ├── cli/
+│   ├── core/
+│   │   ├── anvil.c  
+│   │   ├── parser.c
+│   │   ├── types.c
+│   │   ├── resolver.c
+│   │   └── writer.c
+│   ├── include/
+│   ├── samples/				← 6 core .anvl files
+│   ├── test/
+├── tests/                      ← `stest` harness
 ├── samples/
-├── Makefile                     ← GNU Make only (until AnvilBuild exists)
-└── README.md                    ← this document
+└── README.md                   ← this document
 ```
 
 ## 4. Build System (today)
 
 ```make
+.SILENT:
+
+# -----------------------------------------------------------------------------
+# Tools & flags
 CC      = cc
-CFLAGS  = -std=c23 -Wall -Wextra -Werror -O3 -march=native -flto
-CFLAGS += -DANVIL_IMPLEMENTATION    # exactly one .c file
+CFLAGS  = -std=c2x -Wall -Wextra -Werror -O3 -march=native -fPIC -g
+AR      = ar
+ARFLAGS = rcs
 
-all: libanvil.a test
+# -----------------------------------------------------------------------------
+# Directories
+BUILD       = build
+TEST_BUILD  = $(BUILD)/test
+BIN         = bin
 
-libanvil.a: src/*.c
-	$(CC) $(CFLAGS) -c src/*.c
-	$(AR) rcs libanvil.a *.o
+SRC    		= src
+INC         = -I$(SRC)/include
+SRC_TESTS   = $(SRC)/test
+TEST_INC    = -I$(SRC_TESTS)/include $(INC)
 
-test: libanvil.a tests/main.c
-	$(CC) $(CFLAGS) tests/main.c libanvil.a -o anvil_test
-	./anvil_test
+# -----------------------------------------------------------------------------
+# Core source objects
+CORE_OBJS = $(BUILD)/anvil.o     \
+            $(BUILD)/parser.o    \
+            $(BUILD)/types.o     \
+            $(BUILD)/resolver.o  \
+            $(BUILD)/writer.o
+
+$(BUILD) $(BIN) $(TEST_BUILD):
+	@mkdir -p $@
+
+dirs: $(BUILD) $(BIN) $(TEST_BUILD)
+
+# -----------------------------------------------------------------------------
+# Core library (static)
+$(BIN)/libanvil.a: $(CORE_OBJS) | $(BIN)
+	$(AR) $(ARFLAGS) $@ $^
+
+$(BUILD)/%.o: $(SRC)/core/%.c | dirs
+	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+
+# -----------------------------------------------------------------------------
+# CLI executable
+$(BIN)/anvil: $(SRC)/cli/main.c $(BIN)/libanvil.a | $(BIN)
+	$(CC) $(CFLAGS) $(INC) $< -L$(BIN) -lanvil -o $@
+
+$(BIN)/test_%: $(TEST_BUILD)/test_%.o $(BIN)/libanvil.a $(TEST_BUILD)/utils.o | $(BIN)
+	$(CC) $(CFLAGS) $(TEST_INC) $^ -L$(BIN) -lanvil -lstest -o $@
+
+$(TEST_BUILD)/test_%.o: $(SRC_TESTS)/test_%.c | $(TEST_BUILD)
+	$(CC) $(CFLAGS) $(TEST_INC) -c $< -o $@
 
 clean:
-	rm -f *.o libanvil.a anvil_test
+	rm -f $(BUILD)/*.o $(BUILD)/*.a $(BUILD)/*.so
+	rm -f $(TEST_BUILD)/*.o
+	rm -f $(BIN)/*
+
+.PHONY: all dirs welcome test clean
 ```
 
-## 5. The One True Public Header (include/anvil.h)
+## 5. The Public Header (include/anvil.h)
 
 ```c
 // include/anvil.h
@@ -120,7 +168,12 @@ struct anvil_interface {
     anvil_root (*parse_file)(const char* path);  // auto-detects dialect
 
     void       (*root_destroy)(anvil_root root);
+};
 
+/* The Anvil interface */
+extern const anvil_interface Anvil;
+
+//  other APIs to be implemented ...
     /* Root */
     size_t     (*root_node_count)(anvil_root root);
     anvil_node (*root_node_at)(anvil_root root, size_t index);
@@ -170,10 +223,6 @@ struct anvil_interface {
     void        (*resolve)(anvil_root root, const anvil_resolver* resolver);
     bool        (*write_to_file)(anvil_root root, const char* path);
     bool        (*write_to_buffer)(anvil_root root, char* buf, size_t* out_len);
-};
-
-/* The Anvil interface */
-extern const anvil_interface Anvil;
 ```
 
 ## 6. Dialect Rules (parser behaviour)

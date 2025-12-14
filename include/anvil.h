@@ -1,0 +1,102 @@
+/*
+ * Copyright (c) 2025 Quantum Override. All rights reserved.
+ *
+ * This software is proprietary and confidential. Unauthorized copying,
+ * distribution, modification, or use of this software, via any medium,
+ * is strictly prohibited without express written permission from the
+ * copyright holder.
+ *
+ * SPDX-License-Identifier: Proprietary
+ * ------------------------------------------------------------------
+ * anvil.h - Public API for Anvil
+ * ------------------------------------------------------------------
+ * Author: BadKraft
+ * Created: 2025-12-03
+ * File: include/anvil.h
+ * ------------------------------------------------------------------
+ * Description:
+ * This header defines the public API for the Anvil library, which
+ * provides functionality for loading and managing AML/ASL code.
+ */
+#pragma once
+
+#include "constants.h"
+#include <sigcore/types.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+/* ------------------------------------------------------------------ */
+/* Source structure - a source interface `anvl_source_i` for interrogators */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_source_t *source;
+struct anvl_source_t {
+   // farray-compatible buffer structure
+   struct {
+      void *bucket; // pointer to first element (raw bytes)
+      void *end;    // one past allocated memory
+   } buffer;
+   anvl_dialect dialect;
+   usize stride; // size of each element in bytes (1 for byte arrays)
+   usize pos;
+   usize line;
+   usize col;
+};
+/* ------------------------------------------------------------------ */
+/* Source Interface - for interrogating source content               */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_source_i {
+   source (*create)(const char *, usize);
+   void (*dispose)(source self);
+   anvl_dialect (*dialect)(source);
+   // future interrogator methods
+} anvl_source_i;
+extern const anvl_source_i Source;
+
+/* ------------------------------------------------------------------ */
+/* Context – encapsulates source and state                            */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_context_t *context;
+struct anvl_context_t {
+   source source;
+};
+
+/* ------------------------------------------------------------------ */
+/* Context Builder Interface                                          */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_ctx_builder_i {
+   anvl_dialect dialect;
+   source source;
+   void (*set_dialect)(struct anvl_ctx_builder_i *self, anvl_dialect dialect);
+   void (*set_source)(struct anvl_ctx_builder_i *self, const char *source, usize len);
+   bool (*load_file)(struct anvl_ctx_builder_i *self, const char *filepath);
+   context (*build)(struct anvl_ctx_builder_i *self);
+   void (*dispose)(struct anvl_ctx_builder_i *self);
+} anvl_ctx_builder_i;
+extern anvl_ctx_builder_i CtxBuilder;
+
+/* ------------------------------------------------------------------ */
+/* Context Interface                                                  */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_context_i {
+   struct anvl_ctx_builder_i *(*get_builder)(void);
+   anvl_dialect (*dialect)(context self);
+   void (*dispose)(context self);
+} anvl_context_i;
+extern const anvl_context_i Context;
+
+/* ------------------------------------------------------------------ */
+/* Opaque root handle – will be created by Anvil.load                 */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_root_t *root;
+
+/* ------------------------------------------------------------------ */
+/* The global Anvil interface                                         */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_i {
+   root (*load)(const char *filepath);
+   root (*read)(const char *source, usize len);
+   void (*dispose)(root root);
+   void (*cleanup)(void);
+} anvl_i;
+extern const anvl_i Anvil;

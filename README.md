@@ -26,11 +26,10 @@ This repository contains the **reference implementation of Anvil in pure C**, wi
 ## Repository Structure
 
 ```
-Anvil/                     ← this repo (private)
-├── core/                  ← pure C reference implementation (Anvil)
+anvil/                     ← this repo (private)
+├── src/                  ← pure C reference implementation (Anvil)
 │   ├── include/anvil.h
-│   ├── src/
-│   └── Makefile
+│   ├── core/
 ├── bindings/
 │   ├── Anvil.J/           ← Java 21+ binding (current production)
 │   ├── Anvil.CS/          ← C# / .NET 8 binding
@@ -39,6 +38,7 @@ Anvil/                     ← this repo (private)
 │   └── Anvil.R/           ← Rust binding
 ├── spec/                  ← formal grammar, examples, golden files
 ├── tools/                 ← AnvilBuild (future), minifier, validator
+├── Makefile
 └── README.md              ← you are here
 ```
 

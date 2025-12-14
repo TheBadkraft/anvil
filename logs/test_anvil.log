@@ -1,0 +1,15 @@
+[1] Anvil Entry API          :   4 :         2025-12-14  08:20:20
+=================================================================
+Running: Anvil Load                              1.191 us  [PASS]
+Running: Anvil Read                              0.460 us  [PASS]
+Running: Anvil Dispose                           0.367 us  [PASS]
+Running: Context Get Builder                     0.151 us  [PASS]
+=================================================================
+[1]     TESTS=  4        PASS=  4        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report =================================
+Memory clean — all 3 allocations freed.
+
+
+  Total mallocs:                3
+  Total frees:                  3

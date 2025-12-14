@@ -1,0 +1,13 @@
+[1] Source Interface         :   2 :         2025-12-13  18:26:09
+=================================================================
+Running: Source Dialect AML Shebang              0.986 us  [PASS]
+Running: Source Dialect Invalid Shebang          0.342 us  [PASS]
+=================================================================
+[1]     TESTS=  2        PASS=  2        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report =================================
+Memory clean — all 2 allocations freed.
+
+
+  Total mallocs:                2
+  Total frees:                  2

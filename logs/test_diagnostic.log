@@ -1,0 +1,37 @@
+[1] Memory Diagnostic        :   1 :         2025-12-14  08:14:15
+=================================================================
+Running memory leak diagnostic...
+Test 1: Empty source
+  [DIAG] Allocating source struct...
+  [DIAG] Source struct allocated: 0x606d1a057aa0
+  [DIAG] No data to allocate buffer for
+  [DIAG] Setting buffer pointers: bucket=(nil), end=(nil)
+  Created empty source successfully
+  [DISPOSE] Disposing source: 0x606d1a057aa0
+  [DISPOSE] No buffer to free
+  [DISPOSE] Disposing source struct
+  Disposed empty source
+Test 2: Source with data
+  [DIAG] Allocating source struct...
+  [DIAG] Source struct allocated: 0x606d1a057aa0
+  [DIAG] Allocating buffer for 24 bytes...
+  [DIAG] Buffer allocated: 0x606d1a057ae0
+  [DIAG] Copying 23 bytes to buffer...
+  [DIAG] Data copied successfully
+  [DIAG] Setting buffer pointers: bucket=0x606d1a057ae0, end=0x606d1a057af7
+  Created source with data successfully
+  [DISPOSE] Disposing source: 0x606d1a057aa0
+  [DISPOSE] Freeing buffer: 0x606d1a057ae0
+  [DISPOSE] Disposing source struct
+  Disposed source with data
+Diagnostic complete - check memory state
+Running: Memory Leak Diagnostic                 42.688 us  [PASS]
+=================================================================
+[1]     TESTS=  1        PASS=  1        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report =================================
+Memory clean — all 1 allocations freed.
+
+
+  Total mallocs:                1
+  Total frees:                  1

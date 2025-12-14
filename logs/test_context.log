@@ -1,0 +1,19 @@
+[1] Context Interface        :   7 :         2025-12-14  08:20:06
+=================================================================
+Running: Ctx: Get Builder                        0.393 us  [PASS]
+Running: Ctx Bldr: Default Dialect ASL           1.810 us  [PASS]
+Running: Ctx Bldr: Set Dialect AML               0.440 us  [PASS]
+Running: Ctx Bldr: Set Dialect ASL               0.291 us  [PASS]
+Running: Ctx Bldr: Set Source                    0.740 us  [PASS]
+Running: Ctx Bldr: Chain                         0.526 us  [PASS]
+Loading file: test/samples/shebang.anvl
+Running: Ctx Bldr: Load File Shebang            16.267 us  [PASS]
+=================================================================
+[1]     TESTS=  7        PASS=  7        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report =================================
+Memory clean — all 16 allocations freed.
+
+
+  Total mallocs:                16
+  Total frees:                  16
