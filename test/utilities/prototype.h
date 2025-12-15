@@ -41,7 +41,7 @@ struct stmt_buffer {
 #define PTR_BASE(sb) ((void *)(uintptr_t)(sb)->buffer[5])
 #define PTR_ATTRIBS(sb) ((void *)(uintptr_t)(sb)->buffer[6])
 #define VALUE_TYPE(sb) ((anvl_value_type)(sb)->buffer[7])
-#define PTR_VALUE(sb)       ((void*)(uintptr_t)(sb)->buffer[8])
+#define PTR_VALUE(sb) ((void *)(uintptr_t)(sb)->buffer[8])
 
 /* ------------------------------------------------------------------ */
 /* Sub-Buffer Formats                                                */
