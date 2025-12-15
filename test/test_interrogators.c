@@ -184,6 +184,43 @@ static void test_position_management(void) {
    Source.dispose(src);
 }
 
+// Test operator and symbol classification
+static void test_operator_symbol_classification(void) {
+   // Test operators
+   source src1 = Source.create(":=", 2);
+   Assert.isTrue(Source.is_operator(src1) == ANVL_OP_ASSIGN, ":= should be ASSIGN operator");
+   Source.dispose(src1);
+
+   source src2 = Source.create("=", 1);
+   Assert.isTrue(Source.is_operator(src2) == ANVL_OP_EQUAL, "= should be EQUAL operator");
+   Source.dispose(src2);
+
+   source src3 = Source.create("=>", 2);
+   Assert.isTrue(Source.is_operator(src3) == ANVL_OP_ROCKET, "=> should be ROCKET operator");
+   Source.dispose(src3);
+
+   source src4 = Source.create("hello", 5);
+   Assert.isTrue(Source.is_operator(src4) == ANVL_OP_INVALID, "hello should not be an operator");
+   Source.dispose(src4);
+
+   // Test symbols
+   source src5 = Source.create("@", 1);
+   Assert.isTrue(Source.is_symbol(src5) == ANVL_SYM_AT, "@ should be AT symbol");
+   Source.dispose(src5);
+
+   source src6 = Source.create("{", 1);
+   Assert.isTrue(Source.is_symbol(src6) == ANVL_SYM_L_BRACE, "{ should be L_BRACE symbol");
+   Source.dispose(src6);
+
+   source src7 = Source.create("..", 2);
+   Assert.isTrue(Source.is_symbol(src7) == ANVL_SYM_DOT_DOT, ".. should be DOT_DOT symbol");
+   Source.dispose(src7);
+
+   source src8 = Source.create("xyz", 3);
+   Assert.isTrue(Source.is_symbol(src8) == ANVL_SYM_INVALID, "xyz should not be a symbol");
+   Source.dispose(src8);
+}
+
 __attribute__((constructor)) static void register_test_interrogators(void) {
    testset("Source Interrogators", set_config, set_teardown);
 
@@ -191,6 +228,7 @@ __attribute__((constructor)) static void register_test_interrogators(void) {
    testcase("Character Peek", test_peek);
    testcase("String Matching", test_match_length);
    testcase("Character Classification", test_character_classification);
+   testcase("Operator & Symbol Classification", test_operator_symbol_classification);
    testcase("Consume", test_consume);
    testcase("Whitespace & Comments", test_whitespace_and_comments);
    testcase("Shebang Detection", test_shebang);

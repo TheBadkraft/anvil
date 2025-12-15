@@ -52,7 +52,6 @@ spawn_points := [
     [0.0, 72.0, 0.0, 180.0, -20.0]
 ]
 
-/*
 chunks := [
     (0, 0),
     (1, 0),
@@ -67,17 +66,16 @@ entities := [
 ]
 
 settings := [
-    default := {
+    {
         resolution := (800, 600),
         console := false,
         volume := 5,
         bonus_chest := false
     },
-    custom := {
+    {
         resolution := (1920, 1080),
         console := true,
         volume := 7,
         bonus_chest := true
     }
 ]
-*/

@@ -34,6 +34,9 @@ CORE_OBJS = $(BUILD)/anvil.o     \
             $(BUILD)/resolver.o  \
             $(BUILD)/writer.o    \
             $(BUILD)/source.o    \
+            $(BUILD)/operators.o \
+            $(BUILD)/symbols.o   \
+            $(BUILD)/errors.o    \
             $(BUILD)/utils.o
 
 # -----------------------------------------------------------------------------

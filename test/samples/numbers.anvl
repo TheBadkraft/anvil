@@ -1,0 +1,32 @@
+# Sample demonstrating various numeric formats in Anvil
+
+# Decimal integers
+player_health := 100
+enemy_damage := -50
+zero_score := 0
+
+# Floating point numbers
+pi_value := 3.14159
+scientific := 1.23e-4
+large_float := 123456.789
+
+# Hex color values
+primary_color := #FFAA00
+secondary_color := #ABC
+
+# 0x prefixed hex values
+hex_byte := 0xFF
+hex_word := 0x1234
+hex_dword := 0xDEADBEEF
+
+# Binary values
+binary_ten := 0b1010
+binary_flags := 0b11110000
+
+# 0h prefixed byte arrays (hex digits)
+byte_data := 0hDEADBEEFCAFE
+rgb_bytes := 0hFF00FF
+
+# Large numbers
+max_int := 999999999
+min_int := -999999999

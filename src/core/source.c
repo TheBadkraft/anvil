@@ -24,9 +24,10 @@
 #include <string.h>
 
 // Forward declarations for functions used in source_create
-static usize source_skip_whitespace_and_comments(source self);
-static usize source_consume(source self, usize n);
-static char *source_substring(source self, usize start, usize len);
+static usize source_skip_whitespace_and_comments(source);
+static anvl_dialect source_parse_dialect(source, anvl_dialect);
+static usize source_consume(source, usize);
+static char *source_substring(source, usize, usize);
 
 // --- Substring extraction ---
 static char *source_substring(source self, usize start, usize len) {
@@ -77,21 +78,13 @@ static source source_create(const char *data, usize len) {
 
    // Use interrogators to detect actual dialect from shebang (after whitespace/comments)
    if (data && len > 0) {
-      usize skip_len = source_skip_whitespace_and_comments(src);
-      source_consume(src, skip_len);
+      source_skip_whitespace_and_comments(src);
       if (source_is_shebang(src)) {
-         if (source_match_length(src, "#!aml", 5) == 5) {
-            src->dialect = ANVL_DIALECT_AML;
-         } else if (source_match_length(src, "#!asl", 5) == 5) {
-            src->dialect = ANVL_DIALECT_ASL;
-         }
+         src->dialect = source_parse_dialect(src, src->dialect);
       }
       // do not reset position after shebang ... prep. why scan the preamble again?
       // in fact, be kind and skip ws/comments
-      skip_len = source_skip_whitespace_and_comments(src);
-      if (skip_len > 0) {
-         source_consume(src, skip_len);
-      }
+      source_skip_whitespace_and_comments(src);
    }
 
    return src;

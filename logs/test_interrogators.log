@@ -1,21 +1,22 @@
-[1] Source Interrogators     :  10 :         2025-12-14  09:33:34
+[1] Source Interrogators     :  11 :         2025-12-14  11:22:35
 =================================================================
-Running: Position & EOF                          3.219 us  [PASS]
-Running: Character Peek                          0.993 us  [PASS]
-Running: String Matching                         0.949 us  [PASS]
-Running: Character Classification                0.552 us  [PASS]
-Running: Consume                                 0.885 us  [PASS]
-Running: Whitespace & Comments                   1.564 us  [PASS]
-Running: Shebang Detection                       2.505 us  [PASS]
-Running: Dialect Parsing                         1.747 us  [PASS]
-Running: Source Creation Dialect                21.066 us  [PASS]
-Running: Position Management                     0.692 us  [PASS]
+Running: Position & EOF                          2.147 us  [PASS]
+Running: Character Peek                          0.599 us  [PASS]
+Running: String Matching                         0.690 us  [PASS]
+Running: Character Classification                0.447 us  [PASS]
+Running: Operator & Symbol Classification        3.172 us  [PASS]
+Running: Consume                                 0.653 us  [PASS]
+Running: Whitespace & Comments                   1.029 us  [PASS]
+Running: Shebang Detection                       1.517 us  [PASS]
+Running: Dialect Parsing                         1.706 us  [PASS]
+Running: Source Creation Dialect                 1.762 us  [PASS]
+Running: Position Management                     0.571 us  [PASS]
 =================================================================
-[1]     TESTS= 10        PASS= 10        FAIL=  0        SKIP=  0
+[1]     TESTS= 11        PASS= 11        FAIL=  0        SKIP=  0
 
 ===== Memory Allocations Report =================================
-Memory clean — all 31 allocations freed.
+Memory clean — all 47 allocations freed.
 
 
-  Total mallocs:                31
-  Total frees:                  31
+  Total mallocs:                47
+  Total frees:                  47

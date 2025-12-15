@@ -8,8 +8,11 @@
 #include <sigtest/sigtest.h>
 #include <string.h>
 
-// Forward declare the diagnostic function
-void run_memory_diagnostic(void);
+// Include the diagnostic implementation
+#include "utilities/diagnostic.c"
+
+// Forward declare the diagnostic function (now defined above)
+// void run_memory_diagnostic(void);
 
 static void set_config(FILE **logger) {
    // configure logging stream

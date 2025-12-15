@@ -88,7 +88,29 @@ struct anvl_statement {
    // Followed by attribs_count pairs of (pos, len) for each attribute
 
    // Value info
-   anvl_value_type value_type; // type of value
    usize value_pos;            // value position in source
    usize value_len;            // value length
+   anvl_value_type value_type; // type of value
+};
+
+/* ------------------------------------------------------------------ */
+/* Field Structure (for object key-value pairs)                      */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_field *field;
+struct anvl_field {
+   usize key_pos;              // key position in source
+   usize key_len;              // key length
+   usize value_pos;            // value position in source
+   usize value_len;            // value length
+   anvl_value_type value_type; // type of value
+};
+
+/* ------------------------------------------------------------------ */
+/* Value Structure (for array/tuple elements)                        */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_value *value;
+struct anvl_value {
+   anvl_value_type type; // value type
+   usize pos;            // position in source
+   usize len;            // length in source
 };

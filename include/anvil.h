@@ -119,6 +119,18 @@ struct anvl_context_t {
       usize count;           // number of attributes
       usize capacity;        // allocated capacity
    } attr_list;
+   // List of parsed values (for array/tuple elements)
+   struct {
+      value *values;  // array of value pointers
+      usize count;    // number of values
+      usize capacity; // allocated capacity
+   } value_list;
+   // List of parsed fields (for object key-value pairs)
+   struct {
+      field *fields;  // array of field pointers
+      usize count;    // number of fields
+      usize capacity; // allocated capacity
+   } field_list;
 };
 
 /* ------------------------------------------------------------------ */
@@ -147,6 +159,12 @@ typedef struct anvl_context_i {
    usize (*attribute_count)(context self);
    attribute (*get_attribute)(context self, usize index);
    bool (*add_attribute)(context self, attribute attr);
+   usize (*value_count)(context self);
+   value (*get_value)(context self, usize index);
+   bool (*add_value)(context self, value val);
+   usize (*field_count)(context self);
+   field (*get_field)(context self, usize index);
+   bool (*add_field)(context self, field fld);
    void (*dispose)(context self);
    // Parser
    bool (*parse)(context self);

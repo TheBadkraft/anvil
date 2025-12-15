@@ -1,8 +1,8 @@
-[1] Statement Buffers        :   3 :         2025-12-14  09:33:15
+[1] Statement Buffers        :   3 :         2025-12-14  09:40:25
 =================================================================
-Running: Create & Dispose                        2.399 us  [PASS]
-Running: Context Management                      2.050 us  [PASS]
-Running: Statement with Attributes               0.287 us  [PASS]
+Running: Create & Dispose                        4.000 us  [PASS]
+Running: Context Management                      5.867 us  [PASS]
+Running: Statement with Attributes               0.618 us  [PASS]
 =================================================================
 [1]     TESTS=  3        PASS=  3        FAIL=  0        SKIP=  0
 

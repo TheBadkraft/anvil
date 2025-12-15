@@ -46,6 +46,27 @@ static void test_context_get_builder(void) {
    Assert.isNotNull(builder, "Context.get_builder should return a valid builder interface");
 }
 
+static void test_error_handling(void) {
+   // Clear any existing errors
+   Anvil.error_clear();
+   Assert.isFalse(Anvil.error_is_set(), "Should start with no error");
+
+   // Try to build context without source
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   context ctx = builder->build(builder);
+   Assert.isNull(ctx, "Building context without source should fail");
+
+   // Check that error is set
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set after failed build");
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isNotNull((void *)err, "Error state should be available");
+   Assert.isTrue(err->code == ANVL_ERR_BUILDER_NO_SOURCE, "Error code should be BUILDER_NO_SOURCE");
+
+   // Clear error
+   Anvil.error_clear();
+   Assert.isFalse(Anvil.error_is_set(), "Error should be cleared");
+}
+
 __attribute__((constructor)) static void register_test_test(void) {
    testset("Anvil Entry API", set_config, set_teardown);
 
@@ -53,4 +74,5 @@ __attribute__((constructor)) static void register_test_test(void) {
    testcase("Anvil Read", test_anvil_read);
    testcase("Anvil Dispose", test_anvil_dispose);
    testcase("Context Get Builder", test_context_get_builder);
+   testcase("Error Handling", test_error_handling);
 }

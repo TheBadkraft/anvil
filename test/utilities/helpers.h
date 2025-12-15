@@ -17,3 +17,8 @@
 /* Load test sample files by name */
 const char *get_anvl_path(const char *name);
 const char *get_source_path(const char *name);
+
+/* Helper functions for stress tests */
+char *generate_large_nested_structure(void);
+char *generate_deep_nested_structure(void);
+char *fetch_and_convert_real_data(void);

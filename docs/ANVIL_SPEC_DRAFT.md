@@ -43,7 +43,10 @@ bare_ref          → "." ID ( "." | ":" ID )*
 | Type                | Syntax                                 | Example                                              | Notes                                      |
 |---------------------|----------------------------------------|------------------------------------------------------|--------------------------------------------|
 | Number              | [-]digits[.digits][eE[+|-]digits]?     | 50.0, -10, 1.2e-5                                    | Full scientific notation                  |
-| Boolean             | true / false                           | true                                                 |                                            |
+| Binary Integer      | 0b[01]+                               | 0b1010                                               | Binary literals                           |
+| Hex Integer         | 0x[0-9a-fA-F]+                        | 0xFF, 0x123ABC                                        | C-style hex literals                      |
+| Hex Color           | #rrggbb or #rgb                       | #ffaa00, #abc                                         |                                            |
+| Byte Array          | 0h[0-9a-fA-F]+                        | 0hDEADBEEF                                            | Hex-encoded byte sequence                 |
 | Null                | null                                   | null                                                 |                                            |
 | String              | "..." or '...'                         | "iron"                                               |                                            |
 | Interpolated String | $"..." or $'...'                       | title := $"Welcome, {player.name}!"                  | C#-style, consumer resolves                |
