@@ -23,82 +23,93 @@
 /* Statement Buffer Allocation/Free                                   */
 /* ------------------------------------------------------------------ */
 stmt_buffer stmt_buffer_alloc(void) {
-    return Memory.alloc(sizeof(struct stmt_buffer), true);
+   return Memory.alloc(sizeof(struct stmt_buffer), true);
 }
 
 void stmt_buffer_free(stmt_buffer sb) {
-    if (!sb) return;
+   if (!sb)
+      return;
 
-    // Free sub-buffers
-    if (sb->ptr_base) {
-        Memory.dispose(sb->ptr_base);
-    }
-    if (sb->ptr_attribs) {
-        Memory.dispose(sb->ptr_attribs);
-    }
-    if (sb->ptr_value) {
-        Memory.dispose(sb->ptr_value);
-    }
+   // Free sub-buffers
+   void *ptr_base = PTR_BASE(sb);
+   if (ptr_base) {
+      Memory.dispose(ptr_base);
+   }
+   void *ptr_attribs = PTR_ATTRIBS(sb);
+   if (ptr_attribs) {
+      Memory.dispose(ptr_attribs);
+   }
+   void *ptr_value = PTR_VALUE(sb);
+   if (ptr_value) {
+      Memory.dispose(ptr_value);
+   }
 
-    Memory.dispose(sb);
+   Memory.dispose(sb);
 }
 
 /* ------------------------------------------------------------------ */
 /* Header Setters                                                    */
 /* ------------------------------------------------------------------ */
 void stmt_buffer_set_header(stmt_buffer sb, anvl_stmt_type type, usize stmt_start, usize stmt_len,
-                           usize ident_pos, usize ident_len, anvl_value_type value_type) {
-    if (!sb) return;
+                            usize ident_pos, usize ident_len, anvl_value_type value_type) {
+   if (!sb)
+      return;
 
-    sb->type = type;
-    sb->stmt_start = stmt_start;
-    sb->stmt_len = stmt_len;
-    sb->ident_pos = ident_pos;
-    sb->ident_len = ident_len;
-    sb->value_type = value_type;
+   sb->buffer[0] = (usize)type;
+   sb->buffer[1] = stmt_start;
+   sb->buffer[2] = stmt_len;
+   sb->buffer[3] = ident_pos;
+   sb->buffer[4] = ident_len;
+   sb->buffer[7] = (usize)value_type;
 }
 
 /* ------------------------------------------------------------------ */
 /* Sub-Buffer Setters                                                */
 /* ------------------------------------------------------------------ */
 void stmt_buffer_set_base(stmt_buffer sb, usize pos, usize len) {
-    if (!sb) return;
+   if (!sb)
+      return;
 
-    if (sb->ptr_base) {
-        Memory.dispose(sb->ptr_base);
-    }
+   void *old_ptr = PTR_BASE(sb);
+   if (old_ptr) {
+      Memory.dispose(old_ptr);
+   }
 
-    base_buffer *bb = Memory.alloc(sizeof(base_buffer), true);
-    bb->pos = pos;
-    bb->len = len;
-    sb->ptr_base = bb;
+   base_buffer *bb = Memory.alloc(sizeof(base_buffer), true);
+   bb->pos = pos;
+   bb->len = len;
+   sb->buffer[5] = (usize)(uintptr_t)bb;
 }
 
 void stmt_buffer_set_attribs(stmt_buffer sb, usize count, usize len, usize *pairs) {
-    if (!sb || count == 0) return;
+   if (!sb || count == 0)
+      return;
 
-    if (sb->ptr_attribs) {
-        Memory.dispose(sb->ptr_attribs);
-    }
+   void *old_ptr = PTR_ATTRIBS(sb);
+   if (old_ptr) {
+      Memory.dispose(old_ptr);
+   }
 
-    // Allocate for count, len, and 2*count pairs
-    usize total_size = sizeof(attribs_buffer) + (2 * count - 1) * sizeof(usize);
-    attribs_buffer *ab = Memory.alloc(total_size, true);
-    ab->count = count;
-    ab->len = len;
-    memcpy(ab->pairs, pairs, 2 * count * sizeof(usize));
-    sb->ptr_attribs = ab;
+   // Allocate for count, len, and 2*count pairs
+   usize total_size = sizeof(attribs_buffer) + (2 * count - 1) * sizeof(usize);
+   attribs_buffer *ab = Memory.alloc(total_size, true);
+   ab->count = count;
+   ab->len = len;
+   memcpy(ab->pairs, pairs, 2 * count * sizeof(usize));
+   sb->buffer[6] = (usize)(uintptr_t)ab;
 }
 
 void stmt_buffer_set_value(stmt_buffer sb, usize pos, usize len) {
-    if (!sb) return;
+   if (!sb)
+      return;
 
-    if (sb->ptr_value) {
-        Memory.dispose(sb->ptr_value);
-    }
+   void *old_ptr = PTR_VALUE(sb);
+   if (old_ptr) {
+      Memory.dispose(old_ptr);
+   }
 
-    value_buffer *vb = Memory.alloc(sizeof(value_buffer), true);
-    vb->pos = pos;
-    vb->len = len;
-    sb->ptr_value = vb;
+   value_buffer *vb = Memory.alloc(sizeof(value_buffer), true);
+   vb->pos = pos;
+   vb->len = len;
+   sb->buffer[8] = (usize)(uintptr_t)vb;
 }
