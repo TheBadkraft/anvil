@@ -1,47 +1,10 @@
-[1] Parser Tests             :  26 :         2025-12-15  08:26:49
+[1] Parser Tests             :  51 :         2025-12-18  09:35:51
 =================================================================
-Running: Empty Source                            2.740 us  [PASS]
-Running: Simple Assignment                       2.899 us  [PASS]
-Running: Multiple Statements                     3.441 us  [PASS]
-Running: Number Parsing                         14.830 us  [PASS]
-Running: Array Parsing                           3.478 us  [PASS]
-Running: Tuple Parsing                           2.477 us  [PASS]
-Running: Object Parsing                          3.757 us  [PASS]
-Running: Mixed Array                             2.649 us  [PASS]
-Running: Nested Arrays                           3.696 us  [PASS]
-Running: Mixed Tuple                             2.621 us  [PASS]
-Running: Array with Objects                      3.919 us  [PASS]
-Running: Object with Array                       3.241 us  [PASS]
-Running: Moderate Stress Test                   22.757 us  [PASS]
-Running: Arrays Sample                          140.575 us  [PASS]
-[DEBUG]: Unexpected parse failure for assignments.anvl: Expected ':=' after identifier at line 16, col 30
-
-Running: Assignments Sample                     26.814 us  [FAIL]
-[DEBUG]: Unexpected parse failure for attributes.anvl: Expected ':=' after identifier at line 10, col 5
-
-Running: Attributes Sample                      14.729 us  [FAIL]
-[DEBUG]: Unexpected parse failure for inherits.anvl: Missing ',' in attribute block at line 7, col 5
-
-Running: Inherits Sample                        12.354 us  [FAIL]
-[DEBUG]: Unexpected parse failure for modpack.anvl: Expected ':=' after identifier at line 7, col 12
-
-Running: Modpack Sample                         27.416 us  [FAIL]
-[DEBUG]: Unexpected parse failure for objects.anvl: Missing ',' in attribute block at line 6, col 5
-
-Running: Objects Sample                         15.484 us  [FAIL]
-[DEBUG]: Unexpected parse failure for tuples.anvl: Expected ':=' after identifier at line 12, col 11
-
-Running: Tuples Sample                          25.693 us  [FAIL]
-Running: Generic Aurora                         10.992 us  [PASS]
-Running: Boolean and Null Parsing               12.802 us  [PASS]
-Running: Bare Literals                          11.083 us  [PASS]
-Running: Module Attributes                      10.037 us  [PASS]
-Running: Deep Nesting                           19.443 us  [PASS]
-Running: Real World Data                        41.852 us  [PASS]
-=================================================================
-[1]     TESTS= 26        PASS= 20        FAIL=  6        SKIP=  0
-
-===== Memory Allocations Report =================================
-WARNING: MEMORY LEAK — 79 unfreed allocation(s)
-  Total mallocs:                448
-  Total frees:                  369
+Running: Empty Source                            2.129 us  [PASS]
+Running: Simple Assignment                       4.967 us  [PASS]
+Running: Multiple Statements                     5.104 us  [PASS]
+Running: Array Parsing                           4.172 us  [PASS]
+Running: Number Parsing                         18.348 us  [FAIL]
+Running: Boolean and null parsing               12.485 us  [PASS]
+Running: Bare literals                          10.170 us  [PASS]
+Running: Module attributes                       7.722 us  [PASS]

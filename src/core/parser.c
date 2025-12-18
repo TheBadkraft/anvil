@@ -1,547 +1,676 @@
-/*
- * Copyright (c) 2025 Quantum Override. All rights reserved.
- *
- * This software is proprietary and confidential. Unauthorized copying,
- * distribution, modification, or use of this software, via any medium,
- * is strictly prohibited without express written permission from the
- * copyright holder.
- *
- * SPDX-License-Identifier: Proprietary
- * ------------------------------------------------------------------
- * parser.c - Parser implementation for Anvil
- * ------------------------------------------------------------------
- * Author: BadKraft
- * Created: 2025-12-14
- * File: src/core/parser.c
- * ------------------------------------------------------------------
- */
+// New direct-construction parser (builder-free)
+// Parses AML/ASL into context-owned statements/values.
 
 #include "anvil.h"
 #include "errors.h"
+#include "source_internal.h"
+#include "context_internal.h"
+
 #include <sigcore/memory.h>
 #include <string.h>
 
-/* ------------------------------------------------------------------ */
-/* Parser Context Structure                                          */
-/* ------------------------------------------------------------------ */
 typedef struct {
    context ctx;
    source src;
 } parser_ctx;
 
-/* ------------------------------------------------------------------ */
-/* Forward Declarations                                              */
-/* ------------------------------------------------------------------ */
-static void parser_error(anvl_error_code code, usize line, usize col);
+// Forward declarations
+static void parser_error(anvl_error_code code, source s);
+static void dispose_value_tree(value v);
+static void dispose_statement(statement stmt);
 static bool parse_source(parser_ctx *p);
-static bool parse_statement(parser_ctx *p);
-static bool parse_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type);
-static bool parse_attribute_block(parser_ctx *p);
+static bool parse_statement(parser_ctx *p, statement stmt);
+static value parse_value(parser_ctx *p);
+static value parse_object(parser_ctx *p);
+static value parse_array(parser_ctx *p);
+static value parse_tuple(parser_ctx *p);
+static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_count);
+static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type);
+static bool read_identifier(parser_ctx *p, usize *pos, usize *len);
+static attribute *copy_attributes_slice(context ctx, usize start, usize count);
+static field *shrink_field_array(field *fields, usize count);
+static value *shrink_value_array(value *vals, usize count);
 
-/* ------------------------------------------------------------------ */
-/* Public Parser Interface                                           */
-/* ------------------------------------------------------------------ */
 bool anvl_parse(context ctx) {
    if (!ctx || !ctx->source) {
       return false;
    }
 
+   anvl_error_clear();
+
    parser_ctx p = {
        .ctx = ctx,
-       .src = ctx->source};
-
-   // Clear any existing errors
-   anvl_error_clear();
+       .src = ctx->source,
+   };
 
    return parse_source(&p);
 }
 
-/* ------------------------------------------------------------------ */
-/* Parser Implementation                                             */
-/* ------------------------------------------------------------------ */
-static void parser_error(anvl_error_code code, usize line, usize col) {
-   anvl_error_set(code, anvl_error_code_message(code), line, col, __FILE__);
+static void parser_error(anvl_error_code code, source s) {
+   anvl_error_set(code, anvl_error_code_message(code), si_line(s), si_column(s), __FILE__);
+}
+
+static void dispose_value_tree(value v) {
+   if (!v)
+      return;
+   if (v->type == ANVL_VALUE_OBJECT && v->data.object.fields) {
+      for (usize i = 0; i < v->data.object.field_count; i++) {
+         field f = v->data.object.fields[i];
+         if (!f)
+            continue;
+         if (f->attributes)
+            Memory.dispose(f->attributes);
+         dispose_value_tree(f->val);
+         Memory.dispose(f);
+      }
+      Memory.dispose(v->data.object.fields);
+   } else if ((v->type == ANVL_VALUE_ARRAY || v->type == ANVL_VALUE_TUPLE) && v->data.collection.elements) {
+      for (usize i = 0; i < v->data.collection.element_count; i++) {
+         dispose_value_tree(v->data.collection.elements[i]);
+      }
+      Memory.dispose(v->data.collection.elements);
+   }
+   Memory.dispose(v);
+}
+
+static void dispose_statement(statement stmt) {
+   if (!stmt)
+      return;
+   if (stmt->attributes)
+      Memory.dispose(stmt->attributes);
+   dispose_value_tree(stmt->val);
+   Memory.dispose(stmt);
 }
 
 static bool parse_source(parser_ctx *p) {
-   // Skip initial whitespace and comments
-   Source.skip_whitespace_and_comments(p->src);
+   si_skip_whitespace_and_comments(p->src);
 
-   // Parse module attributes
-   while (Source.match_length(p->src, "@[", 2) == 2) {
-      if (!parse_attribute_block(p)) {
+   // Module attributes (prefix only)
+   while (si_match_length(p->src, "@[", 2) == 2) {
+      if (!parse_attribute_block(p, NULL, NULL))
          return false;
-      }
-      Source.skip_whitespace_and_comments(p->src);
+      si_skip_whitespace_and_comments(p->src);
    }
 
-   // Parse statements
-   while (!Source.is_eof(p->src)) {
-      if (!parse_statement(p)) {
+   while (!si_is_eof(p->src)) {
+      // Shebang is illegal after statements
+      if (si_match_length(p->src, "#!", 2) == 2) {
+         parser_error(ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS, p->src);
          return false;
       }
-      Source.skip_whitespace_and_comments(p->src);
+
+      statement stmt = ci_new_statement(p->ctx, ANVL_STMT_ASSN);
+      if (!stmt) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, p->src);
+         return false;
+      }
+
+      if (!parse_statement(p, stmt)) {
+         dispose_statement(stmt);
+         return false;
+      }
+
+      ci_add_statement(p->ctx, stmt);
+      si_skip_whitespace_and_comments(p->src);
+   }
+
+   si_skip_whitespace_and_comments(p->src);
+   if (si_match_length(p->src, "@[", 2) == 2) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_MODULE_ATTRIBUTES, p->src);
+      return false;
    }
 
    return true;
 }
 
-static bool parse_statement(parser_ctx *p) {
-   usize start_pos = Source.position(p->src);
+static bool parse_statement(parser_ctx *p, statement stmt) {
+   source s = p->src;
+   usize start_pos = si_position(s);
 
-   // Parse identifier
-   usize ident_start = Source.position(p->src);
-   usize ident_len = 0;
+   si_skip_whitespace_and_comments(s);
 
-   // Skip whitespace
-   Source.skip_whitespace_and_comments(p->src);
+   usize ident_pos = 0, ident_len = 0;
+   if (!read_identifier(p, &ident_pos, &ident_len))
+      return false;
 
-   // Check for identifier
-   if (!Source.is_identifier_start(Source.peek(p->src))) {
-      parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, Source.line(p->src), Source.column(p->src));
+   si_skip_whitespace_and_comments(s);
+
+   // Statement attributes (optional)
+   usize attrib_start = p->ctx->attr_list.count;
+   while (si_match_length(s, "@[", 2) == 2) {
+      if (!parse_attribute_block(p, NULL, NULL))
+         return false;
+      si_skip_whitespace_and_comments(s);
+   }
+   usize attrib_count = p->ctx->attr_list.count - attrib_start;
+
+   // Optional inheritance base
+   usize base_pos = 0, base_len = 0;
+   bool saw_assign = false;
+   if (si_match_length(s, ":=", 2) == 2) {
+      si_consume(s, 2);
+      saw_assign = true;
+   } else if (si_match_length(s, ":", 1) == 1) {
+      si_consume(s, 1);
+      si_skip_whitespace_and_comments(s);
+      if (!read_identifier(p, &base_pos, &base_len))
+         return false;
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ":=", 2) != 2) {
+         parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
+         return false;
+      }
+      si_consume(s, 2);
+      saw_assign = true;
+   }
+
+   if (!saw_assign) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
       return false;
    }
 
-   // Read identifier
-   while (!Source.is_eof(p->src) && Source.is_identifier_part(Source.peek(p->src))) {
-      Source.consume(p->src, 1);
-      ident_len++;
-   }
+   si_skip_whitespace_and_comments(s);
 
-   if (ident_len == 0) {
-      parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, Source.line(p->src), Source.column(p->src));
+   value val = parse_value(p);
+   if (!val)
+      return false;
+
+   // Validate attribute applicability
+   if (attrib_count > 0 && val->type != ANVL_VALUE_OBJECT && val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE) {
+      dispose_value_tree(val);
+      parser_error(ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE, s);
       return false;
    }
 
-   // Skip whitespace
-   Source.skip_whitespace_and_comments(p->src);
+   // Populate statement fields
+   stmt->meta[STMT_META_TYPE] = (base_len > 0) ? (usize)ANVL_STMT_INHERITANCE : (usize)ANVL_STMT_ASSN;
+   stmt->meta[STMT_META_IDENT_POS] = ident_pos;
+   stmt->meta[STMT_META_IDENT_LEN] = ident_len;
+   stmt->meta[STMT_META_VALUE_TYPE] = (usize)val->type;
+   stmt->meta[STMT_META_LEN] = si_position(s) - start_pos;
 
-   // Check for assignment operator first
-   if (Source.match_operator(p->src, ":=", 2) == 2) {
-      Source.consume(p->src, 2);
-      Source.skip_whitespace_and_comments(p->src);
+   stmt->base[0] = base_pos;
+   stmt->base[1] = base_len;
+
+   if (attrib_count > 0) {
+      stmt->attrib_count = attrib_count;
+      stmt->attributes = copy_attributes_slice(p->ctx, attrib_start, attrib_count);
    } else {
-      // Check for inheritance (optional)
-      usize base_len = 0;
-      if (Source.match_length(p->src, ":", 1) == 1) {
-         Source.consume(p->src, 1);
-         Source.skip_whitespace_and_comments(p->src);
-
-         // Read base identifier
-         while (!Source.is_eof(p->src) && Source.is_identifier_part(Source.peek(p->src))) {
-            Source.consume(p->src, 1);
-            base_len++;
-         }
-
-         if (base_len == 0) {
-            parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, Source.line(p->src), Source.column(p->src));
-            return false;
-         }
-
-         Source.skip_whitespace_and_comments(p->src);
-      }
-
-      // Parse attributes (optional)
-      // TODO: Implement attribute parsing
-
-      // Expect assignment operator
-      if (Source.match_operator(p->src, ":=", 2) != 2) {
-         parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, Source.line(p->src), Source.column(p->src));
-         return false;
-      }
-      Source.consume(p->src, 2);
-
-      Source.skip_whitespace_and_comments(p->src);
+      stmt->attrib_count = 0;
+      stmt->attributes = NULL;
    }
 
-   // Parse value
-   usize value_start, value_len;
-   anvl_value_type value_type;
-   if (!parse_value(p, &value_start, &value_len, &value_type)) {
-      return false;
-   }
+   stmt->val = val;
 
-   // Create statement
-   statement stmt = Memory.alloc(sizeof(struct anvl_statement), true);
-   stmt->type = ANVL_STMT_ASSN;
-   stmt->stmt_len = Source.position(p->src) - start_pos;
-   stmt->ident_pos = ident_start;
-   stmt->ident_len = ident_len;
-   stmt->attribs_len = 0; // TODO: attributes
-   stmt->attribs_count = 0;
-   stmt->value_type = value_type;
-   stmt->value_pos = value_start;
-   stmt->value_len = value_len;
-
-   // Add to context
-   if (!Context.add_statement(p->ctx, stmt)) {
-      Memory.dispose(stmt);
-      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, Source.line(p->src), Source.column(p->src));
-      return false;
+   si_skip_whitespace_and_comments(s);
+   if (si_match_length(s, ",", 1) == 1) {
+      si_consume(s, 1);
    }
 
    return true;
 }
 
-static bool parse_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type) {
-   *start = Source.position(p->src);
+static value parse_value(parser_ctx *p) {
+   source s = p->src;
+   if (si_match_length(s, "{", 1) == 1)
+      return parse_object(p);
+   if (si_match_length(s, "[", 1) == 1)
+      return parse_array(p);
+   if (si_match_length(s, "(", 1) == 1)
+      return parse_tuple(p);
 
-   // Check for different value types
-   if (Source.match_operator(p->src, "{", 1) == 1) {
-      *type = ANVL_VALUE_OBJECT;
-      // Parse object
-      Source.consume(p->src, 1); // consume '{'
+   usize start = 0, len = 0;
+   anvl_value_type type = ANVL_VALUE_SCALAR;
+   if (!parse_scalar_value(p, &start, &len, &type))
+      return NULL;
 
-      // For objects, store fields in field list
-      usize field_start_index = Context.field_count(p->ctx);
-      usize field_count = 0;
+   value v = ci_new_value(p->ctx, type);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   v->data.scalar.pos = start;
+   v->data.scalar.len = len;
+   return v;
+}
 
-      // Skip whitespace after '{'
-      Source.skip_whitespace_and_comments(p->src);
+static value parse_object(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '{'
+   si_skip_whitespace_and_comments(s);
 
-      // Check for empty object
-      if (Source.match_operator(p->src, "}", 1) == 1) {
-         Source.consume(p->src, 1);
-      } else {
-         // Parse object fields
-         while (true) {
-            // Parse field key
-            usize key_start = Source.position(p->src);
-            usize key_len = 0;
+   if (si_peek(s) == '}') {
+      parser_error(ANVL_ERR_PARSER_EMPTY_OBJECT_NOT_ALLOWED, s);
+      return NULL;
+   }
 
-            // Skip whitespace
-            Source.skip_whitespace_and_comments(p->src);
+   value v = ci_new_value(p->ctx, ANVL_VALUE_OBJECT);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
 
-            // Check for identifier start
-            if (!Source.is_identifier_start(Source.peek(p->src))) {
-               parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
+   usize capacity = 4;
+   field *fields = Memory.alloc(sizeof(field) * capacity, true);
+   usize count = 0;
 
-            // Read key identifier
-            while (!Source.is_eof(p->src) && Source.is_identifier_part(Source.peek(p->src))) {
-               Source.consume(p->src, 1);
-               key_len++;
-            }
-
-            if (key_len == 0) {
-               parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-
-            // Skip whitespace after key
-            Source.skip_whitespace_and_comments(p->src);
-
-            // Expect ':='
-            if (Source.match_operator(p->src, ":=", 2) != 2) {
-               parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-            Source.consume(p->src, 2);
-
-            // Skip whitespace after ':='
-            Source.skip_whitespace_and_comments(p->src);
-
-            // Parse field value
-            usize value_start, value_len;
-            anvl_value_type value_type;
-            if (!parse_value(p, &value_start, &value_len, &value_type)) {
-               return false;
-            }
-
-            // Create field entry
-            field fld = Memory.alloc(sizeof(struct anvl_field), true);
-            fld->key_pos = key_start;
-            fld->key_len = key_len;
-            fld->value_pos = value_start;
-            fld->value_len = value_len;
-            fld->value_type = value_type;
-
-            if (!Context.add_field(p->ctx, fld)) {
-               Memory.dispose(fld);
-               parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-
-            field_count++;
-
-            // Skip whitespace after value
-            Source.skip_whitespace_and_comments(p->src);
-
-            // Check for comma or end
-            if (Source.match_operator(p->src, ",", 1) == 1) {
-               Source.consume(p->src, 1);
-               Source.skip_whitespace_and_comments(p->src);
-            } else if (Source.match_operator(p->src, "}", 1) == 1) {
-               Source.consume(p->src, 1);
-               break;
-            } else {
-               parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-         }
+   while (!si_is_eof(s) && si_peek(s) != '}') {
+      usize key_pos = 0, key_len = 0;
+      if (!read_identifier(p, &key_pos, &key_len)) {
+         dispose_value_tree(v);
+         Memory.dispose(fields);
+         return NULL;
       }
 
-      // For objects, return the field info instead of source positions
-      *start = field_start_index; // starting index in field list
-      *len = field_count;         // number of fields
-      return true;
-   } else if (Source.match_operator(p->src, "[", 1) == 1) {
-      *type = ANVL_VALUE_ARRAY;
-      // Parse array
-      Source.consume(p->src, 1); // consume '['
+      si_skip_whitespace_and_comments(s);
 
-      // For now, just find the matching ']'
-      usize element_start_index = Context.value_count(p->ctx);
-      usize element_count = 0;
-
-      // Skip whitespace after '['
-      Source.skip_whitespace_and_comments(p->src);
-
-      // Check for empty array
-      if (Source.match_operator(p->src, "]", 1) == 1) {
-         Source.consume(p->src, 1);
-      } else {
-         // Parse array elements
-         while (true) {
-            // Parse element value
-            usize elem_start, elem_len;
-            anvl_value_type elem_type;
-            if (!parse_value(p, &elem_start, &elem_len, &elem_type)) {
-               return false;
-            }
-
-            // Create value entry for this element
-            value elem_value = Memory.alloc(sizeof(struct anvl_value), true);
-            elem_value->type = elem_type;
-            elem_value->pos = elem_start;
-            elem_value->len = elem_len;
-
-            if (!Context.add_value(p->ctx, elem_value)) {
-               Memory.dispose(elem_value);
-               parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-
-            element_count++;
-
-            // Skip whitespace after element
-            Source.skip_whitespace_and_comments(p->src);
-
-            // Check for comma or end
-            if (Source.match_operator(p->src, ",", 1) == 1) {
-               Source.consume(p->src, 1);
-               Source.skip_whitespace_and_comments(p->src);
-            } else if (Source.match_operator(p->src, "]", 1) == 1) {
-               Source.consume(p->src, 1);
-               break;
-            } else {
-               parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
+      usize attrib_start = p->ctx->attr_list.count;
+      while (si_match_length(s, "@[", 2) == 2) {
+         if (!parse_attribute_block(p, NULL, NULL)) {
+            dispose_value_tree(v);
+            Memory.dispose(fields);
+            return NULL;
          }
+         si_skip_whitespace_and_comments(s);
+      }
+      usize attrib_count = p->ctx->attr_list.count - attrib_start;
+
+      if (si_match_length(s, ":=", 2) != 2) {
+         dispose_value_tree(v);
+         Memory.dispose(fields);
+         parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
+         return NULL;
+      }
+      si_consume(s, 2);
+      si_skip_whitespace_and_comments(s);
+
+      value field_val = parse_value(p);
+      if (!field_val) {
+         dispose_value_tree(v);
+         Memory.dispose(fields);
+         return NULL;
       }
 
-      // For arrays, return the element info instead of source positions
-      *start = element_start_index; // starting index in value list
-      *len = element_count;         // number of elements
-      // For now, just mark the entire array as parsed
-      return true;
-   } else if (Source.match_operator(p->src, "(", 1) == 1) {
-      *type = ANVL_VALUE_TUPLE;
-      // Parse tuple
-      Source.consume(p->src, 1); // consume '('
-
-      // For tuples, store elements in value list
-      usize element_start_index = Context.value_count(p->ctx);
-      usize element_count = 0;
-
-      // Skip whitespace after '('
-      Source.skip_whitespace_and_comments(p->src);
-
-      // Check for empty tuple
-      if (Source.match_operator(p->src, ")", 1) == 1) {
-         Source.consume(p->src, 1);
-      } else {
-         // Parse tuple elements
-         while (true) {
-            // Parse element value
-            usize elem_start, elem_len;
-            anvl_value_type elem_type;
-            if (!parse_value(p, &elem_start, &elem_len, &elem_type)) {
-               return false;
-            }
-
-            // Create value entry for this element
-            value elem_value = Memory.alloc(sizeof(struct anvl_value), true);
-            elem_value->type = elem_type;
-            elem_value->pos = elem_start;
-            elem_value->len = elem_len;
-
-            if (!Context.add_value(p->ctx, elem_value)) {
-               Memory.dispose(elem_value);
-               parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-
-            element_count++;
-
-            // Skip whitespace after element
-            Source.skip_whitespace_and_comments(p->src);
-
-            // Check for comma or end
-            if (Source.match_operator(p->src, ",", 1) == 1) {
-               Source.consume(p->src, 1);
-               Source.skip_whitespace_and_comments(p->src);
-            } else if (Source.match_operator(p->src, ")", 1) == 1) {
-               Source.consume(p->src, 1);
-               break;
-            } else {
-               parser_error(ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE, Source.line(p->src), Source.column(p->src));
-               return false;
-            }
-         }
+      if (count >= capacity) {
+         capacity *= 2;
+         fields = Memory.realloc(fields, sizeof(field) * capacity);
       }
 
-      // For tuples, return the element info instead of source positions
-      *start = element_start_index; // starting index in value list
-      *len = element_count;         // number of elements
-      return true;
-   } else if (Source.match_operator(p->src, "\"", 1) == 1) {
-      *type = ANVL_VALUE_SCALAR;
-      // Parse string content
-      Source.consume(p->src, 1); // consume opening quote
+      field f = ci_new_field(p->ctx);
+      f->key_pos = key_pos;
+      f->key_len = key_len;
+      f->val = field_val;
+      f->attrib_count = attrib_count;
+      f->attributes = (attrib_count > 0) ? copy_attributes_slice(p->ctx, attrib_start, attrib_count) : NULL;
+      fields[count++] = f;
 
-      bool found_closing_quote = false;
-      while (!Source.is_eof(p->src)) {
-         char c = Source.peek(p->src);
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ",", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+      } else if (si_match_length(s, "}", 1) == 1) {
+         break;
+      } else {
+         dispose_value_tree(v);
+         for (usize i = 0; i < count; i++) {
+            if (fields[i]) {
+               if (fields[i]->attributes)
+                  Memory.dispose(fields[i]->attributes);
+               dispose_value_tree(fields[i]->val);
+               Memory.dispose(fields[i]);
+            }
+         }
+         Memory.dispose(fields);
+         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, s);
+         return NULL;
+      }
+   }
+
+   if (si_match_length(s, "}", 1) != 1) {
+      dispose_value_tree(v);
+      for (usize i = 0; i < count; i++) {
+         if (fields[i]) {
+            if (fields[i]->attributes)
+               Memory.dispose(fields[i]->attributes);
+            dispose_value_tree(fields[i]->val);
+            Memory.dispose(fields[i]);
+         }
+      }
+      Memory.dispose(fields);
+      parser_error(ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE, s);
+      return NULL;
+   }
+
+   si_consume(s, 1);
+
+   v->data.object.field_count = count;
+   v->data.object.fields = shrink_field_array(fields, count);
+   return v;
+}
+
+static value parse_array(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '['
+   si_skip_whitespace_and_comments(s);
+
+   if (si_peek(s) == ']') {
+      parser_error(ANVL_ERR_PARSER_EMPTY_ARRAY_NOT_ALLOWED, s);
+      return NULL;
+   }
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_ARRAY);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+
+   usize capacity = 4;
+   value *elements = Memory.alloc(sizeof(value) * capacity, true);
+   usize count = 0;
+
+   while (!si_is_eof(s) && si_peek(s) != ']') {
+      value elem = parse_value(p);
+      if (!elem) {
+         for (usize i = 0; i < count; i++)
+            dispose_value_tree(elements[i]);
+         Memory.dispose(elements);
+         dispose_value_tree(v);
+         return NULL;
+      }
+
+      if (count >= capacity) {
+         capacity *= 2;
+         elements = Memory.realloc(elements, sizeof(value) * capacity);
+      }
+      elements[count++] = elem;
+
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ",", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+      } else if (si_match_length(s, "]", 1) == 1) {
+         break;
+      } else {
+         for (usize i = 0; i < count; i++)
+            dispose_value_tree(elements[i]);
+         Memory.dispose(elements);
+         dispose_value_tree(v);
+         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY, s);
+         return NULL;
+      }
+   }
+
+   if (si_match_length(s, "]", 1) != 1) {
+      for (usize i = 0; i < count; i++)
+         dispose_value_tree(elements[i]);
+      Memory.dispose(elements);
+      dispose_value_tree(v);
+      parser_error(ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE, s);
+      return NULL;
+   }
+
+   si_consume(s, 1);
+
+   v->data.collection.element_count = count;
+   v->data.collection.elements = shrink_value_array(elements, count);
+   return v;
+}
+
+static value parse_tuple(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '('
+   si_skip_whitespace_and_comments(s);
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_TUPLE);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+
+   usize capacity = 4;
+   value *elements = Memory.alloc(sizeof(value) * capacity, true);
+   usize count = 0;
+
+   while (!si_is_eof(s) && si_peek(s) != ')') {
+      value elem = parse_value(p);
+      if (!elem) {
+         for (usize i = 0; i < count; i++)
+            dispose_value_tree(elements[i]);
+         Memory.dispose(elements);
+         dispose_value_tree(v);
+         return NULL;
+      }
+
+      if (count >= capacity) {
+         capacity *= 2;
+         elements = Memory.realloc(elements, sizeof(value) * capacity);
+      }
+      elements[count++] = elem;
+
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ",", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+      } else if (si_peek(s) == ')') {
+         break;
+      } else {
+         for (usize i = 0; i < count; i++)
+            dispose_value_tree(elements[i]);
+         Memory.dispose(elements);
+         dispose_value_tree(v);
+         if (si_is_eof(s))
+            parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
+         else
+            parser_error(ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE, s);
+         return NULL;
+      }
+   }
+
+   if (si_match_length(s, ")", 1) != 1) {
+      for (usize i = 0; i < count; i++)
+         dispose_value_tree(elements[i]);
+      Memory.dispose(elements);
+      dispose_value_tree(v);
+      parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
+      return NULL;
+   }
+
+   si_consume(s, 1);
+
+   v->data.collection.element_count = count;
+   v->data.collection.elements = shrink_value_array(elements, count);
+   return v;
+}
+
+static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type) {
+   source s = p->src;
+   *start = si_position(s);
+   *type = ANVL_VALUE_SCALAR;
+
+   char first = si_peek(s);
+   if (first == '{' || first == '[' || first == '(') {
+      parser_error(ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, s);
+      return false;
+   }
+
+   if (si_match_length(s, "\"", 1) == 1) {
+      si_consume(s, 1); // opening quote
+      bool closed = false;
+      while (!si_is_eof(s)) {
+         char c = si_peek(s);
          if (c == '"') {
-            // Found closing quote
-            Source.consume(p->src, 1);
-            found_closing_quote = true;
+            si_consume(s, 1);
+            closed = true;
             break;
          } else if (c == '\\') {
-            // Handle escape sequence
-            Source.consume(p->src, 1); // consume backslash
-            if (!Source.is_eof(p->src)) {
-               Source.consume(p->src, 1); // consume escaped character
-            }
+            si_consume(s, 1);
+            if (!si_is_eof(s))
+               si_consume(s, 1);
          } else {
-            Source.consume(p->src, 1);
+            si_consume(s, 1);
          }
       }
-
-      // Check if we found the closing quote
-      if (!found_closing_quote) {
-         parser_error(ANVL_ERR_PARSER_UNTERMINATED_STRING, Source.line(p->src), Source.column(p->src));
+      if (!closed) {
+         parser_error(ANVL_ERR_PARSER_UNTERMINATED_STRING, s);
          return false;
       }
-   } else if (Source.match_operator(p->src, "`", 1) == 1) {
+   } else if (si_match_length(s, "@", 1) == 1 || si_match_length(s, "`", 1) == 1) {
       *type = ANVL_VALUE_BLOB;
-      // TODO: Parse blob
-      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, Source.line(p->src), Source.column(p->src));
-      return false;
-   } else {
-      // Parse scalar (number, boolean, null, identifier)
-      *type = ANVL_VALUE_SCALAR;
-
-      // Skip to next whitespace or operator
-      while (!Source.is_eof(p->src)) {
-         char c = Source.peek(p->src);
-         if (c == ' ' || c == '\t' || c == '\n' || c == '\r' ||
-             c == ',' || c == '}' || c == ']' || c == ')') {
-            break;
+      usize attr_len = 0;
+      if (si_match_length(s, "@", 1) == 1) {
+         si_consume(s, 1);
+         while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+            si_consume(s, 1);
+            attr_len++;
          }
-         Source.consume(p->src, 1);
+         if (attr_len == 0) {
+            parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+            return false;
+         }
+      }
+      if (si_peek(s) != '`') {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return false;
+      }
+      si_consume(s, 1); // consume backtick
+      while (!si_is_eof(s)) {
+         if (si_peek(s) == '`')
+            break;
+         si_consume(s, 1);
+      }
+      if (si_peek(s) != '`') {
+         parser_error(ANVL_ERR_PARSER_UNTERMINATED_BLOB, s);
+         return false;
+      }
+      si_consume(s, 1);
+   } else {
+      while (!si_is_eof(s)) {
+         char c = si_peek(s);
+         if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == '}' || c == ']' || c == ')')
+            break;
+         si_consume(s, 1);
       }
    }
 
-   *len = Source.position(p->src) - *start;
+   *len = si_position(s) - *start;
    return true;
 }
 
-static bool parse_attribute_block(parser_ctx *p) {
-   // Consume "@["
-   Source.consume(p->src, 2);
-   Source.skip_whitespace_and_comments(p->src);
+static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_count) {
+   source s = p->src;
+   si_consume(s, 2); // consume "@["
+   si_skip_whitespace_and_comments(s);
 
-   // Check for empty attribute block
-   if (Source.match_length(p->src, "]", 1) == 1) {
-      parser_error(ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK, Source.line(p->src), Source.column(p->src));
+   if (si_match_length(s, "]", 1) == 1) {
+      parser_error(ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK, s);
       return false;
    }
 
-   while (!Source.is_eof(p->src)) {
-      // Parse attribute key
-      usize key_start = Source.position(p->src);
-      usize key_len = 0;
+   usize start = p->ctx->attr_list.count;
 
-      // Read identifier (may contain dots)
-      while (!Source.is_eof(p->src) &&
-             (Source.is_identifier_part(Source.peek(p->src)) || Source.peek(p->src) == '.')) {
-         Source.consume(p->src, 1);
+   while (!si_is_eof(s)) {
+      usize key_pos = si_position(s);
+      usize key_len = 0;
+      while (!si_is_eof(s) && (Source.is_identifier_part(si_peek(s)) || si_peek(s) == '.')) {
+         si_consume(s, 1);
          key_len++;
       }
-
       if (key_len == 0) {
-         parser_error(ANVL_ERR_PARSER_INVALID_ATTRIBUTE, Source.line(p->src), Source.column(p->src));
+         parser_error(ANVL_ERR_PARSER_INVALID_ATTRIBUTE, s);
          return false;
       }
 
-      usize value_start = 0;
-      usize value_len = 0;
-
-      Source.skip_whitespace_and_comments(p->src);
-
-      // Check for optional value
-      if (Source.match_length(p->src, "=", 1) == 1) {
-         Source.consume(p->src, 1);
-         Source.skip_whitespace_and_comments(p->src);
-
-         // Parse scalar value
-         value_start = Source.position(p->src);
-         anvl_value_type value_type;
-         if (!parse_value(p, &value_start, &value_len, &value_type)) {
+      usize value_pos = 0, value_len = 0;
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, "=", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+         value_pos = si_position(s);
+         anvl_value_type vt;
+         if (!parse_scalar_value(p, &value_pos, &value_len, &vt))
             return false;
-         }
-
-         // Attributes must have scalar values
-         if (value_type != ANVL_VALUE_SCALAR) {
-            parser_error(ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, Source.line(p->src), Source.column(p->src));
+         if (vt != ANVL_VALUE_SCALAR) {
+            parser_error(ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, s);
             return false;
          }
       }
 
-      // Create attribute
-      attribute attr = Memory.alloc(sizeof(struct anvl_attribute), true);
-      attr->key_pos = key_start;
+      attribute attr = ci_new_attribute(p->ctx);
+      if (!attr) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return false;
+      }
+      attr->key_pos = key_pos;
       attr->key_len = key_len;
-      attr->value_pos = value_start;
+      attr->value_pos = value_pos;
       attr->value_len = value_len;
+      ci_add_attribute(p->ctx, attr);
 
-      // Add to context
-      if (!Context.add_attribute(p->ctx, attr)) {
-         Memory.dispose(attr);
-         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, Source.line(p->src), Source.column(p->src));
-         return false;
-      }
-
-      Source.skip_whitespace_and_comments(p->src);
-
-      // Check for end of attribute block
-      if (Source.match_length(p->src, "]", 1) == 1) {
-         Source.consume(p->src, 1);
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, "]", 1) == 1) {
+         si_consume(s, 1);
          break;
       }
-
-      // Expect comma
-      if (Source.match_length(p->src, ",", 1) != 1) {
-         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, Source.line(p->src), Source.column(p->src));
+      if (si_match_length(s, ",", 1) != 1) {
+         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, s);
          return false;
       }
-      Source.consume(p->src, 1);
-      Source.skip_whitespace_and_comments(p->src);
+      si_consume(s, 1);
+      si_skip_whitespace_and_comments(s);
    }
 
+   if (out_start)
+      *out_start = start;
+   if (out_count)
+      *out_count = p->ctx->attr_list.count - start;
    return true;
+}
+
+static bool read_identifier(parser_ctx *p, usize *pos, usize *len) {
+   source s = p->src;
+   if (!Source.is_identifier_start(si_peek(s))) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+      return false;
+   }
+   *pos = si_position(s);
+   *len = 0;
+   while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+      si_consume(s, 1);
+      (*len)++;
+   }
+   if (*len == 0) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+      return false;
+   }
+   return true;
+}
+
+static attribute *copy_attributes_slice(context ctx, usize start, usize count) {
+   if (count == 0)
+      return NULL;
+   attribute *attrs = Memory.alloc(sizeof(attribute) * count, true);
+   for (usize i = 0; i < count; i++) {
+      attrs[i] = ctx->attr_list.attributes[start + i];
+   }
+   return attrs;
+}
+
+static field *shrink_field_array(field *fields, usize count) {
+   if (!fields)
+      return NULL;
+   if (count == 0) {
+      Memory.dispose(fields);
+      return NULL;
+   }
+   return Memory.realloc(fields, sizeof(field) * count);
+}
+
+static value *shrink_value_array(value *vals, usize count) {
+   if (!vals)
+      return NULL;
+   if (count == 0) {
+      Memory.dispose(vals);
+      return NULL;
+   }
+   return Memory.realloc(vals, sizeof(value) * count);
 }

@@ -1,19 +1,26 @@
-[1] Context Interface        :   7 :         2025-12-14  08:20:06
+[1] Context Interface        :  12 :         2025-12-16  20:06:35
 =================================================================
-Running: Ctx: Get Builder                        0.393 us  [PASS]
-Running: Ctx Bldr: Default Dialect ASL           1.810 us  [PASS]
-Running: Ctx Bldr: Set Dialect AML               0.440 us  [PASS]
-Running: Ctx Bldr: Set Dialect ASL               0.291 us  [PASS]
-Running: Ctx Bldr: Set Source                    0.740 us  [PASS]
-Running: Ctx Bldr: Chain                         0.526 us  [PASS]
+Running: Ctx: Get Builder                        0.361 us  [PASS]
+Error: Builder has no source to build context from
+Running: Ctx Bldr: Err Null No Source            2.781 us  [PASS]
+Running: Ctx Bldr: Set Source                    1.328 us  [PASS]
 Loading file: test/samples/shebang.anvl
-Running: Ctx Bldr: Load File Shebang            16.267 us  [PASS]
+Running: Ctx Bldr: Load File Shebang            14.791 us  [PASS]
+Loading file: test/samples/generic.aurora
+Running: Ctx Bldr: Load File No Shebang          9.450 us  [PASS]
+Running: Ctx Bldr: Chain                         0.511 us  [PASS]
+Running: Ctx: Statement Operations               1.058 us  [PASS]
+Running: Ctx: Attribute Operations               1.226 us  [PASS]
+Running: Ctx: Parse Basic                        1.695 us  [PASS]
+Running: Ctx: Parse Multiple Statements          1.883 us  [PASS]
+Running: Ctx: Get Statement Bounds               0.882 us  [PASS]
+Running: Ctx: Add Statement Null                 0.519 us  [PASS]
 =================================================================
-[1]     TESTS=  7        PASS=  7        FAIL=  0        SKIP=  0
+[1]     TESTS= 12        PASS= 12        FAIL=  0        SKIP=  0
 
 ===== Memory Allocations Report =================================
-Memory clean — all 16 allocations freed.
+Memory clean — all 45 allocations freed.
 
 
-  Total mallocs:                16
-  Total frees:                  16
+  Total mallocs:                45
+  Total frees:                  45

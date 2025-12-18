@@ -29,11 +29,11 @@ TEST_INC    = -Iinclude/test $(INC) -I/usr/include/sigtest
 # Core source objects
 # -----------------------------------------------------------------------------
 CORE_OBJS = $(BUILD)/anvil.o     \
+            $(BUILD)/context.o   \
             $(BUILD)/parser.o    \
             $(BUILD)/types.o     \
             $(BUILD)/resolver.o  \
             $(BUILD)/writer.o    \
-            $(BUILD)/source.o    \
             $(BUILD)/operators.o \
             $(BUILD)/symbols.o   \
             $(BUILD)/errors.o    \
@@ -42,10 +42,10 @@ CORE_OBJS = $(BUILD)/anvil.o     \
 # -----------------------------------------------------------------------------
 # Ensure build directories exist
 # -----------------------------------------------------------------------------
-$(BUILD) $(BIN) $(TEST_BUILD):
+$(BUILD) $(BIN) $(TEST_BUILD) $(BIN)/obj:
 	@mkdir -p $@
 
-dirs: $(BUILD) $(BIN) $(TEST_BUILD) $(BIN)/obj $(BIN)/obj
+dirs: $(BUILD) $(BIN) $(TEST_BUILD) $(BIN)/obj
 
 # -----------------------------------------------------------------------------
 # Core library (static)

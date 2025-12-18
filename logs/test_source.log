@@ -1,13 +1,33 @@
-[1] Source Interface         :   2 :         2025-12-13  18:26:09
+[1] Source Interface         :  22 :         2025-12-16  19:23:33
 =================================================================
-Running: Source Dialect AML Shebang              0.986 us  [PASS]
-Running: Source Dialect Invalid Shebang          0.342 us  [PASS]
+Running: Create                                  1.639 us  [PASS]
+Running: Is EOF                                  0.550 us  [PASS]
+Running: Is EOF Offset                           0.357 us  [PASS]
+Running: Peek                                    0.326 us  [PASS]
+Running: Peek Offset                             0.283 us  [PASS]
+Running: Match Length                            0.445 us  [PASS]
+Running: Match Operator                          0.289 us  [PASS]
+Running: Is Alpha                                0.153 us  [PASS]
+Running: Is Digit                                0.111 us  [PASS]
+Running: Is Hex Digit                            0.155 us  [PASS]
+Running: Is Identifier Start                     0.127 us  [PASS]
+Running: Is Identifier Part                      0.129 us  [PASS]
+Running: Consume                                 0.405 us  [PASS]
+Running: Substring                               0.679 us  [PASS]
+Running: Skip Whitespace and Comments            0.617 us  [PASS]
+Running: Is Shebang                              0.902 us  [PASS]
+Running: Parse Dialect                           0.733 us  [PASS]
+Running: Set Position                            0.272 us  [PASS]
+Running: Reset                                   0.367 us  [PASS]
+Running: Dialect: AML Shebang                    0.275 us  [PASS]
+Running: Dialect: Invalid Shebang                0.247 us  [PASS]
+Running: Get Position                            0.377 us  [PASS]
 =================================================================
-[1]     TESTS=  2        PASS=  2        FAIL=  0        SKIP=  0
+[1]     TESTS= 22        PASS= 22        FAIL=  0        SKIP=  0
 
 ===== Memory Allocations Report =================================
-Memory clean — all 2 allocations freed.
+Memory clean — all 44 allocations freed.
 
 
-  Total mallocs:                2
-  Total frees:                  2
+  Total mallocs:                44
+  Total frees:                  44

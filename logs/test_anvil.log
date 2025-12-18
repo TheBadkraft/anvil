@@ -1,10 +1,10 @@
-[1] Anvil Entry API          :   5 :         2025-12-15  03:28:53
+[1] Anvil Entry API          :   5 :         2025-12-17  16:47:45
 =================================================================
-Running: Anvil Load                              1.135 us  [PASS]
-Running: Anvil Read                              0.336 us  [PASS]
-Running: Anvil Dispose                           0.325 us  [PASS]
-Running: Context Get Builder                     0.101 us  [PASS]
-Running: Error Handling                          0.795 us  [PASS]
+Running: Anvil Load                              1.109 us  [PASS]
+Running: Anvil Read                              0.354 us  [PASS]
+Running: Anvil Dispose                           0.216 us  [PASS]
+Running: Context Get Builder                   < 0.1 us  [PASS]
+Running: Error Handling                          1.130 us  [PASS]
 =================================================================
 [1]     TESTS=  5        PASS=  5        FAIL=  0        SKIP=  0
 

@@ -44,8 +44,9 @@
 /* Statement Types                                                   */
 /* ------------------------------------------------------------------ */
 typedef enum {
-   ANVL_STMT_ASSN, // assignment statement
-   ANVL_STMT_FUNC  // function statement (future use)
+   ANVL_STMT_ASSN,        // assignment statement
+   ANVL_STMT_INHERITANCE, // inheritance statement
+   ANVL_STMT_FUNC         // function statement (future use)
 } anvl_stmt_type;
 
 /* ------------------------------------------------------------------ */
@@ -60,9 +61,25 @@ typedef enum {
 } anvl_value_type;
 
 /* ------------------------------------------------------------------ */
+/* Statement Metadata Indices                                        */
+/* ------------------------------------------------------------------ */
+#define STMT_META_TYPE 0
+#define STMT_META_LEN 1
+#define STMT_META_IDENT_POS 2
+#define STMT_META_IDENT_LEN 3
+#define STMT_META_VALUE_TYPE 4
+
+/* ------------------------------------------------------------------ */
+/* Forward declarations for recursive structures                      */
+/* ------------------------------------------------------------------ */
+typedef struct anvl_statement *statement;
+typedef struct anvl_field *field;
+typedef struct anvl_value *value;
+typedef struct anvl_attribute *attribute;
+
+/* ------------------------------------------------------------------ */
 /* Attribute Structure                                               */
 /* ------------------------------------------------------------------ */
-typedef struct anvl_attribute *attribute;
 struct anvl_attribute {
    usize key_pos;   // key position in source
    usize key_len;   // key length
@@ -71,46 +88,57 @@ struct anvl_attribute {
 };
 
 /* ------------------------------------------------------------------ */
-/* Statement Structure                                               */
+/* Statement Structure (simplified with direct ownership)            */
 /* ------------------------------------------------------------------ */
-typedef struct anvl_statement *statement;
 struct anvl_statement {
-   anvl_stmt_type type; // statement type
-   usize stmt_len;      // total statement length
+   usize meta[9]; // metadata buffer
+   usize base[2]; // base position and length
 
-   // Identifier info
-   usize ident_pos; // identifier position in source
-   usize ident_len; // identifier length
+   // Statement attributes
+   usize attrib_count;
+   attribute *attributes;
 
-   // Attributes (optional)
-   usize attribs_len;   // total attributes length (0 if none)
-   usize attribs_count; // number of attributes
-   // Followed by attribs_count pairs of (pos, len) for each attribute
-
-   // Value info
-   usize value_pos;            // value position in source
-   usize value_len;            // value length
-   anvl_value_type value_type; // type of value
+   // Statement value (nested)
+   value val;
 };
 
 /* ------------------------------------------------------------------ */
 /* Field Structure (for object key-value pairs)                      */
 /* ------------------------------------------------------------------ */
-typedef struct anvl_field *field;
 struct anvl_field {
-   usize key_pos;              // key position in source
-   usize key_len;              // key length
-   usize value_pos;            // value position in source
-   usize value_len;            // value length
-   anvl_value_type value_type; // type of value
+   usize key_pos; // key position in source
+   usize key_len; // key length
+
+   // Field attributes (direct ownership)
+   usize attrib_count;
+   attribute *attributes;
+
+   // Field value (nested)
+   value val;
 };
 
 /* ------------------------------------------------------------------ */
-/* Value Structure (for array/tuple elements)                        */
+/* Value Structure (recursive for nested structures)                */
 /* ------------------------------------------------------------------ */
-typedef struct anvl_value *value;
 struct anvl_value {
    anvl_value_type type; // value type
-   usize pos;            // position in source
-   usize len;            // length in source
+   union {
+      // Scalar values (string, number, etc.)
+      struct {
+         usize pos;
+         usize len;
+      } scalar;
+
+      // Object values
+      struct {
+         usize field_count;
+         field *fields;
+      } object;
+
+      // Array/Tuple values
+      struct {
+         usize element_count;
+         value *elements;
+      } collection;
+   } data;
 };

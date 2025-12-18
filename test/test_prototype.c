@@ -16,8 +16,8 @@
  * ------------------------------------------------------------------
  */
 
-#include "anvil.h"
 #include "../test/utilities/prototype.h"
+#include "anvil.h"
 #include <sigtest/sigtest.h>
 
 // Test basic allocation and access
