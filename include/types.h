@@ -57,8 +57,7 @@ typedef enum {
    ANVL_VALUE_OBJECT,
    ANVL_VALUE_ARRAY,
    ANVL_VALUE_TUPLE,
-   ANVL_VALUE_BLOB,
-   ANVL_VALUE_TAG // For @tag annotations in blobs (stored as first element in blob collection)
+   ANVL_VALUE_BLOB
 } anvl_value_type;
 
 /* ------------------------------------------------------------------ */
@@ -118,8 +117,7 @@ struct anvl_attr_meta {
  * For scalars: pos/len in source only
  * For arrays/tuples: pos/len in source + array of element_meta
  * For objects: pos/len in source + field_list indices
- * For blobs: Treated as 2-element collection [ANVL_VALUE_TAG, ANVL_VALUE_BLOB]
- *           Each element tracked in element_meta with source position/length
+ * For blobs: pos/len in source (tag stored as attribute, not in value metadata)
  * ================================================================ */
 struct anvl_element_meta {
    anvl_value_type type; // type of this element

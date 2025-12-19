@@ -7,6 +7,7 @@
 #include "source_internal.h"
 
 #include <sigcore/memory.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef struct {
@@ -317,27 +318,27 @@ static value parse_value(parser_ctx *p) {
 }
 
 /* ========================================================================
- * parse_blob() - Parse blob values as 2-element collections
+ * parse_blob() - Parse blob values as optional-tag attributed scalars
  *
- * Blobs like @json`...` are parsed as:
- *   Element 0: ANVL_VALUE_TAG with @json identifier
- *   Element 1: ANVL_VALUE_BLOB with backtick content
+ * Blobs with tags like @json`...` are parsed as 2-element collections:
+ *  [0] Tag metadata: pos/len of @identifier in source (type=BLOB)
+ *  [1] Content: pos/len of backtick content (type=BLOB)
  *
- * Bare blobs like `...` have:
- *   Element 0: Empty TAG (len=0, pos=0)
- *   Element 1: ANVL_VALUE_BLOB with content
+ * Bare blobs like `...` are parsed as 1-element collections:
+ *  [0] Content: pos/len of backtick content (type=BLOB)
+ *
+ * Consumer logic: if element_count == 2, element[0] holds tag metadata
  * ======================================================================== */
 static value parse_blob(parser_ctx *p) {
    source s = p->src;
 
-   // Create an array-like collection to hold [TAG, BLOB] as elements
    value blob_collection = ci_new_value(p->ctx, ANVL_VALUE_ARRAY);
    if (!blob_collection) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }
 
-   // Allocate space for element type and position tracking
+   // Allocate for up to 2 elements (tag + content)
    anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 2, true);
    if (!elem_types) {
       Memory.dispose(blob_collection);
@@ -345,41 +346,40 @@ static value parse_blob(parser_ctx *p) {
       return NULL;
    }
 
-   usize blob_start = si_position(s);
-   usize tag_pos = blob_start;
-   usize tag_len = 0;
+   usize element_count = 0;
 
-   // Element 0: TAG (if present)
-   elem_types[0] = ANVL_VALUE_TAG;
+   // Check for optional @tag
    if (si_match_length(s, "@", 1) == 1) {
-      tag_pos = si_position(s);
-      si_consume(s, 1); // consume @
-      tag_len = 0;
+      // Element [0]: Tag metadata (not a separate value type, just BLOB-related metadata)
+      elem_types[0] = ANVL_VALUE_BLOB; // Mark as blob-related (no separate type needed)
+      si_consume(s, 1);                // consume @
+
+      usize tag_len = 0;
       while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
          si_consume(s, 1);
          tag_len++;
       }
+
       if (tag_len == 0) { // Only @ with no identifier
          parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
          Memory.dispose(elem_types);
          Memory.dispose(blob_collection);
          return NULL;
       }
+      element_count = 1; // We have tag as element [0], now add content as element [1]
    }
-   // else: bare blob, TAG has len=0
 
-   // Element 1: BLOB content (between backticks)
+   // Element [1 or 0]: BLOB content (between backticks)
    if (si_peek(s) != '`') {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
       Memory.dispose(elem_types);
       Memory.dispose(blob_collection);
       return NULL;
    }
-   elem_types[1] = ANVL_VALUE_BLOB;
-   usize blob_pos = si_position(s);
+
+   elem_types[element_count] = ANVL_VALUE_BLOB;
    si_consume(s, 1); // consume opening backtick
 
-   usize blob_content_start = si_position(s);
    while (!si_is_eof(s)) {
       if (si_peek(s) == '`')
          break;
@@ -392,12 +392,14 @@ static value parse_blob(parser_ctx *p) {
       Memory.dispose(blob_collection);
       return NULL;
    }
-   usize blob_len = si_position(s) - blob_pos + 1; // Include both backticks
-   si_consume(s, 1);                               // consume closing backtick
+   si_consume(s, 1); // consume closing backtick
+
+   // Final element count
+   element_count++;
 
    // Set up collection metadata
    blob_collection->data.collection.element_start = 0;
-   blob_collection->data.collection.element_count = 2;
+   blob_collection->data.collection.element_count = element_count;
    blob_collection->data.collection._elem_types_temp = elem_types;
 
    return blob_collection;

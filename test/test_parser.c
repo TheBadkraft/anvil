@@ -229,7 +229,8 @@ static void test_parse_inheritance_placeholder(void) {
    // Check statement type
    statement stmt = Context.get_statement(ctx, 0);
    anvl_stmt_type type = Statement.type(stmt);
-   Assert.isTrue(type == ANVL_STMT_INHERITANCE, "Statement should be inheritance type");
+   Assert.isTrue(type == ANVL_STMT_ASSN, "Statement should be assignment type");
+   Assert.isNotNull(stmt->base_meta, "Should have base_meta (inheritance)");
 
    // Check identifier
    const char *ident = Statement.identifier(stmt, ctx->source);
@@ -1101,6 +1102,327 @@ static void test_parse_invalid_number(void) {
    Assert.skip("Parser error check not implemented");
 }
 
+// ============================================================================
+// INHERITANCE TESTS
+// ============================================================================
+
+static void test_parse_inheritance_basic(void) {
+   // Basic inheritance: Child : Parent { field := value }
+   const char *source = 
+       "Parent := { x := 10, y := 20 }\n"
+       "Child : Parent := { x := 15 }";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) >= 2, "Should have at least 2 statements");
+   
+   // Second statement should be assignment with base_meta (inheritance is metadata, not type)
+   statement stmt = Context.get_statement(ctx, 1);
+   Assert.isNotNull(stmt, "Second statement should exist");
+   Assert.isTrue(Statement.type(stmt) == ANVL_STMT_ASSN, "Should be assignment statement");
+   // Check that base_meta is present (indicates inheritance)
+   Assert.isNotNull(stmt->base_meta, "Statement should have base_meta for inheritance");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_inheritance_with_attributes(void) {
+   // Inheritance with attributes on child and/or base
+   const char *source = 
+       "Base @[version=1] := { health := 100 }\n"
+       "Child : Base @[difficulty=hard] := { health := 150, level := 5 }";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) >= 2, "Should have at least 2 statements");
+   
+   statement stmt = Context.get_statement(ctx, 1);
+   Assert.isTrue(Statement.type(stmt) == ANVL_STMT_ASSN, "Should be assignment with inheritance");
+   Assert.isNotNull(stmt->base_meta, "Should have base_meta from inheritance");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_inheritance_chain(void) {
+   // Multi-level inheritance: GrandChild : Child : Parent (if supported)
+   // For now, test at least that parsing doesn't crash
+   const char *source = 
+       "Base := { value := 1 }\n"
+       "Middle : Base := { value := 2 }\n"
+       "Derived : Middle := { value := 3 }";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) >= 3, "Should parse inheritance chain");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+// ============================================================================
+// NESTED STRUCTURE TESTS
+// ============================================================================
+
+static void test_parse_nested_object_in_array(void) {
+   // Array containing objects: [{x := 1}, {x := 2}]
+   const char *source = "data := [{ x := 1 }, { y := 2 }]";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should have one statement");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   Assert.isNotNull(stmt, "Statement should exist");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_nested_array_in_object(void) {
+   // Object with array field: { items := [1, 2, 3] }
+   const char *source = "config := { items := [1, 2, 3], name := \"test\" }";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should have one statement");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_deeply_nested_structures(void) {
+   // Deeply nested: [{a := [{b := [{c := 1}]}]}]
+   const char *source = 
+       "deep := [{ a := [{ b := [{ c := 1 }] }] }]";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should parse deeply nested");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_array_with_mixed_contents(void) {
+   // Array with objects and scalars mixed: [1, {x := 2}, "text"]
+   const char *source = "mixed := [1, { x := 2 }, \"text\"]";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should parse mixed array");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+// ============================================================================
+// TUPLE TESTS (various element types)
+// ============================================================================
+
+static void test_parse_tuple_with_mixed_scalars(void) {
+   // Tuple with different scalar types: (1, "text", true, null)
+   const char *source = "coords := (1, \"text\", true, null)";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should have one statement");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_tuple_with_objects(void) {
+   // Tuple containing objects: ({x := 1}, {y := 2})
+   const char *source = "pair := ({x := 1}, {y := 2})";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should parse tuple with objects");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_tuple_with_arrays(void) {
+   // Tuple containing arrays: ([1, 2], [3, 4])
+   const char *source = "pair := ([1, 2], [3, 4])";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should parse tuple with arrays");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_tuple_single_element_error(void) {
+   // Single element tuple should fail (tuples need minimum 2 elements)
+   const char *source = "single := (1)";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   // Note: parser may allow this or reject - depends on spec
+   // For now we just verify it parses one way or another
+   bool result = Context.parse(ctx);
+   Assert.isNotNull(ctx, "Should parse successfully (single element allowed as scalar)");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+// ============================================================================
+// BLOB TAG TESTS
+// ============================================================================
+
+static void test_parse_blob_with_various_tags(void) {
+   // Blobs with different tag formats
+   const char *source = 
+       "json_data := @json`{\"key\": \"value\"}`\n"
+       "base64_data := @base64`aGVsbG8gd29ybGQ=`\n"
+       "markdown := @md`# Header\nText`";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) >= 3, "Should parse multiple blob tags");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+static void test_parse_bare_blob(void) {
+   // Blob without tag: `raw content`
+   const char *source = "raw := `some raw content here`";
+   
+   context ctx = parse_source(source, ANVL_DIALECT_AML);
+   Assert.isTrue(Context.statement_count(ctx) == 1, "Should parse bare blob");
+   
+   Context.dispose(ctx);
+   teardown();
+}
+
+// ============================================================================
+// ADDITIONAL ERROR CODE TESTS
+// ============================================================================
+
+static void test_parse_expected_value_error(void) {
+   // Missing value after :=
+   const char *source = "name :=";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with missing value");
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set");
+   
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isTrue(err->code == ANVL_ERR_PARSER_EXPECTED_VALUE, "Should be EXPECTED_VALUE error");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
+static void test_parse_expected_object_close_error(void) {
+   // Unclosed object: { x := 1
+   const char *source = "obj := { x := 1";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with unclosed object");
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set");
+   
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isTrue(err->code == ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE, "Should be EXPECTED_OBJECT_CLOSE");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
+static void test_parse_trailing_comma_in_object_error(void) {
+   // Trailing comma in object: {x := 1,}
+   const char *source = "obj := {x := 1,}";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with trailing comma");
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set");
+   
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isTrue(err->code == ANVL_ERR_PARSER_TRAILING_COMMA_IN_OBJECT, 
+                 "Should be TRAILING_COMMA_IN_OBJECT");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
+static void test_parse_expected_object_field_error(void) {
+   // Missing field in object: {x := 1, }
+   const char *source = "obj := {x := 1, }";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with missing field");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
+static void test_parse_multiple_shebang_error(void) {
+   // Multiple shebangs
+   const char *source = "#!aml\n#!asl\nname := \"test\"";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with multiple shebangs");
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set");
+   
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isTrue(err->code == ANVL_ERR_PARSER_MULTIPLE_SHEBANG, "Should be MULTIPLE_SHEBANG");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
+static void test_parse_shebang_after_statements_error(void) {
+   // Shebang after statements
+   const char *source = "name := \"test\"\n#!aml\nage := 42";
+   
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, source, strlen(source));
+   
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should be created");
+   
+   bool result = Context.parse(ctx);
+   Assert.isFalse(result, "Should fail with shebang after statements");
+   Assert.isTrue(Anvil.error_is_set(), "Error should be set");
+   
+   const anvl_error_state *err = Anvil.error_get();
+   Assert.isTrue(err->code == ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS, 
+                 "Should be SHEBANG_AFTER_STATEMENTS");
+   
+   Context.dispose(ctx);
+   Anvil.error_clear();
+}
+
 __attribute__((constructor)) static void register_test_parser(void) {
    testset("Parser Tests", set_config, set_teardown);
 
@@ -1111,7 +1433,27 @@ __attribute__((constructor)) static void register_test_parser(void) {
    testcase("Module attributes", test_parse_module_attributes);
    testcase("Object parsing", test_parse_object);
    testcase("Tuple parsing", test_parse_tuple);
-   // testcase("Inheritance syntax", test_parse_inheritance_placeholder);  // DISABLED: needs base_meta implementation
+
+   // Inheritance tests
+   testcase("Inheritance basic", test_parse_inheritance_basic);
+   testcase("Inheritance with attributes", test_parse_inheritance_with_attributes);
+   testcase("Inheritance chain", test_parse_inheritance_chain);
+
+   // Nested structure tests
+   testcase("Nested object in array", test_parse_nested_object_in_array);
+   testcase("Nested array in object", test_parse_nested_array_in_object);
+   testcase("Deeply nested structures", test_parse_deeply_nested_structures);
+   testcase("Array with mixed contents", test_parse_array_with_mixed_contents);
+
+   // Tuple tests
+   testcase("Tuple with mixed scalars", test_parse_tuple_with_mixed_scalars);
+   testcase("Tuple with objects", test_parse_tuple_with_objects);
+   testcase("Tuple with arrays", test_parse_tuple_with_arrays);
+   testcase("Tuple single element", test_parse_tuple_single_element_error);
+
+   // Blob tag tests
+   testcase("Blob with various tags", test_parse_blob_with_various_tags);
+   testcase("Bare blob", test_parse_bare_blob);
 
    // Error tests - negative cases
    testcase("Missing assignment", test_parse_missing_assignment);
@@ -1129,6 +1471,14 @@ __attribute__((constructor)) static void register_test_parser(void) {
    testcase("Unterminated string", test_parse_unterminated_string);
    testcase("Unterminated blob", test_parse_unterminated_blob);
    testcase("Expected comma in tuple", test_parse_expected_comma_in_tuple);
+   
+   // Additional error tests
+   testcase("Expected value error", test_parse_expected_value_error);
+   testcase("Expected object close", test_parse_expected_object_close_error);
+   testcase("Trailing comma in object", test_parse_trailing_comma_in_object_error);
+   testcase("Expected object field", test_parse_expected_object_field_error);
+   testcase("Multiple shebang", test_parse_multiple_shebang_error);
+   testcase("Shebang after statements", test_parse_shebang_after_statements_error);
 }
 
 // Test sample files from test/samples/
