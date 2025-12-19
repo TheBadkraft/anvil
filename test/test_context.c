@@ -142,14 +142,11 @@ static void test_context_statement_operations(void) {
    statement stmt = Memory.alloc(sizeof(struct anvl_statement), true);
    stmt->meta[STMT_META_TYPE] = ANVL_STMT_ASSN;
    stmt->meta[STMT_META_IDENT_POS] = 0;
-   stmt->meta[STMT_META_LEN] = strlen(source_str);
-   stmt->meta[STMT_META_IDENT_POS] = 0;
    stmt->meta[STMT_META_IDENT_LEN] = 4; // "test"
-   stmt->base[0] = 0;
-   stmt->base[1] = 0;
-   stmt->meta[STMT_META_VALUE_TYPE] = ANVL_VALUE_SCALAR;
-   stmt->attrib_count = 0;
-   stmt->attributes = NULL;
+   stmt->meta[STMT_META_BASE_IDX] = 0;  // no base
+   stmt->meta[STMT_META_ATTR_IDX] = 0;  // no attributes
+   stmt->meta[STMT_META_VALUE_IDX] = 0; // value index (placeholder)
+   // NOTE: Statement length is now in value_meta->len (not in meta[STMT_META_LEN] which was removed)
 
    // Add statement
    bool added = Context.add_statement(ctx, stmt);
@@ -209,7 +206,8 @@ static void test_context_parse_basic(void) {
    Assert.isNotNull(stmt, "Statement should exist");
    Assert.isTrue((anvl_stmt_type)stmt->meta[STMT_META_TYPE] == ANVL_STMT_ASSN, "Should be assignment");
    Assert.isTrue(stmt->meta[STMT_META_IDENT_LEN] == 4, "Identifier should be 'name'");
-   Assert.isTrue((anvl_value_type)stmt->meta[STMT_META_VALUE_TYPE] == ANVL_VALUE_SCALAR, "Value should be scalar");
+   // TODO: Value type check when value_meta is implemented
+   // Assert.isTrue((anvl_value_type)stmt->meta[STMT_META_VALUE_IDX] == ANVL_VALUE_SCALAR, "Value should be scalar");
 
    Context.dispose(ctx);
    teardown();

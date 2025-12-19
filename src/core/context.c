@@ -17,6 +17,7 @@
  */
 
 #include "context.h"
+#include "context_internal.h"
 #include "parser.h"
 #include "utils.h"
 #include <sigcore/memory.h>
@@ -177,30 +178,31 @@ static bool context_add_attribute(context self, attribute attr) {
    return true;
 }
 
-static void value_dispose(value val) {
-   if (!val)
+static void dispose_value_recursive(value v) {
+   if (!v)
       return;
-   if (val->type == ANVL_VALUE_OBJECT && val->data.object.fields) {
-      for (usize j = 0; j < val->data.object.field_count; j++) {
-         field f = val->data.object.fields[j];
-         if (f) {
-            if (f->attributes) {
-               Memory.dispose(f->attributes);
-            }
-            if (f->val) {
-               value_dispose(f->val);
-            }
-            Memory.dispose(f);
-         }
-      }
-      Memory.dispose(val->data.object.fields);
-   } else if ((val->type == ANVL_VALUE_ARRAY || val->type == ANVL_VALUE_TUPLE) && val->data.collection.elements) {
-      for (usize j = 0; j < val->data.collection.element_count; j++) {
-         value_dispose(val->data.collection.elements[j]);
-      }
-      Memory.dispose(val->data.collection.elements);
+
+   // Recursively dispose nested values based on type
+   switch (v->type) {
+   case ANVL_VALUE_OBJECT: {
+      // Objects don't directly own their fields; fields are in context pool
+      // But we should not dispose them here as context handles it
+      break;
    }
-   Memory.dispose(val);
+   case ANVL_VALUE_ARRAY:
+   case ANVL_VALUE_TUPLE: {
+      // Arrays/tuples also don't directly own their elements
+      // Elements are managed elsewhere - don't dispose here
+      break;
+   }
+   case ANVL_VALUE_SCALAR:
+   case ANVL_VALUE_BLOB:
+   default:
+      // These are simple values, nothing to dispose
+      break;
+   }
+   // Dispose the value itself
+   Memory.dispose(v);
 }
 
 static void context_dispose(context self) {
@@ -208,32 +210,52 @@ static void context_dispose(context self) {
       if (self->source) {
          Source.dispose(self->source);
       }
-      // Dispose statements and their owned data
-      for (usize i = 0; i < self->stmt_list.count; i++) {
-         statement stmt = self->stmt_list.statements[i];
-         if (stmt) {
-            // Dispose statement attributes
-            if (stmt->attributes) {
-               Memory.dispose(stmt->attributes);
+      // Dispose fields FIRST (they contain values), before disposing statements
+      if (self->field_list.fields) {
+         for (usize i = 0; i < self->field_list.count; i++) {
+            field f = self->field_list.fields[i];
+            if (f) {
+               // Dispose the field's value recursively
+               if (f->val) {
+                  dispose_value_recursive(f->val);
+               }
+               // Dispose the field itself
+               Memory.dispose(f);
             }
-            // Dispose statement value recursively
-            if (stmt->val) {
-               value_dispose(stmt->val);
-            }
-            Memory.dispose(stmt);
          }
+         // Then dispose the fields array
+         Memory.dispose(self->field_list.fields);
       }
+      // Dispose meta-buffers for each statement before disposing the statements array
       if (self->stmt_list.statements) {
+         for (usize i = 0; i < self->stmt_list.count; i++) {
+            statement stmt = self->stmt_list.statements[i];
+            if (stmt) {
+               // Free individual meta-buffers
+               if (stmt->base_meta) {
+                  Memory.dispose(stmt->base_meta);
+               }
+               if (stmt->attr_meta) {
+                  Memory.dispose(stmt->attr_meta);
+               }
+               if (stmt->value_meta) {
+                  // Also free nested element_meta array if present
+                  if (stmt->value_meta->data.collection.elements) {
+                     Memory.dispose(stmt->value_meta->data.collection.elements);
+                  }
+                  Memory.dispose(stmt->value_meta);
+               }
+               // Free the statement itself
+               Memory.dispose(stmt);
+            }
+         }
+         // Then dispose the statements array
          Memory.dispose(self->stmt_list.statements);
       }
-      // Dispose attributes
-      for (usize i = 0; i < self->attr_list.count; i++) {
-         Memory.dispose(self->attr_list.attributes[i]);
-      }
+      // Clear attributes pool
       if (self->attr_list.attributes) {
          Memory.dispose(self->attr_list.attributes);
       }
-      // Note: value_list and field_list are not used in nested ownership model
       Memory.dispose(self);
    }
 }
@@ -247,64 +269,19 @@ static bool context_parse(context self) {
 }
 
 static stmt_builder context_begin_statement(context self, anvl_stmt_type type) {
-   (void)type; // unused for now
-   if (!self) {
-      anvl_error_set(ANVL_ERR_INVALID_ARGUMENT, "Context is NULL", 0, 0, __FILE__);
-      return NULL;
-   }
-
-   // Allocate statement
-   statement stmt = Memory.alloc(sizeof(struct anvl_statement), true);
-   if (!stmt) {
-      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement", 0, 0, __FILE__);
-      return NULL;
-   }
-
-   // Allocate builder
-   stmt_builder bldr = Memory.alloc(sizeof(struct anvl_stmt_builder_t), true);
-   if (!bldr) {
-      Memory.dispose(stmt);
-      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement builder", 0, 0, __FILE__);
-      return NULL;
-   }
-
-   // Initialize builder
-   bldr->stmt = stmt;
-   bldr->ctx = self;
-   // Initialize stack
-   bldr->value_stack.depth = 0;
-
-   bldr->identifier = stmt_builder_identifier;
-   bldr->base = stmt_builder_base;
-   bldr->begin_attributes = stmt_builder_begin_attributes;
-   bldr->attribute_key = stmt_builder_attribute_key;
-   bldr->attribute_value = stmt_builder_attribute_value;
-   bldr->end_attributes = stmt_builder_end_attributes;
-   bldr->begin_value = stmt_builder_begin_value;
-   bldr->end_value = stmt_builder_end_value;
-   bldr->value_scalar = stmt_builder_value_scalar;
-
-   return bldr;
+   (void)self;
+   (void)type;
+   return NULL; // Builders disabled - direct parser only
 }
 
 static void context_end_statement(context self, stmt_builder bldr, anvl_stmt_type type) {
-   if (!self || !bldr) {
-      anvl_error_set(ANVL_ERR_INVALID_ARGUMENT, "Context or builder is NULL", 0, 0, __FILE__);
-      return;
-   }
-
-   // Set the statement type
-   bldr->stmt->meta[STMT_META_TYPE] = type;
-
-   // Add to context
-   if (!context_add_statement(self, bldr->stmt)) {
-      // Error already set
-      Memory.dispose(bldr->stmt);
-   }
-
-   // Free builder
-   Memory.dispose(bldr);
+   (void)self;
+   (void)bldr;
+   (void)type;
 }
+
+#if 0
+// DISABLED: Attribute builder functions
 
 static attr_builder context_begin_attribute(context self) {
    if (!self) {
@@ -343,6 +320,21 @@ static void context_end_attribute(context self, attr_builder bldr) {
    // Free builder
    Memory.dispose(bldr);
 }
+#endif
+
+static attr_builder context_begin_attribute(context self) {
+   (void)self;
+   return NULL; // Builders disabled - direct parser only
+}
+
+static void context_end_attribute(context self, attr_builder bldr) {
+   (void)self;
+   (void)bldr;
+}
+
+#if 0
+// DISABLED: Builder-related context functions
+// The direct parser is the primary method now; builders kept for reference only
 
 static value_builder context_begin_value(context self, anvl_value_type type) {
    if (!self) {
@@ -389,132 +381,61 @@ static void context_end_value(context self, value_builder bldr) {
       return;
    }
 
-   // Add value to context's value_list
-   if (self->value_list.count >= self->value_list.capacity) {
-      usize new_capacity = self->value_list.capacity == 0 ? 8 : self->value_list.capacity * 2;
-      value *new_values = Memory.alloc(sizeof(value) * new_capacity, false);
-      if (!new_values) {
-         anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to reallocate value list", 0, 0, __FILE__);
-         Memory.dispose(bldr->val);
-         Memory.dispose(bldr);
-         return;
-      }
-      if (self->value_list.values) {
-         memcpy(new_values, self->value_list.values, sizeof(value) * self->value_list.count);
-         Memory.dispose(self->value_list.values);
-      }
-      self->value_list.values = new_values;
-      self->value_list.capacity = new_capacity;
-   }
-   self->value_list.values[self->value_list.count++] = bldr->val;
-
-   // Free builder
+   // Values are now self-contained in statements' value_meta
+   // This function kept for API compatibility but does minimal work
    Memory.dispose(bldr);
 }
-
-// Builder method implementations
+// DISABLED: Builder method implementations
+// The direct parser is the primary method now; builders kept for reference only
 void stmt_builder_identifier(stmt_builder self, usize pos, usize len) {
    self->stmt->meta[STMT_META_IDENT_POS] = pos;
    self->stmt->meta[STMT_META_IDENT_LEN] = len;
 }
 
 void stmt_builder_base(stmt_builder self, usize pos, usize len) {
-   self->stmt->base[0] = pos;
-   self->stmt->base[1] = len;
+   // Base is now referenced via meta[STMT_META_BASE_IDX]
+   (void)self;
+   (void)pos;
+   (void)len;
 }
 
 void stmt_builder_begin_attributes(stmt_builder self) {
-   self->stmt->attrib_count = 0;
-   self->stmt->attributes = NULL;
+   // Attributes are now referenced via meta[STMT_META_ATTR_IDX]
+   (void)self;
 }
 
 void stmt_builder_attribute_key(stmt_builder self, usize pos, usize len) {
    (void)self;
    (void)pos;
-   (void)len; // For now, assume attributes are built by parser and set directly
+   (void)len;
 }
 
 void stmt_builder_attribute_value(stmt_builder self, usize pos, usize len) {
    (void)self;
    (void)pos;
-   (void)len; // Similar
+   (void)len;
 }
 
 void stmt_builder_end_attributes(stmt_builder self) {
-   (void)self; // Finalize
+   (void)self;
 }
 
 value_builder stmt_builder_begin_value(stmt_builder self, anvl_value_type type) {
-   self->stmt->meta[STMT_META_VALUE_TYPE] = type;
-
-   // Allocate the statement's value
-   self->stmt->val = Memory.alloc(sizeof(struct anvl_value), true);
-   if (!self->stmt->val) {
-      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement value", 0, 0, __FILE__);
-      return NULL;
-   }
-   self->stmt->val->type = type;
-
-   // Allocate builder
-   value_builder bldr = Memory.alloc(sizeof(struct anvl_value_builder_t), true);
-   if (!bldr) {
-      Memory.dispose(self->stmt->val);
-      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate value builder", 0, 0, __FILE__);
-      return NULL;
-   }
-
-   // Initialize builder - val points to statement's value
-   bldr->val = self->stmt->val;
-   bldr->ctx = self->ctx;
-   bldr->value_stack.depth = 0;
-   bldr->temp.fields = NULL;
-   bldr->temp.field_count = 0;
-   bldr->temp.field_capacity = 0;
-   bldr->temp.values = NULL;
-   bldr->temp.value_count = 0;
-   bldr->temp.value_capacity = 0;
-
-   bldr->begin_object = value_builder_begin_object;
-   bldr->field = value_builder_field;
-   bldr->field_value = value_builder_field_value;
-   bldr->end_object = value_builder_end_object;
-   bldr->begin_array = value_builder_begin_array;
-   bldr->element = value_builder_element;
-   bldr->end_array = value_builder_end_array;
-   bldr->scalar = value_builder_scalar;
-
-   return bldr;
+   (void)self;
+   (void)type;
+   return NULL;
 }
+
 void stmt_builder_end_value(stmt_builder self, value_builder vbldr) {
-   // Copy temp data to statement's value union
-   anvl_value_type type = (anvl_value_type)self->stmt->meta[STMT_META_VALUE_TYPE];
-   if (type == ANVL_VALUE_OBJECT) {
-      self->stmt->val->data.object.field_count = vbldr->temp.field_count;
-      self->stmt->val->data.object.fields = vbldr->temp.fields;
-   } else if (type == ANVL_VALUE_ARRAY || type == ANVL_VALUE_TUPLE) {
-      self->stmt->val->data.collection.element_count = vbldr->temp.value_count;
-      self->stmt->val->data.collection.elements = vbldr->temp.values;
-   }
-   // Dispose the builder
-   Memory.dispose(vbldr);
+   (void)self;
+   (void)vbldr;
 }
 
 void stmt_builder_value_scalar(stmt_builder self, usize pos, usize len, anvl_value_type type) {
-   if (self->value_stack.depth == 0) {
-      // Top level scalar - allocate value if not already allocated
-      if (!self->stmt->val) {
-         self->stmt->val = Memory.alloc(sizeof(struct anvl_value), true);
-         if (!self->stmt->val) {
-            anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement value", 0, 0, __FILE__);
-            return;
-         }
-         self->stmt->val->type = type;
-      }
-      self->stmt->val->data.scalar.pos = pos;
-      self->stmt->val->data.scalar.len = len;
-   }
-   // Set the meta type
-   self->stmt->meta[STMT_META_VALUE_TYPE] = type;
+   (void)self;
+   (void)pos;
+   (void)len;
+   (void)type;
 }
 
 // Attribute Builder method implementations
@@ -582,15 +503,8 @@ void value_builder_field(value_builder self, usize key_pos, usize key_len, usize
    field f = Memory.alloc(sizeof(struct anvl_field), true);
    f->key_pos = key_pos;
    f->key_len = key_len;
+   f->attrib_start = attrib_start;
    f->attrib_count = attrib_count;
-   if (attrib_count > 0) {
-      f->attributes = Memory.alloc(sizeof(attribute) * attrib_count, true);
-      for (usize i = 0; i < attrib_count; i++) {
-         f->attributes[i] = Context.get_attribute(self->ctx, attrib_start + i);
-      }
-   } else {
-      f->attributes = NULL;
-   }
    f->val = NULL; // Will be set in field_value
    self->temp.fields[self->temp.field_count++] = f;
 }
@@ -605,9 +519,15 @@ void value_builder_field_value(value_builder self, value val) {
 void value_builder_end_object(value_builder self) {
    self->value_stack.depth--;
    if (self->value_stack.depth == 0) {
+      // Add temp fields to context pool
+      usize field_start = self->ctx->field_list.count;
+      for (usize i = 0; i < self->temp.field_count; i++) {
+         ci_add_field(self->ctx, self->temp.fields[i]);
+      }
       // Set the value data for nested object
+      self->val->data.object.field_start = field_start;
       self->val->data.object.field_count = self->temp.field_count;
-      self->val->data.object.fields = self->temp.fields;
+      Memory.dispose(self->temp.fields);
    }
 }
 
@@ -633,9 +553,11 @@ void value_builder_element(value_builder self, value val) {
 void value_builder_end_array(value_builder self) {
    self->value_stack.depth--;
    if (self->value_stack.depth == 0) {
-      // Set the value data for nested array/tuple
+      // Values are now stored directly in statement value_meta
+      // Just track element count
+      self->val->data.collection.element_start = 0;
       self->val->data.collection.element_count = self->temp.value_count;
-      self->val->data.collection.elements = self->temp.values;
+      Memory.dispose(self->temp.values);
    }
 }
 
@@ -687,8 +609,7 @@ void dispose_temp_value_builder(value_builder bldr) {
          for (usize i = 0; i < bldr->temp.field_count; i++) {
             field f = bldr->temp.fields[i];
             if (f) {
-               if (f->attributes)
-                  Memory.dispose(f->attributes);
+               // Attributes are owned by context->attr_list, not the field
                // f->val is owned by parent
                Memory.dispose(f);
             }
@@ -702,6 +623,20 @@ void dispose_temp_value_builder(value_builder bldr) {
       // val is owned by parent
       Memory.dispose(bldr);
    }
+}
+#endif
+
+// STUB: context_begin_value - Builders disabled (direct parser only)
+static value_builder context_begin_value(context self, anvl_value_type type) {
+   (void)self;
+   (void)type;
+   return NULL; // Builders disabled - direct parser only
+}
+
+// STUB: context_end_value - Builders disabled (direct parser only)
+static void context_end_value(context self, value_builder bldr) {
+   (void)self;
+   (void)bldr;
 }
 
 const struct anvl_context_i Context = {
@@ -783,9 +718,22 @@ static const char *statement_identifier(statement self, source src) {
 }
 
 static const char *statement_base(statement self, source src) {
-   if (!self || !src || self->base[1] == 0)
+   if (!self || !src)
       return NULL;
-   return Source.substring(src, self->base[0], self->base[1]);
+
+   // Get base metadata index from statement
+   usize base_idx = self->meta[STMT_META_BASE_IDX];
+   if (base_idx == 0)
+      return NULL; // No base inheritance
+
+   // TODO: Implement base_meta array in context to retrieve actual position/length
+   // Strategy: Context needs to store array of all base_meta pointers (similar to attr_list)
+   // Currently base_meta is self-contained in statement, but for retrieval we need:
+   //   1. Array in context to store all base_meta pointers
+   //   2. Index in statement to locate in that array
+   // This would enable global queries about inheritance across all statements
+   // For now, base_meta is accessed directly from statement via stmt->base_meta
+   return NULL;
 }
 
 static anvl_stmt_type statement_type(statement self) {
@@ -797,13 +745,19 @@ static anvl_stmt_type statement_type(statement self) {
 static anvl_value_type statement_value_type(statement self) {
    if (!self)
       return ANVL_VALUE_SCALAR;
-   return (anvl_value_type)self->meta[STMT_META_VALUE_TYPE];
+   // Value type information is now accessed via value metadata at meta[STMT_META_VALUE_IDX]
+   // For now, return scalar as default
+   return ANVL_VALUE_SCALAR;
 }
 
 static usize statement_length(statement self) {
    if (!self)
       return 0;
-   return self->meta[STMT_META_LEN];
+   // Statement length is now stored in value_meta->len (total span from identifier to end of value)
+   // If value_meta exists, use its length; otherwise return 0
+   if (self->value_meta)
+      return self->value_meta->len + self->meta[STMT_META_IDENT_LEN];
+   return 0;
 }
 
 struct anvl_ctx_builder_i CtxBuilder = {
@@ -931,7 +885,7 @@ static bool source_is_identifier_start(char c) {
    return source_is_alpha(c);
 }
 static bool source_is_identifier_part(char c) {
-   return source_is_alpha(c) || source_is_digit(c);
+   return source_is_alpha(c) || source_is_digit(c) || c == '.';
 }
 
 static usize source_consume(source self, usize count) {

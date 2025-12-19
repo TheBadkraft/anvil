@@ -1,10 +1,31 @@
-[1] Parser Tests             :  51 :         2025-12-18  09:35:51
+[1] Parser Tests             :  22 :         2025-12-18  15:20:47
 =================================================================
-Running: Empty Source                            2.129 us  [PASS]
-Running: Simple Assignment                       4.967 us  [PASS]
-Running: Multiple Statements                     5.104 us  [PASS]
-Running: Array Parsing                           4.172 us  [PASS]
-Running: Number Parsing                         18.348 us  [FAIL]
-Running: Boolean and null parsing               12.485 us  [PASS]
-Running: Bare literals                          10.170 us  [PASS]
-Running: Module attributes                       7.722 us  [PASS]
+Running: Empty Source                            1.072 us  [PASS]
+Running: Simple Assignment                       2.103 us  [PASS]
+Running: Multiple Statements                     2.492 us  [PASS]
+Running: Array Parsing                           2.252 us  [PASS]
+Running: Module attributes                       4.435 us  [PASS]
+Running: Object parsing                          2.758 us  [PASS]
+Running: Tuple parsing                           2.135 us  [PASS]
+Running: Missing assignment                      0.767 us  [PASS]
+Running: Missing identifier                      0.601 us  [PASS]
+Running: Invalid value in attribute              0.742 us  [PASS]
+Running: Invalid identifier                      0.620 us  [PASS]
+Running: Empty attribute block                   0.483 us  [PASS]
+Running: Missing comma in array                  1.608 us  [PASS]
+Running: Expected array close                    2.183 us  [FAIL]
+Running: Expected tuple close                    2.068 us  [PASS]
+Running: Empty object not allowed                2.782 us  [PASS]
+Running: Empty array not allowed                 2.674 us  [PASS]
+Running: Missing comma in attributes             3.624 us  [PASS]
+Running: Unexpected module attributes            1.784 us  [FAIL]
+Running: Unterminated string                     9.658 us  [PASS]
+Running: Unterminated blob                       3.438 us  [PASS]
+Running: Expected comma in tuple                 4.469 us  [PASS]
+=================================================================
+[1]     TESTS= 22        PASS= 20        FAIL=  2        SKIP=  0
+
+===== Memory Allocations Report =================================
+WARNING: MEMORY LEAK — 66 unfreed allocation(s)
+  Total mallocs:                134
+  Total frees:                  68

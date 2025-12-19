@@ -74,20 +74,6 @@ static inline void ci_ensure_field_capacity(context ctx, usize need) {
    ctx->field_list.capacity = newcap;
 }
 
-static inline void ci_ensure_value_capacity(context ctx, usize need) {
-   if (ctx->value_list.capacity >= need)
-      return;
-   usize newcap = ctx->value_list.capacity ? ctx->value_list.capacity * 2 : 8;
-   while (newcap < need)
-      newcap *= 2;
-   if (ctx->value_list.values) {
-      ctx->value_list.values = Memory.realloc(ctx->value_list.values, sizeof(value) * newcap);
-   } else {
-      ctx->value_list.values = Memory.alloc(sizeof(value) * newcap, true);
-   }
-   ctx->value_list.capacity = newcap;
-}
-
 // Constructors (zero-initialized)
 static inline statement ci_new_statement(context ctx __attribute__((unused)), anvl_stmt_type type) {
    statement s = Memory.alloc(sizeof(*s), true);
@@ -126,12 +112,56 @@ static inline void ci_add_attribute(context ctx, attribute a) {
    ctx->attr_list.attributes[ctx->attr_list.count++] = a;
 }
 
+static inline attribute ci_get_attribute(context ctx, usize index) {
+   if (index >= ctx->attr_list.count)
+      return NULL;
+   return ctx->attr_list.attributes[index];
+}
+
 static inline void ci_add_field(context ctx, field f) {
    ci_ensure_field_capacity(ctx, ctx->field_list.count + 1);
    ctx->field_list.fields[ctx->field_list.count++] = f;
 }
 
-static inline void ci_add_value(context ctx, value v) {
-   ci_ensure_value_capacity(ctx, ctx->value_list.count + 1);
-   ctx->value_list.values[ctx->value_list.count++] = v;
+/* ========================================================================
+ * Meta-buffer allocation helpers for self-contained statement metadata
+ * ======================================================================== */
+
+/**
+ * Allocate and return a base_meta structure for inheritance metadata.
+ * Returns the allocated base_meta pointer (caller's responsibility to store).
+ */
+static inline struct anvl_base_meta *ci_new_base_meta(void) {
+   struct anvl_base_meta *bm = Memory.alloc(sizeof(*bm), true);
+   return bm;
+}
+
+/**
+ * Allocate and return a value_meta structure for detailed value information.
+ * Returns the allocated value_meta pointer (caller's responsibility to store).
+ */
+static inline struct anvl_value_meta *ci_new_value_meta(anvl_value_type type) {
+   struct anvl_value_meta *vm = Memory.alloc(sizeof(*vm), true);
+   if (vm) {
+      vm->type = type;
+   }
+   return vm;
+}
+
+/**
+ * Allocate an element_meta array for collection types (arrays/tuples).
+ * Returns the allocated array pointer (caller responsible for storing).
+ */
+static inline struct anvl_element_meta *ci_new_element_meta_array(usize count) {
+   struct anvl_element_meta *em = Memory.alloc(sizeof(struct anvl_element_meta) * count, true);
+   return em;
+}
+
+/**
+ * Allocate an attr_meta array for statement-level attributes.
+ * Returns the allocated array pointer (caller responsible for storing).
+ */
+static inline struct anvl_attr_meta *ci_new_attr_meta_array(usize count) {
+   struct anvl_attr_meta *am = Memory.alloc(sizeof(struct anvl_attr_meta) * count, true);
+   return am;
 }

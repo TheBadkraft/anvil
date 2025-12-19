@@ -115,19 +115,14 @@ struct anvl_context_t {
       usize count;           // number of statements
       usize capacity;        // allocated capacity
    } stmt_list;
-   // List of module attributes
+   // List of module attributes (top-level only)
    struct {
       attribute *attributes; // array of attribute pointers
       usize count;           // number of attributes
       usize capacity;        // allocated capacity
    } attr_list;
-   // List of parsed values (for array/tuple elements)
-   struct {
-      value *values;  // array of value pointers
-      usize count;    // number of values
-      usize capacity; // allocated capacity
-   } value_list;
    // List of parsed fields (for object key-value pairs)
+   // Fields store references to their values via value_meta in parent statement
    struct {
       field *fields;  // array of field pointers
       usize count;    // number of fields
