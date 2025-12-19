@@ -1,0 +1,51 @@
+/* Repetitive data stress test */
+records := [
+    { id: 1, value: "record_001", timestamp: 1702500000, hash: "abc123def456" }
+    { id: 2, value: "record_002", timestamp: 1702500001, hash: "bcd234efg567" }
+    { id: 3, value: "record_003", timestamp: 1702500002, hash: "cde345fgh678" }
+    { id: 4, value: "record_004", timestamp: 1702500003, hash: "def456ghi789" }
+    { id: 5, value: "record_005", timestamp: 1702500004, hash: "efg567hij890" }
+    { id: 6, value: "record_006", timestamp: 1702500005, hash: "fgh678ijk901" }
+    { id: 7, value: "record_007", timestamp: 1702500006, hash: "ghi789jkl012" }
+    { id: 8, value: "record_008", timestamp: 1702500007, hash: "hij890klm123" }
+    { id: 9, value: "record_009", timestamp: 1702500008, hash: "ijk901lmn234" }
+    { id: 10, value: "record_010", timestamp: 1702500009, hash: "jkl012mno345" }
+    { id: 11, value: "record_011", timestamp: 1702500010, hash: "klm123nop456" }
+    { id: 12, value: "record_012", timestamp: 1702500011, hash: "lmn234opq567" }
+    { id: 13, value: "record_013", timestamp: 1702500012, hash: "mno345pqr678" }
+    { id: 14, value: "record_014", timestamp: 1702500013, hash: "nop456qrs789" }
+    { id: 15, value: "record_015", timestamp: 1702500014, hash: "opq567rst890" }
+    { id: 16, value: "record_016", timestamp: 1702500015, hash: "pqr678stu901" }
+    { id: 17, value: "record_017", timestamp: 1702500016, hash: "qrs789tuv012" }
+    { id: 18, value: "record_018", timestamp: 1702500017, hash: "rst890uvw123" }
+    { id: 19, value: "record_019", timestamp: 1702500018, hash: "stu901vwx234" }
+    { id: 20, value: "record_020", timestamp: 1702500019, hash: "tuv012wxy345" }
+    { id: 21, value: "record_021", timestamp: 1702500020, hash: "uvw123xyz456" }
+    { id: 22, value: "record_022", timestamp: 1702500021, hash: "vwx234yza567" }
+    { id: 23, value: "record_023", timestamp: 1702500022, hash: "wxy345zab678" }
+    { id: 24, value: "record_024", timestamp: 1702500023, hash: "xyz456abc789" }
+    { id: 25, value: "record_025", timestamp: 1702500024, hash: "yza567bcd890" }
+]
+
+log_entries := [
+    { level: "info", message: "System startup complete", timestamp: 1702500000 }
+    { level: "debug", message: "Loading configuration files", timestamp: 1702500001 }
+    { level: "info", message: "Database connection established", timestamp: 1702500002 }
+    { level: "info", message: "Cache server connected", timestamp: 1702500003 }
+    { level: "info", message: "Worker process started", timestamp: 1702500004 }
+    { level: "debug", message: "Processing request from client", timestamp: 1702500005 }
+    { level: "info", message: "Request processed successfully", timestamp: 1702500006 }
+    { level: "debug", message: "Storing result in cache", timestamp: 1702500007 }
+    { level: "info", message: "Cache update complete", timestamp: 1702500008 }
+    { level: "debug", message: "Sending response to client", timestamp: 1702500009 }
+    { level: "info", message: "Response delivered", timestamp: 1702500010 }
+    { level: "debug", message: "Processing next request", timestamp: 1702500011 }
+    { level: "info", message: "Batch processing started", timestamp: 1702500012 }
+    { level: "debug", message: "Processing item 1 of 100", timestamp: 1702500013 }
+    { level: "debug", message: "Processing item 2 of 100", timestamp: 1702500014 }
+    { level: "debug", message: "Processing item 3 of 100", timestamp: 1702500015 }
+    { level: "debug", message: "Processing item 4 of 100", timestamp: 1702500016 }
+    { level: "debug", message: "Processing item 5 of 100", timestamp: 1702500017 }
+    { level: "info", message: "Batch checkpoint reached", timestamp: 1702500018 }
+    { level: "debug", message: "Flushing buffers to storage", timestamp: 1702500019 }
+]

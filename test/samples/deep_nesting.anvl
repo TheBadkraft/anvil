@@ -1,0 +1,79 @@
+/* Deep nesting test - 10 levels deep */
+root := {
+    level1: {
+        level2: {
+            level3: {
+                level4: {
+                    level5: {
+                        level6: {
+                            level7: {
+                                level8: {
+                                    level9: {
+                                        level10: {
+                                            data: "deeply_nested_value"
+                                            count: 42
+                                            values: [1, 2, 3, 4, 5]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* Parallel deep structures */
+path_a := {
+    a: {
+        b: {
+            c: {
+                d: {
+                    e: {
+                        value: "path_a_value"
+                        tags: ["a", "b", "c", "d", "e"]
+                    }
+                }
+            }
+        }
+    }
+}
+
+path_b := {
+    x: {
+        y: {
+            z: {
+                w: {
+                    v: {
+                        value: "path_b_value"
+                        tags: ["x", "y", "z", "w", "v"]
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* Mixed deep and wide */
+mixed := {
+    wide_section: [
+        { id: 1, name: "item_1" }
+        { id: 2, name: "item_2" }
+        { id: 3, name: "item_3" }
+        { id: 4, name: "item_4" }
+        { id: 5, name: "item_5" }
+    ]
+    deep_section: {
+        a: {
+            b: {
+                c: {
+                    d: {
+                        items: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    }
+                }
+            }
+        }
+    }
+}

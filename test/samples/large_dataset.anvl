@@ -1,0 +1,45 @@
+/* Large dataset with nested structures */
+users := [
+    { name: "Alice Johnson", age: 28, email: "alice@example.com", tags: ["admin", "developer", "reviewer"], active: true }
+    { name: "Bob Smith", age: 35, email: "bob@example.com", tags: ["manager", "developer"], active: true }
+    { name: "Carol White", age: 42, email: "carol@example.com", tags: ["director", "architect"], active: false }
+    { name: "David Brown", age: 29, email: "david@example.com", tags: ["developer", "tester"], active: true }
+    { name: "Eve Davis", age: 31, email: "eve@example.com", tags: ["developer", "reviewer"], active: true }
+    { name: "Frank Wilson", age: 38, email: "frank@example.com", tags: ["manager", "architect"], active: true }
+    { name: "Grace Lee", age: 26, email: "grace@example.com", tags: ["developer"], active: true }
+    { name: "Henry Martin", age: 45, email: "henry@example.com", tags: ["cto", "architect"], active: false }
+    { name: "Iris Chen", age: 33, email: "iris@example.com", tags: ["manager", "developer"], active: true }
+    { name: "Jack Moore", age: 27, email: "jack@example.com", tags: ["developer", "tester"], active: true }
+]
+
+projects := [
+    { id: "proj-001", name: "WebFramework", status: "active", team: ["Alice", "Bob", "David"], budget: 150000 }
+    { id: "proj-002", name: "MobileApp", status: "in-progress", team: ["Carol", "Eve", "Frank"], budget: 200000 }
+    { id: "proj-003", name: "DataPipeline", status: "planning", team: ["Grace", "Jack"], budget: 75000 }
+    { id: "proj-004", name: "Analytics", status: "active", team: ["Iris", "Bob"], budget: 120000 }
+    { id: "proj-005", name: "Security", status: "active", team: ["Henry", "Frank"], budget: 180000 }
+]
+
+config := {
+    database: {
+        host: "db.internal.local"
+        port: 5432
+        credentials: {
+            username: "app_user"
+            password: "secure_hash_value_here"
+            pool_size: 20
+        }
+    }
+    cache: {
+        type: "redis"
+        servers: ["cache1.local:6379", "cache2.local:6379", "cache3.local:6379"]
+        ttl: 3600
+        max_connections: 50
+    }
+    logging: {
+        level: "info"
+        format: "json"
+        outputs: ["console", "file", "syslog"]
+        retention_days: 30
+    }
+}
