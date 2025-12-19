@@ -176,6 +176,10 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
    // Expect assignment operator
    if (si_match_length(s, ":=", 2) != 2) {
+      if (base_meta)
+         Memory.dispose(base_meta);
+      if (attr_meta)
+         Memory.dispose(attr_meta);
       parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
       return false;
    }
@@ -199,6 +203,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       if (base_meta)
          Memory.dispose(base_meta);
       Memory.dispose(attr_meta);
+      Memory.dispose(val);
       parser_error(ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE, s);
       return false;
    }
@@ -210,6 +215,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
          Memory.dispose(base_meta);
       if (attr_meta)
          Memory.dispose(attr_meta);
+      Memory.dispose(val);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return false;
    }
@@ -367,6 +373,15 @@ static value parse_blob(parser_ctx *p) {
          return NULL;
       }
       element_count = 1; // We have tag as element [0], now add content as element [1]
+
+      // BLOB ENCODING RULE: No whitespace allowed between tag and opening backtick
+      // This ensures tag position is deterministic (immediately precedes content)
+      if (si_peek(s) != '`') {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         Memory.dispose(elem_types);
+         Memory.dispose(blob_collection);
+         return NULL;
+      }
    }
 
    // Element [1 or 0]: BLOB content (between backticks)
