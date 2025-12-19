@@ -35,11 +35,13 @@
 #define ANVIL_BUILD_CANDIDATE "dev" // dev, alpha, beta, rc, stable
 
 /* ------------------------------------------------------------------ */
-/* Dialect: AML vs ASL                                                */
+/* Dialect: AML vs ASL vs AMP vs Aurora                               */
 /* ------------------------------------------------------------------ */
 typedef enum {
-   ANVL_DIALECT_AML,
-   ANVL_DIALECT_ASL
+   ANVL_DIALECT_AML,     // Anvil Markup Language (full features)
+   ANVL_DIALECT_ASL,     // Anvil Script Language (future)
+   ANVL_DIALECT_AMP,     // Anvil Messaging Protocol (scalars + blobs only)
+   ANVL_DIALECT_AURORA   // Generic dialect (for generic.aurora samples)
 } anvl_dialect;
 
 /* ------------------------------------------------------------------ */

@@ -40,6 +40,7 @@
 #define ANVL_SHEBANG_LEN 5
 #define ANVL_EXT_LEN 4
 #define ANVL_SHEBANG_AML "#!aml"
+#define ANVL_SHEBANG_AMP "#!amp"
 /* ------------------------------------------------------------------ */
 /* Statement Types                                                   */
 /* ------------------------------------------------------------------ */
@@ -211,3 +212,31 @@ struct anvl_value {
       } collection;
    } data;
 };
+
+/* ================================================================ */
+/* BLOB ENCODING HELPERS (for AMP dialect scalar blobs)             */
+/* ================================================================ */
+/* Blob scalar encoding (used in AMP dialect):
+ * - position: source position of backtick content (unchanged)
+ * - length: encodes both tag length and content length
+ *   * Upper 8 bits (byte[7]) = tag length (0-255)
+ *   * Lower 56 bits (bytes[0-6]) = content length (0-72 PB)
+ *
+ * This allows blobs to remain scalar without wrapper arrays,
+ * while preserving tag information for post-parse resolution.
+ */
+
+/* Extract tag length from encoded length field (upper 8 bits) */
+static inline uint8_t blob_tag_length(usize encoded_length) {
+   return (uint8_t)((encoded_length >> 56) & 0xFF);
+}
+
+/* Extract content length from encoded length field (lower 56 bits) */
+static inline usize blob_content_length(usize encoded_length) {
+   return encoded_length & 0x00FFFFFFFFFFFFFF;
+}
+
+/* Encode tag length and content length into a single usize */
+static inline usize blob_encode_length(uint8_t tag_length, usize content_length) {
+   return ((usize)tag_length << 56) | (content_length & 0x00FFFFFFFFFFFFFF);
+}

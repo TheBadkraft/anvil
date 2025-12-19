@@ -1006,6 +1006,9 @@ static anvl_dialect source_parse_dialect(source self, anvl_dialect current) {
       if (first == 'a' && second == 'm' && third == 'l') {
          source_consume(self, 3);
          return ANVL_DIALECT_AML;
+      } else if (first == 'a' && second == 'm' && third == 'p') {
+         source_consume(self, 3);
+         return ANVL_DIALECT_AMP;
       } else if (first == 'a' && second == 's' && third == 'l') {
          source_consume(self, 3);
          return ANVL_DIALECT_ASL;

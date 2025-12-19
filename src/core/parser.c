@@ -324,100 +324,125 @@ static value parse_value(parser_ctx *p) {
 }
 
 /* ========================================================================
- * parse_blob() - Parse blob values as optional-tag attributed scalars
+ * parse_blob() - Parse blob values
  *
- * Blobs with tags like @json`...` are parsed as 2-element collections:
- *  [0] Tag metadata: pos/len of @identifier in source (type=BLOB)
- *  [1] Content: pos/len of backtick content (type=BLOB)
+ * Two encoding strategies based on dialect:
  *
- * Bare blobs like `...` are parsed as 1-element collections:
- *  [0] Content: pos/len of backtick content (type=BLOB)
+ * Array-based (AML, ASL, AURORA):
+ *   Blobs with tags like @json`...` are parsed as 2-element collections:
+ *    [0] Tag metadata: pos/len of @identifier in source (type=BLOB)
+ *    [1] Content: pos/len of backtick content (type=BLOB)
  *
- * Consumer logic: if element_count == 2, element[0] holds tag metadata
+ *   Bare blobs like `...` are parsed as 1-element collections:
+ *    [0] Content: pos/len of backtick content (type=BLOB)
+ *
+ * Scalar-based (AMP):
+ *   All blobs are stored as VALUE_BLOB scalars with encoded metadata:
+ *    - position: source position of backtick content
+ *    - length: (tag_length << 56) | content_length
+ *     * Upper 8 bits = tag length
+ *     * Lower 56 bits = content length
+ *
  * ======================================================================== */
 static value parse_blob(parser_ctx *p) {
    source s = p->src;
+   anvl_dialect dialect = Source.dialect(s);
 
-   value blob_collection = ci_new_value(p->ctx, ANVL_VALUE_ARRAY);
-   if (!blob_collection) {
-      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-      return NULL;
-   }
+   /* Track tag information for encoding */
+   uint8_t tag_len = 0;
 
-   // Allocate for up to 2 elements (tag + content)
-   anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 2, true);
-   if (!elem_types) {
-      Memory.dispose(blob_collection);
-      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-      return NULL;
-   }
-
-   usize element_count = 0;
-
-   // Check for optional @tag
+   /* Check for optional @tag */
    if (si_match_length(s, "@", 1) == 1) {
-      // Element [0]: Tag metadata (not a separate value type, just BLOB-related metadata)
-      elem_types[0] = ANVL_VALUE_BLOB; // Mark as blob-related (no separate type needed)
-      si_consume(s, 1);                // consume @
+      si_consume(s, 1); /* consume @ */
 
-      usize tag_len = 0;
       while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
          si_consume(s, 1);
          tag_len++;
       }
 
-      if (tag_len == 0) { // Only @ with no identifier
+      if (tag_len == 0) { /* Only @ with no identifier */
          parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
-         Memory.dispose(elem_types);
-         Memory.dispose(blob_collection);
          return NULL;
       }
-      element_count = 1; // We have tag as element [0], now add content as element [1]
 
-      // BLOB ENCODING RULE: No whitespace allowed between tag and opening backtick
-      // This ensures tag position is deterministic (immediately precedes content)
+      /* BLOB ENCODING RULE: No whitespace allowed between tag and opening backtick
+       * This ensures tag position is deterministic (immediately precedes content)
+       */
       if (si_peek(s) != '`') {
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-         Memory.dispose(elem_types);
-         Memory.dispose(blob_collection);
          return NULL;
       }
    }
 
-   // Element [1 or 0]: BLOB content (between backticks)
+   /* BLOB content (between backticks) */
    if (si_peek(s) != '`') {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-      Memory.dispose(elem_types);
-      Memory.dispose(blob_collection);
       return NULL;
    }
+   si_consume(s, 1); /* consume opening backtick */
 
-   elem_types[element_count] = ANVL_VALUE_BLOB;
-   si_consume(s, 1); // consume opening backtick
+   usize content_pos = si_position(s);
+   usize content_len = 0;
 
    while (!si_is_eof(s)) {
       if (si_peek(s) == '`')
          break;
       si_consume(s, 1);
+      content_len++;
    }
 
    if (si_peek(s) != '`') {
       parser_error(ANVL_ERR_PARSER_UNTERMINATED_BLOB, s);
-      Memory.dispose(elem_types);
-      Memory.dispose(blob_collection);
       return NULL;
    }
-   si_consume(s, 1); // consume closing backtick
+   si_consume(s, 1); /* consume closing backtick */
 
-   // Final element count
-   element_count++;
+   /* Create blob value based on dialect */
+   if (dialect == ANVL_DIALECT_AMP) {
+      /* AMP: Scalar blob with encoded tag length in length field */
+      value blob = ci_new_value(p->ctx, ANVL_VALUE_BLOB);
+      if (!blob) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return NULL;
+      }
+      blob->data.scalar.pos = content_pos;
+      blob->data.scalar.len = blob_encode_length(tag_len, content_len);
+      return blob;
+   } else {
+      /* Array-based (AML, ASL, AURORA): Collection with tag and content as separate elements */
+      value blob_collection = ci_new_value(p->ctx, ANVL_VALUE_ARRAY);
+      if (!blob_collection) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return NULL;
+      }
 
-   // Set up collection metadata
-   blob_collection->data.collection.element_start = 0;
-   blob_collection->data.collection.element_count = element_count;
-   blob_collection->data.collection._elem_types_temp = elem_types;
+      /* Allocate for up to 2 elements (tag + content) */
+      anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 2, true);
+      if (!elem_types) {
+         Memory.dispose(blob_collection);
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return NULL;
+      }
 
-   return blob_collection;
+      usize element_count = 0;
+
+      /* Element [0]: Tag metadata (if tag present) */
+      if (tag_len > 0) {
+         elem_types[0] = ANVL_VALUE_BLOB;
+         element_count = 1;
+      }
+
+      /* Element [0 or 1]: Content */
+      elem_types[element_count] = ANVL_VALUE_BLOB;
+      element_count++;
+
+      /* Set up collection metadata */
+      blob_collection->data.collection.element_start = 0;
+      blob_collection->data.collection.element_count = element_count;
+      blob_collection->data.collection._elem_types_temp = elem_types;
+
+      return blob_collection;
+   }
 }
 
 static value parse_object(parser_ctx *p) {

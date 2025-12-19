@@ -1,0 +1,28 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                   Anvil Parser Performance Benchmark                           ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+File                                   Size         Time    Stmts   Throughput
+──────────────────────────── ──────────── ──────────── ──────── ────────────
+assignments.anvl                      461 B    27.75 µs        8       15.84 MB/s
+objects.anvl                          391 B     5.75 µs        0       64.87 MB/s
+inherits.anvl                         448 B     2.15 µs        0      199.18 MB/s
+numbers.anvl                          596 B       309 ns        0     1839.45 MB/s
+attributes.anvl                       660 B     8.82 µs        0       71.34 MB/s
+arrays.anvl                          1.2 KB    80.92 µs        8       14.74 MB/s
+tuples.anvl                           344 B    28.30 µs        6       11.59 MB/s
+modpack.anvl                         7.0 KB     9.80 µs        0      699.54 MB/s
+large_dataset.anvl                   2.2 KB     1.48 µs        0     1440.82 MB/s
+complex_nested.anvl                  3.1 KB       895 ns        0     3370.36 MB/s
+repetitive_data.anvl                 3.7 KB     1.52 µs        0     2347.84 MB/s
+deep_nesting.anvl                    1.8 KB     1.39 µs        0     1270.65 MB/s
+════════════════════════════ ════════════════ ════════════════ ════════ ════════════════
+
+📊 SUMMARY:
+   Successful files: 12
+   Total data:       21.8 KB
+   Total parse time: 169.07 µs
+   Average per file:  0.01 ms
+   Overall throughput: 125.97 MB/s
+
+✅ Performance measurement complete
