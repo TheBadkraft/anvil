@@ -56,9 +56,11 @@ static void dispose_value_tree(value v) {
 }
 
 static void dispose_statement(statement stmt) {
-   // All statements are owned by context->stmt_list, not the parser
-   // This function kept for API compatibility but does nothing
-   (void)stmt;
+   // Free statements that failed to parse before being added to context list
+   // Statements successfully added to context->stmt_list are freed via Context.dispose()
+   if (stmt) {
+      Memory.dispose(stmt);
+   }
 }
 
 static bool parse_source(parser_ctx *p) {

@@ -20,6 +20,9 @@
  */
 #pragma once
 
+/* Version identifier */
+#define ANVIL_VERSION "v.0.1.0-alpha"
+
 #include "constants.h"
 #include "context.h"
 #include "errors.h"
