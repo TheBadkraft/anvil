@@ -1,50 +1,50 @@
-[1] Meta-Buffer Infrastructure:  20 :         2025-12-19  19:10:02
+[1] Meta-Buffer Infrastructure:  20 :         2025-12-19  19:25:46
 =================================================================
-Test 1.1: stmt->base_meta = 0x5827417c0fb0
+Test 1.1: stmt->base_meta = 0x5b6c51b41fb0
   stmt->meta[STMT_META_TYPE] = 0
   stmt->meta[STMT_META_BASE_IDX] = 1
 base_meta: pos=8, len=6
-Running: Base meta buffer exists                99.612 us  [PASS]
+Running: Base meta buffer exists                38.198 us  [PASS]
 Test 1.2: stmt->meta[STMT_META_TYPE] = 0 (expected ASSN=0)
-  stmt->base_meta = 0x5827417c0fb0
-Running: Base meta allocation                    8.143 us  [PASS]
+  stmt->base_meta = 0x5b6c51b41fb0
+Running: Base meta allocation                    7.938 us  [PASS]
 Base class metadata: pos=10, len=9
-Running: Base meta add entry                     5.368 us  [PASS]
+Running: Base meta add entry                     5.402 us  [PASS]
 Retrieved base: parent
-Running: Base meta retrieve entry                5.844 us  [PASS]
+Running: Base meta retrieve entry                6.910 us  [PASS]
 Inheritance: myclass : (base at pos=10, len=6)
-Running: Inheritance simple                      5.682 us  [PASS]
+Running: Inheritance simple                      5.430 us  [PASS]
 Statement attributes count: 0
-Running: Inheritance with attributes             7.111 us  [PASS]
-Test 2.1: stmt->value_meta = 0x5827417c0eb0
+Running: Inheritance with attributes            20.672 us  [PASS]
+Test 2.1: stmt->value_meta = 0x5b6c51b41eb0
   stmt->meta[STMT_META_VALUE_IDX] = 1
 Scalar value_meta: type=0, pos=8, len=7
-Running: Value meta buffer exists                6.549 us  [PASS]
+Running: Value meta buffer exists                6.404 us  [PASS]
 Test 2.2: value_meta->pos=11, len=13
 Scalar at pos=11, len=13
-Running: Value meta scalar                       5.431 us  [PASS]
-Test 2.3: element_count=5, element_meta=0x5827417c12e0
+Running: Value meta scalar                       6.071 us  [PASS]
+Test 2.3: element_count=5, element_meta=0x5b6c51b422e0
 Array with 5 elements, each has pos/len/type metadata
-Running: Value meta array                       11.076 us  [PASS]
-Test 2.4: element_count=3, elements=0x5827417c11d0
+Running: Value meta array                       24.037 us  [PASS]
+Test 2.4: element_count=3, elements=0x5b6c51b421d0
   Element[0] type=1 (expected OBJECT=3)
   Element[1] type=3 (expected TUPLE=2)
   Element[2] type=0 (expected SCALAR=0)
 Mixed array elements: object, tuple, scalar with proper metadata
-Running: Value meta mixed array                 14.139 us  [PASS]
+Running: Value meta mixed array                 16.127 us  [PASS]
 Object with 2 fields
-Running: Value meta object                       6.816 us  [PASS]
+Running: Value meta object                       7.210 us  [PASS]
 Nested object: 2 top-level fields
-Running: Value meta nested object               10.309 us  [PASS]
-Running: Value meta object mixed types          15.149 us  [PASS]
-Running: Value meta inherited object             9.787 us  [PASS]
-Running: Value meta single field object          5.626 us  [PASS]
-Running: Attribute metadata population          18.312 us  [PASS]
-Running: Inheritance single base only           13.644 us  [PASS]
-Running: Complex nested structure               39.322 us  [PASS]
+Running: Value meta nested object               24.023 us  [PASS]
+Running: Value meta object mixed types          32.419 us  [PASS]
+Running: Value meta inherited object            21.934 us  [PASS]
+Running: Value meta single field object         24.391 us  [PASS]
+Running: Attribute metadata population          11.123 us  [PASS]
+Running: Inheritance single base only            6.181 us  [PASS]
+Running: Complex nested structure               26.473 us  [PASS]
 ERROR: Parse failed - Expected ':=' after identifier (code: 2002)
-Running: Attributes with inheritance and objects  54.494 us  [PASS]
-Running: Blob tag metadata                       6.735 us  [FAIL]
+Running: Attributes with inheritance and objects   7.739 us  [PASS]
+Running: Blob tag metadata                       4.608 us  [FAIL]
 =================================================================
 [1]     TESTS= 20        PASS= 19        FAIL=  1        SKIP=  0
 

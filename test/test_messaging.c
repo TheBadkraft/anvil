@@ -55,6 +55,8 @@ static context parse_amp_content(const char *content, bool expect_success) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
+   
    if (!ctx) {
       return NULL;
    }
@@ -288,6 +290,7 @@ static void test_amp_envelope_file_parsing(void) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
    Assert.isNotNull(ctx, "Context should build from AMP content");
 
    if (ctx) {
@@ -315,6 +318,7 @@ static void test_amp_metabuffer_value_spans(void) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
    Assert.isNotNull(ctx, "Context should build");
 
    if (ctx) {
@@ -357,6 +361,7 @@ static void test_amp_response_envelope(void) {
    Assert.isTrue(loaded, "AMP response file should load");
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
    Assert.isNotNull(ctx, "Context should build from response file");
 
    if (ctx) {
@@ -390,6 +395,7 @@ static void test_amp_event_envelope(void) {
    Assert.isTrue(loaded, "AMP event file should load");
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
    Assert.isNotNull(ctx, "Context should build from event file");
 
    if (ctx) {

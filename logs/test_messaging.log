@@ -1,26 +1,25 @@
-[1] AMP Messaging Protocol Tests:  17 :         2025-12-19  19:23:20
+[1] AMP Messaging Protocol Tests:  17 :         2025-12-19  19:31:52
 =================================================================
-Running: AMP scalar string                      25.418 us  [PASS]
-Running: AMP scalar number                       3.136 us  [PASS]
-Running: AMP scalar boolean                      2.547 us  [PASS]
-Running: AMP scalar blob                         3.415 us  [PASS]
-Running: AMP multiple messages                   5.930 us  [PASS]
-Running: AMP rejects objects                     1.681 us  [PASS]
-Running: AMP rejects arrays                      1.313 us  [PASS]
-Running: AMP rejects tuples                      1.203 us  [PASS]
-Running: AMP rejects attributes                  0.656 us  [PASS]
-Running: AMP rejects inheritance                 1.170 us  [PASS]
-Running: AML allows objects                      4.568 us  [PASS]
-Running: AML allows inheritance                  2.436 us  [PASS]
-Running: Dialect detection - AMP                 0.709 us  [PASS]
-Running: AMP envelope file parsing              11.491 us  [PASS]
-Running: AMP meta-buffer VALUE spans             4.457 us  [PASS]
-Running: AMP response envelope                  22.543 us  [PASS]
-Running: AMP event envelope                     19.851 us  [PASS]
+Running: AMP scalar string                      11.704 us  [PASS]
+Running: AMP scalar number                       2.807 us  [PASS]
+Running: AMP scalar boolean                      2.328 us  [PASS]
+Running: AMP scalar blob                         3.185 us  [PASS]
+Running: AMP multiple messages                   5.447 us  [PASS]
+Running: AMP rejects objects                     1.614 us  [PASS]
+Running: AMP rejects arrays                      1.178 us  [PASS]
+Running: AMP rejects tuples                      1.151 us  [PASS]
+Running: AMP rejects attributes                  0.584 us  [PASS]
+Running: AMP rejects inheritance                 1.036 us  [PASS]
+Running: AML allows objects                      4.070 us  [PASS]
+Running: AML allows inheritance                  2.256 us  [PASS]
+Running: Dialect detection - AMP                 0.602 us  [PASS]
+Running: AMP envelope file parsing              10.746 us  [PASS]
+Running: AMP meta-buffer VALUE spans             4.179 us  [PASS]
+Running: AMP response envelope                  22.441 us  [PASS]
+Running: AMP event envelope                     18.435 us  [PASS]
 =================================================================
 [1]     TESTS= 17        PASS= 17        FAIL=  0        SKIP=  0
 
 ===== Memory Allocations Report =================================
-WARNING: MEMORY LEAK — 4 unfreed allocation(s)
-  Total mallocs:                138
-  Total frees:                  134
+  Total mallocs:                0
+  Total frees:                  0
