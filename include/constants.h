@@ -38,10 +38,10 @@
 /* Dialect: AML vs ASL vs AMP vs Aurora                               */
 /* ------------------------------------------------------------------ */
 typedef enum {
-   ANVL_DIALECT_AML,     // Anvil Markup Language (full features)
-   ANVL_DIALECT_ASL,     // Anvil Script Language (future)
-   ANVL_DIALECT_AMP,     // Anvil Messaging Protocol (scalars + blobs only)
-   ANVL_DIALECT_AURORA   // Generic dialect (for generic.aurora samples)
+   ANVL_DIALECT_AML,   // Anvil Markup Language (full features)
+   ANVL_DIALECT_ASL,   // Anvil Script Language (future)
+   ANVL_DIALECT_AMP,   // Anvil Messaging Protocol (scalars + blobs only)
+   ANVL_DIALECT_AURORA // Generic dialect (for generic.aurora samples)
 } anvl_dialect;
 
 /* ------------------------------------------------------------------ */
@@ -58,6 +58,7 @@ typedef enum {
 #define ANVL_SHEBANG_LEN 5
 #define ANVL_EXT_LEN 4
 #define ANVL_SHEBANG_AML "#!aml"
+#define ANVL_SHEBANG_AMP "#!amp"
 #define ANVL_SHEBANG_ASL "#!asl"
 #define ANVL_EXT_AML ".aml"
 #define ANVL_EXT_ASL ".asl"

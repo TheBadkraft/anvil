@@ -35,13 +35,6 @@
 #define ANVIL_BUILD_CANDIDATE "dev" // dev, alpha, beta, rc, stable
 
 /* ------------------------------------------------------------------ */
-/* Constants                                                          */
-/* ------------------------------------------------------------------ */
-#define ANVL_SHEBANG_LEN 5
-#define ANVL_EXT_LEN 4
-#define ANVL_SHEBANG_AML "#!aml"
-#define ANVL_SHEBANG_AMP "#!amp"
-/* ------------------------------------------------------------------ */
 /* Statement Types                                                   */
 /* ------------------------------------------------------------------ */
 typedef enum {
