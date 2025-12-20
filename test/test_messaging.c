@@ -56,7 +56,7 @@ static context parse_amp_content(const char *content, bool expect_success) {
 
    context ctx = builder->build(builder);
    builder->dispose(builder); // CRITICAL: dispose builder to free source from Memory.dispose
-   
+
    if (!ctx) {
       return NULL;
    }
@@ -219,6 +219,7 @@ static void test_aml_allows_objects(void) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source
    Assert.isNotNull(ctx, "AML context should build");
 
    if (ctx) {
@@ -243,6 +244,7 @@ static void test_aml_allows_inheritance(void) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source
    Assert.isNotNull(ctx, "AML context should build");
 
    if (ctx) {
@@ -267,6 +269,7 @@ static void test_dialect_detection_amp(void) {
    builder->set_source(builder, content, strlen(content));
 
    context ctx = builder->build(builder);
+   builder->dispose(builder); // CRITICAL: dispose builder to free source
    Assert.isNotNull(ctx, "Context should build");
 
    if (ctx) {

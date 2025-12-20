@@ -705,7 +705,7 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
 
 static void builder_dispose(struct anvl_ctx_builder_i *self) {
    if (self->source) {
-      Memory.dispose(self->source);
+      Source.dispose(self->source);
    }
    self->source = NULL;
 }
