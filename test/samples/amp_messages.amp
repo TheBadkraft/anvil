@@ -1,0 +1,5 @@
+#!amp
+user_id := 12345
+username := "alice"
+is_active := true
+timestamp := 1703071200

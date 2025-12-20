@@ -1,0 +1,4 @@
+#!amp
+status_code := 200
+message := "OK"
+response_time_ms := 45

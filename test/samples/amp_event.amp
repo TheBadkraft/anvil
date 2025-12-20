@@ -1,0 +1,6 @@
+#!amp
+event_type := "user_login"
+user_id := 42
+device_id := "mobile-001"
+location := "US-CA"
+session_duration := 3600

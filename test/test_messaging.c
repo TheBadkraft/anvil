@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test/utilities/helpers.h"
+
 /* ================================================================== */
 /* Helper: Parse AMP content with error checking                      */
 /* ================================================================== */
@@ -258,6 +260,150 @@ static void test_dialect_detection_amp(void) {
 }
 
 /* ================================================================== */
+/* Test 14: AMP envelope meta-buffer validation - messages content    */
+/* ================================================================== */
+static void test_amp_envelope_file_parsing(void) {
+   const char *content = "#!amp\nuser_id := 12345\nusername := \"alice\"\nis_active := true\ntimestamp := 1703071200";
+
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   Assert.isNotNull(builder, "Builder should not be null");
+
+   builder->set_dialect(builder, ANVL_DIALECT_AMP);
+   builder->set_source(builder, content, strlen(content));
+
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should build from AMP content");
+
+   if (ctx) {
+      anvl_dialect dialect = Context.dialect(ctx);
+      Assert.isTrue(dialect == ANVL_DIALECT_AMP, "Dialect should be AMP");
+
+      bool result = Context.parse(ctx);
+      Assert.isTrue(result, "AMP envelope should parse successfully");
+
+      usize stmt_count = Context.statement_count(ctx);
+      Assert.isTrue(stmt_count == 4, "Should have 4 messages (statements)");
+
+      Context.dispose(ctx);
+   }
+}
+
+/* ================================================================== */
+/* Test 15: AMP meta-buffer structure - verify no inheritance/attrs   */
+/* ================================================================== */
+static void test_amp_metabuffer_value_spans(void) {
+   const char *content = "#!amp\nstatus := 200\nmessage := \"OK\"";
+
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_dialect(builder, ANVL_DIALECT_AMP);
+   builder->set_source(builder, content, strlen(content));
+
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should build");
+
+   if (ctx) {
+      bool result = Context.parse(ctx);
+      Assert.isTrue(result, "AMP content should parse");
+
+      usize stmt_count = Context.statement_count(ctx);
+      Assert.isTrue(stmt_count == 2, "Should have 2 statements");
+
+      // Verify AMP statements don't have inheritance or attributes
+      statement stmt1 = Context.get_statement(ctx, 0);
+      Assert.isNotNull(stmt1, "First statement should exist");
+
+      // In AMP, no inheritance allowed
+      Assert.isTrue(stmt1->base_meta == NULL, "AMP should have no base_meta");
+      Assert.isTrue(stmt1->meta[STMT_META_BASE_IDX] == 0, "STMT_META_BASE_IDX should be 0");
+
+      // In AMP, no attributes allowed
+      Assert.isTrue(stmt1->attr_meta == NULL, "AMP should have no attr_meta");
+      Assert.isTrue(stmt1->meta[STMT_META_ATTR_IDX] == 0, "STMT_META_ATTR_IDX should be 0");
+
+      // Second statement should also be clean
+      statement stmt2 = Context.get_statement(ctx, 1);
+      Assert.isNotNull(stmt2, "Second statement should exist");
+      Assert.isTrue(stmt2->base_meta == NULL, "Second statement has no base_meta");
+      Assert.isTrue(stmt2->attr_meta == NULL, "Second statement has no attr_meta");
+
+      Context.dispose(ctx);
+   }
+}
+
+/* ================================================================== */
+/* Test 16: AMP response envelope - meta-buffer structure             */
+/* ================================================================== */
+static void test_amp_response_envelope(void) {
+   const char *filepath = get_source_path("amp_response.amp");
+
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   bool loaded = builder->load_file(builder, filepath);
+   Assert.isTrue(loaded, "AMP response file should load");
+
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should build from response file");
+
+   if (ctx) {
+      bool result = Context.parse(ctx);
+      Assert.isTrue(result, "Response envelope should parse");
+
+      usize stmt_count = Context.statement_count(ctx);
+      Assert.isTrue(stmt_count == 3, "Should have 3 response fields");
+
+      // Check first statement (status_code := 200)
+      statement stmt = Context.get_statement(ctx, 0);
+      Assert.isNotNull(stmt, "First statement should exist");
+
+      // AMP statements should NOT have base_meta or attr_meta
+      Assert.isTrue(stmt->base_meta == NULL, "AMP statement should not have base_meta");
+      Assert.isTrue(stmt->meta[STMT_META_BASE_IDX] == 0, "AMP STMT_META_BASE_IDX should be 0");
+      Assert.isTrue(stmt->meta[STMT_META_ATTR_IDX] == 0, "AMP STMT_META_ATTR_IDX should be 0");
+
+      Context.dispose(ctx);
+   }
+}
+
+/* ================================================================== */
+/* Test 17: AMP event envelope - multiple scalars with validation     */
+/* ================================================================== */
+static void test_amp_event_envelope(void) {
+   const char *filepath = get_source_path("amp_event.amp");
+
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   bool loaded = builder->load_file(builder, filepath);
+   Assert.isTrue(loaded, "AMP event file should load");
+
+   context ctx = builder->build(builder);
+   Assert.isNotNull(ctx, "Context should build from event file");
+
+   if (ctx) {
+      bool result = Context.parse(ctx);
+      Assert.isTrue(result, "Event envelope should parse");
+
+      usize stmt_count = Context.statement_count(ctx);
+      Assert.isTrue(stmt_count == 5, "Event should have 5 fields");
+
+      // All statements should be ANVL_STMT_MSSG or ANVL_STMT_ASSN in AMP
+      for (usize i = 0; i < stmt_count; i++) {
+         statement stmt = Context.get_statement(ctx, i);
+         Assert.isNotNull(stmt, "Statement should exist");
+
+         anvl_stmt_type stmt_type = (anvl_stmt_type)stmt->meta[STMT_META_TYPE];
+         // In AMP, statements are assignment statements (can be reinterpreted as MSSG later)
+         Assert.isTrue(stmt_type == ANVL_STMT_ASSN || stmt_type == ANVL_STMT_MSSG,
+                       "AMP statement should be ASSN or MSSG");
+
+         // Verify no inheritance or attributes
+         Assert.isTrue(stmt->base_meta == NULL, "No inheritance in AMP");
+         Assert.isTrue(stmt->attr_meta == NULL, "No attributes in AMP");
+      }
+
+      Context.dispose(ctx);
+   }
+}
+
+
+/* ================================================================== */
 /* Test registration using sigtest framework                          */
 /* ================================================================== */
 __attribute__((constructor)) static void register_test_messaging(void) {
@@ -283,4 +429,10 @@ __attribute__((constructor)) static void register_test_messaging(void) {
 
    // Dialect detection
    testcase("Dialect detection - AMP", test_dialect_detection_amp);
+
+   // AMP envelope files with meta-buffer validation
+   testcase("AMP envelope file parsing", test_amp_envelope_file_parsing);
+   testcase("AMP meta-buffer VALUE spans", test_amp_metabuffer_value_spans);
+   testcase("AMP response envelope", test_amp_response_envelope);
+   testcase("AMP event envelope", test_amp_event_envelope);
 }
