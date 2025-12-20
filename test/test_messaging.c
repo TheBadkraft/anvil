@@ -30,6 +30,19 @@
 #include "../test/utilities/helpers.h"
 
 /* ================================================================== */
+/* Test Setup and Teardown                                            */
+/* ================================================================== */
+static void setup_messaging(FILE **logger) {
+   *logger = fopen("logs/test_messaging.log", "w");
+   Memory.init();
+}
+
+static void teardown_messaging(void) {
+   Anvil.cleanup();
+   Memory.teardown();
+}
+
+/* ================================================================== */
 /* Helper: Parse AMP content with error checking                      */
 /* ================================================================== */
 static context parse_amp_content(const char *content, bool expect_success) {
@@ -210,8 +223,9 @@ static void test_aml_allows_objects(void) {
       Anvil.error_clear();
       bool result = Context.parse(ctx);
       Assert.isTrue(result, "AML object parse should succeed");
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -233,8 +247,9 @@ static void test_aml_allows_inheritance(void) {
       Anvil.error_clear();
       bool result = Context.parse(ctx);
       Assert.isTrue(result, "AML inheritance parse should succeed");
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -255,8 +270,9 @@ static void test_dialect_detection_amp(void) {
    if (ctx) {
       anvl_dialect detected = Context.dialect(ctx);
       Assert.isTrue(detected == ANVL_DIALECT_AMP, "Should detect AMP from shebang");
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -283,9 +299,9 @@ static void test_amp_envelope_file_parsing(void) {
 
       usize stmt_count = Context.statement_count(ctx);
       Assert.isTrue(stmt_count == 4, "Should have 4 messages (statements)");
-
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -325,9 +341,9 @@ static void test_amp_metabuffer_value_spans(void) {
       Assert.isNotNull(stmt2, "Second statement should exist");
       Assert.isTrue(stmt2->base_meta == NULL, "Second statement has no base_meta");
       Assert.isTrue(stmt2->attr_meta == NULL, "Second statement has no attr_meta");
-
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -358,9 +374,9 @@ static void test_amp_response_envelope(void) {
       Assert.isTrue(stmt->base_meta == NULL, "AMP statement should not have base_meta");
       Assert.isTrue(stmt->meta[STMT_META_BASE_IDX] == 0, "AMP STMT_META_BASE_IDX should be 0");
       Assert.isTrue(stmt->meta[STMT_META_ATTR_IDX] == 0, "AMP STMT_META_ATTR_IDX should be 0");
-
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
 
 /* ================================================================== */
@@ -397,17 +413,16 @@ static void test_amp_event_envelope(void) {
          Assert.isTrue(stmt->base_meta == NULL, "No inheritance in AMP");
          Assert.isTrue(stmt->attr_meta == NULL, "No attributes in AMP");
       }
-
-      Context.dispose(ctx);
    }
+   if (ctx)
+      Context.dispose(ctx);
 }
-
 
 /* ================================================================== */
 /* Test registration using sigtest framework                          */
 /* ================================================================== */
 __attribute__((constructor)) static void register_test_messaging(void) {
-   testset("AMP Messaging Protocol Tests", NULL, NULL);
+   testset("AMP Messaging Protocol Tests", setup_messaging, teardown_messaging);
 
    // Valid AMP messages (scalars only)
    testcase("AMP scalar string", test_amp_scalar_string);

@@ -318,7 +318,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
 static value parse_value(parser_ctx *p) {
    source s = p->src;
-   
+
    // AMP dialect validation: no complex types allowed
    anvl_dialect dialect = Source.dialect(s);
    if (dialect == ANVL_DIALECT_AMP) {
@@ -335,7 +335,7 @@ static value parse_value(parser_ctx *p) {
          return NULL;
       }
    }
-   
+
    if (si_match_length(s, "{", 1) == 1)
       return parse_object(p);
    if (si_match_length(s, "[", 1) == 1)
@@ -484,13 +484,13 @@ static value parse_blob(parser_ctx *p) {
 
 static value parse_object(parser_ctx *p) {
    source s = p->src;
-   
+
    // AMP dialect validation: objects not allowed
    if (Source.dialect(s) == ANVL_DIALECT_AMP) {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
       return NULL;
    }
-   
+
    si_consume(s, 1); // consume '{'
    si_skip_whitespace_and_comments(s);
 
@@ -580,13 +580,13 @@ static value parse_object(parser_ctx *p) {
 
 static value parse_array(parser_ctx *p) {
    source s = p->src;
-   
+
    // AMP dialect validation: arrays not allowed
    if (Source.dialect(s) == ANVL_DIALECT_AMP) {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
       return NULL;
    }
-   
+
    si_consume(s, 1); // consume '['
    si_skip_whitespace_and_comments(s);
 
@@ -654,13 +654,13 @@ static value parse_array(parser_ctx *p) {
 
 static value parse_tuple(parser_ctx *p) {
    source s = p->src;
-   
+
    // AMP dialect validation: tuples not allowed
    if (Source.dialect(s) == ANVL_DIALECT_AMP) {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
       return NULL;
    }
-   
+
    si_consume(s, 1); // consume '('
    si_skip_whitespace_and_comments(s);
 
