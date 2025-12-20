@@ -193,7 +193,7 @@ static void test_amp_reject_inheritance(void) {
 /* Test 11: AML allows objects - should still work                    */
 /* ================================================================== */
 static void test_aml_allows_objects(void) {
-   const char *content = "#!aml\ndata := {key: \"value\"}";
+   const char *content = "data := { key := \"value\" }";
 
    anvl_ctx_builder_i *builder = Context.get_builder();
    Assert.isNotNull(builder, "Builder should not be null");
@@ -205,6 +205,7 @@ static void test_aml_allows_objects(void) {
    Assert.isNotNull(ctx, "AML context should build");
 
    if (ctx) {
+      Anvil.error_clear();
       bool result = Context.parse(ctx);
       Assert.isTrue(result, "AML object parse should succeed");
       Context.dispose(ctx);
@@ -215,7 +216,7 @@ static void test_aml_allows_objects(void) {
 /* Test 12: Bare colon (inheritance) in AML still works               */
 /* ================================================================== */
 static void test_aml_allows_inheritance(void) {
-   const char *content = "#!aml\nderived : base";
+   const char *content = "derived := base";
 
    anvl_ctx_builder_i *builder = Context.get_builder();
    Assert.isNotNull(builder, "Builder should not be null");
@@ -227,6 +228,7 @@ static void test_aml_allows_inheritance(void) {
    Assert.isNotNull(ctx, "AML context should build");
 
    if (ctx) {
+      Anvil.error_clear();
       bool result = Context.parse(ctx);
       Assert.isTrue(result, "AML inheritance parse should succeed");
       Context.dispose(ctx);
@@ -256,35 +258,29 @@ static void test_dialect_detection_amp(void) {
 }
 
 /* ================================================================== */
-/* Main test runner                                                   */
+/* Test registration using sigtest framework                          */
 /* ================================================================== */
-int main(void) {
-   printf("\n╔════════════════════════════════════════════════════════════════╗\n");
-   printf("║         AMP (Anvil Messaging Protocol) Validation Tests       ║\n");
-   printf("╚════════════════════════════════════════════════════════════════╝\n\n");
+__attribute__((constructor)) static void register_test_messaging(void) {
+   testset("AMP Messaging Protocol Tests", NULL, NULL);
 
-   // Valid AMP messages
-   Test.run(test_amp_scalar_string, "Test 1: AMP scalar string");
-   Test.run(test_amp_scalar_number, "Test 2: AMP scalar number");
-   Test.run(test_amp_scalar_boolean, "Test 3: AMP scalar boolean");
-   Test.run(test_amp_scalar_blob, "Test 4: AMP scalar blob");
-   Test.run(test_amp_multiple_messages, "Test 5: AMP multiple messages");
+   // Valid AMP messages (scalars only)
+   testcase("AMP scalar string", test_amp_scalar_string);
+   testcase("AMP scalar number", test_amp_scalar_number);
+   testcase("AMP scalar boolean", test_amp_scalar_boolean);
+   testcase("AMP scalar blob", test_amp_scalar_blob);
+   testcase("AMP multiple messages", test_amp_multiple_messages);
 
    // Invalid AMP messages (should be rejected)
-   Test.run(test_amp_reject_object, "Test 6: AMP rejects objects");
-   Test.run(test_amp_reject_array, "Test 7: AMP rejects arrays");
-   Test.run(test_amp_reject_tuple, "Test 8: AMP rejects tuples");
-   Test.run(test_amp_reject_attributes, "Test 9: AMP rejects attributes");
-   Test.run(test_amp_reject_inheritance, "Test 10: AMP rejects inheritance");
+   testcase("AMP rejects objects", test_amp_reject_object);
+   testcase("AMP rejects arrays", test_amp_reject_array);
+   testcase("AMP rejects tuples", test_amp_reject_tuple);
+   testcase("AMP rejects attributes", test_amp_reject_attributes);
+   testcase("AMP rejects inheritance", test_amp_reject_inheritance);
 
    // Backward compatibility (AML should still work)
-   Test.run(test_aml_allows_objects, "Test 11: AML allows objects");
-   Test.run(test_aml_allows_inheritance, "Test 12: AML allows inheritance");
+   testcase("AML allows objects", test_aml_allows_objects);
+   testcase("AML allows inheritance", test_aml_allows_inheritance);
 
    // Dialect detection
-   Test.run(test_dialect_detection_amp, "Test 13: Dialect detection - AMP");
-
-   printf("\n✅ AMP validation tests complete\n");
-   Anvil.cleanup();
-   return 0;
+   testcase("Dialect detection - AMP", test_dialect_detection_amp);
 }

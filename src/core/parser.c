@@ -65,6 +65,13 @@ static bool parse_source(parser_ctx *p) {
    si_skip_whitespace_and_comments(p->src);
 
    // Module attributes (prefix only)
+   // AMP dialect does not allow module-level attributes
+   if (Source.dialect(p->src) == ANVL_DIALECT_AMP) {
+      if (si_match_length(p->src, "@[", 2) == 2) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, p->src);
+         return false;
+      }
+   }
    while (si_match_length(p->src, "@[", 2) == 2) {
       if (!parse_attribute_block(p, NULL, NULL))
          return false;
@@ -119,6 +126,11 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    struct anvl_base_meta *base_meta = NULL;
    usize base_pos = 0, base_len = 0;
    if (si_match_length(s, ":", 1) == 1 && si_peek_offset(s, 1) != '=') {
+      // AMP dialect does not allow inheritance (bare : operator)
+      if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return false;
+      }
       si_consume(s, 1);
       si_skip_whitespace_and_comments(s);
       if (!read_identifier(p, &base_pos, &base_len))
@@ -138,6 +150,13 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    struct anvl_attr_meta *attr_meta = NULL;
    usize attrib_start = p->ctx->attr_list.count;
    while (si_match_length(s, "@[", 2) == 2) {
+      // AMP dialect does not allow attributes
+      if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         if (base_meta)
+            Memory.dispose(base_meta);
+         return false;
+      }
       if (!parse_attribute_block(p, NULL, NULL))
          return false;
       si_skip_whitespace_and_comments(s);
@@ -299,6 +318,24 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
 static value parse_value(parser_ctx *p) {
    source s = p->src;
+   
+   // AMP dialect validation: no complex types allowed
+   anvl_dialect dialect = Source.dialect(s);
+   if (dialect == ANVL_DIALECT_AMP) {
+      if (si_match_length(s, "{", 1) == 1) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return NULL;
+      }
+      if (si_match_length(s, "[", 1) == 1) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return NULL;
+      }
+      if (si_match_length(s, "(", 1) == 1) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return NULL;
+      }
+   }
+   
    if (si_match_length(s, "{", 1) == 1)
       return parse_object(p);
    if (si_match_length(s, "[", 1) == 1)
@@ -447,6 +484,13 @@ static value parse_blob(parser_ctx *p) {
 
 static value parse_object(parser_ctx *p) {
    source s = p->src;
+   
+   // AMP dialect validation: objects not allowed
+   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return NULL;
+   }
+   
    si_consume(s, 1); // consume '{'
    si_skip_whitespace_and_comments(s);
 
@@ -536,6 +580,13 @@ static value parse_object(parser_ctx *p) {
 
 static value parse_array(parser_ctx *p) {
    source s = p->src;
+   
+   // AMP dialect validation: arrays not allowed
+   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return NULL;
+   }
+   
    si_consume(s, 1); // consume '['
    si_skip_whitespace_and_comments(s);
 
@@ -603,6 +654,13 @@ static value parse_array(parser_ctx *p) {
 
 static value parse_tuple(parser_ctx *p) {
    source s = p->src;
+   
+   // AMP dialect validation: tuples not allowed
+   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return NULL;
+   }
+   
    si_consume(s, 1); // consume '('
    si_skip_whitespace_and_comments(s);
 
