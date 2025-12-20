@@ -101,8 +101,8 @@ None - this is the initial release.
 ### Dependencies
 
 - C23 (ISO/IEC 9899:2023)
-- sigtest framework (testing only, not in production library)
-- sigcore library (testing only)
+- **SigmaTest** framework 
+- **SigmaCore** library
 
 ### Files Changed
 
