@@ -1,0 +1,31 @@
+# Sample with mixed binary-looking and text blob content
+@certificate_pem = `-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKzJq5t7nKOOMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+aWRnaXRzIFB0eSBMdGQwHhcNMjUxMjE5MTQzMDAwWhcNMjYxMjE5MTQzMDAwWjBF
+MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
+-----END CERTIFICATE-----`
+
+@multi_format = `{
+  "text": "This is plain text content with multiple lines that can include special characters: !@#$%^&*()",
+  "binary_hex": "48656c6c6f20576f726c6420f09f9881",
+  "unicode": "こんにちは世界 🌍 مرحبا بالعالم",
+  "nested": {
+    "level1": {
+      "level2": {
+        "data": "deeply nested content with [special] {chars} and \"quotes\""
+      }
+    }
+  }
+}`
+
+@log_entries = `2025-12-19 14:30:01.234 [INFO ] Service started with PID 12345
+2025-12-19 14:30:02.567 [DEBUG] Initializing connection pool: 20 connections
+2025-12-19 14:30:03.890 [DEBUG] Loading configuration from /etc/app/config.yml
+2025-12-19 14:30:05.123 [INFO ] Server listening on 0.0.0.0:8080
+2025-12-19 14:30:10.456 [WARN ] Slow query detected: SELECT * FROM users took 2345ms
+2025-12-19 14:30:15.789 [ERROR] Failed to connect to database: Connection timeout after 30000ms
+2025-12-19 14:30:16.012 [INFO ] Retrying connection (attempt 2/5)
+2025-12-19 14:30:17.345 [INFO ] Database connection restored`
+
+@protobuf_like = `\x08\x96\x01\x12\x04Test\x1a\x0f{\"key\":\"value\"}\x22\x03\x80\x02\xc0\x84=`

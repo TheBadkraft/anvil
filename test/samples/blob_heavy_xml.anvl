@@ -1,0 +1,16 @@
+# Sample with XML-like blob data
+@document = `<message xmlns="http://example.com/msg" version="1.0"><header><from>alice@example.com</from><to>bob@example.com</to><timestamp>2025-12-19T14:30:45Z</timestamp></header><body><content type="text/plain">This is a test message with multiple lines of text content</content><metadata><tags><tag>important</tag><tag>urgent</tag></tags><priority>high</priority></metadata></body></message>`
+
+@payload = `<?xml version="1.0"?><root><items><item id="1"><name>Widget A</name><price currency="USD">29.99</price><stock>150</stock></item><item id="2"><name>Widget B</name><price currency="USD">39.99</price><stock>87</stock></item></items></root>`
+
+@encoded = `VGhpcyBpcyBhIGZha2UgYmFzZTY0IGVuY29kZWQgYmluYXJ5IGRhdGEgdGhhdCBjb250YWlucyBtdWx0aXBsZSBjaHVua3Mgb2YgZmlsZSBpbmZvcm1hdGlvbiBhbGxvd2luZyBmb3IgZWZmaWNpZW50IHN0b3JhZ2U=`
+
+@template = `
+<html>
+<head><title>Report for Q4 2025</title></head>
+<body>
+<section><h1>Executive Summary</h1><p>This quarter showed significant growth across all metrics.</p></section>
+<section><h2>Financial Overview</h2><table><tr><td>Revenue</td><td>$2.5M</td></tr><tr><td>Expenses</td><td>$1.8M</td></tr></table></section>
+</body>
+</html>
+`

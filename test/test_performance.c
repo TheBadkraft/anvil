@@ -142,6 +142,10 @@ int main(void) {
        "test/samples/complex_nested.anvl",
        "test/samples/repetitive_data.anvl",
        "test/samples/deep_nesting.anvl",
+       "test/samples/blob_heavy_json.anvl",
+       "test/samples/blob_heavy_xml.anvl",
+       "test/samples/blob_heavy_csv.anvl",
+       "test/samples/blob_heavy_mixed.anvl",
        NULL};
 
    /* Run benchmarks */

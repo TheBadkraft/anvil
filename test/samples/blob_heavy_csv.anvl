@@ -1,0 +1,35 @@
+# Sample with CSV-like and highly structured blob data
+@raw_csv = `timestamp,user_id,action,resource_id,status_code,response_time_ms
+2025-12-19T14:30:01Z,usr-001,GET,res-123,200,45.2
+2025-12-19T14:30:02Z,usr-002,POST,res-456,201,120.5
+2025-12-19T14:30:03Z,usr-001,GET,res-123,200,43.8
+2025-12-19T14:30:04Z,usr-003,DELETE,res-789,204,15.3
+2025-12-19T14:30:05Z,usr-002,GET,res-456,304,5.1
+2025-12-19T14:30:06Z,usr-004,POST,res-new,201,250.7
+2025-12-19T14:30:07Z,usr-001,PATCH,res-123,200,87.4`
+
+@structured_data = `[{"session_id":"s-001","user":"alice","duration_sec":1800,"actions":[{"ts":"14:30:01","op":"login"},{"ts":"14:30:45","op":"view_page"},{"ts":"14:31:20","op":"create_item"},{"ts":"15:00:00","op":"logout"}]},{"session_id":"s-002","user":"bob","duration_sec":2400,"actions":[{"ts":"14:35:10","op":"login"},{"ts":"14:36:00","op":"search"},{"ts":"14:50:30","op":"download"}]}]`
+
+@config_block = `
+version: 2.0
+database:
+  primary:
+    host: db-primary.example.com
+    port: 5432
+    replicas:
+      - db-replica-1.example.com:5432
+      - db-replica-2.example.com:5432
+  cache:
+    redis_nodes:
+      - node1:6379
+      - node2:6379
+    ttl_seconds: 3600
+logging:
+  level: INFO
+  outputs:
+    - type: file
+      path: /var/log/app.log
+      rotation: daily
+    - type: elasticsearch
+      hosts: [es1:9200, es2:9200]
+`

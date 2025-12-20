@@ -1,0 +1,15 @@
+# Sample file with dense JSON blob data
+@config = `{"database":{"host":"localhost","port":5432,"pool_size":20,"ssl":true,"credentials":{"username":"admin","password":"secret"}},"cache":{"ttl":3600,"strategy":"lru"},"logging":{"level":"debug","format":"json","destinations":["stdout","file"]}}`
+
+@metrics = `{"timestamp":"2025-12-19T14:30:45Z","events":{"login":42,"logout":38,"api_call":1523,"error":12},"performance":{"avg_response_ms":45.2,"p99_response_ms":234.1}}`
+
+@schema = `{"tables":[{"name":"users","columns":[{"name":"id","type":"uuid"},{"name":"email","type":"string","unique":true},{"name":"created_at","type":"timestamp"}]},{"name":"events","columns":[{"name":"id","type":"bigint"},{"name":"user_id","type":"uuid"},{"name":"event_type","type":"string"}]}]}`
+
+@certificates = `{
+  "certs": [
+    {"id":"cert-001","issuer":"Let's Encrypt","expires":"2026-12-19","fingerprint":"sha256:abc123..."},
+    {"id":"cert-002","issuer":"DigiCert","expires":"2025-06-15","fingerprint":"sha256:def456..."}
+  ]
+}`
+
+@response = `{"status":"success","data":{"records":[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"},{"id":3,"name":"Charlie"}]},"meta":{"timestamp":"2025-12-19T14:30:45Z","request_id":"req-789"}}`
