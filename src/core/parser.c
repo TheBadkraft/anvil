@@ -1,5 +1,20 @@
-// New direct-construction parser (builder-free)
-// Parses AML/ASL into context-owned statements/values.
+/*
+ * Copyright (c) 2025 Quantum Override. All rights reserved.
+ *
+ * This software is proprietary and confidential. Unauthorized copying,
+ * distribution, modification, or use of this software, via any medium,
+ * is strictly prohibited without express written permission from the
+ * copyright holder.
+ *
+ * SPDX-License-Identifier: Proprietary
+ * ------------------------------------------------------------------
+ * parser.c - Implementation of Anvil parser
+ * ------------------------------------------------------------------
+ * Author: BadKraft
+ * Created: 2025-12-13
+ * File: src/core/parser.c
+ * ------------------------------------------------------------------
+ */
 
 #include "anvil.h"
 #include "context_internal.h"
