@@ -1,5 +1,6 @@
 # Anvil — The Final Data Language  
-**ANVL · Version 1.0 · December 2025**  
+**ANVL · Version 0.1.0-alpha · December 20, 2025**  
+
 **Private Repository · Internal Reference Implementation**
 
 ```text
@@ -18,8 +19,10 @@
 
 Anvil is not another config format.  
 Anvil is the **end** of config formats.
+Anvil is not just another languge.
+Anvil is a paradigm shift in data structure, object modelling, and messaging.
 
-Zero-copy · Typeless · Human-first · Blazing fast · Dual-dialect · Immutable AST · Perfect round-tripping · Resolver-pluggable · Built to replace every legacy data language in existence.
+Zero-copy · Typeless · Human-first · Blazing fast · Multi-dialect (AML, AMP, ASL-**TBD**) · Immutable AST-**TBD** · Perfect round-tripping · Resolver-**TBD** · Built to replace every legacy data language in existence.
 
 This repository contains the **reference implementation of Anvil in pure C**, with official first-class bindings for the only languages that matter.
 
@@ -45,12 +48,12 @@ anvil/                     ← this repo (private)
 ## Core Principles (Non-Negotiable)
 
 | Principle                         | Status |
-|-----------------------------------|--------|
+|-----------------------------------|---------|
 | Single source of truth: `core/include/anvil.h` | Locked |
 | Public API = one global `const struct anvil_interface Anvil` | Locked |
 | Zero-copy parsing, spans into original buffer | Locked |
-| Immutable AST, round-trip identical writer | Locked |
-| Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | Locked |
+| Immutable AST, round-trip identical writer | **TBD** (v0.2.0) |
+| Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | **TBD** (v0.2.0) |
 | No macros except literal constants | Locked |
 | No CMake. GNU Makefile until AnvilBuild exists | Locked |
 | C23 default, C11 fallback only when forced | Locked |
@@ -60,29 +63,32 @@ anvil/                     ← this repo (private)
 | Dialect | Purpose                          | Status     |
 |--------|----------------------------------|------------|
 | AML    | Declarative data modeling        | Complete   |
-| ASL    | Lightweight imperative scripting | In progress (functions, `$call()`, VM) |
+| AMP    | Anvil Messaging Protocol         | Complete   |
+| ASL    | Lightweight imperative scripting | **TBD** (v0.2.0) |
 
 ## Bindings Status (Official Only)
 
 | Binding   | Language     | Status            | Repository       |
 |-----------|--------------|-------------------|------------------|
-| Anvil.J   | Java 21+     | Production (v0.1.7) | [`anvil-engine`] |
-| Anvil.CS  | C# / .NET 8  | Planned Q1 2026   | —                |
-| Anvil.CPP  | C++20/23     | Planned           | —                |
-| Anvil.PY  | Python 3.12+ | Planned           | —                |
-| Anvil.R   | Rust 1.75+   | Planned           | —                |
+| Anvil.J   | Java 21+     | **TBD** (Planned Q1 2026) | —          |
+| Anvil.CS  | C# / .NET 8  | **TBD** (Planned Q1 2026) | —          |
+| Anvil.CPP | C++20/23     | **TBD** (Planned Q2 2026) | —          |
+| Anvil.PY  | Python 3.12+ | **TBD** (Planned Q2 2026) | —          |
+| Anvil.R   | Rust 1.75+   | **TBD** (Planned Q3 2026) | —          |
 
-The `anvil-engine` in Java is a _proof of concept_ library. It is free to be replicated, forked, clones, modified, and distributed.
+No official bindings exist yet. The Java implementation referenced in prior work was a proof of concept.
 
-All bindings consume the exact same C interface. No exceptions. No sugar in core.
+## Performance Metrics
 
-## Performance (Current Java Baseline – C Will Crush It)
+| Metric                              | Previous (Java POC) | Current C (v0.1.0-alpha) | Target (v1.0) |
+|-------------------------------------|---------------------|--------------------------|---------------|
+| 8 KB real-world config parse        | ~25 µs              | Benchmarking in progress | < 10 µs       |
+| 64 KB enterprise config parse       | ~120 µs             | **TBD** (pending perf run) | < 50 µs       |
+| 1 MB data file parse                | ~2000 µs            | **TBD** (pending perf run) | < 800 µs      |
+| Heap allocations (hot path)         | 0                   | 0                        | 0             |
+| Memory peak during parse            | < 64 KB             | **TBD** (pending measurement) | < 32 KB       |
 
-| Metric                       | Java 21 (warm) | C Target (2026) |
-|------------------------------|----------------|-----------------|
-| 8 KB real-world config parse | ~25 µs        | < 15 µs         |
-| Heap allocations (hot path)   | 0              | 0               |
-| Memory peak                  | < 64 KB        | < 32 KB         |
+Note: First three entries are from Java proof-of-concept. C implementation performance benchmarking in progress. Zero-allocation guarantee maintained through meta-buffer and direct construction approach.
 
 C version will be faster, smaller, and run on bare metal without a JVM.
 
@@ -90,10 +96,12 @@ C version will be faster, smaller, and run on bare metal without a JVM.
 
 | Milestone         | Target   | Content                                      |
 |-------------------|----------|----------------------------------------------|
-| Anvil 1.0         | Q1 2026  | Pure C core, full AML complete, ASL functions |
-| AnvilBuild 1.0    | Q2 2026  | Build system written in ASL using `.anvil`   |
-| Anvil 2.0         | 2026    | Multi-file modules, package system, VM       |
-| Anvil Everywhere  | 2027+   | Every major language has an official binding |
+| Anvil 0.1.0-alpha | Dec 2025 | Pure C parser (AML, AMP), zero memory leaks  |
+| Anvil 0.2.0       | Q1 2026  | Immutable AST, Resolver, streaming parser    |
+| Anvil 1.0         | Q2 2026  | Full AML/AMP support, ASL functions, bindings |
+| AnvilBuild 1.0    | Q3 2026  | Build system written in ASL using `.anvil`   |
+| Anvil 2.0         | 2027     | Multi-file modules, package system, VM       |
+| Anvil Everywhere  | 2027+    | Official bindings for major languages        |
 
 ---
 
