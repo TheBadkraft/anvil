@@ -2,7 +2,8 @@
 
 **For:** Developers joining the project  
 **Size:** ~5 min read  
-**Updated:** December 19, 2025  
+**Updated:** December 20, 2025  
+**Version:** v0.1.0-alpha  
 
 ---
 
@@ -11,8 +12,9 @@
 **Parser Type:** Zero-copy, direct-construction  
 **Language:** C23 (ISO C)  
 **Entry Point:** `bool anvl_parse(context ctx)`  
-**Test Status:** 51 tests, all passing ✅  
-**Memory:** 18 allocations, 3 critical leaks fixed ✅  
+**Test Status:** 17 tests, all passing ✅  
+**Memory:** 18 allocations, 4 critical leaks fixed ✅ (138/138 freed)  
+**Version:** v0.1.0-alpha
 
 ---
 

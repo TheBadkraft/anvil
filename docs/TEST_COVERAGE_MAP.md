@@ -2,7 +2,8 @@
 
 **Purpose:** Trace which code paths are exercised by each test  
 **Audience:** QA, code reviewers, debuggers  
-**Updated:** December 19, 2025  
+**Updated:** December 20, 2025  
+**Version:** v0.1.0-alpha  
 
 ---
 
