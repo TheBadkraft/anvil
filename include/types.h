@@ -74,6 +74,18 @@ typedef enum {
 #define STMT_META_VALUE_IDX 7  // index into value_meta
 #define STMT_META_RESERVED_8 8 // reserved for future use
 
+/* ================================================================== */
+/* Statement Metadata Indices (AMP Dialect - Scalar Messaging)        */
+/* ================================================================== */
+/* AMP reinterprets meta[9] for zero-copy scalar messages:
+ * Reuses STMT_META_TYPE, STMT_META_IDENT_POS, STMT_META_IDENT_LEN
+ * Slots [4-5] unused (no inheritance/attributes in AMP)
+ * New slots for direct value access and protocol metadata:
+ */
+#define STMT_META_AMP_VALUE_POS 6 // value span position
+#define STMT_META_AMP_VALUE_LEN 7 // value span length
+#define STMT_META_AMP_FLAGS 8     // compression, UDP part count, encoding hints
+
 /* ------------------------------------------------------------------ */
 /* Forward declarations for recursive structures                      */
 /* ------------------------------------------------------------------ */

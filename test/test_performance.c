@@ -146,6 +146,7 @@ int main(void) {
        "test/samples/blob_heavy_xml.anvl",
        "test/samples/blob_heavy_csv.anvl",
        "test/samples/blob_heavy_mixed.anvl",
+       "test/samples/amp_envelope.anvl",
        NULL};
 
    /* Run benchmarks */
