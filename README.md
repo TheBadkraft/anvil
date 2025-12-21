@@ -18,13 +18,23 @@
 > ~ Badkraft, 2025
 
 Anvil is not another config format.  
-Anvil is the **end** of config formats.
-Anvil is not just another languge.
-Anvil is a paradigm shift in data structure, object modelling, and messaging.
+Anvil is the **end** of config formats.  
+Anvil is not just another languge.  
+Anvil is a paradigm shift in data structure, object modelling, and messaging.  
 
-Zero-copy · Typeless · Human-first · Blazing fast · Multi-dialect (AML, AMP, ASL-**TBD**) · Immutable AST-**TBD** · Perfect round-tripping · Resolver-**TBD** · Built to replace every legacy data language in existence.
+ · Zero-copy · Typeless · Human-first · Fast is an understatment · 
+ · Multi-dialect (AML, AMP, ASL-**TBD**) · Immutable AST-**TBD** · 
+ · Perfect round-tripping · Resolver-**TBD** · 
+  
+### Built to replace every legacy data and configuration language in existence.
 
-This repository contains the **reference implementation of Anvil in pure C**, with official first-class bindings for the only languages that matter.
+This repository contains the **reference implementation of Anvil in pure C**. We will be planning and executing bindings/wrappers in at least 6 other languages or platforms:
+- C++
+- C#/.Net
+- Java
+- Python
+- Rust
+- Node
 
 ## Repository Structure
 
@@ -49,8 +59,7 @@ anvil/                     ← this repo (private)
 
 | Principle                         | Status |
 |-----------------------------------|---------|
-| Single source of truth: `core/include/anvil.h` | Locked |
-| Public API = one global `const struct anvil_interface Anvil` | Locked |
+| Attitude ... because it's earned | Locked |
 | Zero-copy parsing, spans into original buffer | Locked |
 | Immutable AST, round-trip identical writer | **TBD** (v0.2.0) |
 | Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | **TBD** (v0.2.0) |
