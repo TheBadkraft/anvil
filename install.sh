@@ -7,7 +7,8 @@
 set -e
 
 # Configuration
-PREFIX="${1:=/}"
+PREFIX="${1:-/}"
+[ "$PREFIX" = "/" ] && PREFIX="" || PREFIX="${PREFIX%/}/"
 LIB_DIR="${PREFIX}usr/lib"
 INCLUDE_DIR="${PREFIX}usr/include/anvil"
 BIN_DIR="${PREFIX}usr/bin"
