@@ -110,7 +110,9 @@ static inline usize si_match_operator(source s, const char *op, usize n) {
 // Whitespace/comments skipping: delegate to existing implementation for now
 // (We can replace with a fully inlined scanner later once grammar is locked.)
 static inline usize si_skip_whitespace_and_comments(source s) {
-   return Source.skip_whitespace_and_comments(s);
+   usize n = Source.skip_whitespace_and_comments(s);
+   si_consume(s, n);
+   return n;
 }
 
 // Position management helpers

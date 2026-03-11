@@ -19,8 +19,7 @@
 #include "anvil.h"
 #include "context.h"
 #include "utils.h"
-#include <sigcore/memory.h>
-#include <stdlib.h>
+#include <sigma.memory/memory.h>
 #include <string.h>
 
 /* Root structure */
@@ -33,13 +32,19 @@ struct anvl_root_t {
 
 static root anvil_load(const char *filepath) {
    (void)filepath;
-   return Memory.alloc(sizeof(struct anvl_root_t), true); // minimal stub
+   root r = Allocator.alloc(sizeof(struct anvl_root_t)); // minimal stub
+   if (r)
+      memset(r, 0, sizeof(struct anvl_root_t));
+   return r;
 }
 
 static root anvil_read(const char *source, usize len) {
    (void)source;
    (void)len;
-   return Memory.alloc(sizeof(struct anvl_root_t), true); // minimal
+   root r = Allocator.alloc(sizeof(struct anvl_root_t)); // minimal
+   if (r)
+      memset(r, 0, sizeof(struct anvl_root_t));
+   return r;
 }
 
 static void anvil_cleanup(void) {
@@ -54,7 +59,7 @@ static void anvil_cleanup(void) {
 }
 
 static void anvil_dispose(root r) {
-   Memory.dispose(r);
+   Allocator.dispose(r);
 }
 
 static bool anvil_error_is_set(void) {

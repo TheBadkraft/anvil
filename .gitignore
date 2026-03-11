@@ -54,3 +54,18 @@ dkms.conf
 # debug information files
 *.dwo
 /usr
+
+# Build outputs (objects, compiled test binaries)
+build/
+bin/
+
+# Test logs
+logs/
+
+# Valgrind core dumps
+vgcore.*
+
+# Temp / scratch files
+*.txt
+debug_parser.c
+diagnose_tests.c

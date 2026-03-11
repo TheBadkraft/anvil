@@ -10,8 +10,8 @@
  * ------------------------------------------------------------------
  */
 #include "../../include/utils.h"
-#include <sigcore/memory.h>
-#include <sigcore/types.h>
+#include <sigma.core/types.h>
+#include <sigma.memory/memory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

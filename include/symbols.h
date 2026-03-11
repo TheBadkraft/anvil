@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include <sigcore/types.h>
+#include <sigma.core/types.h>
 #include <stdbool.h>
 
 /* ------------------------------------------------------------------ */

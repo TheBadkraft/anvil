@@ -25,7 +25,7 @@
 #include "symbols.h"
 #include "types.h"
 #include "utils.h"
-#include <sigcore/types.h>
+#include <sigma.core/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

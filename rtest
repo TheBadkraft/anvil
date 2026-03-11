@@ -1,0 +1,350 @@
+#!/bin/bash
+# Local Test Runner for Anvil
+# Handles tests in subdirectories (unit/, integration/, performance/, stress/, validation/)
+# Usage: ./rtest <test_spec> [options]
+# e.g., ./rtest unit/parser
+#       ./rtest unit/parser --valgrind
+#       ./rtest unit
+
+set -e
+
+# Source configuration
+if [ -f "./config.sh" ]; then
+    source ./config.sh
+fi
+
+# Set build directories (from config or defaults)
+BUILD_DIR=${BUILD_DIR:-build}
+TST_BUILD_DIR="${BUILD_DIR}/test"
+SRC_DIR=${SRC_DIR:-src}
+TEST_DIR=${TEST_DIR:-test}
+
+# Supported test subdirectories
+TEST_SUBDIRS=("unit" "integration" "performance" "stress" "validation")
+
+# Parse arguments
+USE_VALGRIND=false
+SHOW_HELP=false
+test_spec=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --valgrind)
+            USE_VALGRIND=true
+            shift
+            ;;
+        --help|-h)
+            SHOW_HELP=true
+            shift
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Usage: $0 <test_spec> [--valgrind] [--help]"
+            exit 1
+            ;;
+        *)
+            if [ -z "$test_spec" ]; then
+                test_spec="$1"
+            else
+                echo "Multiple test specs specified. Usage: $0 <test_spec> [--valgrind] [--help]"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ "$SHOW_HELP" = true ]; then
+    echo "Anvil Test Runner (rtest)"
+    echo ""
+    echo "Usage: rtest <test_spec> [options]"
+    echo ""
+    echo "Test Specification:"
+    echo "  name               Run specific test (searches all subdirs)"
+    echo "  subdir/name        Run specific test in subdirectory"
+    echo "  subdir             Run all tests in subdirectory"
+    echo ""
+    echo "Options:"
+    echo "  --valgrind    Run test(s) with valgrind memory checker"
+    echo "  --help, -h    Show this help message"
+    echo ""
+    echo "Supported subdirectories:"
+    for d in "${TEST_SUBDIRS[@]}"; do
+        echo "  - $d/"
+    done
+    echo ""
+    echo "Examples:"
+    echo "  rtest unit/parser              # Run test/unit/test_parser.c"
+    echo "  rtest parser                   # Search all subdirs for test_parser.c"
+    echo "  rtest unit                     # Run all tests in test/unit/"
+    echo "  rtest unit --valgrind          # Run all unit tests with valgrind"
+    exit 0
+fi
+
+if [ -z "$test_spec" ]; then
+    echo "Usage: $0 <test_spec> [--valgrind] [--help]"
+    echo "e.g., $0 unit/parser"
+    echo "     $0 unit"
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Compile library objects (src/core/*.c + src/utilities/*.c)
+# Uses ANVIL_SOURCES / ANVIL_OBJECTS from config.sh if available,
+# otherwise discovers sources here.
+# ---------------------------------------------------------------------------
+compile_library_objects() {
+    if [ ${#ANVIL_SOURCES[@]} -eq 0 ]; then
+        # Fallback discovery (should not happen if config.sh is sourced)
+        shopt -s nullglob
+        _core=("$SRC_DIR/core"/*.c)
+        _util=("$SRC_DIR/utilities"/*.c)
+        ANVIL_SOURCES=("${_core[@]}" "${_util[@]}")
+        ANVIL_OBJECTS=()
+        for _s in "${ANVIL_SOURCES[@]}"; do
+            ANVIL_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+        done
+        unset _core _util _s
+    fi
+
+    mkdir -p "$BUILD_DIR"
+    for i in "${!ANVIL_SOURCES[@]}"; do
+        local src="${ANVIL_SOURCES[$i]}"
+        local obj="${ANVIL_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            ${CC:-gcc} ${CFLAGS:--Wall -Wextra -g -fPIC -std=c2x -I./include -I/usr/local/include} -c "$src" -o "$obj"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Compile test helper objects (test/utilities/helpers.c, etc.)
+# ---------------------------------------------------------------------------
+compile_test_helpers() {
+    mkdir -p "$TST_BUILD_DIR"
+
+    local helper_src="${ANVIL_HELPER_SRC:-$TEST_DIR/utilities/helpers.c}"
+    local helper_obj="${ANVIL_HELPER_OBJ:-$TST_BUILD_DIR/helpers.o}"
+
+    if [ -f "$helper_src" ]; then
+        if [ ! -f "$helper_obj" ] || [ "$helper_src" -nt "$helper_obj" ]; then
+            echo "Compiling $helper_src -> $helper_obj"
+            ${CC:-gcc} ${TST_CFLAGS:--Wall -Wextra -g -fPIC -std=c2x -I./include -I/usr/local/include -DTSTDBG -I./test} \
+                -c "$helper_src" -o "$helper_obj"
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Compile prototype objects (test/utilities/prototype.c) — optional per test
+# ---------------------------------------------------------------------------
+compile_proto_objects() {
+    if [ ${#PROTO_OBJECTS[@]} -eq 0 ]; then
+        return
+    fi
+    mkdir -p "$TST_BUILD_DIR"
+    local proto_src="$TEST_DIR/utilities/prototype.c"
+    local proto_obj="${PROTO_OBJECTS[0]}"
+    if [ -f "$proto_src" ]; then
+        if [ ! -f "$proto_obj" ] || [ "$proto_src" -nt "$proto_obj" ]; then
+            echo "Compiling $proto_src -> $proto_obj"
+            ${CC:-gcc} ${TST_CFLAGS:--Wall -Wextra -g -fPIC -std=c2x -I./include -I/usr/local/include -DTSTDBG -I./test} \
+                -c "$proto_src" -o "$proto_obj"
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Resolve package objects for test linking (TST_REQUIRES or REQUIRES)
+# ---------------------------------------------------------------------------
+resolve_test_packages() {
+    TEST_PKG_OBJECTS=()
+    local req_list=()
+    if declare -p TST_REQUIRES >/dev/null 2>&1; then
+        req_list=("${TST_REQUIRES[@]}")
+    elif declare -p REQUIRES >/dev/null 2>&1; then
+        req_list=("${REQUIRES[@]}")
+    fi
+    for pkg in "${req_list[@]}"; do
+        local pkg_file="/usr/local/packages/${pkg}.o"
+        if [ -f "$pkg_file" ]; then
+            TEST_PKG_OBJECTS+=("$pkg_file")
+        else
+            echo "Warning: package '$pkg' not found at $pkg_file"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Compile and run a single test
+# Args: test_basename subdir
+# ---------------------------------------------------------------------------
+compile_and_run_test() {
+    local test_basename="$1"
+    local subdir="$2"
+    local test_src="$TEST_DIR/$subdir/test_${test_basename}.c"
+
+    if [ ! -f "$test_src" ]; then
+        echo "ERROR: Test source not found: $test_src"
+        return 1
+    fi
+
+    echo "Found test: $test_src"
+
+    # Compile test object
+    local test_obj="$TST_BUILD_DIR/test_${test_basename}.o"
+    mkdir -p "$TST_BUILD_DIR"
+
+    if [ ! -f "$test_obj" ] || [ "$test_src" -nt "$test_obj" ]; then
+        echo "Compiling $test_src -> $test_obj"
+        ${CC:-gcc} ${TST_CFLAGS:--Wall -Wextra -g -fPIC -std=c2x -I./include -I/usr/local/include -DTSTDBG -I./test} \
+            -c "$test_src" -o "$test_obj"
+    fi
+
+    # Determine extra objects based on test config
+    local test_config="${TEST_CONFIGS[$test_basename]:-standard}"
+    local extra_objects=()
+    if [ "$test_config" = "with_proto_objects" ]; then
+        compile_proto_objects
+        extra_objects=("${PROTO_OBJECTS[@]}")
+    elif [ "$test_config" = "with_resolver_objects" ]; then
+        compile_resolver_objects
+        extra_objects=("${RESOLVER_OBJECTS[@]}")
+    fi
+
+    # Resolve packages for this run
+    resolve_test_packages
+
+    local exe="$TST_BUILD_DIR/test_${test_basename}"
+    local helper_obj="${ANVIL_HELPER_OBJ:-$TST_BUILD_DIR/helpers.o}"
+
+    # Check if relinking is needed
+    local needs_relink=false
+    [ ! -f "$exe" ] && needs_relink=true
+    for obj in "${ANVIL_OBJECTS[@]}" "${TEST_PKG_OBJECTS[@]}"; do
+        [ "$obj" -nt "$exe" ] && needs_relink=true && break
+    done
+
+    if [ "$needs_relink" = true ] || [ "$test_obj" -nt "$exe" ]; then
+        echo "Linking test: $exe"
+        # Packages must come first so their __attribute__((constructor)) functions
+        # (e.g. sigma.memory's init_memory_system) run before the test's own
+        # constructors (which call Allocator.alloc via testset()).
+        local link_objs=("${TEST_PKG_OBJECTS[@]}" "$test_obj" "${ANVIL_OBJECTS[@]}")
+        # Add helper if it exists
+        [ -f "$helper_obj" ] && link_objs+=("$helper_obj")
+        # Add any extra (proto) objects
+        [ ${#extra_objects[@]} -gt 0 ] && link_objs+=("${extra_objects[@]}")
+
+        ${CC:-gcc} "${link_objs[@]}" ${TST_LDFLAGS} -o "$exe"
+    fi
+
+    echo ""
+    echo "=== Running test_${test_basename} ($subdir) ==="
+    echo ""
+
+    if [ "$USE_VALGRIND" = true ] && [ "${VALGRIND_ENABLED:-true}" = true ]; then
+        echo "Running with valgrind..."
+        valgrind ${VALGRIND_OPTS:---leak-check=full --show-leak-kinds=all --track-origins=yes} "$exe"
+    else
+        "$exe"
+    fi
+
+    echo ""
+    echo "=== Test complete ==="
+    echo ""
+}
+
+# ---------------------------------------------------------------------------
+# Run all tests in a subdirectory
+# ---------------------------------------------------------------------------
+run_all_tests_in_dir() {
+    local subdir="$1"
+    local test_dir_path="$TEST_DIR/$subdir"
+
+    if [ ! -d "$test_dir_path" ]; then
+        echo "ERROR: Test directory not found: $test_dir_path"
+        exit 1
+    fi
+
+    local test_files=("$test_dir_path"/test_*.c)
+
+    if [ ${#test_files[@]} -eq 0 ] || [ ! -f "${test_files[0]}" ]; then
+        echo "No tests found in $test_dir_path"
+        exit 1
+    fi
+
+    local pass=0 fail=0 total=0
+
+    for test_src in "${test_files[@]}"; do
+        local test_basename
+        test_basename=$(basename "$test_src" .c)
+        test_basename="${test_basename#test_}"  # strip "test_" prefix
+        total=$((total + 1))
+
+        echo "------------------------------------------------------------"
+        if compile_and_run_test "$test_basename" "$subdir"; then
+            pass=$((pass + 1))
+        else
+            fail=$((fail + 1))
+            echo "FAILED: test_${test_basename}"
+        fi
+    done
+
+    echo "========================================"
+    echo "Test Suite Summary ($subdir/)"
+    echo "========================================"
+    echo "  Total:  $total"
+    echo "  Passed: $pass"
+    echo "  Failed: $fail"
+    echo "========================================"
+
+    [ $fail -gt 0 ] && exit 1
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Find a test across all subdirectories
+# ---------------------------------------------------------------------------
+find_test_subdir() {
+    local test_basename="$1"
+    for d in "${TEST_SUBDIRS[@]}"; do
+        if [ -f "$TEST_DIR/$d/test_${test_basename}.c" ]; then
+            echo "$d"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Main: compile shared objects, then dispatch
+# ---------------------------------------------------------------------------
+compile_library_objects
+compile_test_helpers
+
+if [[ "$test_spec" == */* ]]; then
+    # Explicit subdir/name form
+    subdir="${test_spec%%/*}"
+    test_basename="${test_spec#*/}"
+    compile_and_run_test "$test_basename" "$subdir"
+else
+    # Check if it's a subdirectory name
+    is_subdir=false
+    for d in "${TEST_SUBDIRS[@]}"; do
+        [ "$test_spec" = "$d" ] && is_subdir=true && break
+    done
+
+    if [ "$is_subdir" = true ]; then
+        run_all_tests_in_dir "$test_spec"
+    else
+        # Search all subdirs for the test
+        found_subdir=$(find_test_subdir "$test_spec") || {
+            echo "ERROR: test_${test_spec}.c not found in any subdirectory"
+            echo "Searched: ${TEST_SUBDIRS[*]}"
+            exit 1
+        }
+        compile_and_run_test "$test_spec" "$found_subdir"
+    fi
+fi

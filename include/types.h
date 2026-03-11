@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include <sigcore/types.h>
+#include <sigma.core/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -245,3 +245,9 @@ static inline usize blob_content_length(usize encoded_length) {
 static inline usize blob_encode_length(uint8_t tag_length, usize content_length) {
    return ((usize)tag_length << 56) | (content_length & 0x00FFFFFFFFFFFFFF);
 }
+
+/* ------------------------------------------------------------------ */
+/* Type Name Utilities                                               */
+/* ------------------------------------------------------------------ */
+const char *anvl_value_type_name(anvl_value_type type);
+const char *anvl_stmt_type_name(anvl_stmt_type type);
