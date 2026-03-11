@@ -551,6 +551,6 @@ static bool serializer_to_stream(context ctx, FILE *out,
 /* ------------------------------------------------------------------ */
 
 const anvl_serializer_i Serializer = {
-   .serialize  = serializer_serialize,
-   .to_stream  = serializer_to_stream,
+    .serialize = serializer_serialize,
+    .to_stream = serializer_to_stream,
 };
