@@ -276,7 +276,8 @@ static void write_object_fields(context ctx, iw w,
          /* inner_inline=true: write_field_value won't emit newline;
           * we add comma (for non-last) then newline ourselves. */
          write_field_value(ctx, w, f->val, opts, /*inner_inline=*/true);
-         if (!is_last) iw_append(w, ",");
+         if (!is_last)
+            iw_append(w, ",");
          iw_blank(w);
       }
       iw_pop(w);
@@ -507,11 +508,11 @@ static bool write_root(context ctx, iw w,
 }
 
 /* ------------------------------------------------------------------ */
-/* Public API                                                          */
+/* Vtable implementations                                             */
 /* ------------------------------------------------------------------ */
 
-string_builder anvl_serializer_serialize(context ctx,
-                                         const anvl_serializer_options_t *opts) {
+static string_builder serializer_serialize(context ctx,
+                                           const anvl_serializer_options_t *opts) {
    if (!ctx)
       return NULL;
    const anvl_serializer_options_t *o = opts ? opts : &ANVL_SERIALIZER_DEFAULT;
@@ -531,12 +532,12 @@ string_builder anvl_serializer_serialize(context ctx,
    return sb;
 }
 
-bool anvl_serializer_to_stream(context ctx, FILE *out,
-                               const anvl_serializer_options_t *opts) {
+static bool serializer_to_stream(context ctx, FILE *out,
+                                 const anvl_serializer_options_t *opts) {
    if (!ctx || !out)
       return false;
 
-   string_builder sb = anvl_serializer_serialize(ctx, opts);
+   string_builder sb = serializer_serialize(ctx, opts);
    if (!sb)
       return false;
 
@@ -544,3 +545,12 @@ bool anvl_serializer_to_stream(context ctx, FILE *out,
    StringBuilder.dispose(sb);
    return true;
 }
+
+/* ------------------------------------------------------------------ */
+/* Vtable                                                             */
+/* ------------------------------------------------------------------ */
+
+const anvl_serializer_i Serializer = {
+   .serialize  = serializer_serialize,
+   .to_stream  = serializer_to_stream,
+};

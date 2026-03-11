@@ -43,20 +43,21 @@ extern const anvl_serializer_options_t ANVL_SERIALIZER_DEFAULT;
 extern const anvl_serializer_options_t ANVL_SERIALIZER_MINIFIED;
 
 /* ------------------------------------------------------------------ */
-/* Public API                                                         */
+/* Serializer interface (vtable)                                      */
 /* ------------------------------------------------------------------ */
+typedef struct anvl_serializer_i {
+   /**
+    * Serialize context to a string_builder.
+    * Caller must dispose the result via StringBuilder.dispose().
+    * Returns NULL on error (e.g. AMP dialect with object values).
+    */
+   string_builder (*serialize)(context ctx, const anvl_serializer_options_t *opts);
 
-/**
- * Serialize context to a string_builder.
- * Caller must dispose the returned string_builder via StringBuilder.dispose().
- * Returns NULL on error (e.g. AMP dialect with object values).
- */
-string_builder anvl_serializer_serialize(context ctx,
-                                         const anvl_serializer_options_t *opts);
+   /**
+    * Serialize context to a FILE stream.
+    * Returns false on error.
+    */
+   bool (*to_stream)(context ctx, FILE *out, const anvl_serializer_options_t *opts);
+} anvl_serializer_i;
 
-/**
- * Serialize context to a FILE stream.
- * Returns false on error.
- */
-bool anvl_serializer_to_stream(context ctx, FILE *out,
-                               const anvl_serializer_options_t *opts);
+extern const anvl_serializer_i Serializer;

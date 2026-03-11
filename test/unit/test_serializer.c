@@ -78,7 +78,7 @@ static context build_context(const char *src_str) {
 
 /* Serialize ctx, return heap string.  Caller must Allocator.dispose(). */
 static char *serialize(context ctx, const anvl_serializer_options_t *opts) {
-   string_builder sb = anvl_serializer_serialize(ctx, opts);
+   string_builder sb = Serializer.serialize(ctx, opts);
    if (!sb)
       return NULL;
    char *text = (char *)StringBuilder.toString(sb);
@@ -489,7 +489,7 @@ static void test_st08_amp_dialect_shebang_and_guard(void) {
    context ctx2 = build_context(obj_src);
    Assert.isNotNull(ctx2, "AML object context should build");
 
-   string_builder sb = anvl_serializer_serialize(ctx2, &amp_opts);
+   string_builder sb = Serializer.serialize(ctx2, &amp_opts);
    Assert.isNull(sb, "AMP serializer should return NULL for object values");
    Context.dispose(ctx2);
    Anvil.error_clear();
