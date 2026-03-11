@@ -277,19 +277,16 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
             return false;
          }
 
-         // Populate element_meta array from temporary elem_types stored in val
-         anvl_value_type *elem_types = (anvl_value_type *)val->data.collection._elem_types_temp;
-         if (elem_types) {
+         // Populate element_meta from the temporary tracking array (type + pos + len)
+         struct anvl_element_meta *elem_temp =
+             (struct anvl_element_meta *)val->data.collection._elem_types_temp;
+         if (elem_temp) {
             for (usize i = 0; i < elem_count; i++) {
-               elem_meta[i].type = elem_types[i];
-               // TODO: Store pos/len for each element when available
-               // Strategy: Track element source positions during parse_array/parse_tuple
-               // Currently, we only have elem_types from temporary buffer
-               // Need to capture start/end position for each element as it's parsed
-               // Would require position tracking in array/tuple parsing loops
+               elem_meta[i].type = elem_temp[i].type;
+               elem_meta[i].pos = elem_temp[i].pos;
+               elem_meta[i].len = elem_temp[i].len;
             }
-            // Clean up temporary elem_types array
-            Allocator.dispose(elem_types);
+            Allocator.dispose(elem_temp);
             val->data.collection._elem_types_temp = NULL;
          }
 
@@ -458,10 +455,10 @@ static value parse_blob(parser_ctx *p) {
       }
 
       /* Allocate for up to 2 elements (tag + content) */
-      anvl_value_type *elem_types = Allocator.alloc(sizeof(anvl_value_type) * 2);
-      if (elem_types)
-         memset(elem_types, 0, sizeof(anvl_value_type) * 2);
-      if (!elem_types) {
+      struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 2);
+      if (elem_temp)
+         memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 2);
+      if (!elem_temp) {
          Allocator.dispose(blob_collection);
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
          return NULL;
@@ -469,20 +466,20 @@ static value parse_blob(parser_ctx *p) {
 
       usize element_count = 0;
 
-      /* Element [0]: Tag metadata (if tag present) */
+      /* Element [0]: Tag metadata (if tag present) — pos/len are 0 (not needed by serializer) */
       if (tag_len > 0) {
-         elem_types[0] = ANVL_VALUE_BLOB;
+         elem_temp[0].type = ANVL_VALUE_BLOB;
          element_count = 1;
       }
 
-      /* Element [0 or 1]: Content */
-      elem_types[element_count] = ANVL_VALUE_BLOB;
+      /* Element [0 or 1]: Content — pos/len are 0 (serializer uses value_meta->pos/len) */
+      elem_temp[element_count].type = ANVL_VALUE_BLOB;
       element_count++;
 
       /* Set up collection metadata */
       blob_collection->data.collection.element_start = 0;
       blob_collection->data.collection.element_count = element_count;
-      blob_collection->data.collection._elem_types_temp = elem_types;
+      blob_collection->data.collection._elem_types_temp = elem_temp;
 
       return blob_collection;
    }
@@ -601,11 +598,11 @@ static value parse_array(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary array to track element types
-   anvl_value_type *elem_types = Allocator.alloc(sizeof(anvl_value_type) * 256);
-   if (elem_types)
-      memset(elem_types, 0, sizeof(anvl_value_type) * 256);
-   if (!elem_types) {
+   // Build a temporary element_meta array to track type + source position/length per element
+   struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 256);
+   if (elem_temp)
+      memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 256);
+   if (!elem_temp) {
       Allocator.dispose(v);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -614,9 +611,11 @@ static value parse_array(parser_ctx *p) {
    usize element_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != ']') {
+      usize elem_start = si_position(s);
       value elem = parse_value(p);
+      usize elem_end = si_position(s);
       if (!elem) {
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          return NULL;
       }
 
@@ -624,14 +623,16 @@ static value parse_array(parser_ctx *p) {
       if (Source.dialect(s) == ANVL_DIALECT_AMP &&
           elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
       }
 
-      // Store element type for later use in element_meta population
+      // Track element type, start position, and length for use in element_meta
       if (element_count < 256) {
-         elem_types[element_count] = elem->type;
+         elem_temp[element_count].type = elem->type;
+         elem_temp[element_count].pos = elem_start;
+         elem_temp[element_count].len = elem_end - elem_start;
       }
       element_count++;
 
@@ -643,23 +644,22 @@ static value parse_array(parser_ctx *p) {
          break;
       } else {
          parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY, s);
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          return NULL;
       }
    }
 
    if (si_match_length(s, "]", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE, s);
-      Allocator.dispose(elem_types);
+      Allocator.dispose(elem_temp);
       return NULL;
    }
 
    si_consume(s, 1);
 
-   v->data.collection.element_start = 0; // Will be populated by value_meta
+   v->data.collection.element_start = 0;
    v->data.collection.element_count = element_count;
-   // Store element types pointer temporarily (will be used in parse_statement to populate element_meta)
-   v->data.collection._elem_types_temp = elem_types;
+   v->data.collection._elem_types_temp = elem_temp;
    return v;
 }
 
@@ -675,11 +675,11 @@ static value parse_tuple(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary array to track element types
-   anvl_value_type *elem_types = Allocator.alloc(sizeof(anvl_value_type) * 256);
-   if (elem_types)
-      memset(elem_types, 0, sizeof(anvl_value_type) * 256);
-   if (!elem_types) {
+   // Build a temporary element_meta array to track type + source position/length per element
+   struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 256);
+   if (elem_temp)
+      memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 256);
+   if (!elem_temp) {
       Allocator.dispose(v);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -688,9 +688,11 @@ static value parse_tuple(parser_ctx *p) {
    usize element_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != ')') {
+      usize elem_start = si_position(s);
       value elem = parse_value(p);
+      usize elem_end = si_position(s);
       if (!elem) {
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          return NULL;
       }
 
@@ -698,14 +700,16 @@ static value parse_tuple(parser_ctx *p) {
       if (Source.dialect(s) == ANVL_DIALECT_AMP &&
           elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
       }
 
-      // Store element type for later use in element_meta population
+      // Track element type, start position, and length for use in element_meta
       if (element_count < 256) {
-         elem_types[element_count] = elem->type;
+         elem_temp[element_count].type = elem->type;
+         elem_temp[element_count].pos = elem_start;
+         elem_temp[element_count].len = elem_end - elem_start;
       }
       element_count++;
 
@@ -720,23 +724,22 @@ static value parse_tuple(parser_ctx *p) {
             parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
          else
             parser_error(ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE, s);
-         Allocator.dispose(elem_types);
+         Allocator.dispose(elem_temp);
          return NULL;
       }
    }
 
    if (si_match_length(s, ")", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
-      Allocator.dispose(elem_types);
+      Allocator.dispose(elem_temp);
       return NULL;
    }
 
    si_consume(s, 1);
 
-   v->data.collection.element_start = 0; // Will be populated by value_meta
+   v->data.collection.element_start = 0;
    v->data.collection.element_count = element_count;
-   // Store element types pointer temporarily (will be used in parse_statement to populate element_meta)
-   v->data.collection._elem_types_temp = elem_types;
+   v->data.collection._elem_types_temp = elem_temp;
    return v;
 }
 

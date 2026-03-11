@@ -72,6 +72,22 @@ for _s in "${RESOLVER_SOURCES[@]}"; do
 done
 unset _s
 
+# ---------------------------------------------------------------------------
+# Package: anvil.serializer (post-parse optional)
+# Sources: src/serializer/*.c
+# Artifact: anvil.serializer.o  (cpkg anvil.serializer)
+# ---------------------------------------------------------------------------
+shopt -s nullglob
+_SERIALIZER_SRCS=("$SRC_DIR/serializer"/*.c)
+SERIALIZER_SOURCES=("${_SERIALIZER_SRCS[@]}")
+unset _SERIALIZER_SRCS
+
+SERIALIZER_OBJECTS=()
+for _s in "${SERIALIZER_SOURCES[@]}"; do
+    SERIALIZER_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+done
+unset _s
+
 # Test helper object (compiled from test/utilities/helpers.c, linked with every test)
 ANVIL_HELPER_SRC="$TEST_DIR/utilities/helpers.c"
 ANVIL_HELPER_OBJ="$TST_BUILD_DIR/helpers.o"
@@ -112,6 +128,18 @@ compile_resolver_objects() {
     done
 }
 
+compile_serializer_objects() {
+    mkdir -p "$BUILD_DIR"
+    for i in "${!SERIALIZER_SOURCES[@]}"; do
+        local src="${SERIALIZER_SOURCES[$i]}"
+        local obj="${SERIALIZER_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            $CC $CFLAGS -c "$src" -o "$obj"
+        fi
+    done
+}
+
 # ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
@@ -129,11 +157,12 @@ declare -A BUILD_TARGETS=(
 # ---------------------------------------------------------------------------
 # cpkg package definitions
 # Format: "output_name | src_basename1 src_basename2 ..."
-# Usage:  cpkg anvil  |  cpkg anvil.resolver
+# Usage:  cpkg anvil  |  cpkg resolver
 # ---------------------------------------------------------------------------
 declare -A PACKAGES=(
     ["anvil"]="anvil | anvil context errors operators parser symbols types utils"
-    ["anvil.resolver"]="anvil.resolver | resolver"
+    ["resolver"]="anvil.resolver | resolver"
+    ["anvil.serializer"]="anvil.serializer | serializer"
 )
 
 # ---------------------------------------------------------------------------
@@ -142,6 +171,7 @@ declare -A PACKAGES=(
 declare -A TEST_CONFIGS=(
     ["prototype"]="with_proto_objects"
     ["resolver"]="with_resolver_objects"
+    ["serializer"]="with_serializer_objects"
 )
 
 # Prototype objects (linked only for tests that need them)

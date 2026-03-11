@@ -100,6 +100,9 @@ typedef enum {
    // AMP Dialect Errors (440x)
    ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401,
 
+   // Serializer Errors (450x)
+   ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED = 4501,
+
    // Lexer/Scanner Errors (500x)
    ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,
    ANVL_ERR_PARSER_UNTERMINATED_STRING = 5002,

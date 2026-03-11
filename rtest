@@ -211,6 +211,9 @@ compile_and_run_test() {
     elif [ "$test_config" = "with_resolver_objects" ]; then
         compile_resolver_objects
         extra_objects=("${RESOLVER_OBJECTS[@]}")
+    elif [ "$test_config" = "with_serializer_objects" ]; then
+        compile_serializer_objects
+        extra_objects=("${SERIALIZER_OBJECTS[@]}")
     fi
 
     # Resolve packages for this run
