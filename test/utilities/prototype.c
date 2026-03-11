@@ -17,13 +17,16 @@
  */
 
 #include "prototype.h"
+#include <sigma.memory/memory.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
 /* Statement Buffer Allocation/Free                                   */
 /* ------------------------------------------------------------------ */
 stmt_buffer stmt_buffer_alloc(void) {
-   return Memory.alloc(sizeof(struct stmt_buffer), true);
+   void *_r = Allocator.alloc(sizeof(struct stmt_buffer));
+   if (_r) memset(_r, 0, sizeof(struct stmt_buffer));
+   return _r;
 }
 
 void stmt_buffer_free(stmt_buffer sb) {
@@ -33,18 +36,18 @@ void stmt_buffer_free(stmt_buffer sb) {
    // Free sub-buffers
    void *ptr_base = PTR_BASE(sb);
    if (ptr_base) {
-      Memory.dispose(ptr_base);
+      Allocator.dispose(ptr_base);
    }
    void *ptr_attribs = PTR_ATTRIBS(sb);
    if (ptr_attribs) {
-      Memory.dispose(ptr_attribs);
+      Allocator.dispose(ptr_attribs);
    }
    void *ptr_value = PTR_VALUE(sb);
    if (ptr_value) {
-      Memory.dispose(ptr_value);
+      Allocator.dispose(ptr_value);
    }
 
-   Memory.dispose(sb);
+   Allocator.dispose(sb);
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,10 +75,11 @@ void stmt_buffer_set_base(stmt_buffer sb, usize pos, usize len) {
 
    void *old_ptr = PTR_BASE(sb);
    if (old_ptr) {
-      Memory.dispose(old_ptr);
+      Allocator.dispose(old_ptr);
    }
 
-   base_buffer *bb = Memory.alloc(sizeof(base_buffer), true);
+   base_buffer *bb = Allocator.alloc(sizeof(base_buffer));
+   if (bb) memset(bb, 0, sizeof(base_buffer));
    bb->pos = pos;
    bb->len = len;
    sb->buffer[5] = (usize)(uintptr_t)bb;
@@ -87,12 +91,13 @@ void stmt_buffer_set_attribs(stmt_buffer sb, usize count, usize len, usize *pair
 
    void *old_ptr = PTR_ATTRIBS(sb);
    if (old_ptr) {
-      Memory.dispose(old_ptr);
+      Allocator.dispose(old_ptr);
    }
 
    // Allocate for count, len, and 2*count pairs
    usize total_size = sizeof(attribs_buffer) + (2 * count - 1) * sizeof(usize);
-   attribs_buffer *ab = Memory.alloc(total_size, true);
+   attribs_buffer *ab = Allocator.alloc(total_size);
+   if (ab) memset(ab, 0, total_size);
    ab->count = count;
    ab->len = len;
    memcpy(ab->pairs, pairs, 2 * count * sizeof(usize));
@@ -105,10 +110,11 @@ void stmt_buffer_set_value(stmt_buffer sb, usize pos, usize len) {
 
    void *old_ptr = PTR_VALUE(sb);
    if (old_ptr) {
-      Memory.dispose(old_ptr);
+      Allocator.dispose(old_ptr);
    }
 
-   value_buffer *vb = Memory.alloc(sizeof(value_buffer), true);
+   value_buffer *vb = Allocator.alloc(sizeof(value_buffer));
+   if (vb) memset(vb, 0, sizeof(value_buffer));
    vb->pos = pos;
    vb->len = len;
    sb->buffer[8] = (usize)(uintptr_t)vb;

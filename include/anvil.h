@@ -29,7 +29,7 @@
 #include "operators.h"
 #include "symbols.h"
 #include "types.h"
-#include <sigcore/types.h>
+#include <sigma.core/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

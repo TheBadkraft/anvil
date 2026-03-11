@@ -19,7 +19,7 @@
 #pragma once
 
 #include "anvil.h"
-#include <sigcore/memory.h>
+#include <sigma.memory/memory.h>
 
 /* ------------------------------------------------------------------ */
 /* Statement Buffer Structure                                        */

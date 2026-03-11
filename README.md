@@ -1,5 +1,5 @@
 # Anvil — The Final Data Language  
-**ANVL · Version 0.1.0-alpha · December 20, 2025**  
+**ANVL · Version 0.2.0-alpha (pre-release) · March 11, 2026**  
 
 **Private Repository · Internal Reference Implementation**
 
@@ -24,7 +24,7 @@ Anvil is a paradigm shift in data structure, object modelling, and messaging.
 
  · Zero-copy · Typeless · Human-first · Fast is an understatment · 
  · Multi-dialect (AML, AMP, ASL-**TBD**) · Immutable AST-**TBD** · 
- · Perfect round-tripping · Resolver-**TBD** · 
+ · Perfect round-tripping · Resolver-**complete** · AMP arrays/tuples-**complete** · 
   
 ### Built to replace every legacy data and configuration language in existence.
 
@@ -61,8 +61,8 @@ anvil/                     ← this repo (private)
 |-----------------------------------|---------|
 | Attitude ... because it's earned | Locked |
 | Zero-copy parsing, spans into original buffer | Locked |
-| Immutable AST, round-trip identical writer | **TBD** (v0.2.0) |
-| Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | **TBD** (v0.2.0) |
+| Immutable AST, round-trip identical writer | **TBD** (v0.2.0 — Writer pending) |
+| Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | **Partial** (inheritance ✅; vars + imports TBD v0.3.0) |
 | No macros except literal constants | Locked |
 | No CMake. GNU Makefile until AnvilBuild exists | Locked |
 | C23 default, C11 fallback only when forced | Locked |
@@ -72,8 +72,8 @@ anvil/                     ← this repo (private)
 | Dialect | Purpose                          | Status     |
 |--------|----------------------------------|------------|
 | AML    | Declarative data modeling        | Complete   |
-| AMP    | Anvil Messaging Protocol         | Complete   |
-| ASL    | Lightweight imperative scripting | **TBD** (v0.2.0) |
+| AMP    | Anvil Messaging Protocol         | Complete (scalar arrays/tuples v0.1.1) |
+| ASL    | Lightweight imperative scripting | **TBD** (v0.4.0) |
 
 ## Bindings Status (Official Only)
 
@@ -103,14 +103,15 @@ C version will be faster, smaller, and run on bare metal without a JVM.
 
 ## Roadmap
 
-| Milestone         | Target   | Content                                      |
-|-------------------|----------|----------------------------------------------|
-| Anvil 0.1.0-alpha | Dec 2025 | Pure C parser (AML, AMP), zero memory leaks  |
-| Anvil 0.2.0       | Q1 2026  | Immutable AST, Resolver, streaming parser    |
-| Anvil 1.0         | Q2 2026  | Full AML/AMP support, ASL functions, bindings |
-| AnvilBuild 1.0    | Q3 2026  | Build system written in ASL using `.anvil`   |
-| Anvil 2.0         | 2027     | Multi-file modules, package system, VM       |
-| Anvil Everywhere  | 2027+    | Official bindings for major languages        |
+| Milestone              | Target   | Content                                      | Status |
+|------------------------|----------|----------------------------------------------|--------|
+| Anvil 0.1.0-alpha      | Dec 2025 | Pure C parser (AML, AMP), zero memory leaks  | ✅ Released |
+| Anvil 0.1.1-alpha      | Mar 2026 | AMP scalar arrays/tuples, all error codes    | ✅ Released |
+| Anvil 0.2.0-alpha      | Mar 2026 | Inheritance Resolver ✅, Writer (pending)     | ⚠️ In progress |
+| Anvil 0.3.0-alpha      | Q2 2026  | VarRef resolution, Import graph              | ❌ Planned |
+| Anvil 0.4.0-alpha      | Q2 2026  | ASL parser + evaluator core                  | ❌ Planned |
+| Anvil 1.0              | Q3 2026  | Full AML/AMP/ASL, schema validation, bindings | ❌ Planned |
+| AnvilBuild 1.0         | Q4 2026  | Build system written in ASL using `.anvil`   | ❌ Planned |
 
 ---
 

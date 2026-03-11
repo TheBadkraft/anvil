@@ -3,15 +3,15 @@
  */
 
 #include "anvil.h"
-#include <sigcore/memory.h>
+#include <sigma.memory/memory.h>
 #include <sigtest/sigtest.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 // Atomic function 1: Allocate source struct
 static source alloc_source_struct(void) {
-   source src = Memory.alloc(sizeof(struct anvl_source_t), true);
+   source src = Allocator.alloc(sizeof(struct anvl_source_t));
+   if (src) memset(src, 0, sizeof(struct anvl_source_t));
    return src; // Returns allocated struct or NULL on failure
 }
 
@@ -20,7 +20,7 @@ static char *alloc_buffer(const char *data, usize len) {
    if (!data || len == 0) {
       return NULL;
    }
-   char *buffer = malloc(len + 1); // +1 for null terminator
+   char *buffer = Allocator.alloc(len + 1); // +1 for null terminator
    return buffer;                  // Returns allocated buffer or NULL on failure
 }
 
@@ -102,9 +102,9 @@ static source source_create_diagnostic(const char *data, usize len) {
 cleanup:
    if (!success) {
       if (buffer)
-         free(buffer);
+         Allocator.dispose(buffer);
       if (src)
-         Memory.dispose(src);
+         Allocator.dispose(src);
       return NULL;
    }
 

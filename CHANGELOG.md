@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — toward v0.2.0-alpha
+
+### In Progress
+
+- `port/writer` — not yet started; see plan.md for scope
+
+---
+
+## [v0.2.0-alpha] — pre-release (2026-03-11)
+
+**Status:** Resolver complete; pending Writer before tagging  
+**Milestone:** Single-inheritance resolution, cycle detection, lazy merge cache
+
+### Added
+
+- **Inheritance Resolver** (`include/resolver.h`, `src/core/resolver.c`)
+  - `anvl_resolver_build_state(ctx, src)` — validates the inheritance DAG using Kahn's
+    topological sort; returns NULL (no error) when no statements have a base (fast-path)
+  - `anvl_node_state_get_merged_fields(state, idx)` — lazily computes merged field list;
+    derived fields override base fields (last-write-wins); result cached per slot
+  - `anvl_node_state_warm_all(state)` — pre-warms all merge slots eagerly
+  - `anvl_node_state_dispose(state)` — frees all resolver-owned heap
+  - FNV-1a open-addressing hash (`anvl_id_map_t`) for identifier→index mapping
+  - Forward-reference support (derived declared before base — Kahn handles ordering)
+  - `ANVL_ERR_RESOLVER_CYCLE_DETECTED` (4050) — set on cycle in build_state
+  - `ANVL_ERR_RESOLVER_MISSING_BASE` (4051) — deferred; set on first access in get_merged_fields
+
+- **Type name utilities** (`src/core/types.c`)
+  - `anvl_value_type_name(type)` — returns display string for `anvl_value_type` enum values
+  - `anvl_stmt_type_name(type)` — returns display string for `anvl_stmt_type` enum values
+
+- **10 resolver unit tests** (`test/unit/test_resolver.c`)
+  - No-inheritance fast-path
+  - Single-level: inherits unoverridden fields; derived override; base unchanged
+  - Three-level chain: full resolution and midpoint correctness
+  - Forward reference (child declared before parent)
+  - Cycle detection (A:B + B:A)
+  - `warm_all` idempotency
+  - Missing base deferred error
+
+### Fixed
+
+- **`parser.c`**: `value_meta->data.object.field_start` was never set — only `field_count`
+  was transferred from the temporary `value` object to `value_meta` during statement
+  finalization. This meant all object statements appeared to own fields starting at index 0,
+  breaking resolver merge logic, field interrogation, and any future writer output.
+
+### Architecture
+
+- Resolver is a pure post-parse pass: takes a fully-built `context` + `source`,
+  returns a disposable `anvl_node_state_t`; never modifies the context
+- Merge cache holds `field*` pointer arrays pointing back into `ctx->field_list`; no deep copies
+- Topological sort validates the DAG at build-state time; missing bases are deferred until
+  first field access (consistent with Anvil.Net reference behavior)
+
+### Test Results
+
+- 153 tests across 11 test files; 153/153 passing
+- Zero memory leaks
+
+---
+
+## [v0.1.1-alpha] — 2026-03-11
+
+**Status:** Released  
+**Milestone:** AMP scalar arrays/tuples enforcement + all Phase 1–3 error codes
+
+### Added
+
+- **AMP scalar enforcement in arrays and tuples** (`src/core/parser.c`)
+  - `parse_array()` and `parse_tuple()` now reject non-scalar elements in AMP dialect
+  - `ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401` added to `include/errors.h`
+  - AMP arrays/tuples were previously blocked entirely; now allowed with scalar-only enforcement
+
+- **All remaining Phase 1–3 error codes** (`include/errors.h`, `src/core/errors.c`)
+  - Resolver: `ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050`, `ANVL_ERR_RESOLVER_MISSING_BASE = 4051`
+  - Vars: `ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101` … `ANVL_ERR_VARS_KEY_NOT_FOUND = 4105`
+  - Import: `ANVL_ERR_IMPORT_NOT_FIRST = 4201` … `ANVL_ERR_IMPORT_CYCLIC = 4206`
+  - Using: `ANVL_ERR_USING_MODULE_NOT_FOUND = 4305` … `ANVL_ERR_USING_AFTER_STATEMENTS = 4307`
+  - Full message and name table entries added for all new codes
+
+- **5 new AMP parser tests** (`test/unit/test_parser.c`)
+  - Valid AMP scalar array accepted
+  - Valid AMP scalar tuple accepted
+  - AMP array with nested object rejected (4401)
+  - AMP array with nested array rejected (4401)
+  - AMP tuple with nested object rejected (4401)
+
+### Test Results
+
+- 143 tests across 10 test files; 143/143 passing (up from 138 in v0.1.0-alpha)
+
+---
+
 ## [v0.1.0-alpha] - 2025-12-20
 
 **Status:** Production-Ready Parser Release  

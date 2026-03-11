@@ -24,7 +24,8 @@
 #pragma once
 
 #include "context.h"
-#include <sigcore/memory.h>
+#include <sigma.memory/memory.h>
+#include <string.h>
 
 // Ensure capacity helpers (grow by 2x, minimal 8)
 static inline void ci_ensure_stmt_capacity(context ctx, usize need) {
@@ -33,16 +34,17 @@ static inline void ci_ensure_stmt_capacity(context ctx, usize need) {
    usize newcap = ctx->stmt_list.capacity ? ctx->stmt_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
-   if (ctx->stmt_list.statements) {
-      ctx->stmt_list.statements = Memory.realloc(ctx->stmt_list.statements, sizeof(statement) * newcap);
-   } else {
-      ctx->stmt_list.statements = Memory.alloc(sizeof(statement) * newcap, true);
-      if (!ctx->stmt_list.statements) {
-         // Allocation failed - log error
-         anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement array", 0, 0, __FILE__);
-         return;
-      }
+   statement *newbuf = Allocator.alloc(sizeof(statement) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement array", 0, 0, __FILE__);
+      return;
    }
+   memset(newbuf, 0, sizeof(statement) * newcap);
+   if (ctx->stmt_list.statements) {
+      memcpy(newbuf, ctx->stmt_list.statements, sizeof(statement) * ctx->stmt_list.count);
+      Allocator.dispose(ctx->stmt_list.statements);
+   }
+   ctx->stmt_list.statements = newbuf;
    ctx->stmt_list.capacity = newcap;
 }
 
@@ -52,11 +54,15 @@ static inline void ci_ensure_attr_capacity(context ctx, usize need) {
    usize newcap = ctx->attr_list.capacity ? ctx->attr_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
+   attribute *newbuf = Allocator.alloc(sizeof(attribute) * newcap);
+   if (!newbuf)
+      return;
+   memset(newbuf, 0, sizeof(attribute) * newcap);
    if (ctx->attr_list.attributes) {
-      ctx->attr_list.attributes = Memory.realloc(ctx->attr_list.attributes, sizeof(attribute) * newcap);
-   } else {
-      ctx->attr_list.attributes = Memory.alloc(sizeof(attribute) * newcap, true);
+      memcpy(newbuf, ctx->attr_list.attributes, sizeof(attribute) * ctx->attr_list.count);
+      Allocator.dispose(ctx->attr_list.attributes);
    }
+   ctx->attr_list.attributes = newbuf;
    ctx->attr_list.capacity = newcap;
 }
 
@@ -66,34 +72,46 @@ static inline void ci_ensure_field_capacity(context ctx, usize need) {
    usize newcap = ctx->field_list.capacity ? ctx->field_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
+   field *newbuf = Allocator.alloc(sizeof(field) * newcap);
+   if (!newbuf)
+      return;
+   memset(newbuf, 0, sizeof(field) * newcap);
    if (ctx->field_list.fields) {
-      ctx->field_list.fields = Memory.realloc(ctx->field_list.fields, sizeof(field) * newcap);
-   } else {
-      ctx->field_list.fields = Memory.alloc(sizeof(field) * newcap, true);
+      memcpy(newbuf, ctx->field_list.fields, sizeof(field) * ctx->field_list.count);
+      Allocator.dispose(ctx->field_list.fields);
    }
+   ctx->field_list.fields = newbuf;
    ctx->field_list.capacity = newcap;
 }
 
 // Constructors (zero-initialized)
 static inline statement ci_new_statement(context ctx __attribute__((unused)), anvl_stmt_type type) {
-   statement s = Memory.alloc(sizeof(*s), true);
+   statement s = Allocator.alloc(sizeof(*s));
+   if (s)
+      memset(s, 0, sizeof(*s));
    s->meta[STMT_META_TYPE] = (usize)type;
    return s;
 }
 
 static inline value ci_new_value(context ctx __attribute__((unused)), anvl_value_type type) {
-   value v = Memory.alloc(sizeof(*v), true);
+   value v = Allocator.alloc(sizeof(*v));
+   if (v)
+      memset(v, 0, sizeof(*v));
    v->type = type;
    return v;
 }
 
 static inline field ci_new_field(context ctx __attribute__((unused))) {
-   field f = Memory.alloc(sizeof(*f), true);
+   field f = Allocator.alloc(sizeof(*f));
+   if (f)
+      memset(f, 0, sizeof(*f));
    return f;
 }
 
 static inline attribute ci_new_attribute(context ctx __attribute__((unused))) {
-   attribute a = Memory.alloc(sizeof(*a), true);
+   attribute a = Allocator.alloc(sizeof(*a));
+   if (a)
+      memset(a, 0, sizeof(*a));
    return a;
 }
 
@@ -132,7 +150,9 @@ static inline void ci_add_field(context ctx, field f) {
  * Returns the allocated base_meta pointer (caller's responsibility to store).
  */
 static inline struct anvl_base_meta *ci_new_base_meta(void) {
-   struct anvl_base_meta *bm = Memory.alloc(sizeof(*bm), true);
+   struct anvl_base_meta *bm = Allocator.alloc(sizeof(*bm));
+   if (bm)
+      memset(bm, 0, sizeof(*bm));
    return bm;
 }
 
@@ -141,7 +161,9 @@ static inline struct anvl_base_meta *ci_new_base_meta(void) {
  * Returns the allocated value_meta pointer (caller's responsibility to store).
  */
 static inline struct anvl_value_meta *ci_new_value_meta(anvl_value_type type) {
-   struct anvl_value_meta *vm = Memory.alloc(sizeof(*vm), true);
+   struct anvl_value_meta *vm = Allocator.alloc(sizeof(*vm));
+   if (vm)
+      memset(vm, 0, sizeof(*vm));
    if (vm) {
       vm->type = type;
    }
@@ -153,7 +175,9 @@ static inline struct anvl_value_meta *ci_new_value_meta(anvl_value_type type) {
  * Returns the allocated array pointer (caller responsible for storing).
  */
 static inline struct anvl_element_meta *ci_new_element_meta_array(usize count) {
-   struct anvl_element_meta *em = Memory.alloc(sizeof(struct anvl_element_meta) * count, true);
+   struct anvl_element_meta *em = Allocator.alloc(sizeof(struct anvl_element_meta) * count);
+   if (em)
+      memset(em, 0, sizeof(struct anvl_element_meta) * count);
    return em;
 }
 
@@ -162,6 +186,8 @@ static inline struct anvl_element_meta *ci_new_element_meta_array(usize count) {
  * Returns the allocated array pointer (caller responsible for storing).
  */
 static inline struct anvl_attr_meta *ci_new_attr_meta_array(usize count) {
-   struct anvl_attr_meta *am = Memory.alloc(sizeof(struct anvl_attr_meta) * count, true);
+   struct anvl_attr_meta *am = Allocator.alloc(sizeof(struct anvl_attr_meta) * count);
+   if (am)
+      memset(am, 0, sizeof(struct anvl_attr_meta) * count);
    return am;
 }
