@@ -197,6 +197,34 @@ compile_import_objects() {
 }
 
 # ---------------------------------------------------------------------------
+# Package: anvil.asl (post-parse optional)
+# Sources: src/asl/*.c
+# Artifact: anvil.asl.o  (cpkg anvil.asl)
+# ---------------------------------------------------------------------------
+shopt -s nullglob
+_ASL_SRCS=("$SRC_DIR/asl"/*.c)
+ASL_SOURCES=("${_ASL_SRCS[@]}")
+unset _ASL_SRCS
+
+ASL_OBJECTS=()
+for _s in "${ASL_SOURCES[@]}"; do
+    ASL_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+done
+unset _s
+
+compile_asl_objects() {
+    mkdir -p "$BUILD_DIR"
+    for i in "${!ASL_SOURCES[@]}"; do
+        local src="${ASL_SOURCES[$i]}"
+        local obj="${ASL_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            $CC $CFLAGS -c "$src" -o "$obj"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
 declare -A BUILD_TARGETS=(
@@ -231,6 +259,7 @@ declare -A TEST_CONFIGS=(
     ["serializer"]="with_serializer_objects"
     ["vars"]="with_vars_objects"
     ["import"]="with_import_objects"
+    ["asl"]="with_asl_objects"
 )
 
 # Prototype objects (linked only for tests that need them)
