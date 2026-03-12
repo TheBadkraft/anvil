@@ -48,6 +48,7 @@ static bool read_identifier(parser_ctx *p, usize *pos, usize *len);
 static bool parse_vars_block(parser_ctx *p);
 static value parse_varref(parser_ctx *p);
 static value parse_interp_string(parser_ctx *p);
+static bool parse_import_decl(parser_ctx *p);
 
 bool anvl_parse(context ctx) {
    if (!ctx || !ctx->source) {
@@ -84,6 +85,19 @@ static void dispose_statement(statement stmt) {
 
 static bool parse_source(parser_ctx *p) {
    si_skip_whitespace_and_comments(p->src);
+
+   // import declarations — must precede module attributes, vars, and all statements
+   // import is not allowed in AMP dialect
+   while (si_match_length(p->src, "import", 6) == 6 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 6))) {
+      if (Source.dialect(p->src) == ANVL_DIALECT_AMP) {
+         parser_error(ANVL_ERR_IMPORT_AMP_FORBIDDEN, p->src);
+         return false;
+      }
+      if (!parse_import_decl(p))
+         return false;
+      si_skip_whitespace_and_comments(p->src);
+   }
 
    // Module attributes (prefix only)
    // AMP dialect does not allow module-level attributes
@@ -143,6 +157,13 @@ static bool parse_source(parser_ctx *p) {
                          p->src);
             return false;
          }
+      }
+
+      // import after statements is illegal
+      if (si_match_length(p->src, "import", 6) == 6 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 6))) {
+         parser_error(ANVL_ERR_IMPORT_NOT_FIRST, p->src);
+         return false;
       }
 
       statement stmt = ci_new_statement(p->ctx, ANVL_STMT_ASSN);
@@ -1052,6 +1073,78 @@ static bool parse_vars_block(parser_ctx *p) {
    }
    si_consume(s, 1); // consume '}'
 
+   return true;
+}
+
+/* ========================================================================
+ * parse_import_decl() - Parse a single import declaration
+ *
+ * Grammar:  import "path/to/file.aml" [as alias]
+ *
+ * Called from parse_source() before module attributes, vars, and statements.
+ * The "import" keyword has already been confirmed (but not consumed) by the
+ * caller.  All positions/lengths are byte offsets into the source buffer.
+ * ======================================================================== */
+static bool parse_import_decl(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 6); // consume "import"
+   si_skip_whitespace_and_comments(s);
+
+   // Expect opening '"'
+   if (si_peek(s) != '"') {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_CHAR, s);
+      return false;
+   }
+   si_consume(s, 1); // opening '"'
+
+   usize path_pos = si_position(s);
+   bool closed = false;
+   while (!si_is_eof(s)) {
+      char c = si_peek(s);
+      if (c == '"') {
+         closed = true;
+         break;
+      }
+      if (c == '\\') {
+         si_consume(s, 1);
+         if (!si_is_eof(s))
+            si_consume(s, 1);
+      } else {
+         si_consume(s, 1);
+      }
+   }
+   usize path_len = si_position(s) - path_pos;
+   if (!closed) {
+      parser_error(ANVL_ERR_PARSER_UNTERMINATED_STRING, s);
+      return false;
+   }
+   si_consume(s, 1); // closing '"'
+   si_skip_whitespace_and_comments(s);
+
+   // Optional:  as <alias>
+   usize alias_pos = 0;
+   usize alias_len = 0;
+   if (si_match_length(s, "as", 2) == 2 &&
+       !Source.is_identifier_part(si_peek_offset(s, 2))) {
+      si_consume(s, 2); // consume "as"
+      si_skip_whitespace_and_comments(s);
+      if (!Source.is_identifier_start(si_peek(s))) {
+         parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+         return false;
+      }
+      alias_pos = si_position(s);
+      while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+         si_consume(s, 1);
+         alias_len++;
+      }
+   }
+
+   ci_add_import_decl(p->ctx, (struct anvl_import_decl){
+                                  .path_pos = path_pos,
+                                  .path_len = path_len,
+                                  .alias_pos = alias_pos,
+                                  .alias_len = alias_len,
+                              });
    return true;
 }
 

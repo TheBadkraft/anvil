@@ -2,7 +2,7 @@
 **Target: Anvil v1.0.0-rel**  
 **Reference: `~/repos/anvil.net/docs/CoreBoundary.md` (frozen spec authority)**  
 **Target: Anvil.Net `~/repos/anvil.net/Anvil.Net/Anvil.Net.csproj` (frozen backend project)**
-**Last updated: 2026-03-11**
+**Last updated: 2026-03-12**
 
 ---
 
@@ -38,7 +38,7 @@ This is the guiding document for porting all remaining Anvil features from the f
 | Gate | Condition |
 |------|-----------|
 | `v0.2.0-alpha` | Writer + Resolver (inheritance) complete |
-| `v0.3.0-alpha` | VarRef + Import Graph complete |
+| `v0.3.0-alpha` | VarRef + Import Graph complete | VarRef ✅ — Import Graph ✅ |
 | `v0.4.0-alpha` | ASL parser + evaluator core complete |
 | `v0.4.3-alpha` | AMP scalar arrays/tuples complete |
 | `v0.4.5-alpha` | Schema validation core complete |
@@ -75,15 +75,15 @@ This is the guiding document for porting all remaining Anvil features from the f
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Vars block parsing (`vars { }`) | ❌ | |
-| `$identifier` VarRef value type | ❌ | Parsed as new value type; resolved at materialise time against vars state |
-| `$"…{ref}…"` InterpolatedString value type | ❌ | Segment list (literal + ref spans); resolved at materialise time |
-| `anvl_vars_state_t` | ❌ | Holds vars block fields + resolved value table |
-| Circular ref detection (eager, at vars-state construction) | ❌ | |
-| Missing key deferred to first dereference | ❌ | |
-| `ANVL_ERR_VARS_*` error codes (4101–4105) | ⚠️ | Codes defined in `errors.h`; not yet wired |
+| Vars block parsing (`vars { }`) | ✅ | Parsed in `parser.c`; stored as key/value entries in source |
+| `$identifier` VarRef value type | ✅ | `ANVL_VAL_VAR_REF`; resolved at materialise time against vars state |
+| `$"…{ref}…"` InterpolatedString value type | ✅ | `ANVL_VAL_INTERP_STR`; segment list (literal + ref spans) |
+| `anvl_vars_state_t` | ✅ | Implemented in `src/vars/vars.c` |
+| Circular ref detection (eager, at vars-state construction) | ✅ | Detected at `anvl_vars_state_build()` time |
+| Missing key deferred to first dereference | ✅ | `ANVL_ERR_VARS_KEY_NOT_FOUND` on `anvl_vars_materialise()` |
+| `ANVL_ERR_VARS_*` error codes (4101–4105) | ✅ | Defined and wired in `errors.h` / `vars.c` |
 
-### 1.4 · Writer
+### 1.4 · Writer (Serializer)
 **Spec ref**: CoreBoundary.md — writer emits AML/AMP/ASL text from a parsed context
 
 | Item | Status | Notes |
@@ -100,10 +100,10 @@ This is the guiding document for porting all remaining Anvil features from the f
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `anvil_import_graph_t` DAG structure | ❌ | |
-| `anvil_import_check_cycle()` — pure graph algorithm | ❌ | Belongs in core |
-| File I/O callback interface (binding feeds bytes) | ❌ | Core receives buffer/callback; never opens a file descriptor |
-| Import error codes (`ImportFileNotFound`, `ImportCyclicDependency`) | ❌ | |
+| `anvil_import_graph_t` DAG structure | ✅ | `include/import.h`, `src/import/import.c` |
+| `anvil_import_check_cycle()` — pure graph algorithm | ✅ | DFS load-stack in `import.c` |
+| File I/O callback interface (binding feeds bytes) | ✅ | `anvl_import_loader_cb` — core never opens file descriptors |
+| Import error codes (`ImportFileNotFound`, `ImportCyclicDependency`) | ✅ | `ANVL_ERR_IMPORT_*` 4201–4206 |
 
 ---
 
@@ -172,11 +172,11 @@ All items below must be true before tagging `v1.0.0-rel`:
 | All Phase 2 core items complete | ❌ |
 | Sigma.Memory fully integrated (replaces all internal alloc) | ❌ |
 | Sigma.Collections used for AST node/token storage | ❌ |
-| Sigma.Text used for writer output layer | ❌ |
+| Sigma.Text used for string building (vars, serializer) | ✅ | `StringBuilder` in `vars.c` + `serializer.c`; `String` in `context.c` |
 | Public API frozen — `include/anvil.h` matches C ABI sketch in CoreBoundary.md §6 | ❌ |
 | Zero memory leaks (Valgrind) across all test suites | ✅ (current scope) |
 | Performance benchmarks documented in `docs/benchmarks.md` | ❌ |
-| CHANGELOG complete and up to date | ⚠️ (partial — v0.1.0-alpha through v0.2.0-alpha pre-release) |
+| CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.2.2-alpha |
 | All test samples updated for v1.0 feature set | ❌ |
 
 ---
@@ -186,7 +186,7 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Module | File | Lines | Status |
 |--------|------|-------|--------|
 | Core entry point | `src/core/anvil.c` | 79 | ✅ |
-| Parser (AML + AMP) | `src/core/parser.c` | 875 | ✅ |
+| Parser (AML + AMP) | `src/core/parser.c` | 1231 | ✅ |
 | Context | `src/core/context.c` | 1058 | ✅ |
 | Errors | `src/core/errors.c` | 233 | ✅ |
 | Operators | `src/core/operators.c` | 59 | ✅ |
@@ -195,7 +195,7 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Types | `src/core/types.c` | 40 | ✅ type name functions |
 | Resolver | `src/core/resolver.c` | 490 | ✅ Full implementation |
 | Serializer | `src/serializer/serializer.c` | ~550 | ✅ Full implementation |
-| VarRef | *(no file)* | — | ❌ Not started |
+| Vars / VarRef | `src/vars/vars.c` | 287 | ✅ Full implementation (v0.2.2-alpha) |
 | Import graph | *(no file)* | — | ❌ Not started |
 | ASL | *(no file)* | — | ❌ Not started |
 | Schema | *(no file)* | — | ❌ Not started |

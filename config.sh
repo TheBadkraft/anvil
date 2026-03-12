@@ -169,6 +169,34 @@ compile_vars_objects() {
 }
 
 # ---------------------------------------------------------------------------
+# Package: anvil.import (post-parse optional)
+# Sources: src/import/*.c
+# Artifact: anvil.import.o  (cpkg anvil.import)
+# ---------------------------------------------------------------------------
+shopt -s nullglob
+_IMPORT_SRCS=("$SRC_DIR/import"/*.c)
+IMPORT_SOURCES=("${_IMPORT_SRCS[@]}")
+unset _IMPORT_SRCS
+
+IMPORT_OBJECTS=()
+for _s in "${IMPORT_SOURCES[@]}"; do
+    IMPORT_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+done
+unset _s
+
+compile_import_objects() {
+    mkdir -p "$BUILD_DIR"
+    for i in "${!IMPORT_SOURCES[@]}"; do
+        local src="${IMPORT_SOURCES[$i]}"
+        local obj="${IMPORT_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            $CC $CFLAGS -c "$src" -o "$obj"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
 declare -A BUILD_TARGETS=(
@@ -191,6 +219,7 @@ declare -A PACKAGES=(
     ["anvil"]="anvil | anvil context errors operators parser symbols types utils"
     ["resolver"]="anvil.resolver | resolver"
     ["anvil.serializer"]="anvil.serializer | serializer"
+    ["anvil.import"]="anvil.import | import"
 )
 
 # ---------------------------------------------------------------------------
@@ -201,6 +230,7 @@ declare -A TEST_CONFIGS=(
     ["resolver"]="with_resolver_objects"
     ["serializer"]="with_serializer_objects"
     ["vars"]="with_vars_objects"
+    ["import"]="with_import_objects"
 )
 
 # Prototype objects (linked only for tests that need them)

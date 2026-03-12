@@ -17,39 +17,8 @@
 #include "context.h"
 #include "errors.h"
 #include <sigma.memory/memory.h>
+#include <sigma.text/strings.h>
 #include <string.h>
-
-/* ------------------------------------------------------------------ */
-/* Internal string builder                                            */
-/* ------------------------------------------------------------------ */
-typedef struct {
-   char *buf;
-   usize len;
-   usize cap;
-} sb_t;
-
-static bool sb_append(sb_t *sb, const char *data, usize len) {
-   if (len == 0)
-      return true;
-   if (sb->len + len + 1 > sb->cap) {
-      usize newcap = sb->cap ? sb->cap * 2 : 64;
-      while (newcap < sb->len + len + 1)
-         newcap *= 2;
-      char *newbuf = Allocator.alloc(newcap);
-      if (!newbuf)
-         return false;
-      if (sb->buf) {
-         memcpy(newbuf, sb->buf, sb->len);
-         Allocator.dispose(sb->buf);
-      }
-      sb->buf = newbuf;
-      sb->cap = newcap;
-   }
-   memcpy(sb->buf + sb->len, data, len);
-   sb->len += len;
-   sb->buf[sb->len] = '\0';
-   return true;
-}
 
 /* ------------------------------------------------------------------ */
 /* vars_build                                                         */
@@ -266,48 +235,34 @@ static char *vars_materialise_interp(anvl_vars_state_t *state, context ctx,
       return NULL;
 
    const char *src_data = Source.data(ctx->source);
-   sb_t sb = {0};
+   string_builder sb = StringBuilder.new(64);
+   if (!sb) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
+                     anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
+                     0, 0, __FILE__);
+      return NULL;
+   }
 
    for (usize i = 0; i < vm->data.interp_string.segment_count; i++) {
       const struct anvl_interp_segment *seg = &vm->data.interp_string.segments[i];
       if (!seg->is_ref) {
          /* Literal span: copy directly from source */
-         if (!sb_append(&sb, src_data + seg->pos, seg->len)) {
-            if (sb.buf)
-               Allocator.dispose(sb.buf);
-            anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
-                           anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
-                           0, 0, __FILE__);
-            return NULL;
-         }
+         StringBuilder.appendf(sb, "%.*s", (int)seg->len, src_data + seg->pos);
       } else {
          /* Reference hole: resolve the identifier and copy its value */
          usize rpos, rlen;
          anvl_value_type rtype;
          if (!vars_resolve(state, src_data + seg->pos, seg->len, &rpos, &rlen, &rtype)) {
-            if (sb.buf)
-               Allocator.dispose(sb.buf);
+            StringBuilder.dispose(sb);
             return NULL; /* error already set by vars_resolve */
          }
-         if (!sb_append(&sb, src_data + rpos, rlen)) {
-            if (sb.buf)
-               Allocator.dispose(sb.buf);
-            anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
-                           anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
-                           0, 0, __FILE__);
-            return NULL;
-         }
+         StringBuilder.appendf(sb, "%.*s", (int)rlen, src_data + rpos);
       }
    }
 
-   if (!sb.buf) {
-      /* Zero segments or all empty — return empty string */
-      char *empty = Allocator.alloc(1);
-      if (empty)
-         *empty = '\0';
-      return empty;
-   }
-   return sb.buf;
+   string result = StringBuilder.toString(sb);
+   StringBuilder.dispose(sb);
+   return result;
 }
 
 /* ------------------------------------------------------------------ */

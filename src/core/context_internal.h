@@ -111,6 +111,33 @@ static inline void ci_add_vars_entry(context ctx, struct anvl_vars_entry e) {
    ctx->vars_list.entries[ctx->vars_list.count++] = e;
 }
 
+static inline void ci_ensure_import_capacity(context ctx, usize need) {
+   if (ctx->import_list.capacity >= need)
+      return;
+   usize newcap = ctx->import_list.capacity ? ctx->import_list.capacity * 2 : 4;
+   while (newcap < need)
+      newcap *= 2;
+   struct anvl_import_decl *newbuf = Allocator.alloc(sizeof(struct anvl_import_decl) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate import decl array", 0, 0, __FILE__);
+      return;
+   }
+   memset(newbuf, 0, sizeof(struct anvl_import_decl) * newcap);
+   if (ctx->import_list.decls) {
+      memcpy(newbuf, ctx->import_list.decls, sizeof(struct anvl_import_decl) * ctx->import_list.count);
+      Allocator.dispose(ctx->import_list.decls);
+   }
+   ctx->import_list.decls = newbuf;
+   ctx->import_list.capacity = newcap;
+}
+
+static inline void ci_add_import_decl(context ctx, struct anvl_import_decl d) {
+   ci_ensure_import_capacity(ctx, ctx->import_list.count + 1);
+   if (!ctx->import_list.decls)
+      return;
+   ctx->import_list.decls[ctx->import_list.count++] = d;
+}
+
 // Constructors (zero-initialized)
 static inline statement ci_new_statement(context ctx __attribute__((unused)), anvl_stmt_type type) {
    statement s = Allocator.alloc(sizeof(*s));

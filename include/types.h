@@ -153,6 +153,16 @@ struct anvl_vars_entry {
    anvl_value_type value_type; // SCALAR, OBJECT, ARRAY, TUPLE, BLOB, or VARREF
 };
 
+/* ------------------------------------------------------------------ */
+/* Import Declaration (stored in context->import_list during parse)   */
+/* ------------------------------------------------------------------ */
+struct anvl_import_decl {
+   usize path_pos;  // byte offset into source after the opening '"'
+   usize path_len;  // byte length of the path string (excluding quotes)
+   usize alias_pos; // byte offset of the alias identifier (0 if none)
+   usize alias_len; // byte length of the alias identifier (0 if none)
+};
+
 struct anvl_value_meta {
    anvl_value_type type; // scalar, object, array, tuple, blob, varref, interp_string
    usize pos;            // position in source

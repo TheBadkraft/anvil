@@ -135,6 +135,12 @@ struct anvl_context_t {
       usize capacity;                  // allocated capacity
       bool parsed;                     // true once vars block has been seen
    } vars_list;
+   // Import declarations (populated during parse; in-order, before vars/statements)
+   struct {
+      struct anvl_import_decl *decls; // array of import declarations
+      usize count;                    // number of declarations
+      usize capacity;                 // allocated capacity
+   } import_list;
 };
 
 /* ------------------------------------------------------------------ */

@@ -266,6 +266,10 @@ static void context_dispose(context self) {
       if (self->vars_list.entries) {
          Allocator.dispose(self->vars_list.entries);
       }
+      // Clear import decls pool
+      if (self->import_list.decls) {
+         Allocator.dispose(self->import_list.decls);
+      }
       Allocator.dispose(self);
    }
 }
