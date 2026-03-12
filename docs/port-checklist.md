@@ -37,10 +37,10 @@ This is the guiding document for porting all remaining Anvil features from the f
 ### Version gates
 | Gate | Condition |
 |------|-----------|
-| `v0.2.0-alpha` | Writer + Resolver (inheritance) complete |
+| `v0.2.0-alpha` | Writer + Resolver (inheritance) complete | ✅ |
 | `v0.3.0-alpha` | VarRef + Import Graph complete | VarRef ✅ — Import Graph ✅ |
 | `v0.4.0-alpha` | ASL parser + evaluator core complete | ✅ |
-| `v0.4.3-alpha` | AMP scalar arrays/tuples complete |
+| `v0.4.3-alpha` | AMP scalar arrays/tuples complete | ✅ (retroactive — landed in v0.1.1-alpha) |
 | `v0.4.5-alpha` | Schema validation core complete | ✅ |
 | `v1.0.0-rel` | All Phase 1–3 items complete, Sigma.Memory integrated, public API frozen, benchmarks documented |
 
@@ -180,7 +180,7 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Public API frozen — `include/anvil.h` matches C ABI sketch in CoreBoundary.md §6 | ❌ |
 | Zero memory leaks (Valgrind) across all test suites | ✅ (current scope) |
 | Performance benchmarks documented in `docs/benchmarks.md` | ❌ |
-| CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.2.2-alpha |
+| CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.4.5-alpha |
 | All test samples updated for v1.0 feature set | ❌ |
 
 ---

@@ -44,6 +44,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.4.3-alpha] — retroactive gate (2026-03-11)
+
+**Status:** Released (retroactive tag — work landed in v0.1.1-alpha)  
+**Milestone:** AMP scalar arrays/tuples gate satisfied
+
+This gate was satisfied early. The AMP scalar enforcement work was implemented as low-hanging fruit during the initial port and shipped in v0.1.1-alpha, predating the formal versioning scheme. No new code; this entry closes the gate retroactively.
+
+### Gate Condition Satisfied
+
+- AMP scalar array `[v, …]` parsing ✅ — `parse_array()` rejects non-scalar elements in AMP dialect
+- AMP scalar tuple `(v, …)` parsing ✅ — `parse_tuple()` rejects non-scalar elements in AMP dialect
+- `ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401` ✅ — defined in `include/errors.h`
+- 5 parser tests ✅ — 2 happy-path (valid scalar array/tuple), 3 rejection (nested object/array/tuple in AMP)
+
+*See v0.1.1-alpha entry for full implementation details.*
+
+---
+
 ## [v0.4.0-alpha] — pre-release (2026-05-08)
 
 **Status:** ASL parser + evaluator complete; v0.4.0-alpha gate satisfied  
