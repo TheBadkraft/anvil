@@ -214,6 +214,12 @@ compile_and_run_test() {
     elif [ "$test_config" = "with_serializer_objects" ]; then
         compile_serializer_objects
         extra_objects=("${SERIALIZER_OBJECTS[@]}")
+    elif [ "$test_config" = "with_vars_objects" ]; then
+        compile_vars_objects
+        extra_objects=("${VARS_OBJECTS[@]}")
+    elif [ "$test_config" = "with_import_objects" ]; then
+        compile_import_objects
+        extra_objects=("${IMPORT_OBJECTS[@]}")
     fi
 
     # Resolve packages for this run

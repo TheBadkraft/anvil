@@ -7,17 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — toward v0.2.0-alpha
+## [Unreleased] — toward v0.4.0-alpha
 
 ### In Progress
 
-- `port/writer` — not yet started; see plan.md for scope
+- `port/asl` — ASL parser + evaluator core (`anvil_asl_parse`, `anvil_asl_eval`)
+
+---
+
+## [v0.3.0-alpha] — pre-release (2026-03-12)
+
+**Status:** Import Graph complete; v0.3.0-alpha gate satisfied  
+**Milestone:** Full import DAG resolution with DFS cycle detection, diamond dedup, and loader callback interface
+
+### Added
+
+- **Import Graph** (`include/import.h`, `src/import/import.c`)
+  - `import "path" [as alias]` declaration parsing in `parser.c`; stored as source spans in `ctx->import_list`
+  - `struct anvl_import_decl` — `{path_pos, path_len, alias_pos, alias_len}` (types.h)
+  - `import_list` field in `anvl_context_t` — flat array of declarations (context.h)
+  - `ImportGraph.build(ctx, owner_path, loader, userdata)` — DFS graph walk
+  - `ImportGraph.dispose(graph)` — frees all owned memory
+  - `anvl_import_loader_cb` — binding-provided callback; core never opens file descriptors
+  - Canonical-first dedup (diamond dedup): same path loaded twice → single entry, extra alias registered
+  - DFS load-stack cycle detection → `ANVL_ERR_IMPORT_CYCLIC`
+  - Duplicate alias detection → `ANVL_ERR_IMPORT_DUPLICATE_ALIAS`
+  - File-not-found propagation → `ANVL_ERR_IMPORT_FILE_NOT_FOUND`
+  - Placement guards: import after statements → `ANVL_ERR_IMPORT_NOT_FIRST`; import in AMP dialect → `ANVL_ERR_IMPORT_AMP_FORBIDDEN`
+  - Stem alias derivation: `my-blocks.aml` → `my_blocks` (StringBuilder-based, Allocator-backed)
+  - `anvil.import` package in `config.sh`; `with_import_objects` wired in `rtest`
+
+- **10 import unit tests** (`test/unit/test_import.c`)
+  - Parser: no imports, single import, explicit alias, import-after-statement error
+  - Graph builder: empty graph, stem alias, explicit alias, duplicate alias error, cyclic error, diamond dedup
+
+---
+
+## [v0.2.2-alpha] — pre-release (2026-03-12)
+
+**Status:** Vars / VarRef complete; Import Graph remaining for v0.3.0-alpha gate  
+**Milestone:** Full VarRef + interpolated string resolution; build system modernized
+
+### Added
+
+- **Vars / VarRef** (`include/vars.h`, `src/vars/vars.c`)
+  - `Vars.build(ctx, src)` — resolves VarRef chains, detects circular references at build time
+  - `Vars.resolve(state, key, key_len, ...)` — look up a key in the resolved vars state
+  - `Vars.materialise_interp(state, ctx, vm)` — expands `$"…{ref}…"` to a heap-allocated string
+  - `Vars.dispose(state)` — frees all vars-state owned memory
+  - Vtable interface pattern consistent with `Anvil` / `Context` / `Source` / `Serializer`
+  - `ANVL_VALUE_VAR_REF` and `ANVL_VALUE_INTERP_STRING` value types parsed in `parser.c`
+  - Vars block (`vars { }`) fully parsed; key/value entries stored as source spans
+  - Interpolated string segment list (literal + ref spans); resolved at materialise time
+  - Circular ref detection eager at `Vars.build()` time
+  - Missing key returns `ANVL_ERR_VARS_KEY_NOT_FOUND` on `Vars.materialise_interp()`
+  - String building in `materialise_interp` uses **sigma.text** `StringBuilder` (Allocator-backed)
+
+- **20 vars unit tests** (`test/unit/test_vars.c`)
+  - Vars build: no vars block, empty block, single/multi key
+  - VarRef: direct ref, ref-to-ref chain, unknown key
+  - Circular ref detection: direct cycle (A→A), indirect cycle (A→B→A), non-cycle chain
+  - InterpolatedString: literal-only, single ref, multi-ref, prefix/suffix, multi-segment
+  - Error paths: `materialise_interp` on non-interp-string value, null state
+
+### Changed
+
+- **Build system**: Makefile removed; project now uses `cbuild` / `rtest` exclusively
+- **Include path**: all test files migrated from `<sigtest/sigtest.h>` → `<sigma.test/sigtest.h>`
+  (`/usr/local/include/sigma.test/` is the canonical location)
+- **`.vscode/c_cpp_properties.json`**: updated to sigma.* include paths; removed stale makefile-tools
+  provider; `cStandard` updated to `c23`
+- **`vars_materialise_interp`**: replaced hand-rolled `sb_t` buffer with `StringBuilder` from
+  **sigma.text** — all string-building heap allocations now flow through `Allocator`
+
+### Test Results
+
+- 192 tests across 13 test files; 192/192 passing
+- Zero memory leaks
+
+---
+
+## [v0.2.1-alpha] — pre-release (2026-03-11)
+
+**Status:** Serializer complete; v0.2.0-alpha gate fully satisfied  
+**Milestone:** AML/AMP/ASL serializer (writer) with vtable interface
+
+### Added
+
+- **Serializer / Writer** (`include/serializer.h`, `src/serializer/serializer.c`)
+  - `Serializer.serialize(ctx, src, opts)` — emits AML/AMP/ASL text to a heap string
+  - `Serializer.to_stream(ctx, src, opts, stream)` — writes directly to a `FILE *`
+  - `opts.minify` — single-line, comma-separated, no padding
+  - AML dialect: full support for scalar, object, array, tuple, blob value types
+  - AMP dialect: scalar-only guard enforced at write time
+  - Blob verbatim fidelity: raw source span emitted; round-trip idempotency verified
+  - Vtable interface (`Serializer` global const) matching `Anvil` / `Context` / `Source` pattern
+  - Uses **sigma.text** `StringBuilder` for all output buffering
+
+- **Serializer tests** (`test/unit/test_serializer.c`)
+  - Round-trip tests for AML and AMP dialects
+  - Blob fidelity tests (ST06c–ST06f)
+  - Minify mode output tests
+
+### Test Results
+
+- 172 tests across 12 test files; 172/172 passing
+- Zero memory leaks
 
 ---
 
 ## [v0.2.0-alpha] — pre-release (2026-03-11)
 
-**Status:** Resolver complete; pending Writer before tagging  
+**Status:** Complete — Resolver + Writer (serializer) gate satisfied; see v0.2.1-alpha  
 **Milestone:** Single-inheritance resolution, cycle detection, lazy merge cache
 
 ### Added

@@ -4,7 +4,7 @@
 
 #include "anvil.h"
 #include <sigma.memory/memory.h>
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 #include <stdio.h>
 #include <string.h>
 

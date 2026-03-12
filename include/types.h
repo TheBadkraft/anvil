@@ -51,7 +51,9 @@ typedef enum {
    ANVL_VALUE_OBJECT,
    ANVL_VALUE_ARRAY,
    ANVL_VALUE_TUPLE,
-   ANVL_VALUE_BLOB
+   ANVL_VALUE_BLOB,
+   ANVL_VALUE_VARREF,       // $identifier — reference to vars entry
+   ANVL_VALUE_INTERP_STRING // $"…{ref}…" — interpolated string with hole segments
 } anvl_value_type;
 
 /* ------------------------------------------------------------------ */
@@ -131,8 +133,38 @@ struct anvl_element_meta {
    usize len;            // length in source
 };
 
+/* ------------------------------------------------------------------ */
+/* Interpolation Segment (for ANVL_VALUE_INTERP_STRING)              */
+/* ------------------------------------------------------------------ */
+struct anvl_interp_segment {
+   bool is_ref; // true = {ref} hole; false = literal span
+   usize pos;   // source position: content start (literal) or identifier start (ref)
+   usize len;   // length of literal span or identifier
+};
+
+/* ------------------------------------------------------------------ */
+/* Vars Block Entry (stored in context->vars_list during parse)       */
+/* ------------------------------------------------------------------ */
+struct anvl_vars_entry {
+   usize key_pos;              // identifier position in source
+   usize key_len;              // identifier length
+   usize value_pos;            // value span start (identifier for VARREF)
+   usize value_len;            // value span length
+   anvl_value_type value_type; // SCALAR, OBJECT, ARRAY, TUPLE, BLOB, or VARREF
+};
+
+/* ------------------------------------------------------------------ */
+/* Import Declaration (stored in context->import_list during parse)   */
+/* ------------------------------------------------------------------ */
+struct anvl_import_decl {
+   usize path_pos;  // byte offset into source after the opening '"'
+   usize path_len;  // byte length of the path string (excluding quotes)
+   usize alias_pos; // byte offset of the alias identifier (0 if none)
+   usize alias_len; // byte length of the alias identifier (0 if none)
+};
+
 struct anvl_value_meta {
-   anvl_value_type type; // scalar, object, array, tuple, blob
+   anvl_value_type type; // scalar, object, array, tuple, blob, varref, interp_string
    usize pos;            // position in source
    usize len;            // length in source
    union {
@@ -146,6 +178,12 @@ struct anvl_value_meta {
          usize element_count;
          struct anvl_element_meta *elements; // array of element metadata (pos/len/type for each)
       } collection;
+      // For ANVL_VALUE_INTERP_STRING: segment list
+      // (ANVL_VALUE_VARREF uses pos/len directly — no union member needed)
+      struct {
+         usize segment_count;
+         struct anvl_interp_segment *segments; // heap-allocated, freed with value_meta
+      } interp_string;
    } data;
 };
 
@@ -198,6 +236,7 @@ struct anvl_value {
    anvl_value_type type; // value type
    union {
       // Scalar values (string, number, etc.)
+      // Also used for ANVL_VALUE_VARREF: pos/len = identifier span (not '$')
       struct {
          usize pos;
          usize len;
@@ -215,6 +254,16 @@ struct anvl_value {
          usize element_count;    // number of elements
          void *_elem_types_temp; // TEMPORARY: element types buffer (used during parsing only)
       } collection;
+
+      // ANVL_VALUE_INTERP_STRING: parse-time temporary storage
+      // Transferred to value_meta for top-level statements;
+      // kept directly for field values (freed via dispose_value_recursive).
+      struct {
+         usize pos; // content start (position after opening ")
+         usize len; // content length (up to closing ")
+         usize segment_count;
+         struct anvl_interp_segment *segments_temp; // NULL after ownership transfer
+      } interp;
    } data;
 };
 

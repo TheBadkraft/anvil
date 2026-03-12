@@ -13,7 +13,7 @@
 #include "anvil.h"
 #include <sigma.memory/memory.h>
 #include <sigma.text/strings.h>
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 #include <string.h>
 
 static void set_config(FILE **logger) {

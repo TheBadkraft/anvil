@@ -25,7 +25,7 @@
 #include "serializer.h"
 #include "utilities/helpers.h"
 #include <sigma.memory/memory.h>
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,6 +40,10 @@ static void test_st04b_block_array_round_trip(void);
 static void test_st05_tuple_always_inline(void);
 static void test_st06a_untagged_blob_round_trip(void);
 static void test_st06b_tagged_blob_round_trip(void);
+static void test_st06c_multiline_blob_exact(void);
+static void test_st06d_blob_special_chars_verbatim(void);
+static void test_st06e_minify_blob_unchanged(void);
+static void test_st06f_blob_serialization_idempotent(void);
 static void test_st07_full_document_values_preserved(void);
 static void test_st08_amp_dialect_shebang_and_guard(void);
 static void test_st12_inheritance_syntax_preserved(void);
@@ -410,8 +414,8 @@ static void test_st06b_tagged_blob_round_trip(void) {
    Context.dispose(ctx1);
 
    Assert.isNotNull(text, "serialized text exists");
-   Assert.isTrue(strstr(text, "@md`") != NULL, "output contains @md`");
-   Assert.isTrue(strstr(text, "# Title") != NULL, "output contains blob content");
+   /* Verify the full blob span — tag, opening backtick, content, closing backtick */
+   Assert.isTrue(strstr(text, "@md`# Title`") != NULL, "full blob span @md`# Title` preserved");
 
    context ctx2 = build_context(text);
    Allocator.dispose(text);
@@ -419,6 +423,148 @@ static void test_st06b_tagged_blob_round_trip(void) {
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
    Context.dispose(ctx2);
+   teardown();
+}
+
+/* ================================================================
+ * ST06c — Multi-line blob: exact content preserved verbatim
+ * ================================================================
+ * Blob content spans multiple lines; every byte (including embedded
+ * newlines and leading whitespace) must appear character-for-character
+ * in the serialized output — the full @tag`...` span is emitted raw.
+ * ================================================================ */
+static void test_st06c_multiline_blob_exact(void) {
+   const char *src =
+       "#!aml\n"
+       "data := `line1\n"
+       "line2\n"
+       "  indented\n"
+       "`\n";
+
+   context ctx1 = build_context(src);
+   Assert.isNotNull(ctx1, "ctx1 should exist");
+
+   char *text = serialize(ctx1, &ANVL_SERIALIZER_DEFAULT);
+   Context.dispose(ctx1);
+
+   Assert.isNotNull(text, "serialized text exists");
+   /* Full span including both backtick delimiters must be verbatim */
+   Assert.isTrue(strstr(text, "`line1\nline2\n  indented\n`") != NULL,
+                 "multi-line blob content preserved verbatim");
+
+   context ctx2 = build_context(text);
+   Allocator.dispose(text);
+   Assert.isNotNull(ctx2, "re-parsed context exists");
+   Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
+
+   Context.dispose(ctx2);
+   teardown();
+}
+
+/* ================================================================
+ * ST06d — Blob with AML-special chars preserved verbatim
+ * ================================================================
+ * Characters that carry syntactic meaning in AML (:=, {, }, [, ], ,)
+ * must not be processed or mangled when they appear inside a blob.
+ * ================================================================ */
+static void test_st06d_blob_special_chars_verbatim(void) {
+   const char *src =
+       "#!aml\n"
+       "raw := `name := {key:[1,2,3]}, debug := true`\n";
+
+   context ctx1 = build_context(src);
+   Assert.isNotNull(ctx1, "ctx1 should exist");
+
+   char *text = serialize(ctx1, &ANVL_SERIALIZER_DEFAULT);
+   Context.dispose(ctx1);
+
+   Assert.isNotNull(text, "serialized text exists");
+   Assert.isTrue(strstr(text, "`name := {key:[1,2,3]}, debug := true`") != NULL,
+                 "AML-special chars inside blob preserved verbatim");
+
+   context ctx2 = build_context(text);
+   Allocator.dispose(text);
+   Assert.isNotNull(ctx2, "re-parsed context exists");
+   Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
+
+   Context.dispose(ctx2);
+   teardown();
+}
+
+/* ================================================================
+ * ST06e — Minify: multi-line blob content NOT modified
+ * ================================================================
+ * In minify mode the serializer strips whitespace between statements
+ * and uses ":=" instead of " := ".  The blob content itself must be
+ * emitted verbatim — newlines inside the blob survive minification.
+ * ================================================================ */
+static void test_st06e_minify_blob_unchanged(void) {
+   const char *src =
+       "#!aml\n"
+       "doc := @md`# Title\n"
+       "\n"
+       "Some **markdown**.\n"
+       "`\n";
+
+   context ctx = build_context(src);
+   Assert.isNotNull(ctx, "ctx should exist");
+
+   char *text = serialize(ctx, &ANVL_SERIALIZER_MINIFIED);
+   Context.dispose(ctx);
+
+   Assert.isNotNull(text, "minified text exists");
+   /* Outer syntax is minified: ":=" not " := " */
+   Assert.isTrue(strstr(text, "doc:=") != NULL, "minify: := has no spaces");
+   /* Blob content (including internal newlines) is preserved verbatim */
+   Assert.isTrue(strstr(text, "@md`# Title\n\nSome **markdown**.\n`") != NULL,
+                 "minify: blob content including newlines unchanged");
+
+   context ctx2 = build_context(text);
+   Allocator.dispose(text);
+   Assert.isNotNull(ctx2, "re-parsed context exists");
+   Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
+
+   Context.dispose(ctx2);
+   teardown();
+}
+
+/* ================================================================
+ * ST06f — Idempotency: serialize twice → byte-identical output
+ * ================================================================
+ * parse → serialize → text1
+ * parse text1 → serialize → text2
+ * text1 must equal text2 exactly.  This catches any path where the
+ * serializer reconstructs blob delimiters or tags rather than
+ * emitting the raw source span (reconstruction could drift on the
+ * second pass if positions are mis-tracked).
+ * ================================================================ */
+static void test_st06f_blob_serialization_idempotent(void) {
+   const char *src =
+       "#!aml\n"
+       "cert := @pem`-----BEGIN CERTIFICATE-----\n"
+       "MIIDXTCCAkWgAwIBAgI=\n"
+       "-----END CERTIFICATE-----\n"
+       "`\n";
+
+   /* First pass */
+   context ctx1 = build_context(src);
+   Assert.isNotNull(ctx1, "ctx1 should exist");
+   char *text1 = serialize(ctx1, &ANVL_SERIALIZER_DEFAULT);
+   Context.dispose(ctx1);
+   Assert.isNotNull(text1, "text1 exists");
+
+   /* Second pass */
+   context ctx2 = build_context(text1);
+   Assert.isNotNull(ctx2, "ctx2 should exist");
+   char *text2 = serialize(ctx2, &ANVL_SERIALIZER_DEFAULT);
+   Context.dispose(ctx2);
+   Assert.isNotNull(text2, "text2 exists");
+
+   /* Byte-identical */
+   Assert.isTrue(strcmp(text1, text2) == 0, "serialize twice → identical output");
+
+   Allocator.dispose(text1);
+   Allocator.dispose(text2);
    teardown();
 }
 
@@ -620,6 +766,10 @@ __attribute__((constructor)) static void register_test_serializer(void) {
    testcase("ST05: Tuple always inline", test_st05_tuple_always_inline);
    testcase("ST06a: Untagged blob round-trip", test_st06a_untagged_blob_round_trip);
    testcase("ST06b: Tagged blob round-trip", test_st06b_tagged_blob_round_trip);
+   testcase("ST06c: Multi-line blob exact content", test_st06c_multiline_blob_exact);
+   testcase("ST06d: Blob special chars verbatim", test_st06d_blob_special_chars_verbatim);
+   testcase("ST06e: Minify blob content unchanged", test_st06e_minify_blob_unchanged);
+   testcase("ST06f: Blob serialization idempotent", test_st06f_blob_serialization_idempotent);
    testcase("ST07: Full document values preserved", test_st07_full_document_values_preserved);
    testcase("ST08: AMP dialect shebang and guard", test_st08_amp_dialect_shebang_and_guard);
    testcase("ST12: Inheritance syntax preserved", test_st12_inheritance_syntax_preserved);

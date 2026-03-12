@@ -193,6 +193,14 @@ static void dispose_value_recursive(value v) {
       // Elements are managed elsewhere - don't dispose here
       break;
    }
+   case ANVL_VALUE_INTERP_STRING:
+      // Free segment array stored in parse-time temporary field
+      if (v->data.interp.segments_temp)
+         Allocator.dispose(v->data.interp.segments_temp);
+      break;
+   case ANVL_VALUE_VARREF:
+      // VarRef values own no heap data
+      break;
    case ANVL_VALUE_SCALAR:
    case ANVL_VALUE_BLOB:
    default:
@@ -253,6 +261,14 @@ static void context_dispose(context self) {
       // Clear attributes pool
       if (self->attr_list.attributes) {
          Allocator.dispose(self->attr_list.attributes);
+      }
+      // Clear vars entries pool
+      if (self->vars_list.entries) {
+         Allocator.dispose(self->vars_list.entries);
+      }
+      // Clear import decls pool
+      if (self->import_list.decls) {
+         Allocator.dispose(self->import_list.decls);
       }
       Allocator.dispose(self);
    }

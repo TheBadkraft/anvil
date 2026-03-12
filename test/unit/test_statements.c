@@ -19,6 +19,6 @@
 
 #include "anvil.h"
 #include <sigma.memory/memory.h>
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 
 // All tests disabled until refactored for new meta-buffer architecture
