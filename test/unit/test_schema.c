@@ -195,13 +195,16 @@ static void test_sc05_enum_values_all_present(void) {
 
    bool has_client = false, has_server = false, has_both = false;
    for (int i = 0; i < t->value_count; i++) {
-      if (strcmp(t->values[i], "client") == 0) has_client = true;
-      if (strcmp(t->values[i], "server") == 0) has_server = true;
-      if (strcmp(t->values[i], "both") == 0)   has_both   = true;
+      if (strcmp(t->values[i], "client") == 0)
+         has_client = true;
+      if (strcmp(t->values[i], "server") == 0)
+         has_server = true;
+      if (strcmp(t->values[i], "both") == 0)
+         has_both = true;
    }
    Assert.isTrue(has_client, "has 'client'");
    Assert.isTrue(has_server, "has 'server'");
-   Assert.isTrue(has_both,   "has 'both'");
+   Assert.isTrue(has_both, "has 'both'");
 
    Schema.ruleset_free(rules);
    Context.dispose(ctx);
@@ -240,8 +243,8 @@ static void test_sc07_object_fields_correct_names(void) {
    anvl_schema_type_t *t = Schema.get_type(rules, "BlockConfig");
    Assert.isNotNull(t, "BlockConfig type found");
    Assert.isTrue(t->field_count == 2, "2 fields");
-   Assert.isTrue(strcmp(t->fields[0].name, "id") == 0,       "field[0] = id");
-   Assert.isTrue(strcmp(t->fields[1].name, "hardness") == 0,  "field[1] = hardness");
+   Assert.isTrue(strcmp(t->fields[0].name, "id") == 0, "field[0] = id");
+   Assert.isTrue(strcmp(t->fields[1].name, "hardness") == 0, "field[1] = hardness");
 
    Schema.ruleset_free(rules);
    Context.dispose(ctx);
@@ -645,24 +648,24 @@ static void test_sc20_two_object_types_both_validated(void) {
 __attribute__((constructor)) static void register_test_schema(void) {
    testset("Schema Tests", set_config, set_teardown);
 
-   testcase("SC01: Parse enum schema returns not null",   test_sc01_parse_enum_schema_not_null);
-   testcase("SC02: No @[schema] attr → null + error",    test_sc02_no_schema_attr_returns_null);
-   testcase("SC03: Enum type kind is ENUM",               test_sc03_enum_type_kind_is_enum);
-   testcase("SC04: Flags type kind is FLAGS",             test_sc04_flags_type_kind_is_flags);
-   testcase("SC05: Enum values all present",              test_sc05_enum_values_all_present);
-   testcase("SC06: Object type kind is OBJECT",           test_sc06_object_type_kind_is_object);
-   testcase("SC07: Object fields have correct names",     test_sc07_object_fields_correct_names);
+   testcase("SC01: Parse enum schema returns not null", test_sc01_parse_enum_schema_not_null);
+   testcase("SC02: No @[schema] attr → null + error", test_sc02_no_schema_attr_returns_null);
+   testcase("SC03: Enum type kind is ENUM", test_sc03_enum_type_kind_is_enum);
+   testcase("SC04: Flags type kind is FLAGS", test_sc04_flags_type_kind_is_flags);
+   testcase("SC05: Enum values all present", test_sc05_enum_values_all_present);
+   testcase("SC06: Object type kind is OBJECT", test_sc06_object_type_kind_is_object);
+   testcase("SC07: Object fields have correct names", test_sc07_object_fields_correct_names);
    testcase("SC08: Object fields have correct ExpectedType", test_sc08_object_fields_correct_expected_type);
-   testcase("SC09: Valid data → is_valid=true",           test_sc09_valid_data_is_valid);
-   testcase("SC10: Missing required field → error",       test_sc10_missing_required_field_error);
-   testcase("SC11: Field wrong type → error",             test_sc11_field_wrong_type_error);
-   testcase("SC12: Extra fields permitted",               test_sc12_extra_fields_permitted);
-   testcase("SC13: Untyped statements pass through",      test_sc13_untyped_statements_pass_through);
-   testcase("SC14: Unknown base → null + error",          test_sc14_unknown_base_returns_null);
-   testcase("SC15: Multiple violations all collected",    test_sc15_multiple_violations_all_collected);
-   testcase("SC16: Load valid .asch file",                test_sc16_load_valid_asch_file);
+   testcase("SC09: Valid data → is_valid=true", test_sc09_valid_data_is_valid);
+   testcase("SC10: Missing required field → error", test_sc10_missing_required_field_error);
+   testcase("SC11: Field wrong type → error", test_sc11_field_wrong_type_error);
+   testcase("SC12: Extra fields permitted", test_sc12_extra_fields_permitted);
+   testcase("SC13: Untyped statements pass through", test_sc13_untyped_statements_pass_through);
+   testcase("SC14: Unknown base → null + error", test_sc14_unknown_base_returns_null);
+   testcase("SC15: Multiple violations all collected", test_sc15_multiple_violations_all_collected);
+   testcase("SC16: Load valid .asch file", test_sc16_load_valid_asch_file);
    testcase("SC17: Nonexistent file handled without crash", test_sc17_load_nonexistent_file_returns_null);
-   testcase("SC18: File-based data validates correctly",  test_sc18_validate_file_based_data);
-   testcase("SC19: Two typed stmts both missing fields",  test_sc19_two_typed_stmts_both_missing_fields);
+   testcase("SC18: File-based data validates correctly", test_sc18_validate_file_based_data);
+   testcase("SC19: Two typed stmts both missing fields", test_sc19_two_typed_stmts_both_missing_fields);
    testcase("SC20: Two schema object types both validated", test_sc20_two_object_types_both_validated);
 }

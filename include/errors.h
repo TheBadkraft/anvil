@@ -104,12 +104,12 @@ typedef enum {
    ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED = 4501,
 
    // Schema Errors (460x)
-   ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,              // document lacks the required @[schema] module attribute
-   ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602,           // schema field references an undefined type name
-   ANVL_ERR_SCHEMA_BASE_UNKNOWN = 4603,              // schema statement base is not 'enum', 'flags', or a known type
-   ANVL_ERR_SCHEMA_VALIDATION_REQUIRED = 4604,       // required field absent in data document
-   ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH = 4605,  // data field value type does not match schema field type
-   ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD = 4606,  // data field not declared in schema type (strict mode)
+   ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,             // document lacks the required @[schema] module attribute
+   ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602,          // schema field references an undefined type name
+   ANVL_ERR_SCHEMA_BASE_UNKNOWN = 4603,             // schema statement base is not 'enum', 'flags', or a known type
+   ANVL_ERR_SCHEMA_VALIDATION_REQUIRED = 4604,      // required field absent in data document
+   ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH = 4605, // data field value type does not match schema field type
+   ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD = 4606, // data field not declared in schema type (strict mode)
 
    // Lexer/Scanner Errors (500x)
    ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,
