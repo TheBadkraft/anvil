@@ -223,6 +223,9 @@ compile_and_run_test() {
     elif [ "$test_config" = "with_asl_objects" ]; then
         compile_asl_objects
         extra_objects=("${ASL_OBJECTS[@]}")
+    elif [ "$test_config" = "with_schema_objects" ]; then
+        compile_schema_objects
+        extra_objects=("${SCHEMA_OBJECTS[@]}")
     fi
 
     # Resolve packages for this run

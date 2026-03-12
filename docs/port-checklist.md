@@ -39,9 +39,9 @@ This is the guiding document for porting all remaining Anvil features from the f
 |------|-----------|
 | `v0.2.0-alpha` | Writer + Resolver (inheritance) complete |
 | `v0.3.0-alpha` | VarRef + Import Graph complete | VarRef ✅ — Import Graph ✅ |
-| `v0.4.0-alpha` | ASL parser + evaluator core complete |
+| `v0.4.0-alpha` | ASL parser + evaluator core complete | ✅ |
 | `v0.4.3-alpha` | AMP scalar arrays/tuples complete |
-| `v0.4.5-alpha` | Schema validation core complete |
+| `v0.4.5-alpha` | Schema validation core complete | ✅ |
 | `v1.0.0-rel` | All Phase 1–3 items complete, Sigma.Memory integrated, public API frozen, benchmarks documented |
 
 ---
@@ -120,30 +120,34 @@ This is the guiding document for porting all remaining Anvil features from the f
 | Tests for valid scalar arrays/tuples | ✅ | 2 happy-path tests in test_parser.c |
 | Tests for invalid nested elements (rejection) | ✅ | 3 rejection tests in test_parser.c |
 
-### 2.2 · ASL Parser and Evaluator Core (v0.4.0–v0.4.1)
-**Spec ref**: CoreBoundary.md §8 — `AslParser` → `anvil_asl_parse()`, `AslEvaluator` → `anvil_asl_eval()`
+### 2.2 · ASL Parser and Evaluator Core (v0.4.0–v0.4.1) ✅
+**Spec ref**: CoreBoundary.md §8 — `AslParser` → `Asl.parse()`, `AslEvaluator` → `Asl.exec()`
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `anvil_asl_parse()` — parse function bodies into `asl_node_t` tree | ❌ | |
-| `asl_node_t` / `asl_op_t` / `asl_value_t` | ❌ | Tagged union: int/float/bool/string/null/list/map |
-| `asl_scope_t` — linked list of local variable frames | ❌ | |
-| `asl_function_t` — body node + parameter list | ❌ | |
-| `asl_exec_context_t` — depth counter + dispatch table pointer | ❌ | |
-| `anvil_asl_eval()` — recursive-descent evaluator | ❌ | |
-| `asl_module_t` function pointer table | ❌ | C equivalent of `IAnvilCallableModule` trampoline |
+| `Asl.parse()` — parse function bodies into `asl_node_t` tree | ✅ | Pratt-style recursive-descent; returns heap-allocated AST |
+| `asl_node_t` / `asl_op_t` / `asl_value_t` | ✅ | Tagged union: NULL/INT/FLOAT/STRING/BOOL/TUPLE/LIST/MAP |
+| `asl_scope_t` — flat array (max 256 vars), deep-copy on store | ✅ | Flat preferred over linked list; same semantics |
+| `asl_function_meta_t` — name/body/parameter source spans | ✅ | |
+| `asl_exec_context_t` equivalent (eval ctx + depth guard) | ✅ | `asl_eval_ctx_t` internal; max depth 32 |
+| `Asl.exec()` — tree-walk evaluator | ✅ | bind params → eval_block → return value |
+| `asl_module_t` function pointer table | ✅ | `name` + `call` fn pointer + `userdata`; C equiv of `IAnvilCallableModule` |
+| `asl_ext_lookup_cb` / `asl_fn_dispatch_cb` | ✅ | `$varref` resolution and function dispatch callbacks |
+| `Asl.node_free()` / `Asl.value_free()` | ✅ | Recursive free; zero Valgrind leaks |
+| 25 unit tests (A01–E05) | ✅ | Parser structural, literals, arithmetic, control flow, scope/dispatch |
 | `@[attr]` on ASL functions (v0.4.2) | 🚫 | Binding-specific (`AnvilScriptEngine` API) |
 
-### 2.3 · Schema Validation Core (v0.4.5)
+### 2.3 · Schema Validation Core (v0.4.5) ✅
 **Spec ref**: CoreBoundary.md §9 — stateless tree walk belongs in core
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `anvil_schema_resolve()` | ❌ | Resolves enum/flags virtual bases; detects unknown types |
-| `anvil_schema_ruleset_t` | ❌ | Immutable after load; shared across validation calls |
-| `anvil_type_rule_t` / `anvil_field_rule_t` | ❌ | Pure predicates; no heap allocation during eval |
-| Schema error codes `460x` | ❌ | `SchemaAttrMissing`, `SchemaTypeUnresolved`, etc. |
-| `.asch` file extension recognition | ❌ | |
+| `Schema.resolve()` | ✅ | Resolves enum/flags virtual bases; detects unknown types; error 4601–4603 |
+| `anvl_schema_ruleset_t` | ✅ | Dynamic array with capacity doubling; shared across validation calls |
+| `anvl_schema_type_t` / `anvl_field_rule_t` | ✅ | Object/Enum/Flags kind; field rules with expected `anvl_value_type` |
+| Schema error codes `460x` | ✅ | 4601 `SchemaAttrMissing`, 4602 `SchemaTypeUnresolved`, 4603 `SchemaBaseUnknown`, 4604 `SchemaValidationRequired`, 4605 `SchemaValidationTypeMismatch`, 4606 `SchemaValidationUnknownField` |
+| `.asch` file extension recognition | ✅ | Loaded via `Context.get_builder()->load_file()`; no special handling needed |
+| 20 unit tests (SC01–SC20) | ✅ | Resolver enum/flags, resolver object, validator valid/invalid/extra/untyped, file I/O, multi-type |
 
 ---
 
@@ -196,6 +200,6 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Resolver | `src/core/resolver.c` | 490 | ✅ Full implementation |
 | Serializer | `src/serializer/serializer.c` | ~550 | ✅ Full implementation |
 | Vars / VarRef | `src/vars/vars.c` | 287 | ✅ Full implementation (v0.2.2-alpha) |
-| Import graph | *(no file)* | — | ❌ Not started |
-| ASL | *(no file)* | — | ❌ Not started |
-| Schema | *(no file)* | — | ❌ Not started |
+| Import graph | `src/import/import.c` | 568 | ✅ Full implementation (v0.3.0-alpha) |
+| ASL | `src/asl/asl.c` | 1560 | ✅ Full implementation (v0.4.0-alpha) |
+| Schema | `src/schema/schema.c` | ~440 | ✅ Full implementation (v0.4.5-alpha) |

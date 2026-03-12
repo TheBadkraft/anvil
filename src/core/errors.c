@@ -94,6 +94,13 @@ static const char *error_messages[] = {
 
     [ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR] = "AMP array/tuple elements must be scalar or blob values",
 
+    [ANVL_ERR_SCHEMA_ATTR_MISSING] = "Schema document is missing the required @[schema] module attribute",
+    [ANVL_ERR_SCHEMA_TYPE_UNRESOLVED] = "Schema field references a type name that is not defined in the schema",
+    [ANVL_ERR_SCHEMA_BASE_UNKNOWN] = "Schema statement base is not a virtual base ('enum', 'flags') or a known schema type",
+    [ANVL_ERR_SCHEMA_VALIDATION_REQUIRED] = "Required field is missing in the data document",
+    [ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH] = "Data field value type does not match the declared schema field type",
+    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] = "Data document contains a field not declared in the schema type",
+
     [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "Unexpected character",
     [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "Unterminated string literal",
     [ANVL_ERR_PARSER_UNTERMINATED_BLOB] = "Unterminated blob literal",
@@ -177,6 +184,13 @@ static const char *error_names[] = {
     [ANVL_ERR_USING_AFTER_STATEMENTS] = "ANVL_ERR_USING_AFTER_STATEMENTS",
 
     [ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR] = "ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR",
+
+    [ANVL_ERR_SCHEMA_ATTR_MISSING] = "ANVL_ERR_SCHEMA_ATTR_MISSING",
+    [ANVL_ERR_SCHEMA_TYPE_UNRESOLVED] = "ANVL_ERR_SCHEMA_TYPE_UNRESOLVED",
+    [ANVL_ERR_SCHEMA_BASE_UNKNOWN] = "ANVL_ERR_SCHEMA_BASE_UNKNOWN",
+    [ANVL_ERR_SCHEMA_VALIDATION_REQUIRED] = "ANVL_ERR_SCHEMA_VALIDATION_REQUIRED",
+    [ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH] = "ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH",
+    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] = "ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD",
 
     [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "ANVL_ERR_PARSER_UNEXPECTED_CHAR",
     [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "ANVL_ERR_PARSER_UNTERMINATED_STRING",
