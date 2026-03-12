@@ -220,6 +220,9 @@ compile_and_run_test() {
     elif [ "$test_config" = "with_import_objects" ]; then
         compile_import_objects
         extra_objects=("${IMPORT_OBJECTS[@]}")
+    elif [ "$test_config" = "with_asl_objects" ]; then
+        compile_asl_objects
+        extra_objects=("${ASL_OBJECTS[@]}")
     fi
 
     # Resolve packages for this run

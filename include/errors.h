@@ -116,6 +116,13 @@ typedef enum {
    ANVL_ERR_VARS_INVALID_VARREF = 5010,      // '$' not followed by valid identifier
    ANVL_ERR_VARS_UNTERMINATED_INTERP = 5011, // $"…{ref" missing closing '}'}
 
+   // ASL Errors (510x)
+   ANVL_ERR_ASL_PARSE_ERROR = 5101,           // ASL script parse failure
+   ANVL_ERR_ASL_RUNTIME_ERROR = 5102,         // ASL runtime failure
+   ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED = 5103,   // call depth limit exceeded
+   ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP = 5104,    // break outside loop
+   ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
+
    // I/O Errors (600x)
    ANVL_ERR_IO_FILE_NOT_FOUND = 6001,
    ANVL_ERR_IO_READ_FAILED = 6002,

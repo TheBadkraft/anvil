@@ -7,11 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — toward v0.4.0-alpha
+## [Unreleased]
 
-### In Progress
+---
 
-- `port/asl` — ASL parser + evaluator core (`anvil_asl_parse`, `anvil_asl_eval`)
+## [v0.4.0-alpha] — pre-release (2026-05-08)
+
+**Status:** ASL parser + evaluator complete; v0.4.0-alpha gate satisfied  
+**Milestone:** Full ASL (Anvil Script Language) parse + tree-walk evaluation with flat scope, control flow, and external dispatch
+
+### Added
+
+- **ASL** (`include/asl.h`, `src/asl/asl.c`)
+  - `Asl.parse(meta, src)` — Pratt-style recursive-descent parser; returns heap-allocated AST (`asl_node_t *`)
+  - `Asl.exec(meta, src, args, argc, out, modules, ...)` — parse → bind parameters → tree-walk eval → return value
+  - `Asl.node_free(node)` / `Asl.value_free(val)` — recursive free helpers
+  - `asl_value_t` — tagged union: `ASL_NULL`, `ASL_INT`, `ASL_FLOAT`, `ASL_STRING`, `ASL_BOOL`, `ASL_TUPLE`, `ASL_LIST`, `ASL_MAP`
+  - `asl_node_t` — AST node with child array; node kinds cover literals, binary/unary ops, identifiers, assign, block, if, for, break, continue, call, return
+  - `asl_function_meta_t` — function name/body/parameter spans (source-level offsets)
+  - `asl_module_t` — external module dispatch callback (`name` + `call` function pointer + `userdata`)
+  - `asl_ext_lookup_cb` / `asl_fn_dispatch_cb` — callbacks for `$varref` resolution and function dispatch
+  - Flat scope (`asl_scope_impl_t`): max 256 vars, deep-copy on store/return
+  - Truthiness: `null`→false, zero/`""`/empty containers→false, else→true
+  - `i++` / `i--` desugared to `assign(i, binary(i, 1))`
+  - `for` loop children: `[init, cond, step, body]`; `break` / `continue` as scope-exit flags
+  - Error codes: `ANVL_ERR_ASL_PARSE_ERROR` (5101), `ANVL_ERR_ASL_RUNTIME_ERROR` (5102), `ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED` (5103), `ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP` (5104), `ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP` (5105)
+  - `anvil.asl` package in `config.sh`; `with_asl_objects` wired in `rtest`
+
+- **25 ASL unit tests** (`test/unit/test_asl.c`)
+  - **A01–A05** Parser structural: non-null node, root is BLOCK, literal child, float child, string child
+  - **B01–B05** Literals: exec int 42, float 3.14, string `"hello"`, bool `true`, `null`
+  - **C01–C05** Arithmetic: add, multiply, subtract, modulo, string concatenation
+  - **D01–D05** Control flow: if-taken, else-taken, for-loop accumulator, break, continue
+  - **E01–E05** Scope / dispatch: local assignment, `$varref` external lookup, comparison, logical `&&`, parameter binding
 
 ---
 
