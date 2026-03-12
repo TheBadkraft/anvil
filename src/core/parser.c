@@ -647,11 +647,10 @@ static value parse_object(parser_ctx *p) {
          si_skip_whitespace_and_comments(s);
       } else if (si_match_length(s, "}", 1) == 1) {
          break;
-      } else {
-         dispose_value_tree(v);
-         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, s);
-         return NULL;
       }
+      /* Otherwise: field was newline-separated — continue to next field.
+         si_skip_whitespace_and_comments already consumed any newlines, so
+         the loop condition (peek != '}') will terminate correctly. */
    }
 
    if (si_match_length(s, "}", 1) != 1) {

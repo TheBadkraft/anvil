@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.4.5-alpha] — pre-release (2026-03-12)
+
+**Status:** Schema resolver + validator complete; v0.4.5-alpha gate satisfied  
+**Milestone:** Schema definition resolution and data validation against typed field rules
+
+### Added
+
+- **Schema** (`include/schema.h`, `src/schema/schema.c`)
+  - `Schema.resolve(ctx)` — walks a `@[schema]`-attributed document; classifies each statement as `ANVL_SCHEMA_OBJECT`, `ANVL_SCHEMA_ENUM`, or `ANVL_SCHEMA_FLAGS`; returns `anvl_schema_ruleset_t *` or NULL with error
+  - `Schema.validate(rules, data_ctx, file_path)` — walks a data document; for each typed statement whose base resolves to a known schema type, checks all declared fields are present with the correct `anvl_value_type`; collects all violations before returning (no fail-fast)
+  - `Schema.get_type(rules, name)` — O(n) lookup by name in a ruleset
+  - `Schema.ruleset_free(rules)` / `Schema.result_free(result)` — full deep-free helpers
+  - `anvl_schema_type_t` — name, kind, fields array (Object) or values array (Enum/Flags)
+  - `anvl_field_rule_t` — field name + `expected_type` (`anvl_value_type`)
+  - `anvl_schema_ruleset_t` — dynamic array of `anvl_schema_type_t *` with capacity doubling
+  - `anvl_schema_result_t` — `is_valid` flag + dynamic `anvl_schema_error_t` array
+  - `anvl_schema_error_t` — validation error with code, message (owned copy), and optional file path
+  - Error codes: `ANVL_ERR_SCHEMA_ATTR_MISSING` (4601), `ANVL_ERR_SCHEMA_TYPE_UNRESOLVED` (4602), `ANVL_ERR_SCHEMA_BASE_UNKNOWN` (4603), `ANVL_ERR_SCHEMA_VALIDATION_REQUIRED` (4604), `ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH` (4605), `ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD` (4606)
+  - `anvil.schema` package in `config.sh`; `with_schema_objects` wired in `rtest`
+
+- **20 Schema unit tests** (`test/unit/test_schema.c`)
+  - **SC01–SC05** Resolver — enum/flags: non-null ruleset, no-attr error, enum kind, flags kind, enum values
+  - **SC06–SC08** Resolver — object types: kind is OBJECT, field names correct, field expected types correct
+  - **SC09–SC15** Validator: valid data passes, missing required field error, type mismatch error, extra fields permitted, untyped statements pass through, unknown base returns null, multiple violations all collected
+  - **SC16–SC20** File I/O and multi-type: load .asch file, nonexistent file handled, file-based validation, two typed stmts both missing fields, two schema types both validated
+
+### Fixed
+
+- `find_own_field` in `schema.c`: parser allocates nested object fields depth-first (inner fields precede their parent in the flat `field_list`); fixed scan to cover the full statement field range rather than relying on `field_start + field_count` which excluded sibling fields after a nested object
+- AML C parser requires commas between object fields (unlike the C# reference); all schema test source strings updated accordingly
+
+---
+
 ## [v0.4.0-alpha] — pre-release (2026-05-08)
 
 **Status:** ASL parser + evaluator complete; v0.4.0-alpha gate satisfied  

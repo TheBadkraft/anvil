@@ -225,6 +225,34 @@ compile_asl_objects() {
 }
 
 # ---------------------------------------------------------------------------
+# Package: anvil.schema (post-parse optional)
+# Sources: src/schema/*.c
+# Artifact: anvil.schema.o  (cpkg anvil.schema)
+# ---------------------------------------------------------------------------
+shopt -s nullglob
+_SCHEMA_SRCS=("$SRC_DIR/schema"/*.c)
+SCHEMA_SOURCES=("${_SCHEMA_SRCS[@]}")
+unset _SCHEMA_SRCS
+
+SCHEMA_OBJECTS=()
+for _s in "${SCHEMA_SOURCES[@]}"; do
+    SCHEMA_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+done
+unset _s
+
+compile_schema_objects() {
+    mkdir -p "$BUILD_DIR"
+    for i in "${!SCHEMA_SOURCES[@]}"; do
+        local src="${SCHEMA_SOURCES[$i]}"
+        local obj="${SCHEMA_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            $CC $CFLAGS -c "$src" -o "$obj"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
 declare -A BUILD_TARGETS=(
@@ -248,6 +276,7 @@ declare -A PACKAGES=(
     ["resolver"]="anvil.resolver | resolver"
     ["anvil.serializer"]="anvil.serializer | serializer"
     ["anvil.import"]="anvil.import | import"
+    ["anvil.schema"]="anvil.schema | schema"
 )
 
 # ---------------------------------------------------------------------------
@@ -260,6 +289,7 @@ declare -A TEST_CONFIGS=(
     ["vars"]="with_vars_objects"
     ["import"]="with_import_objects"
     ["asl"]="with_asl_objects"
+    ["schema"]="with_schema_objects"
 )
 
 # Prototype objects (linked only for tests that need them)
