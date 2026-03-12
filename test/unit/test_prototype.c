@@ -18,7 +18,7 @@
 
 #include "../utilities/prototype.h"
 #include "anvil.h"
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 
 // Test basic allocation and access
 static void test_stmt_buffer_basic(void) {

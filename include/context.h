@@ -128,6 +128,13 @@ struct anvl_context_t {
       usize count;    // number of fields
       usize capacity; // allocated capacity
    } field_list;
+   // Vars block entries (populated during parse; empty if no vars block)
+   struct {
+      struct anvl_vars_entry *entries; // array of vars entries
+      usize count;                     // number of entries
+      usize capacity;                  // allocated capacity
+      bool parsed;                     // true once vars block has been seen
+   } vars_list;
 };
 
 /* ------------------------------------------------------------------ */

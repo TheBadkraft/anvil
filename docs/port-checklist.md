@@ -69,22 +69,31 @@ This is the guiding document for porting all remaining Anvil features from the f
 ### 1.3 · Vars / VarRef Resolution
 **Spec ref**: CoreBoundary.md §6 — `AnvilVarsState` → `anvil_vars_state_t`
 
+**Design divergences from .Net reference (intentional):**
+- Interpolation hole syntax: `.Net` uses `{.ref}` (dot-prefix); C port uses `{ref}` (cleaner, dot was a .Net-ism)
+- Blob interpolation: not implemented; blobs remain 100% verbatim (`$` sigil on blobs is a parse error)
+
 | Item | Status | Notes |
 |------|--------|-------|
-| Vars block parsing | ❌ | Not present in parser.c or context.c |
-| `anvil_vars_state_t` | ❌ | |
+| Vars block parsing (`vars { }`) | ❌ | |
+| `$identifier` VarRef value type | ❌ | Parsed as new value type; resolved at materialise time against vars state |
+| `$"…{ref}…"` InterpolatedString value type | ❌ | Segment list (literal + ref spans); resolved at materialise time |
+| `anvl_vars_state_t` | ❌ | Holds vars block fields + resolved value table |
 | Circular ref detection (eager, at vars-state construction) | ❌ | |
 | Missing key deferred to first dereference | ❌ | |
+| `ANVL_ERR_VARS_*` error codes (4101–4105) | ⚠️ | Codes defined in `errors.h`; not yet wired |
 
 ### 1.4 · Writer
-**Spec ref**: CoreBoundary.md — writer emits byte-for-byte identical source (comments, whitespace, order)
+**Spec ref**: CoreBoundary.md — writer emits AML/AMP/ASL text from a parsed context
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `writer.c` implementation | ❌ | File exists, 0 lines |
-| Byte-for-byte round-trip fidelity (AML) | ❌ | Core principle — must be verified with golden files |
-| AMP write support | ❌ | |
-| Comment and whitespace preservation | ❌ | |
+| `serializer.c` implementation | ✅ | Ported as `anvil.serializer` package (`port/serializer`, merged `8499c1c`) |
+| AML dialect write support | ✅ | All value types: scalar, object, array, tuple, blob |
+| AMP dialect write support | ✅ | Scalar-only guard enforced at write time |
+| Blob verbatim fidelity | ✅ | Raw source span emitted; idempotency verified (ST06c–ST06f) |
+| Minify mode | ✅ | Single-line, comma-separated, no padding |
+| Vtable interface (`Serializer.serialize` / `Serializer.to_stream`) | ✅ | Matches `Anvil`/`Context`/`Source` pattern |
 
 ### 1.5 · Import Graph Resolution
 **Spec ref**: CoreBoundary.md §7 — graph walk in core; file I/O in binding
@@ -185,7 +194,7 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Utilities | `src/utilities/utils.c` | 56 | ✅ |
 | Types | `src/core/types.c` | 40 | ✅ type name functions |
 | Resolver | `src/core/resolver.c` | 490 | ✅ Full implementation |
-| Writer | `src/core/writer.c` | 0 | ❌ Empty stub |
+| Serializer | `src/serializer/serializer.c` | ~550 | ✅ Full implementation |
 | VarRef | *(no file)* | — | ❌ Not started |
 | Import graph | *(no file)* | — | ❌ Not started |
 | ASL | *(no file)* | — | ❌ Not started |

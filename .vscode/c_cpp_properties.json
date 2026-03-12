@@ -3,18 +3,19 @@
         {
             "name": "Linux",
             "includePath": [
+                "${workspaceFolder}/include",
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/include/**",
-                "${workspaceFolder}/include/sigcore/**",
-                "/usr/include/sigtest/**",
-                "/usr/include/sigtest/internal/**"
+                "/usr/local/include",
+                "/usr/local/include/sigma.test",
+                "/usr/local/include/sigma.memory",
+                "/usr/local/include/sigma.text",
+                "/usr/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c17",
+            "cStandard": "c23",
             "cppStandard": "gnu++17",
-            "intelliSenseMode": "linux-gcc-x64",
-            "configurationProvider": "ms-vscode.makefile-tools"
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4

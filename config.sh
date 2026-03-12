@@ -141,6 +141,34 @@ compile_serializer_objects() {
 }
 
 # ---------------------------------------------------------------------------
+# Package: anvil.vars (post-parse optional)
+# Sources: src/vars/*.c
+# Artifact: anvil.vars.o  (cpkg anvil.vars)
+# ---------------------------------------------------------------------------
+shopt -s nullglob
+_VARS_SRCS=("$SRC_DIR/vars"/*.c)
+VARS_SOURCES=("${_VARS_SRCS[@]}")
+unset _VARS_SRCS
+
+VARS_OBJECTS=()
+for _s in "${VARS_SOURCES[@]}"; do
+    VARS_OBJECTS+=("$BUILD_DIR/$(basename "${_s%.c}").o")
+done
+unset _s
+
+compile_vars_objects() {
+    mkdir -p "$BUILD_DIR"
+    for i in "${!VARS_SOURCES[@]}"; do
+        local src="${VARS_SOURCES[$i]}"
+        local obj="${VARS_OBJECTS[$i]}"
+        if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+            echo "Compiling $src -> $obj"
+            $CC $CFLAGS -c "$src" -o "$obj"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Build targets
 # ---------------------------------------------------------------------------
 declare -A BUILD_TARGETS=(
@@ -172,6 +200,7 @@ declare -A TEST_CONFIGS=(
     ["prototype"]="with_proto_objects"
     ["resolver"]="with_resolver_objects"
     ["serializer"]="with_serializer_objects"
+    ["vars"]="with_vars_objects"
 )
 
 # Prototype objects (linked only for tests that need them)

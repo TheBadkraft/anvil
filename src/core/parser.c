@@ -20,6 +20,7 @@
 #include "context_internal.h"
 #include "errors.h"
 #include "source_internal.h"
+#include "vars.h"
 
 #include <sigma.memory/memory.h>
 #include <stdio.h>
@@ -44,6 +45,9 @@ static value parse_blob(parser_ctx *p);
 static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_count);
 static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type);
 static bool read_identifier(parser_ctx *p, usize *pos, usize *len);
+static bool parse_vars_block(parser_ctx *p);
+static value parse_varref(parser_ctx *p);
+static value parse_interp_string(parser_ctx *p);
 
 bool anvl_parse(context ctx) {
    if (!ctx || !ctx->source) {
@@ -95,11 +99,50 @@ static bool parse_source(parser_ctx *p) {
       si_skip_whitespace_and_comments(p->src);
    }
 
+   // vars block must come before all statements (optional; at most one)
+   // Only trigger if "vars" is followed by '{' (after whitespace) — not ':='
+   if (si_match_length(p->src, "vars", 4) == 4 &&
+       !Source.is_identifier_part(si_peek_offset(p->src, 4))) {
+      // Peek past 'vars' and any whitespace to look for '{'
+      usize la = 4;
+      while (!si_is_eof_offset(p->src, la)) {
+         char lc = si_peek_offset(p->src, la);
+         if (lc != ' ' && lc != '\t' && lc != '\r' && lc != '\n')
+            break;
+         la++;
+      }
+      if (!si_is_eof_offset(p->src, la) && si_peek_offset(p->src, la) == '{') {
+         if (!parse_vars_block(p))
+            return false;
+         si_skip_whitespace_and_comments(p->src);
+      }
+   }
+
    while (!si_is_eof(p->src)) {
       // Shebang is illegal after statements
       if (si_match_length(p->src, "#!", 2) == 2) {
          parser_error(ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS, p->src);
          return false;
+      }
+
+      // vars block is illegal after statements (or if already seen)
+      // Only check when "vars" is followed by '{' (real block, not vars-as-identifier)
+      if (si_match_length(p->src, "vars", 4) == 4 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 4))) {
+         usize la = 4;
+         while (!si_is_eof_offset(p->src, la)) {
+            char lc = si_peek_offset(p->src, la);
+            if (lc != ' ' && lc != '\t' && lc != '\r' && lc != '\n')
+               break;
+            la++;
+         }
+         if (!si_is_eof_offset(p->src, la) && si_peek_offset(p->src, la) == '{') {
+            parser_error(p->ctx->vars_list.parsed
+                             ? ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED
+                             : ANVL_ERR_VARS_NOT_FIRST,
+                         p->src);
+            return false;
+         }
       }
 
       statement stmt = ci_new_statement(p->ctx, ANVL_STMT_ASSN);
@@ -295,6 +338,15 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    } else if (val->type == ANVL_VALUE_OBJECT) {
       value_meta->data.object.field_start = val->data.object.field_start;
       value_meta->data.object.field_count = val->data.object.field_count;
+   } else if (val->type == ANVL_VALUE_VARREF) {
+      // Override pos/len to identifier span (not including the '$' sigil)
+      value_meta->pos = val->data.scalar.pos;
+      value_meta->len = val->data.scalar.len;
+   } else if (val->type == ANVL_VALUE_INTERP_STRING) {
+      // Transfer segment ownership from temporary value to value_meta
+      value_meta->data.interp_string.segment_count = val->data.interp.segment_count;
+      value_meta->data.interp_string.segments = val->data.interp.segments_temp;
+      val->data.interp.segments_temp = NULL; // ownership transferred
    }
 
    // Fill statement metadata buffer with directional indices
@@ -345,6 +397,19 @@ static value parse_value(parser_ctx *p) {
       return parse_tuple(p);
    if (si_match_length(s, "@", 1) == 1 || si_match_length(s, "`", 1) == 1)
       return parse_blob(p);
+
+   // VarRef ($identifier) or interpolated string ($"...")
+   if (si_peek(s) == '$') {
+      char next = si_peek_offset(s, 1);
+      if (next == '"')
+         return parse_interp_string(p);
+      if (next == '`') {
+         // '$' before backtick is invalid — blobs are always verbatim
+         parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+         return NULL;
+      }
+      return parse_varref(p);
+   }
 
    usize start = 0, len = 0;
    anvl_value_type type = ANVL_VALUE_SCALAR;
@@ -874,5 +939,293 @@ static bool read_identifier(parser_ctx *p, usize *pos, usize *len) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
       return false;
    }
+   // Guard reserved keyword: 'vars'
+   if (*len == 4 && strncmp(si_data(s) + *pos, "vars", 4) == 0) {
+      parser_error(ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD, s);
+      return false;
+   }
    return true;
+}
+
+/* ========================================================================
+ * parse_vars_block() - Parse a vars { } block
+ *
+ * Grammar: vars { key := value, ... }
+ *
+ * Constraints (enforced here):
+ *   - Must appear before all statements (enforced in parse_source)
+ *   - At most one vars block per source (enforced in parse_source)
+ *   - No duplicate keys
+ *   - No interpolated string values (interp strings not allowed in vars block)
+ *
+ * Populates ctx->vars_list.entries; sets ctx->vars_list.parsed = true.
+ * ======================================================================== */
+static bool parse_vars_block(parser_ctx *p) {
+   source s = p->src;
+
+   si_consume(s, 4); // consume "vars"
+   si_skip_whitespace_and_comments(s);
+
+   if (si_match_length(s, "{", 1) != 1) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+   si_consume(s, 1); // consume '{'
+   si_skip_whitespace_and_comments(s);
+
+   p->ctx->vars_list.parsed = true;
+
+   while (!si_is_eof(s) && si_peek(s) != '}') {
+      // Parse key
+      usize key_pos = 0, key_len = 0;
+      if (!read_identifier(p, &key_pos, &key_len))
+         return false;
+
+      si_skip_whitespace_and_comments(s);
+
+      // Check for duplicate key
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->vars_list.count; i++) {
+         struct anvl_vars_entry *e = &p->ctx->vars_list.entries[i];
+         if (e->key_len == key_len &&
+             strncmp(src_data + e->key_pos, src_data + key_pos, key_len) == 0) {
+            parser_error(ANVL_ERR_VARS_DUPLICATE_KEY, s);
+            return false;
+         }
+      }
+
+      // Expect ':='
+      if (si_match_length(s, ":=", 2) != 2) {
+         parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
+         return false;
+      }
+      si_consume(s, 2);
+      si_skip_whitespace_and_comments(s);
+
+      // Parse value
+      usize value_start = si_position(s);
+      value val = parse_value(p);
+      usize value_end = si_position(s);
+      if (!val)
+         return false;
+
+      // Interpolated strings are not allowed as vars block values
+      if (val->type == ANVL_VALUE_INTERP_STRING) {
+         if (val->data.interp.segments_temp)
+            Allocator.dispose(val->data.interp.segments_temp);
+         Allocator.dispose(val);
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return false;
+      }
+
+      // Clean up temporary internal data for collection types
+      if ((val->type == ANVL_VALUE_ARRAY || val->type == ANVL_VALUE_TUPLE) &&
+          val->data.collection._elem_types_temp) {
+         Allocator.dispose(val->data.collection._elem_types_temp);
+         val->data.collection._elem_types_temp = NULL;
+      }
+
+      // Determine value span: for VARREF, store the identifier span (not '$')
+      usize vpos = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.pos : value_start;
+      usize vlen = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.len
+                                                    : (value_end - value_start);
+
+      ci_add_vars_entry(p->ctx, (struct anvl_vars_entry){
+                                    .key_pos = key_pos,
+                                    .key_len = key_len,
+                                    .value_pos = vpos,
+                                    .value_len = vlen,
+                                    .value_type = val->type,
+                                });
+      Allocator.dispose(val);
+
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ",", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+      }
+   }
+
+   if (si_match_length(s, "}", 1) != 1) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE, s);
+      return false;
+   }
+   si_consume(s, 1); // consume '}'
+
+   return true;
+}
+
+/* ========================================================================
+ * parse_varref() - Parse $identifier
+ *
+ * Consumes the '$' sigil and reads the following identifier.
+ * Returns a ANVL_VALUE_VARREF value with scalar.pos/len = identifier span.
+ * ======================================================================== */
+static value parse_varref(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '$'
+
+   if (!Source.is_identifier_start(si_peek(s))) {
+      parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+      return NULL;
+   }
+
+   usize ident_pos = si_position(s);
+   usize ident_len = 0;
+   while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+      si_consume(s, 1);
+      ident_len++;
+   }
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_VARREF);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   v->data.scalar.pos = ident_pos;
+   v->data.scalar.len = ident_len;
+   return v;
+}
+
+/* ========================================================================
+ * parse_interp_string() - Parse $"…{ref}…"
+ *
+ * Grammar:
+ *   $"  ( literal_char | '{{' | '}}' | '{' identifier '}' )*  "
+ *
+ * Segments:
+ *   - Literal span: is_ref=false, pos=source_start, len=source_length
+ *   - '{{' escape:  is_ref=false, pos=first_brace_pos, len=1 (emits single '{')
+ *   - '}}' escape:  is_ref=false, pos=first_brace_pos, len=1 (emits single '}')
+ *   - Ref hole:     is_ref=true,  pos=identifier_start, len=identifier_length
+ *
+ * Returns ANVL_VALUE_INTERP_STRING with interp.segments_temp set.
+ * Caller (parse_statement) must transfer ownership to value_meta.
+ * ======================================================================== */
+static value parse_interp_string(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '$'
+   si_consume(s, 1); // consume '"'
+
+   // Dynamic segment array
+   usize cap = 16;
+   struct anvl_interp_segment *segs =
+       Allocator.alloc(sizeof(struct anvl_interp_segment) * cap);
+   if (!segs) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   memset(segs, 0, sizeof(struct anvl_interp_segment) * cap);
+   usize nseg = 0;
+
+   // Helper: grow segment array if needed
+#define SEGS_PUSH(is_r, p_, l_)                                                                \
+   do {                                                                                        \
+      if (nseg >= cap) {                                                                       \
+         usize newcap_ = cap * 2;                                                              \
+         struct anvl_interp_segment *nb_ =                                                     \
+             Allocator.alloc(sizeof(struct anvl_interp_segment) * newcap_);                    \
+         if (!nb_) {                                                                           \
+            Allocator.dispose(segs);                                                           \
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                \
+            return NULL;                                                                       \
+         }                                                                                     \
+         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                         \
+         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                         \
+         Allocator.dispose(segs);                                                              \
+         segs = nb_;                                                                           \
+         cap = newcap_;                                                                        \
+      }                                                                                        \
+      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)}; \
+   } while (0)
+
+   usize lit_start = si_position(s);
+   usize lit_len = 0;
+   bool closed = false;
+
+   while (!si_is_eof(s)) {
+      char ch = si_peek(s);
+
+      if (ch == '"') {
+         // Closing quote: flush any pending literal, then done
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         si_consume(s, 1);
+         closed = true;
+         break;
+      }
+
+      if (ch == '{') {
+         if (si_peek_offset(s, 1) == '{') {
+            // '{{' → escaped literal '{'
+            if (lit_len > 0)
+               SEGS_PUSH(false, lit_start, lit_len);
+            SEGS_PUSH(false, si_position(s), 1); // only first '{'
+            si_consume(s, 2);
+            lit_start = si_position(s);
+            lit_len = 0;
+            continue;
+         }
+         // '{identifier}' — reference hole
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         si_consume(s, 1); // consume '{'
+         if (!Source.is_identifier_start(si_peek(s))) {
+            Allocator.dispose(segs);
+            parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+            return NULL;
+         }
+         usize ipos = si_position(s);
+         usize ilen = 0;
+         while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+            si_consume(s, 1);
+            ilen++;
+         }
+         if (si_peek(s) != '}') {
+            Allocator.dispose(segs);
+            parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
+            return NULL;
+         }
+         si_consume(s, 1); // consume '}'
+         SEGS_PUSH(true, ipos, ilen);
+         lit_start = si_position(s);
+         lit_len = 0;
+         continue;
+      }
+
+      if (ch == '}' && si_peek_offset(s, 1) == '}') {
+         // '}}' → escaped literal '}'
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         SEGS_PUSH(false, si_position(s), 1); // only first '}'
+         si_consume(s, 2);
+         lit_start = si_position(s);
+         lit_len = 0;
+         continue;
+      }
+
+      // Ordinary character — accumulate into literal span
+      if (lit_len == 0)
+         lit_start = si_position(s);
+      si_consume(s, 1);
+      lit_len++;
+   }
+
+#undef SEGS_PUSH
+
+   if (!closed) {
+      Allocator.dispose(segs);
+      parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
+      return NULL;
+   }
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_INTERP_STRING);
+   if (!v) {
+      Allocator.dispose(segs);
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   v->data.interp.segment_count = nseg;
+   v->data.interp.segments_temp = segs;
+   return v;
 }

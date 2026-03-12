@@ -5,7 +5,7 @@
 #include "anvil.h"
 #include "utilities/helpers.h"
 #include <sigma.memory/memory.h>
-#include <sigtest/sigtest.h>
+#include <sigma.test/sigtest.h>
 #include <string.h>
 
 // Include the diagnostic implementation

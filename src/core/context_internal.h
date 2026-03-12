@@ -84,6 +84,33 @@ static inline void ci_ensure_field_capacity(context ctx, usize need) {
    ctx->field_list.capacity = newcap;
 }
 
+static inline void ci_ensure_vars_capacity(context ctx, usize need) {
+   if (ctx->vars_list.capacity >= need)
+      return;
+   usize newcap = ctx->vars_list.capacity ? ctx->vars_list.capacity * 2 : 8;
+   while (newcap < need)
+      newcap *= 2;
+   struct anvl_vars_entry *newbuf = Allocator.alloc(sizeof(struct anvl_vars_entry) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate vars entry array", 0, 0, __FILE__);
+      return;
+   }
+   memset(newbuf, 0, sizeof(struct anvl_vars_entry) * newcap);
+   if (ctx->vars_list.entries) {
+      memcpy(newbuf, ctx->vars_list.entries, sizeof(struct anvl_vars_entry) * ctx->vars_list.count);
+      Allocator.dispose(ctx->vars_list.entries);
+   }
+   ctx->vars_list.entries = newbuf;
+   ctx->vars_list.capacity = newcap;
+}
+
+static inline void ci_add_vars_entry(context ctx, struct anvl_vars_entry e) {
+   ci_ensure_vars_capacity(ctx, ctx->vars_list.count + 1);
+   if (!ctx->vars_list.entries)
+      return;
+   ctx->vars_list.entries[ctx->vars_list.count++] = e;
+}
+
 // Constructors (zero-initialized)
 static inline statement ci_new_statement(context ctx __attribute__((unused)), anvl_stmt_type type) {
    statement s = Allocator.alloc(sizeof(*s));
