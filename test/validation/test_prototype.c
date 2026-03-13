@@ -8,11 +8,25 @@
  *
  * SPDX-License-Identifier: Proprietary
  * ------------------------------------------------------------------
- * prototype_test.c - Tests for statement buffer prototype
+ * test_prototype.c - Validation of compact blob buffer layout prototype
  * ------------------------------------------------------------------
  * Author: BadKraft
  * Created: 2025-12-15
- * File: test/utilities/prototype_test.c
+ * File: test/validation/test_prototype.c
+ * ------------------------------------------------------------------
+ *
+ * DESIGN NOTE:
+ *   This file validates the prototype concept for compacting statement
+ *   data into a flat usize[9] blob buffer. Each slot holds either a
+ *   scalar field (type, position, length) or a pointer-as-integer to
+ *   a heap-allocated sub-buffer (base, attribs, value). The goal is to
+ *   explore whether the parser's statement representation can be reduced
+ *   to a single contiguous allocation with pointer slots, minimising
+ *   struct overhead and improving cache locality.
+ *
+ *   This is a concept validation, not coverage for production src/ code.
+ *   If the compact-buffer approach is adopted, these tests should migrate
+ *   to the appropriate unit test file and this file retired.
  * ------------------------------------------------------------------
  */
 
@@ -20,20 +34,21 @@
 #include "anvil.h"
 #include <sigma.test/sigtest.h>
 
-// Test basic allocation and access
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Validate basic allocation, header fields, and sub-buffer slot assignment
 static void test_stmt_buffer_basic(void) {
    stmt_buffer sb = stmt_buffer_alloc();
    Assert.isNotNull(sb, "Statement buffer should allocate");
 
-   // Set header
    stmt_buffer_set_header(sb, ANVL_STMT_ASSN, 10, 20, 15, 5, ANVL_VALUE_SCALAR);
 
-   // Check access
    Assert.isTrue(STMT_TYPE(sb) == ANVL_STMT_ASSN, "Type should match");
    Assert.isTrue(STMT_START(sb) == 10, "Start should match");
    Assert.isTrue(STMT_LEN(sb) == 20, "Length should match");
 
-   // Set sub-buffers
    stmt_buffer_set_base(sb, 100, 5);
    base_buffer *bb = PTR_BASE(sb);
    Assert.isNotNull(bb, "Base buffer should be set");
@@ -48,11 +63,10 @@ static void test_stmt_buffer_basic(void) {
    stmt_buffer_free(sb);
 }
 
-// Test memory contiguity (basic check)
+// Verify the flat buffer is truly contiguous in memory
 static void test_stmt_buffer_contiguity(void) {
    stmt_buffer sb = stmt_buffer_alloc();
 
-   // Check buffer is contiguous
    usize *buf = sb->buffer;
    for (int i = 0; i < 9; i++) {
       Assert.isTrue(&buf[i] == &sb->buffer[i], "Buffer should be contiguous");
@@ -61,7 +75,7 @@ static void test_stmt_buffer_contiguity(void) {
    stmt_buffer_free(sb);
 }
 
-// Test attribs buffer
+// Validate attribs sub-buffer slot: count, len, and variadic pairs
 static void test_stmt_buffer_attribs(void) {
    stmt_buffer sb = stmt_buffer_alloc();
 
@@ -78,9 +92,14 @@ static void test_stmt_buffer_attribs(void) {
    stmt_buffer_free(sb);
 }
 
-// Register tests
-void prototype_test_register(void) {
-   testcase("Statement Buffer Basic", test_stmt_buffer_basic);
-   testcase("Statement Buffer Contiguity", test_stmt_buffer_contiguity);
-   testcase("Statement Buffer Attribs", test_stmt_buffer_attribs);
+// ============================================================================
+// Registration
+// ============================================================================
+
+__attribute__((constructor)) static void register_test_prototype(void) {
+   testset("Compact Blob Buffer Prototype", NULL, NULL);
+
+   testcase("PB01 Header fields and sub-buffer slots", test_stmt_buffer_basic);
+   testcase("PB02 Flat buffer memory contiguity", test_stmt_buffer_contiguity);
+   testcase("PB03 Attribs sub-buffer pairs", test_stmt_buffer_attribs);
 }
