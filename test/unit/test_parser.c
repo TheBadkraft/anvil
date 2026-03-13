@@ -293,9 +293,11 @@ static void test_parse_numbers(void) {
    Context.dispose(ctx);
 }
 
+#if 0 // Region: blocked — value_meta not yet populated for numeric types
 static void test_parse_numbers_stub(void) {
    Assert.skip("Number parsing tests disabled until value_meta is implemented");
 }
+#endif
 
 // Test 10: Boolean and null parsing
 
@@ -777,6 +779,9 @@ static void test_parse_missing_comma_in_array(void) {
    Context.dispose(ctx);
    Anvil.error_clear();
 }
+#if 0 // Region: dead code — EXPECTED_OBJECT_FIELD (3001) and EXPECTED_OBJECT_VALUE (3002)
+//   are never raised by parser.c; EXPECTED_OBJECT_CLOSE (3003) and
+//   TRAILING_COMMA_IN_OBJECT (3004) are covered by the _error variants below.
 // Test: Expected object field
 static void test_parse_expected_object_field(void) {
    Assert.skip("Parser error check not implemented");
@@ -796,6 +801,7 @@ static void test_parse_expected_object_close(void) {
 static void test_parse_trailing_comma_in_object(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
 // Test: Expected array close
 static void test_parse_expected_array_close(void) {
@@ -928,6 +934,8 @@ static void test_parse_unexpected_token(void) {
    Anvil.error_clear();
 }
 
+#if 0 // Region: dead code — DUPLICATE_FIELD_IN_OBJECT (4001) and INVALID_KEY_IN_OBJECT (4002)
+//   are defined in errors.h but never raised by parser.c.
 // Test: Duplicate field in object
 static void test_parse_duplicate_field_in_object(void) {
    Assert.skip("Parser error check not implemented");
@@ -937,12 +945,23 @@ static void test_parse_duplicate_field_in_object(void) {
 static void test_parse_invalid_key_in_object(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
-// Test: Identifier is keyword
+// Test: Identifier is keyword — 'vars' is a reserved keyword; using it as a
+//   statement identifier raises ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD (4003).
 static void test_parse_identifier_is_keyword(void) {
-   Assert.skip("Parser error check not implemented");
+   const char *source = "vars := 42";
+   const anvl_error_state *err_state;
+   context ctx = parse_source_with_err(source, ANVL_DIALECT_AML, &err_state);
+   Assert.isNotNull((void *)err_state, "Error state should be set for keyword used as identifier");
+   Assert.isTrue(err_state->code == ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD,
+                 "Should be IDENTIFIER_IS_KEYWORD error");
+   Context.dispose(ctx);
+   Anvil.error_clear();
 }
 
+#if 0 // Region: dead code — ATTRIBUTE_IS_KEYWORD (4004) and TUPLE_TOO_SHORT (4005)
+//   are defined in errors.h but never raised by parser.c.
 // Test: Attribute is keyword
 static void test_parse_attribute_is_keyword(void) {
    Assert.skip("Parser error check not implemented");
@@ -952,6 +971,7 @@ static void test_parse_attribute_is_keyword(void) {
 static void test_parse_tuple_too_short(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
 // Test: Expected comma in tuple
 static void test_parse_expected_comma_in_tuple(void) {
@@ -975,6 +995,9 @@ static void test_parse_expected_comma_in_tuple(void) {
    Anvil.error_clear();
 }
 
+#if 0 // Region: dead code — EMPTY_TUPLE_ELEMENT (4007), ROCKET_OP_NOT_VALID (4008),
+//   ASSIGNMENT_NOT_ALLOWED_HERE (4010), and INVALID_ATTRIBUTE_BLOCK (4011) are
+//   defined in errors.h but never raised by parser.c.
 // Test: Empty tuple element
 static void test_parse_empty_tuple_element(void) {
    Assert.skip("Parser error check not implemented");
@@ -994,20 +1017,40 @@ static void test_parse_assignment_not_allowed_here(void) {
 static void test_parse_invalid_attribute_block(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
-// Test: Invalid attribute
+// Test: Invalid attribute — zero-length attribute key: @[=value] causes key_len == 0,
+//   which triggers ANVL_ERR_PARSER_INVALID_ATTRIBUTE (4012).
 static void test_parse_invalid_attribute(void) {
-   Assert.skip("Parser error check not implemented");
+   const char *source = "@[=value]\nname := val";
+   const anvl_error_state *err_state;
+   context ctx = parse_source_with_err(source, ANVL_DIALECT_AML, &err_state);
+   Assert.isNotNull((void *)err_state, "Error state should be set for zero-length attribute key");
+   Assert.isTrue(err_state->code == ANVL_ERR_PARSER_INVALID_ATTRIBUTE,
+                 "Should be INVALID_ATTRIBUTE error");
+   Context.dispose(ctx);
+   Anvil.error_clear();
 }
 
+#if 0 // Region: dead code — DUPLICATE_ATTRIBUTE_KEY (4013) is defined in errors.h
+//   but never raised by parser.c.
 // Test: Duplicate attribute key
 static void test_parse_duplicate_attribute_key(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
-// Test: Unexpected character
+// Test: Unexpected character — import without opening '"' triggers
+//   ANVL_ERR_PARSER_UNEXPECTED_CHAR (5001).
 static void test_parse_unexpected_char(void) {
-   Assert.skip("Parser error check not implemented");
+   const char *source = "import notaquote";
+   const anvl_error_state *err_state;
+   context ctx = parse_source_with_err(source, ANVL_DIALECT_AML, &err_state);
+   Assert.isNotNull((void *)err_state, "Error state should be set for unexpected char in import");
+   Assert.isTrue(err_state->code == ANVL_ERR_PARSER_UNEXPECTED_CHAR,
+                 "Should be UNEXPECTED_CHAR error");
+   Context.dispose(ctx);
+   Anvil.error_clear();
 }
 
 // Test: Unterminated string
@@ -1054,6 +1097,9 @@ static void test_parse_unterminated_blob(void) {
    Anvil.error_clear();
 }
 
+#if 0 // Region: dead code — EXPECTED_BACKTICK (5005), UNTERMINATED_FREEFORM (5006),
+//   INVALID_HEX_LITERAL (5007), INVALID_EXPONENT (5008), and INVALID_NUMBER (5009)
+//   are defined in errors.h but the lexer validation paths are not yet implemented.
 // Test: Expected backtick
 static void test_parse_expected_backtick(void) {
    Assert.skip("Parser error check not implemented");
@@ -1078,6 +1124,7 @@ static void test_parse_invalid_exponent(void) {
 static void test_parse_invalid_number(void) {
    Assert.skip("Parser error check not implemented");
 }
+#endif
 
 // ============================================================================
 // INHERITANCE TESTS
@@ -1541,28 +1588,31 @@ __attribute__((constructor)) static void register_test_parser(void) {
    testcase("Inheritance placeholder", test_parse_inheritance_placeholder);
 
    // Sample file tests (test/samples/*.anvl and *.aurora)
-   testcase("Sample arrays.anvl",      test_parse_arrays_sample);
+   testcase("Sample arrays.anvl", test_parse_arrays_sample);
    testcase("Sample assignments.anvl", test_parse_assignments_sample);
-   testcase("Sample attributes.anvl",  test_parse_attributes_sample);
-   testcase("Sample inherits.anvl",    test_parse_inherits_sample);
-   testcase("Sample modpack.anvl",     test_parse_modpack_sample);
-   testcase("Sample objects.anvl",     test_parse_objects_sample);
-   testcase("Sample tuples.anvl",      test_parse_tuples_sample);
-   testcase("Sample generic.aurora",   test_parse_generic_aurora);
+   testcase("Sample attributes.anvl", test_parse_attributes_sample);
+   testcase("Sample inherits.anvl", test_parse_inherits_sample);
+   testcase("Sample modpack.anvl", test_parse_modpack_sample);
+   testcase("Sample objects.anvl", test_parse_objects_sample);
+   testcase("Sample tuples.anvl", test_parse_tuples_sample);
+   testcase("Sample generic.aurora", test_parse_generic_aurora);
 
    // Stress tests
-   testcase("Deep nesting",     test_parse_deep_nesting);
-   testcase("Real world data",  test_parse_real_world_data);
+   testcase("Deep nesting", test_parse_deep_nesting);
+   testcase("Real world data", test_parse_real_world_data);
 
    // Error — unexpected token
    testcase("Unexpected token", test_parse_unexpected_token);
+   testcase("Identifier is keyword", test_parse_identifier_is_keyword);
+   testcase("Invalid attribute key", test_parse_invalid_attribute);
+   testcase("Unexpected char in import", test_parse_unexpected_char);
 
    // AMP dialect tests (port/amp-strict)
-   testcase("AMP scalar array",            test_amp_scalar_array);
-   testcase("AMP scalar tuple",            test_amp_scalar_tuple);
-   testcase("AMP nested array in array",   test_amp_array_nested_array);
-   testcase("AMP nested tuple in array",   test_amp_array_nested_tuple);
-   testcase("AMP nested tuple in tuple",   test_amp_tuple_nested_tuple);
+   testcase("AMP scalar array", test_amp_scalar_array);
+   testcase("AMP scalar tuple", test_amp_scalar_tuple);
+   testcase("AMP nested array in array", test_amp_array_nested_array);
+   testcase("AMP nested tuple in array", test_amp_array_nested_tuple);
+   testcase("AMP nested tuple in tuple", test_amp_tuple_nested_tuple);
 }
 
 // Test sample files from test/samples/
