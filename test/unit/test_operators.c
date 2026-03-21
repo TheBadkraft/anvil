@@ -97,17 +97,20 @@ static void test_is_operator_false(void) {
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_operators(void) {
+static void _register(void) {
    testset("Operators", set_config, set_teardown);
 
-   testcase("OP01 from_symbol := ASSIGN",         test_operator_from_symbol_assign);
-   testcase("OP02 from_symbol = EQUAL",           test_operator_from_symbol_equal);
-   testcase("OP03 from_symbol => ROCKET",         test_operator_from_symbol_rocket);
-   testcase("OP04 from_symbol unknown INVALID",   test_operator_from_symbol_invalid);
-   testcase("OP05 symbol for ASSIGN",             test_operator_symbol_assign);
-   testcase("OP06 symbol for ROCKET",             test_operator_symbol_rocket);
-   testcase("OP07 length for ASSIGN",             test_operator_length_assign);
-   testcase("OP08 is_operator :=",                test_is_operator_assign);
-   testcase("OP09 is_operator =>",                test_is_operator_rocket);
-   testcase("OP10 is_operator rejects non-op",    test_is_operator_false);
+   testcase("OP01 from_symbol := ASSIGN", test_operator_from_symbol_assign);
+   testcase("OP02 from_symbol = EQUAL", test_operator_from_symbol_equal);
+   testcase("OP03 from_symbol => ROCKET", test_operator_from_symbol_rocket);
+   testcase("OP04 from_symbol unknown INVALID", test_operator_from_symbol_invalid);
+   testcase("OP05 symbol for ASSIGN", test_operator_symbol_assign);
+   testcase("OP06 symbol for ROCKET", test_operator_symbol_rocket);
+   testcase("OP07 length for ASSIGN", test_operator_length_assign);
+   testcase("OP08 is_operator :=", test_is_operator_assign);
+   testcase("OP09 is_operator =>", test_is_operator_rocket);
+   testcase("OP10 is_operator rejects non-op", test_is_operator_false);
+}
+__attribute__((constructor)) static void register_test_operators(void) {
+   Tests.enqueue(_register);
 }

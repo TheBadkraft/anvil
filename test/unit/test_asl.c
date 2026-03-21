@@ -588,7 +588,7 @@ static void test_e05_exec_parameters(void) {
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_asl(void) {
+static void _register(void) {
    testset("ASL Tests", set_config, set_teardown);
 
    testcase("A01: Parse simple return non-null", test_a01_parse_simple_return_non_null);
@@ -620,4 +620,7 @@ __attribute__((constructor)) static void register_test_asl(void) {
    testcase("E03: Exec comparison 3>2=true", test_e03_exec_comparison);
    testcase("E04: Exec logical && true", test_e04_exec_logical_and);
    testcase("E05: Exec function parameters", test_e05_exec_parameters);
+}
+__attribute__((constructor)) static void register_test_asl(void) {
+   Tests.enqueue(_register);
 }

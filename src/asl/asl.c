@@ -13,7 +13,7 @@
  *   §2  Parser   — Pratt/precedence-climbing recursive-descent
  *   §3  Eval     — tree-walk evaluator with flat per-call scope
  *
- * All heap allocation goes through Allocator.alloc / Allocator.dispose
+ * All heap allocation goes through Allocator.alloc / Allocator.free
  * (sigma.memory).  String building uses StringBuilder (sigma.text).
  *
  * Error reporting: anvl_error_set() + return NULL / false.
@@ -23,7 +23,7 @@
 #include "asl.h"
 #include "errors.h"
 #include <sigma.memory/memory.h>
-#include <sigma.text/strings.h>
+#include <sigma.core/strings.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -106,7 +106,7 @@ static bool node_add_child(asl_node_t *parent, asl_node_t *child) {
       if (!nb) return false;
       memcpy(nb, parent->children,
              sizeof(asl_node_t *) * (usize)parent->child_count);
-      Allocator.dispose(parent->children);
+      Allocator.free(parent->children);
       parent->children = nb;
    } else if (parent->child_count == 0) {
       /* first alloc path already handled above, but guard */
@@ -119,8 +119,8 @@ static void node_free_impl(asl_node_t *n) {
    if (!n) return;
    for (int i = 0; i < n->child_count; i++)
       node_free_impl(n->children[i]);
-   if (n->children) Allocator.dispose(n->children);
-   Allocator.dispose(n);
+   if (n->children) Allocator.free(n->children);
+   Allocator.free(n);
 }
 
 /* ================================================================
@@ -130,19 +130,19 @@ static void node_free_impl(asl_node_t *n) {
 static void value_free_impl(asl_value_t *v) {
    if (!v) return;
    if (v->kind == ASL_STRING && v->string_value) {
-      Allocator.dispose(v->string_value);
+      Allocator.free(v->string_value);
       v->string_value = NULL;
    } else if (v->kind == ASL_LIST) {
       for (int i = 0; i < v->list_count; i++)
          value_free_impl(&v->list_items[i]);
-      if (v->list_items) Allocator.dispose(v->list_items);
+      if (v->list_items) Allocator.free(v->list_items);
    } else if (v->kind == ASL_MAP) {
       for (int i = 0; i < v->map_count; i++) {
-         if (v->map_keys[i]) Allocator.dispose(v->map_keys[i]);
+         if (v->map_keys[i]) Allocator.free(v->map_keys[i]);
          value_free_impl(&v->map_values[i]);
       }
-      if (v->map_keys)   Allocator.dispose(v->map_keys);
-      if (v->map_values) Allocator.dispose(v->map_values);
+      if (v->map_keys)   Allocator.free(v->map_keys);
+      if (v->map_values) Allocator.free(v->map_values);
    }
    /* do NOT free v itself — it may be stack / array element */
 }
@@ -421,7 +421,7 @@ static asl_node_t *parse_primary(asl_scanner_t *s, const char *src) {
          n = node_alloc(ASL_NODE_INT_LITERAL);
          if (n) n->int_value = (int64_t)strtoll(tmp, NULL, 10);
       }
-      Allocator.dispose(tmp);
+      Allocator.free(tmp);
       return n;
    }
 
@@ -1105,7 +1105,7 @@ static bool eval_expr(asl_eval_ctx_t *ctx, const asl_node_t *node, asl_value_t *
             memcpy(key, ctx->src + node->start, (usize)klen);
             key[klen] = '\0';
             bool found = ctx->ext_lookup(key, out, ctx->ext_ud);
-            Allocator.dispose(key);
+            Allocator.free(key);
             if (found) return true;
          }
          char msg[96];
@@ -1298,7 +1298,7 @@ static bool eval_expr(asl_eval_ctx_t *ctx, const asl_node_t *node, asl_value_t *
             for (int i = 0; i < argc; i++) {
                if (!eval_expr(ctx, node->children[i + 1], &args[i])) {
                   for (int j = 0; j < i; j++) value_free_impl(&args[j]);
-                  Allocator.dispose(args);
+                  Allocator.free(args);
                   return false;
                }
             }
@@ -1320,7 +1320,7 @@ static bool eval_expr(asl_eval_ctx_t *ctx, const asl_node_t *node, asl_value_t *
                   fn_buf[fn_len] = '\0';
                   *out = ctx->modules[mi].call(fn_buf, args, argc,
                                                ctx->modules[mi].userdata);
-                  Allocator.dispose(fn_buf);
+                  Allocator.free(fn_buf);
                   ok = true;
                   break;
                }
@@ -1333,7 +1333,7 @@ static bool eval_expr(asl_eval_ctx_t *ctx, const asl_node_t *node, asl_value_t *
                   memcpy(fn_buf, ctx->src + callee->start, (usize)callee->length);
                   fn_buf[callee->length] = '\0';
                   ok = ctx->fn_dispatch(fn_buf, args, argc, out, ctx->fn_ud);
-                  Allocator.dispose(fn_buf);
+                  Allocator.free(fn_buf);
                }
             }
             if (!ok) {
@@ -1345,7 +1345,7 @@ static bool eval_expr(asl_eval_ctx_t *ctx, const asl_node_t *node, asl_value_t *
 
          if (args) {
             for (int i = 0; i < argc; i++) value_free_impl(&args[i]);
-            Allocator.dispose(args);
+            Allocator.free(args);
          }
          return ok;
       }

@@ -724,7 +724,7 @@ static void test_blob_tag_metadata(void) {
    * Test Registration
    * ======================================================================== */
 
-__attribute__((constructor)) static void register_test_meta_buffers(void) {
+static void _register(void) {
    testset("Meta-Buffer Infrastructure", set_config, set_teardown);
 
    // Phase 1: Base metadata buffer tests
@@ -758,4 +758,7 @@ __attribute__((constructor)) static void register_test_meta_buffers(void) {
 
    // Phase 6: Blob tag metadata
    testcase("Blob tag metadata", test_blob_tag_metadata);
+}
+__attribute__((constructor)) static void register_test_meta_buffers(void) {
+   Tests.enqueue(_register);
 }

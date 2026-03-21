@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# bench — Build and run the anvil benchmark suite
+#
+# Usage:
+#   ./bench              build (if needed) then run
+#   ./bench --build      force rebuild
+#   ./bench --run        run only (assumes binary is up to date)
+#   ./bench --clean      remove benchmark build artifacts
+# ---------------------------------------------------------------------------
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+source "$SCRIPT_DIR/config.sh"
+
+BENCH_DIR="$TEST_DIR/benchmarks"
+BENCH_BUILD="$TST_BUILD_DIR/benchmarks"
+BENCH_BIN="$BIN_DIR/run_benchmarks"
+CC="${CC:-gcc}"
+BENCH_CFLAGS="$CFLAGS $TST_CFLAGS -I$TEST_DIR/benchmarks"
+
+SIGMA_MEMORY="/usr/local/packages/sigma.memory.o"
+SIGMA_CORE_MODULE="/usr/local/packages/sigma.core.module.o"
+SIGMA_TEXT="/usr/local/packages/sigma.core.text.o"
+SIGMA_CORE_UTILS="/usr/local/packages/sigma.core.utils.o"
+
+BENCH_SRCS=(
+    "$BENCH_DIR/bench_parse.c"
+    "$BENCH_DIR/bench_resolver.c"
+    "$BENCH_DIR/bench_serializer.c"
+    "$BENCH_DIR/bench_asl.c"
+    "$BENCH_DIR/performance.c"
+    "$BENCH_DIR/run_benchmarks.c"
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+_build() {
+    mkdir -p "$BENCH_BUILD" "$BIN_DIR"
+
+    # Core library objects
+    anvil_compile
+    compile_resolver_objects
+    compile_serializer_objects
+    compile_asl_objects
+
+    # Benchmark objects
+    local bench_objs=()
+    for src in "${BENCH_SRCS[@]}"; do
+        local base
+        base=$(basename "${src%.c}")
+        local obj="$BENCH_BUILD/${base}.o"
+        echo "Compiling $src -> $obj"
+        $CC $BENCH_CFLAGS -c "$src" -o "$obj"
+        bench_objs+=("$obj")
+    done
+
+    # Link
+    echo "Linking $BENCH_BIN"
+    $CC \
+        "$SIGMA_MEMORY" "$SIGMA_CORE_MODULE" "$SIGMA_TEXT" "$SIGMA_CORE_UTILS" \
+        "${ANVIL_OBJECTS[@]}" \
+        "${RESOLVER_OBJECTS[@]}" \
+        "${SERIALIZER_OBJECTS[@]}" \
+        "${ASL_OBJECTS[@]}" \
+        "${bench_objs[@]}" \
+        -lm -o "$BENCH_BIN"
+
+    echo "Built: $BENCH_BIN"
+}
+
+_clean() {
+    rm -rf "$BENCH_BUILD"
+    rm -f "$BENCH_BIN"
+    echo "Cleaned benchmark artifacts."
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+case "${1:-}" in
+    --build)
+        _build
+        ;;
+    --run)
+        exec "$BENCH_BIN"
+        ;;
+    --clean)
+        _clean
+        ;;
+    *)
+        if [ ! -f "$BENCH_BIN" ]; then
+            _build
+        fi
+        exec "$BENCH_BIN"
+        ;;
+esac

@@ -11,8 +11,8 @@
  */
 #include "utils.h"
 #include <sigma.core/types.h>
-#include <sigma.memory/memory.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 anvl_dialect dialect_hint_from_ext(const char *filepath) {
@@ -37,14 +37,14 @@ bool load_source(const char *path, const char **out_source, usize *out_len) {
    long len = ftell(f);
    fseek(f, 0, SEEK_SET);
 
-   char *filebuff = Allocator.alloc((usize)len + 1);
+   char *filebuff = malloc((usize)len + 1);
    if (!filebuff) {
       fclose(f);
       return false;
    }
 
    if (fread(filebuff, 1, (usize)len, f) != (usize)len) {
-      Allocator.dispose(filebuff);
+      free(filebuff);
       fclose(f);
       return false;
    }

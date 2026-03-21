@@ -80,7 +80,7 @@ static context build_context(const char *src_str) {
    return ctx;
 }
 
-/* Serialize ctx, return heap string.  Caller must Allocator.dispose(). */
+/* Serialize ctx, return heap string.  Caller must Allocator.free(). */
 static char *serialize(context ctx, const anvl_serializer_options_t *opts) {
    string_builder sb = Serializer.serialize(ctx, opts);
    if (!sb)
@@ -100,11 +100,11 @@ static context round_trip(const char *src_str, const anvl_serializer_options_t *
    if (!text)
       return NULL;
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    return ctx2;
 }
 
-/* Return raw source substring for statement value at stmt_idx. Caller must Allocator.dispose(). */
+/* Return raw source substring for statement value at stmt_idx. Caller must Allocator.free(). */
 static char *stmt_value_str(context ctx, usize idx) {
    statement stmt = Context.get_statement(ctx, idx);
    if (!stmt || !stmt->value_meta)
@@ -122,7 +122,7 @@ static usize stmt_object_field_count(context ctx, usize idx) {
    return stmt->value_meta->data.object.field_count;
 }
 
-/* Return raw key string for field at field_start + offset. Caller must Allocator.dispose(). */
+/* Return raw key string for field at field_start + offset. Caller must Allocator.free(). */
 static char *field_key_str(context ctx, usize stmt_idx, usize field_offset) {
    statement stmt = Context.get_statement(ctx, stmt_idx);
    if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT)
@@ -134,7 +134,7 @@ static char *field_key_str(context ctx, usize stmt_idx, usize field_offset) {
    return Source.substring(ctx->source, f->key_pos, f->key_len);
 }
 
-/* Return raw value string for field at field_start + offset. Caller must Allocator.dispose(). */
+/* Return raw value string for field at field_start + offset. Caller must Allocator.free(). */
 static char *field_val_str(context ctx, usize stmt_idx, usize field_offset) {
    statement stmt = Context.get_statement(ctx, stmt_idx);
    if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT)
@@ -168,22 +168,22 @@ static void test_st01_scalars_round_trip(void) {
    v = stmt_value_str(ctx, 0);
    Assert.isNotNull(v, "name value present");
    Assert.isTrue(strcmp(v, "\"Anvil.Engine\"") == 0, "name := \"Anvil.Engine\"");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = stmt_value_str(ctx, 1);
    Assert.isNotNull(v, "count value present");
    Assert.isTrue(strcmp(v, "42") == 0, "count := 42");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = stmt_value_str(ctx, 2);
    Assert.isNotNull(v, "debug value present");
    Assert.isTrue(strcmp(v, "true") == 0, "debug := true");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = stmt_value_str(ctx, 3);
    Assert.isNotNull(v, "material value present");
    Assert.isTrue(strcmp(v, "stone") == 0, "material := stone");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -206,12 +206,12 @@ static void test_st02_inline_object_round_trip(void) {
    v = field_val_str(ctx, 0, 0); /* x */
    Assert.isNotNull(v, "x value present");
    Assert.isTrue(strcmp(v, "10") == 0, "x := 10");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = field_val_str(ctx, 0, 1); /* y */
    Assert.isNotNull(v, "y value present");
    Assert.isTrue(strcmp(v, "20") == 0, "y := 20");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -238,17 +238,17 @@ static void test_st03_block_object_round_trip(void) {
    v = field_val_str(ctx, 0, 0); /* name */
    Assert.isNotNull(v, "name value present");
    Assert.isTrue(strcmp(v, "\"server\"") == 0, "name := \"server\"");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = field_val_str(ctx, 0, 1); /* port */
    Assert.isNotNull(v, "port value present");
    Assert.isTrue(strcmp(v, "8080") == 0, "port := 8080");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    v = field_val_str(ctx, 0, 2); /* debug */
    Assert.isNotNull(v, "debug value present");
    Assert.isTrue(strcmp(v, "false") == 0, "debug := false");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -280,8 +280,8 @@ static void test_st04a_inline_array_round_trip(void) {
    Assert.isTrue(strcmp(e0, "alpha") == 0, "element[0] == alpha");
    Assert.isTrue(strcmp(e1, "beta") == 0, "element[1] == beta");
 
-   Allocator.dispose(e0);
-   Allocator.dispose(e1);
+   Allocator.free(e0);
+   Allocator.free(e1);
    Context.dispose(ctx);
    teardown();
 }
@@ -310,19 +310,19 @@ static void test_st04b_block_array_round_trip(void) {
                         stmt->value_meta->data.collection.elements[0].pos,
                         stmt->value_meta->data.collection.elements[0].len);
    Assert.isTrue(strcmp(e, "8080") == 0, "element[0] == 8080");
-   Allocator.dispose(e);
+   Allocator.free(e);
 
    e = Source.substring(ctx->source,
                         stmt->value_meta->data.collection.elements[1].pos,
                         stmt->value_meta->data.collection.elements[1].len);
    Assert.isTrue(strcmp(e, "8443") == 0, "element[1] == 8443");
-   Allocator.dispose(e);
+   Allocator.free(e);
 
    e = Source.substring(ctx->source,
                         stmt->value_meta->data.collection.elements[2].pos,
                         stmt->value_meta->data.collection.elements[2].len);
    Assert.isTrue(strcmp(e, "9000") == 0, "element[2] == 9000");
-   Allocator.dispose(e);
+   Allocator.free(e);
 
    Context.dispose(ctx);
    teardown();
@@ -349,7 +349,7 @@ static void test_st05_tuple_always_inline(void) {
 
    /* Verify values round-trip */
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
 
    statement stmt = Context.get_statement(ctx2, 0);
@@ -361,13 +361,13 @@ static void test_st05_tuple_always_inline(void) {
                         stmt->value_meta->data.collection.elements[0].pos,
                         stmt->value_meta->data.collection.elements[0].len);
    Assert.isTrue(strcmp(e, "10") == 0, "element[0] == 10");
-   Allocator.dispose(e);
+   Allocator.free(e);
 
    e = Source.substring(ctx2->source,
                         stmt->value_meta->data.collection.elements[2].pos,
                         stmt->value_meta->data.collection.elements[2].len);
    Assert.isTrue(strcmp(e, "-200") == 0, "element[2] == -200");
-   Allocator.dispose(e);
+   Allocator.free(e);
 
    Context.dispose(ctx2);
    teardown();
@@ -391,7 +391,7 @@ static void test_st06a_untagged_blob_round_trip(void) {
    Assert.isTrue(strstr(text, "`hello`") != NULL, "output contains `hello`");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
@@ -418,7 +418,7 @@ static void test_st06b_tagged_blob_round_trip(void) {
    Assert.isTrue(strstr(text, "@md`# Title`") != NULL, "full blob span @md`# Title` preserved");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
@@ -453,7 +453,7 @@ static void test_st06c_multiline_blob_exact(void) {
                  "multi-line blob content preserved verbatim");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
@@ -483,7 +483,7 @@ static void test_st06d_blob_special_chars_verbatim(void) {
                  "AML-special chars inside blob preserved verbatim");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
@@ -520,7 +520,7 @@ static void test_st06e_minify_blob_unchanged(void) {
                  "minify: blob content including newlines unchanged");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 1, "1 statement");
 
@@ -563,8 +563,8 @@ static void test_st06f_blob_serialization_idempotent(void) {
    /* Byte-identical */
    Assert.isTrue(strcmp(text1, text2) == 0, "serialize twice → identical output");
 
-   Allocator.dispose(text1);
-   Allocator.dispose(text2);
+   Allocator.free(text1);
+   Allocator.free(text2);
    teardown();
 }
 
@@ -587,19 +587,19 @@ static void test_st07_full_document_values_preserved(void) {
    char *v;
    v = stmt_value_str(ctx, 0);
    Assert.isTrue(strcmp(v, "\"Anvil.Engine\"") == 0, "name");
-   Allocator.dispose(v);
+   Allocator.free(v);
    v = stmt_value_str(ctx, 1);
    Assert.isTrue(strcmp(v, "true") == 0, "debug");
-   Allocator.dispose(v);
+   Allocator.free(v);
    v = stmt_value_str(ctx, 2);
    Assert.isTrue(strcmp(v, "42") == 0, "count");
-   Allocator.dispose(v);
+   Allocator.free(v);
    v = stmt_value_str(ctx, 3);
    Assert.isTrue(strcmp(v, "3.14159") == 0, "pi");
-   Allocator.dispose(v);
+   Allocator.free(v);
    v = stmt_value_str(ctx, 4);
    Assert.isTrue(strcmp(v, "vanilla") == 0, "flavor");
-   Allocator.dispose(v);
+   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -628,7 +628,7 @@ static void test_st08_amp_dialect_shebang_and_guard(void) {
    Assert.isTrue(strncmp(text, "#!amp", 5) == 0, "AMP shebang emitted");
    Assert.isTrue(strstr(text, "status") != NULL, "status present");
    Assert.isTrue(strstr(text, "ok") != NULL, "ok present");
-   Allocator.dispose(text);
+   Allocator.free(text);
 
    /* AML doc with object serialized as AMP should return NULL (error) */
    const char *obj_src = "#!aml\nconfig := { a := 1 }\n";
@@ -665,7 +665,7 @@ static void test_st12_inheritance_syntax_preserved(void) {
                  "inheritance :base syntax preserved");
 
    context ctx2 = build_context(text);
-   Allocator.dispose(text);
+   Allocator.free(text);
    Assert.isNotNull(ctx2, "re-parsed context exists");
    Assert.isTrue(Context.statement_count(ctx2) == 2, "2 statements");
 
@@ -691,7 +691,7 @@ static void test_st_m1_minify_scalar(void) {
 
    Assert.isNotNull(text, "minified text exists");
    Assert.isTrue(strcmp(text, "#!aml\na:=1") == 0, "minified output: #!aml\\na:=1");
-   Allocator.dispose(text);
+   Allocator.free(text);
    teardown();
 }
 
@@ -710,7 +710,7 @@ static void test_st_m2_minify_object(void) {
    Assert.isNotNull(text, "minified text exists");
    Assert.isTrue(strcmp(text, "#!aml\nconfig:={name:=server,port:=8080}") == 0,
                  "minified object output");
-   Allocator.dispose(text);
+   Allocator.free(text);
    teardown();
 }
 
@@ -729,7 +729,7 @@ static void test_st_m3_minify_array(void) {
    Assert.isNotNull(text, "minified text exists");
    Assert.isTrue(strcmp(text, "#!aml\ntags:=[alpha,beta,gamma]") == 0,
                  "minified array output");
-   Allocator.dispose(text);
+   Allocator.free(text);
    teardown();
 }
 
@@ -748,14 +748,14 @@ static void test_st_m6_minify_multi_statement(void) {
    Assert.isNotNull(text, "minified text exists");
    Assert.isTrue(strcmp(text, "#!aml\nname:=engine,count:=42,debug:=true") == 0,
                  "minified multi-statement output");
-   Allocator.dispose(text);
+   Allocator.free(text);
    teardown();
 }
 
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_serializer(void) {
+static void _register(void) {
    testset("Serializer Tests", set_config, set_teardown);
 
    testcase("ST01: Scalar statements round-trip", test_st01_scalars_round_trip);
@@ -777,4 +777,7 @@ __attribute__((constructor)) static void register_test_serializer(void) {
    testcase("ST_M2: Minify object", test_st_m2_minify_object);
    testcase("ST_M3: Minify array", test_st_m3_minify_array);
    testcase("ST_M6: Minify multi-statement", test_st_m6_minify_multi_statement);
+}
+__attribute__((constructor)) static void register_test_serializer(void) {
+   Tests.enqueue(_register);
 }

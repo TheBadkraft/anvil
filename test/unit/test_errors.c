@@ -111,9 +111,9 @@ static void test_error_code_message_known(void) {
 // ER10 — code_message and code_name disagree (they serve different purposes)
 static void test_error_code_message_vs_name(void) {
    const char *name = anvl_error_code_name(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
-   const char *msg  = anvl_error_code_message(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
+   const char *msg = anvl_error_code_message(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
    Assert.isNotNull((void *)name, "Name should not be NULL");
-   Assert.isNotNull((void *)msg,  "Message should not be NULL");
+   Assert.isNotNull((void *)msg, "Message should not be NULL");
    // They are distinct strings serving different purposes
    Assert.isTrue(name != msg, "Name and message should be different string literals");
 }
@@ -122,17 +122,20 @@ static void test_error_code_message_vs_name(void) {
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_errors(void) {
+static void _register(void) {
    testset("Error Handling", set_config, set_teardown);
 
-   testcase("ER01 Initial no-error state",       test_error_initial_state);
-   testcase("ER02 Set and get error",             test_error_set_and_get);
-   testcase("ER03 Clear resets state",            test_error_clear);
-   testcase("ER04 Second set overwrites first",   test_error_overwrite);
-   testcase("ER05 code_name for NONE",            test_error_code_name_none);
-   testcase("ER06 code_name for known code",      test_error_code_name_known);
-   testcase("ER07 code_name for unknown code",    test_error_code_name_unknown);
-   testcase("ER08 code_message for NONE",         test_error_code_message_none);
-   testcase("ER09 code_message for known code",   test_error_code_message_known);
-   testcase("ER10 code_message vs code_name",     test_error_code_message_vs_name);
+   testcase("ER01 Initial no-error state", test_error_initial_state);
+   testcase("ER02 Set and get error", test_error_set_and_get);
+   testcase("ER03 Clear resets state", test_error_clear);
+   testcase("ER04 Second set overwrites first", test_error_overwrite);
+   testcase("ER05 code_name for NONE", test_error_code_name_none);
+   testcase("ER06 code_name for known code", test_error_code_name_known);
+   testcase("ER07 code_name for unknown code", test_error_code_name_unknown);
+   testcase("ER08 code_message for NONE", test_error_code_message_none);
+   testcase("ER09 code_message for known code", test_error_code_message_known);
+   testcase("ER10 code_message vs code_name", test_error_code_message_vs_name);
+}
+__attribute__((constructor)) static void register_test_errors(void) {
+   Tests.enqueue(_register);
 }

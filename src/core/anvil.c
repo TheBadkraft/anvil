@@ -59,7 +59,7 @@ static void anvil_cleanup(void) {
 }
 
 static void anvil_dispose(root r) {
-   Allocator.dispose(r);
+   Allocator.free(r);
 }
 
 static bool anvil_error_is_set(void) {

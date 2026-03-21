@@ -215,7 +215,7 @@ static void test_operator_symbol_classification(void) {
    Assert.isTrue(anvl_symbol_from_symbol("xyz", 3) == ANVL_SYM_INVALID, "xyz should not be a symbol");
 }
 
-__attribute__((constructor)) static void register_test_interrogators(void) {
+static void _register(void) {
    testset("Source Interrogators", set_config, set_teardown);
 
    testcase("Position & EOF", test_position_and_eof);
@@ -229,4 +229,7 @@ __attribute__((constructor)) static void register_test_interrogators(void) {
    testcase("Dialect Parsing", test_parse_dialect);
    testcase("Source Creation Dialect", test_source_creation_dialect);
    testcase("Position Management", test_position_management);
+}
+__attribute__((constructor)) static void register_test_interrogators(void) {
+   Tests.enqueue(_register);
 }

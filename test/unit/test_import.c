@@ -80,7 +80,7 @@ static bool mock_load(const char *path, const char **out_src, usize *out_len,
    const mock_loader_t *m = (const mock_loader_t *)userdata;
    for (usize i = 0; i < m->count; i++) {
       if (strcmp(m->entries[i].path, path) == 0) {
-         /* Copy source to heap (ImportGraph.dispose will Allocator.dispose it) */
+         /* Copy source to heap (ImportGraph.dispose will Allocator.free it) */
          usize len = m->entries[i].source_len;
          char *buf = Allocator.alloc(len + 1);
          if (!buf)
@@ -127,7 +127,7 @@ static void test_i02_single_import_stored(void) {
    const struct anvl_import_decl *d = &ctx->import_list.decls[0];
    char *path = Source.substring(ctx->source, d->path_pos, d->path_len);
    Assert.isTrue(strcmp(path, "blocks/terrain.aml") == 0, "path is 'blocks/terrain.aml'");
-   Allocator.dispose(path);
+   Allocator.free(path);
 
    Assert.isTrue(d->alias_len == 0, "no explicit alias");
 
@@ -150,7 +150,7 @@ static void test_i03_import_with_explicit_alias_stored(void) {
    const struct anvl_import_decl *d = &ctx->import_list.decls[0];
    char *alias = Source.substring(ctx->source, d->alias_pos, d->alias_len);
    Assert.isTrue(strcmp(alias, "terrain") == 0, "alias is 'terrain'");
-   Allocator.dispose(alias);
+   Allocator.free(alias);
 
    Context.dispose(ctx);
    teardown();
@@ -366,7 +366,7 @@ static void test_i10_graph_build_diamond_dedup(void) {
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_import(void) {
+static void _register(void) {
    testset("Import Tests", set_config, set_teardown);
 
    testcase("I01: No imports parses ok", test_i01_no_imports_parses_ok);
@@ -379,4 +379,7 @@ __attribute__((constructor)) static void register_test_import(void) {
    testcase("I08: Graph build duplicate alias is error", test_i08_graph_build_duplicate_alias_is_error);
    testcase("I09: Graph build cyclic import is error", test_i09_graph_build_cyclic_import_is_error);
    testcase("I10: Graph build diamond dedup", test_i10_graph_build_diamond_dedup);
+}
+__attribute__((constructor)) static void register_test_import(void) {
+   Tests.enqueue(_register);
 }

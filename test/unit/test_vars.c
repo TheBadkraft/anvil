@@ -122,11 +122,11 @@ static void test_v02_single_entry_stored(void) {
    const struct anvl_vars_entry *e = &ctx->vars_list.entries[0];
    char *key = Source.substring(ctx->source, e->key_pos, e->key_len);
    Assert.isTrue(strcmp(key, "atlas") == 0, "key is 'atlas'");
-   Allocator.dispose(key);
+   Allocator.free(key);
 
    char *val = Source.substring(ctx->source, e->value_pos, e->value_len);
    Assert.isTrue(strcmp(val, "terrain.png") == 0, "value is 'terrain.png'");
-   Allocator.dispose(val);
+   Allocator.free(val);
 
    Context.dispose(ctx);
    teardown();
@@ -240,7 +240,7 @@ static void test_v08_scalar_varref_resolves(void) {
    char *resolved = resolve_stmt_varref(ctx, vs, 0);
    Assert.isNotNull(resolved, "resolved value exists");
    Assert.isTrue(strcmp(resolved, "terrain.png") == 0, "resolved to terrain.png");
-   Allocator.dispose(resolved);
+   Allocator.free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -277,7 +277,7 @@ static void test_v09_varref_in_object_field_resolves(void) {
    Assert.isTrue(ok, "resolve succeeded");
    char *resolved = Source.substring(ctx->source, rpos, rlen);
    Assert.isTrue(strcmp(resolved, "stone.png") == 0, "resolved to stone.png");
-   Allocator.dispose(resolved);
+   Allocator.free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -361,7 +361,7 @@ static void test_v12_varref_in_derived_object_resolves(void) {
       field f = ctx->field_list.fields[fstart + i];
       char *k = Source.substring(ctx->source, f->key_pos, f->key_len);
       bool match = strcmp(k, "texture") == 0;
-      Allocator.dispose(k);
+      Allocator.free(k);
       if (match) {
          tex_field = f;
          break;
@@ -376,7 +376,7 @@ static void test_v12_varref_in_derived_object_resolves(void) {
                 tex_field->val->data.scalar.len, &rpos, &rlen, &rtype);
    char *resolved = Source.substring(ctx->source, rpos, rlen);
    Assert.isTrue(strcmp(resolved, "missing.png") == 0, "resolved to missing.png");
-   Allocator.dispose(resolved);
+   Allocator.free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -407,7 +407,7 @@ static void test_v13_varref_chain_resolves_to_scalar(void) {
    Assert.isTrue(ok, "atlas resolves");
    char *val = Source.substring(ctx->source, rpos, rlen);
    Assert.isTrue(strcmp(val, "terrain.png") == 0, "atlas chain -> terrain.png");
-   Allocator.dispose(val);
+   Allocator.free(val);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -486,7 +486,7 @@ static void test_v16_single_ref_interpolation(void) {
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "Hello, Lattice!") == 0,
                  "materialised: Hello, Lattice!");
-   Allocator.dispose(result);
+   Allocator.free(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -512,7 +512,7 @@ static void test_v17_multi_ref_interpolation(void) {
    char *result = Vars.materialise_interp(vs, ctx, stmt->value_meta);
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "v1.0") == 0, "materialised: v1.0");
-   Allocator.dispose(result);
+   Allocator.free(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -541,7 +541,7 @@ static void test_v18_literal_only_interpolation(void) {
    char *result = Vars.materialise_interp(vs, ctx, stmt->value_meta);
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "no refs here") == 0, "materialised: no refs here");
-   Allocator.dispose(result);
+   Allocator.free(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -568,7 +568,7 @@ static void test_v19_escaped_braces_materialise(void) {
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "open { and close }") == 0,
                  "materialised: open { and close }");
-   Allocator.dispose(result);
+   Allocator.free(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -602,7 +602,7 @@ static void test_v20_missing_ref_in_interpolation(void) {
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_vars(void) {
+static void _register(void) {
    testset("Vars Tests", set_config, set_teardown);
 
    testcase("V01: Empty vars block parses ok", test_v01_empty_vars_block_parses_ok);
@@ -625,4 +625,7 @@ __attribute__((constructor)) static void register_test_vars(void) {
    testcase("V18: Literal-only interpolation", test_v18_literal_only_interpolation);
    testcase("V19: Escaped braces materialise", test_v19_escaped_braces_materialise);
    testcase("V20: Missing ref in interpolation", test_v20_missing_ref_in_interpolation);
+}
+__attribute__((constructor)) static void register_test_vars(void) {
+   Tests.enqueue(_register);
 }

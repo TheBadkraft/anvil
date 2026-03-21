@@ -282,13 +282,13 @@ static void test_parse_numbers(void) {
    char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isNotNull(value_text, "Should be able to extract value text");
    Assert.isTrue(strcmp(value_text, "42") == 0, "Value should be '42'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    // Check neg_int := -123
    stmt = Context.get_statement(ctx, 1);
    value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "-123") == 0, "Value should be '-123'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    Context.dispose(ctx);
 }
@@ -323,17 +323,17 @@ static void test_parse_booleans_and_null(void) {
    stmt = Context.get_statement(ctx, 0); // bool_true := true
    char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "true") == 0, "Value should be 'true'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // bool_false := false
    value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "false") == 0, "Value should be 'false'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    stmt = Context.get_statement(ctx, 2); // null_val := null
    value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "null") == 0, "Value should be 'null'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    Context.dispose(ctx);
 }
@@ -362,12 +362,12 @@ static void test_parse_bare_literals(void) {
    stmt = Context.get_statement(ctx, 0); // bare1 := some_value
    char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "some_value") == 0, "Value should be 'some_value'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // bare2 := another.value
    value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strcmp(value_text, "another.value") == 0, "Value should be 'another.value'");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    Context.dispose(ctx);
 }
@@ -428,7 +428,7 @@ static void test_parse_blobs(void) {
    char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
    Assert.isTrue(strstr(value_text, "@email") != NULL || strstr(value_text, "user@example.com") != NULL,
                  "Should contain blob content");
-   Allocator.dispose(value_text);
+   Allocator.free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // url := @http`https://example.com`
    Assert.isNotNull(stmt->value_meta, "Should have value_meta");
@@ -564,7 +564,7 @@ static void test_parse_moderate_stress(void) {
    Assert.isNotNull(stmt->value_meta, "Should have value metadata");
 
    Context.dispose(ctx);
-   Allocator.dispose(source);
+   Allocator.free(source);
 }
 // Test 21: Sample arrays.anvl file
 static void test_parse_arrays_sample(void) {
@@ -663,7 +663,7 @@ static void test_parse_deep_nesting(void) {
    Assert.isTrue(result, "Deep nesting parsing should succeed");
    Assert.isTrue(Context.statement_count(ctx) == 1, "Should have one statement");
 
-   Allocator.dispose(source);
+   Allocator.free(source);
    Context.dispose(ctx);
 }
 // Test 30: Stress test - Real world data conversion
@@ -683,7 +683,7 @@ static void test_parse_real_world_data(void) {
       Assert.isTrue(result, "Real world data parsing should succeed");
       Assert.isTrue(Context.statement_count(ctx) > 0, "Should have statements");
 
-      Allocator.dispose(source);
+      Allocator.free(source);
       Context.dispose(ctx);
    } else {
       // If we can't fetch data, just pass the test
@@ -1517,7 +1517,7 @@ static void test_amp_tuple_nested_tuple(void) {
    teardown();
 }
 
-__attribute__((constructor)) static void register_test_parser(void) {
+static void _register(void) {
    testset("Parser Tests", set_config, set_teardown);
 
    testcase("Empty Source", test_parse_empty_source);
@@ -1614,6 +1614,9 @@ __attribute__((constructor)) static void register_test_parser(void) {
    testcase("AMP nested tuple in array", test_amp_array_nested_tuple);
    testcase("AMP nested tuple in tuple", test_amp_tuple_nested_tuple);
 }
+__attribute__((constructor)) static void register_test_parser(void) {
+   Tests.enqueue(_register);
+}
 
 // Test sample files from test/samples/
 static context parse_file(const char *filename, anvl_dialect exp_dialect, usize exp_pos, usize exp_line, usize exp_col) {
@@ -1622,7 +1625,7 @@ static context parse_file(const char *filename, anvl_dialect exp_dialect, usize 
    anvl_ctx_builder_i *builder = Context.get_builder();
    bool loaded = builder->load_file(builder, filepath);
    if (!loaded) {
-      writelnf("[DEBUG]: Failed to load file: %s", filepath);
+      fprintf(stderr, "[DEBUG]: Failed to load file: %s\n", filepath);
    }
    Assert.isTrue(loaded, "Sample file should load successfully");
 
@@ -1643,7 +1646,7 @@ static context parse_file(const char *filename, anvl_dialect exp_dialect, usize 
       Assert.isTrue(Anvil.error_is_set(), "Error should be set when parsing fails");
       const anvl_error_state *err = Anvil.error_get();
       Assert.isNotNull((void *)err, "Error state should be available");
-      writelnf("[DEBUG]: Unexpected parse failure for %s: %s at line %ld, col %ld\n",
+      fprintf(stderr, "[DEBUG]: Unexpected parse failure for %s: %s at line %ld, col %ld\n",
                filename, err->message, err->line, err->column);
       Anvil.error_clear();
    }
@@ -1662,11 +1665,11 @@ static context parse_source(const char *source, anvl_dialect dialect) {
 
    bool result = Context.parse(ctx);
    if (!result) {
-      writelnf("[DEBUG]: Failed to parse source: %s", source);
+      fprintf(stderr, "[DEBUG]: Failed to parse source: %s\n", source);
 
       const anvl_error_state *err = Anvil.error_get();
       if (err->message)
-         writelnf("Error: %s", err->message);
+         fprintf(stderr, "Error: %s\n", err->message);
    }
 
    Assert.isTrue(result, "Source parsing should succeed");

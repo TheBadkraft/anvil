@@ -41,15 +41,15 @@ static void test_value_type_name_object(void) {
 
 // TY03 — ANVL_VALUE_ARRAY, TUPLE, BLOB all return distinct names
 static void test_value_type_name_distinct(void) {
-   const char *arr   = anvl_value_type_name(ANVL_VALUE_ARRAY);
+   const char *arr = anvl_value_type_name(ANVL_VALUE_ARRAY);
    const char *tuple = anvl_value_type_name(ANVL_VALUE_TUPLE);
-   const char *blob  = anvl_value_type_name(ANVL_VALUE_BLOB);
-   Assert.isNotNull((void *)arr,   "ARRAY type name should not be NULL");
+   const char *blob = anvl_value_type_name(ANVL_VALUE_BLOB);
+   Assert.isNotNull((void *)arr, "ARRAY type name should not be NULL");
    Assert.isNotNull((void *)tuple, "TUPLE type name should not be NULL");
-   Assert.isNotNull((void *)blob,  "BLOB type name should not be NULL");
+   Assert.isNotNull((void *)blob, "BLOB type name should not be NULL");
    Assert.isTrue(strcmp(arr, tuple) != 0, "ARRAY and TUPLE names should differ");
-   Assert.isTrue(strcmp(arr, blob) != 0,  "ARRAY and BLOB names should differ");
-   Assert.isTrue(strcmp(tuple, blob) != 0,"TUPLE and BLOB names should differ");
+   Assert.isTrue(strcmp(arr, blob) != 0, "ARRAY and BLOB names should differ");
+   Assert.isTrue(strcmp(tuple, blob) != 0, "TUPLE and BLOB names should differ");
 }
 
 // TY04 — ANVL_VALUE_VARREF and INTERP_STRING names are non-null
@@ -111,17 +111,20 @@ static void test_stmt_type_name_out_of_range(void) {
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_types(void) {
+static void _register(void) {
    testset("Types", set_config, set_teardown);
 
-   testcase("TY01 value_type_name SCALAR",            test_value_type_name_scalar);
-   testcase("TY02 value_type_name OBJECT",            test_value_type_name_object);
-   testcase("TY03 value_type_name distinct names",    test_value_type_name_distinct);
-   testcase("TY04 value_type_name VARREF/INTERP",     test_value_type_name_varref_interp);
+   testcase("TY01 value_type_name SCALAR", test_value_type_name_scalar);
+   testcase("TY02 value_type_name OBJECT", test_value_type_name_object);
+   testcase("TY03 value_type_name distinct names", test_value_type_name_distinct);
+   testcase("TY04 value_type_name VARREF/INTERP", test_value_type_name_varref_interp);
    testcase("TY05 value_type_name out-of-range safe", test_value_type_name_out_of_range);
-   testcase("TY06 stmt_type_name ASSN",               test_stmt_type_name_assn);
-   testcase("TY07 stmt_type_name FUNC",               test_stmt_type_name_func);
-   testcase("TY08 stmt_type_name MSSG",               test_stmt_type_name_mssg);
-   testcase("TY09 stmt_type_names distinct",          test_stmt_type_names_distinct);
-   testcase("TY10 stmt_type_name out-of-range safe",  test_stmt_type_name_out_of_range);
+   testcase("TY06 stmt_type_name ASSN", test_stmt_type_name_assn);
+   testcase("TY07 stmt_type_name FUNC", test_stmt_type_name_func);
+   testcase("TY08 stmt_type_name MSSG", test_stmt_type_name_mssg);
+   testcase("TY09 stmt_type_names distinct", test_stmt_type_names_distinct);
+   testcase("TY10 stmt_type_name out-of-range safe", test_stmt_type_name_out_of_range);
+}
+__attribute__((constructor)) static void register_test_types(void) {
+   Tests.enqueue(_register);
 }

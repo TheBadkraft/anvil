@@ -85,38 +85,41 @@ static void test_symbol_length_comma(void) {
 
 // SY09 — known single-char symbols are recognised
 static void test_is_symbol_known(void) {
-   Assert.isTrue(anvl_is_symbol("@", 1),  "'@' should be a symbol");
-   Assert.isTrue(anvl_is_symbol("{", 1),  "'{' should be a symbol");
-   Assert.isTrue(anvl_is_symbol("}", 1),  "'}' should be a symbol");
-   Assert.isTrue(anvl_is_symbol("[", 1),  "'[' should be a symbol");
-   Assert.isTrue(anvl_is_symbol("]", 1),  "']' should be a symbol");
-   Assert.isTrue(anvl_is_symbol("(", 1),  "'(' should be a symbol");
-   Assert.isTrue(anvl_is_symbol(")", 1),  "')' should be a symbol");
-   Assert.isTrue(anvl_is_symbol(",", 1),  "',' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("@", 1), "'@' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("{", 1), "'{' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("}", 1), "'}' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("[", 1), "'[' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("]", 1), "']' should be a symbol");
+   Assert.isTrue(anvl_is_symbol("(", 1), "'(' should be a symbol");
+   Assert.isTrue(anvl_is_symbol(")", 1), "')' should be a symbol");
+   Assert.isTrue(anvl_is_symbol(",", 1), "',' should be a symbol");
 }
 
 // SY10 — non-symbol text is rejected
 static void test_is_symbol_false(void) {
    Assert.isFalse(anvl_is_symbol("hello", 5), "'hello' should not be a symbol");
-   Assert.isFalse(anvl_is_symbol(":=", 2),    "':=' should not be a symbol");
-   Assert.isFalse(anvl_is_symbol("?", 1),     "'?' should not be a symbol");
+   Assert.isFalse(anvl_is_symbol(":=", 2), "':=' should not be a symbol");
+   Assert.isFalse(anvl_is_symbol("?", 1), "'?' should not be a symbol");
 }
 
 // ============================================================================
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_symbols(void) {
+static void _register(void) {
    testset("Symbols", set_config, set_teardown);
 
-   testcase("SY01 from_symbol @",                test_symbol_from_symbol_at);
-   testcase("SY02 from_symbol {",                test_symbol_from_symbol_lbrace);
-   testcase("SY03 from_symbol }",                test_symbol_from_symbol_rbrace);
-   testcase("SY04 from_symbol ,",                test_symbol_from_symbol_comma);
-   testcase("SY05 from_symbol unknown INVALID",  test_symbol_from_symbol_invalid);
-   testcase("SY06 symbol string for AT",         test_symbol_symbol_at);
-   testcase("SY07 symbol string for L_BRACKET",  test_symbol_symbol_lbracket);
-   testcase("SY08 symbol length for COMMA",      test_symbol_length_comma);
-   testcase("SY09 is_symbol known chars",        test_is_symbol_known);
+   testcase("SY01 from_symbol @", test_symbol_from_symbol_at);
+   testcase("SY02 from_symbol {", test_symbol_from_symbol_lbrace);
+   testcase("SY03 from_symbol }", test_symbol_from_symbol_rbrace);
+   testcase("SY04 from_symbol ,", test_symbol_from_symbol_comma);
+   testcase("SY05 from_symbol unknown INVALID", test_symbol_from_symbol_invalid);
+   testcase("SY06 symbol string for AT", test_symbol_symbol_at);
+   testcase("SY07 symbol string for L_BRACKET", test_symbol_symbol_lbracket);
+   testcase("SY08 symbol length for COMMA", test_symbol_length_comma);
+   testcase("SY09 is_symbol known chars", test_is_symbol_known);
    testcase("SY10 is_symbol rejects non-symbol", test_is_symbol_false);
+}
+__attribute__((constructor)) static void register_test_symbols(void) {
+   Tests.enqueue(_register);
 }

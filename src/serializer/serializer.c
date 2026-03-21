@@ -18,7 +18,7 @@
 #include "anvil.h"
 
 #include <sigma.memory/memory.h>
-#include <sigma.text/strings.h>
+#include <sigma.core/strings.h>
 #include <stdio.h>
 #include <string.h>
 

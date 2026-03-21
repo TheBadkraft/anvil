@@ -12,17 +12,18 @@ ASAN_ENABLED=false
 ASAN_OPTIONS="detect_leaks=1:detect_stack_use_after_return=1:detect_invalid_pointer_pairs=1"
 
 # Base compiler flags
-BASE_CFLAGS="-Wall -Wextra -g -fPIC -std=$STD -I./include -I/usr/local/include"
+# Library (production): optimized, no debug symbols
+BASE_CFLAGS="-Wall -Wextra -O2 -fPIC -std=$STD -I./include -I/usr/local/include"
 
 if [ "$ASAN_ENABLED" = true ]; then
     BASE_CFLAGS="$BASE_CFLAGS -fsanitize=address -fsanitize=undefined"
 fi
 
 CFLAGS="$BASE_CFLAGS"
-# -I./test lets test files use "utilities/helpers.h" regardless of subdir depth
-TST_CFLAGS="$CFLAGS -DTSTDBG -I./test"
+# Test binaries: keep debug symbols for valgrind/GDB; don't inherit NDEBUG so asserts fire
+TST_CFLAGS="-Wall -Wextra -g -fPIC -std=$STD -I./include -I/usr/local/include -DTSTDBG -I./test -D_POSIX_C_SOURCE=200809L"
 LDFLAGS="-shared"
-TST_LDFLAGS="-Wl,--wrap=malloc -Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc"  # required by sigma.test.o
+TST_LDFLAGS="-lm"  # -lm for bench stddev
 
 SRC_DIR=src
 BUILD_DIR=build
@@ -33,10 +34,10 @@ TST_BUILD_DIR="$BUILD_DIR/test"
 LIB_NAME="anvil"
 
 # Runtime dependencies (cbuild resolves these as /usr/local/packages/<name>.o)
-REQUIRES=("sigma.memory" "sigma.text")
+REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text")
 
 # Test dependencies (rtest resolves these — adds sigma.test on top of REQUIRES)
-TST_REQUIRES=("sigma.memory" "sigma.text" "sigma.test")
+TST_REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text" "sigma.core.utils" "sigma.test")
 
 # ---------------------------------------------------------------------------
 # Package: anvil (mandatory core)
@@ -290,6 +291,21 @@ declare -A TEST_CONFIGS=(
     ["import"]="with_import_objects"
     ["asl"]="with_asl_objects"
     ["schema"]="with_schema_objects"
+    # benchmark test configs
+    ["bench_parse"]="standard"
+    ["bench_resolver"]="with_resolver_objects"
+    ["bench_serializer"]="with_serializer_objects"
+    ["bench_asl"]="with_asl_objects"
+    ["performance"]="standard"
+)
+
+# Per-test package overrides (omit sigma.test.o for standalone-main tests)
+declare -A TEST_PKG_OVERRIDES=(
+    ["bench_parse"]="sigma.memory sigma.core.module sigma.core.text sigma.core.utils"
+    ["bench_asl"]="sigma.memory sigma.core.module sigma.core.text sigma.core.utils"
+    ["bench_resolver"]="sigma.memory sigma.core.module sigma.core.text sigma.core.utils"
+    ["bench_serializer"]="sigma.memory sigma.core.module sigma.core.text sigma.core.utils"
+    ["performance"]="sigma.memory sigma.core.module sigma.core.text sigma.core.utils"
 )
 
 # Prototype objects (linked only for tests that need them)
@@ -301,3 +317,12 @@ fi
 unset _PROTO_SRC
 
 declare -A TEST_COMPILE_FLAGS=()
+
+# Per-test linker flag overrides (omit --wrap for standalone-main tests)
+declare -A TEST_LDFLAGS_OVERRIDES=(
+    ["bench_parse"]="-lm"
+    ["bench_asl"]="-lm"
+    ["bench_resolver"]="-lm"
+    ["bench_serializer"]="-lm"
+    ["performance"]="-lm"
+)

@@ -21,7 +21,7 @@
 #pragma once
 
 /* Version identifier */
-#define ANVIL_VERSION "v.0.1.0-alpha"
+#define ANVIL_VERSION "v0.4.5-alpha"
 
 #include "constants.h"
 #include "context.h"

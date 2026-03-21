@@ -11,6 +11,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.0-alpha] — pre-release (2026-03-21)
+
+**Status:** Sigma.Core migration complete; all unit tests passing (19/19 suites, 0 failures)
+**Milestone:** Infrastructure upgrade — module system, new allocator API, sigma.core.text, test framework
+
+### Added
+
+- **Module system** (`src/core/module.c`)
+  - Anvil registers as `SIGMA_ROLE_USER` via `sigma_module_init_all()` / `sigma_module_shutdown_all()` called from `src/cli/main.c`
+  - Module bootstrap creates a 1 MiB bump slab for `StringBuilder` allocations; wires `StringBuilder.alloc_use()` on init and restores NULL on shutdown
+  - Anvil dependency chain: `sigma.memory` → `sigma.core.module` → `sigma.core.text`
+
+- **sigma.core.text** (`<sigma.core/strings.h>`)
+  - All `<sigma.text/strings.h>` includes updated to `<sigma.core/strings.h>` — header is now the canonical location for `String`, `StringBuilder`, and helper functions
+
+### Changed
+
+- **Allocator API migration** (from sigma.memory 0.2.x R7 API to sigma.core/sigma.memory current)
+  - `Allocator.dispose(x)` → `Allocator.free(x)` — ~60 call sites across `src/` and `test/`
+  - `rscope` type → `bump_allocator` (`include/context.h`)
+  - `Allocator.Resource.acquire(size)` → `Allocator.create_bump(size)`
+  - `Allocator.Resource.release(arena)` → `Allocator.release((sc_ctrl_base_s *)arena)`
+  - `Allocator.Resource.alloc(arena, size)` → `arena->alloc(arena, size)` (all call sites in `context_internal.h` and `parser.c`)
+  - Removed `--wrap=malloc/free` linker flags from `TST_LDFLAGS`; new sigma.memory uses mmap/slab allocators and no longer exports `__wrap_*` symbols
+  - `REQUIRES` / `TST_REQUIRES` in `config.sh` updated to reflect new package names
+
+- **Test framework** (`test/unit/*.c`, 19 files)
+  - Migration from direct `testset()` constructor registration to `Tests.enqueue(_register)` pattern
+  - `_run_pending()` fires after `sigma_module_init_all()` in `main()`
+  - `test/validation/test_prototype.c` moved from `test/unit/` to `test/validation/`
+
+- **Context arena sizing** (`src/core/context.c`)
+  - Slab multiplier increased from 4× to 16×, floor raised from 4 KiB to 64 KiB
+  - Fixes OOM failures on larger sample files (modpack.anvl, arrays.anvl, tuples.anvl) caused by the doubling-without-free strategy in `ci_ensure_*_capacity` consuming arena space
+
+### Fixed
+
+- `writelnf` implicit declaration: removed all calls to the now-absent `writelnf()` helper across
+  `test/unit/test_parser.c`, `test/unit/test_statements.c`, and `test/utilities/diagnostic.c`;
+  replaced with `fprintf(stderr, "...\n", ...)` — `writelnf` was removed in the sigma.core rewrite
+- Shutdown segfault: `_anvil_shutdown` no longer calls `Allocator.release(bump)` — sigma.memory drains its own controllers on module shutdown; releasing before sigma.test's cleanup caused a use-after-free in `stringbuilder_dispose`
+- `Time` symbol missing in bench packages: added `sigma.core.utils.o` to `TST_REQUIRES` and bench package lists in `config.sh`
+
+---
+
 ## [v0.4.5-alpha] — pre-release (2026-03-12)
 
 **Status:** Schema resolver + validator complete; v0.4.5-alpha gate satisfied  
@@ -62,7 +107,7 @@ This gate was satisfied early. The AMP scalar enforcement work was implemented a
 
 ---
 
-## [v0.4.0-alpha] — pre-release (2026-05-08)
+## [v0.4.0-alpha] — pre-release (2026-03-12)
 
 **Status:** ASL parser + evaluator complete; v0.4.0-alpha gate satisfied  
 **Milestone:** Full ASL (Anvil Script Language) parse + tree-walk evaluation with flat scope, control flow, and external dispatch

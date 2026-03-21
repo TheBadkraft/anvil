@@ -427,7 +427,7 @@ static void test_amp_event_envelope(void) {
 /* ================================================================== */
 /* Test registration using sigtest framework                          */
 /* ================================================================== */
-__attribute__((constructor)) static void register_test_messaging(void) {
+static void _register(void) {
    testset("AMP Messaging Protocol Tests", setup_messaging, teardown_messaging);
 
    // Valid AMP messages (scalars only)
@@ -456,4 +456,7 @@ __attribute__((constructor)) static void register_test_messaging(void) {
    testcase("AMP meta-buffer VALUE spans", test_amp_metabuffer_value_spans);
    testcase("AMP response envelope", test_amp_response_envelope);
    testcase("AMP event envelope", test_amp_event_envelope);
+}
+__attribute__((constructor)) static void register_test_messaging(void) {
+   Tests.enqueue(_register);
 }

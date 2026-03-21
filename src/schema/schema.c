@@ -62,18 +62,18 @@ static anvl_schema_type_t *stype_alloc(void) {
 static void stype_free(anvl_schema_type_t *t) {
    if (!t)
       return;
-   Allocator.dispose(t->name);
+   Allocator.free(t->name);
    if (t->fields) {
       for (int i = 0; i < t->field_count; i++)
-         Allocator.dispose(t->fields[i].name);
-      Allocator.dispose(t->fields);
+         Allocator.free(t->fields[i].name);
+      Allocator.free(t->fields);
    }
    if (t->values) {
       for (int i = 0; i < t->value_count; i++)
-         Allocator.dispose(t->values[i]);
-      Allocator.dispose(t->values);
+         Allocator.free(t->values[i]);
+      Allocator.free(t->values);
    }
-   Allocator.dispose(t);
+   Allocator.free(t);
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,7 +88,7 @@ static anvl_schema_ruleset_t *ruleset_alloc(void) {
       return NULL;
    r->types = Allocator.alloc(sizeof(anvl_schema_type_t *) * RULESET_INIT_CAP);
    if (!r->types) {
-      Allocator.dispose(r);
+      Allocator.free(r);
       return NULL;
    }
    memset(r->types, 0, sizeof(anvl_schema_type_t *) * RULESET_INIT_CAP);
@@ -107,7 +107,7 @@ static bool ruleset_push(anvl_schema_ruleset_t *r, anvl_schema_type_t *t) {
       memcpy(a, r->types, sizeof(anvl_schema_type_t *) * (usize)r->capacity);
       memset(a + r->capacity, 0,
              sizeof(anvl_schema_type_t *) * (usize)(new_cap - r->capacity));
-      Allocator.dispose(r->types);
+      Allocator.free(r->types);
       r->types    = a;
       r->capacity = new_cap;
    }
@@ -120,8 +120,8 @@ static void ruleset_free_impl(anvl_schema_ruleset_t *r) {
       return;
    for (int i = 0; i < r->count; i++)
       stype_free(r->types[i]);
-   Allocator.dispose(r->types);
-   Allocator.dispose(r);
+   Allocator.free(r->types);
+   Allocator.free(r);
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,7 +137,7 @@ static anvl_schema_result_t *result_alloc(void) {
    res->errors =
        Allocator.alloc(sizeof(anvl_schema_error_t) * RESULT_INIT_CAP);
    if (!res->errors) {
-      Allocator.dispose(res);
+      Allocator.free(res);
       return NULL;
    }
    res->is_valid       = true;
@@ -156,7 +156,7 @@ static bool result_push(anvl_schema_result_t *res, int code,
          return false;
       memcpy(a, res->errors,
              sizeof(anvl_schema_error_t) * (usize)res->error_count);
-      Allocator.dispose(res->errors);
+      Allocator.free(res->errors);
       res->errors         = a;
       res->error_capacity = new_cap;
    }
@@ -175,9 +175,9 @@ static void result_free_impl(anvl_schema_result_t *res) {
    if (!res)
       return;
    for (int i = 0; i < res->error_count; i++)
-      Allocator.dispose(res->errors[i].message);
-   Allocator.dispose(res->errors);
-   Allocator.dispose(res);
+      Allocator.free(res->errors[i].message);
+   Allocator.free(res->errors);
+   Allocator.free(res);
 }
 
 /* ------------------------------------------------------------------ */
@@ -248,8 +248,8 @@ static anvl_schema_ruleset_t *schema_resolve(context schema_ctx) {
                   "Unknown schema base '%s' in type '%s'.",
                   base_name ? base_name : "?",
                   type_name ? type_name : "?");
-         Allocator.dispose(type_name);
-         Allocator.dispose(base_name);
+         Allocator.free(type_name);
+         Allocator.free(base_name);
          ruleset_free_impl(ruleset);
          anvl_error_set(ANVL_ERR_SCHEMA_BASE_UNKNOWN, msg, 0, 0, NULL);
          return NULL;
@@ -391,7 +391,7 @@ static void validate_object(context data_ctx, statement stmt,
       }
    }
 
-   Allocator.dispose(stmt_name);
+   Allocator.free(stmt_name);
 }
 
 /* ------------------------------------------------------------------ */
@@ -421,7 +421,7 @@ static anvl_schema_result_t *schema_validate(anvl_schema_ruleset_t *rules,
       if (!base_name)
          continue;
       anvl_schema_type_t *schema_type = schema_get_type(rules, base_name);
-      Allocator.dispose(base_name);
+      Allocator.free(base_name);
 
       if (!schema_type)
          continue; /* unrecognised base → pass through */

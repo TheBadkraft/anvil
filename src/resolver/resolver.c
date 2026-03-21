@@ -41,11 +41,11 @@ static bool id_map_init(anvl_id_map_t *map, usize cap) {
    map->val = Allocator.alloc(sizeof(usize) * cap);
    if (!map->key_pos || !map->key_len || !map->val) {
       if (map->key_pos)
-         Allocator.dispose(map->key_pos);
+         Allocator.free(map->key_pos);
       if (map->key_len)
-         Allocator.dispose(map->key_len);
+         Allocator.free(map->key_len);
       if (map->val)
-         Allocator.dispose(map->val);
+         Allocator.free(map->val);
       map->key_pos = map->key_len = map->val = NULL;
       return false;
    }
@@ -62,15 +62,15 @@ static bool id_map_init(anvl_id_map_t *map, usize cap) {
 
 static void id_map_free(anvl_id_map_t *map) {
    if (map->key_pos) {
-      Allocator.dispose(map->key_pos);
+      Allocator.free(map->key_pos);
       map->key_pos = NULL;
    }
    if (map->key_len) {
-      Allocator.dispose(map->key_len);
+      Allocator.free(map->key_len);
       map->key_len = NULL;
    }
    if (map->val) {
-      Allocator.dispose(map->val);
+      Allocator.free(map->val);
       map->val = NULL;
    }
    map->cap = map->count = 0;
@@ -201,13 +201,13 @@ anvl_node_state_t *anvl_resolver_build_state(context ctx, source src) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      "resolver: adj alloc failed", 0, 0, __FILE__);
       if (in_degree)
-         Allocator.dispose(in_degree);
+         Allocator.free(in_degree);
       if (dep_head)
-         Allocator.dispose(dep_head);
+         Allocator.free(dep_head);
       if (dep_next)
-         Allocator.dispose(dep_next);
+         Allocator.free(dep_next);
       if (dep_target)
-         Allocator.dispose(dep_target);
+         Allocator.free(dep_target);
       id_map_free(&id_to_idx);
       return NULL;
    }
@@ -239,10 +239,10 @@ anvl_node_state_t *anvl_resolver_build_state(context ctx, source src) {
    if (!queue) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      "resolver: queue alloc failed", 0, 0, __FILE__);
-      Allocator.dispose(in_degree);
-      Allocator.dispose(dep_head);
-      Allocator.dispose(dep_next);
-      Allocator.dispose(dep_target);
+      Allocator.free(in_degree);
+      Allocator.free(dep_head);
+      Allocator.free(dep_next);
+      Allocator.free(dep_target);
       id_map_free(&id_to_idx);
       return NULL;
    }
@@ -268,11 +268,11 @@ anvl_node_state_t *anvl_resolver_build_state(context ctx, source src) {
       }
    }
 
-   Allocator.dispose(queue);
-   Allocator.dispose(in_degree);
-   Allocator.dispose(dep_head);
-   Allocator.dispose(dep_next);
-   Allocator.dispose(dep_target);
+   Allocator.free(queue);
+   Allocator.free(in_degree);
+   Allocator.free(dep_head);
+   Allocator.free(dep_next);
+   Allocator.free(dep_target);
 
    /* ---- 5. Cycle check ------------------------------------------- */
    if (topo_count < n) {
@@ -298,10 +298,10 @@ anvl_node_state_t *anvl_resolver_build_state(context ctx, source src) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      "resolver: cache alloc failed", 0, 0, __FILE__);
       if (state->merge_cache)
-         Allocator.dispose(state->merge_cache);
+         Allocator.free(state->merge_cache);
       if (state->computed)
-         Allocator.dispose(state->computed);
-      Allocator.dispose(state);
+         Allocator.free(state->computed);
+      Allocator.free(state);
       id_map_free(&id_to_idx);
       return NULL;
    }
@@ -366,7 +366,7 @@ static anvl_field_list_t *merge_fields(const anvl_field_list_t *base_list,
 
    anvl_field_list_t *result = Allocator.alloc(sizeof(*result));
    if (!result) {
-      Allocator.dispose(out);
+      Allocator.free(out);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      "resolver: field_list alloc failed", 0, 0, __FILE__);
       return NULL;
@@ -444,7 +444,7 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields(
 
    state->merge_cache[stmt_idx].fields = merged->fields;
    state->merge_cache[stmt_idx].count = merged->count;
-   Allocator.dispose(merged); /* free wrapper, keep fields array */
+   Allocator.free(merged); /* free wrapper, keep fields array */
    state->computed[stmt_idx] = 1;
    return &state->merge_cache[stmt_idx];
 }
@@ -476,15 +476,15 @@ void anvl_node_state_dispose(anvl_node_state_t *state) {
    if (state->merge_cache) {
       for (usize i = 0; i < state->stmt_count; i++) {
          if (state->computed[i] && state->merge_cache[i].fields) {
-            Allocator.dispose(state->merge_cache[i].fields);
+            Allocator.free(state->merge_cache[i].fields);
             state->merge_cache[i].fields = NULL;
          }
       }
-      Allocator.dispose(state->merge_cache);
+      Allocator.free(state->merge_cache);
    }
    if (state->computed)
-      Allocator.dispose(state->computed);
+      Allocator.free(state->computed);
 
    id_map_free(&state->id_to_idx);
-   Allocator.dispose(state);
+   Allocator.free(state);
 }

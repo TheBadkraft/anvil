@@ -233,11 +233,11 @@ static void test_source_substring(void) {
    char *sub = Source.substring(src, 0, 5);
    Assert.isNotNull(sub, "Substring should be created");
    Assert.isTrue(strcmp(sub, "hello") == 0, "Substring should be 'hello'");
-   Allocator.dispose(sub);
+   Allocator.free(sub);
 
    sub = Source.substring(src, 6, 5);
    Assert.isTrue(strcmp(sub, "world") == 0, "Substring should be 'world'");
-   Allocator.dispose(sub);
+   Allocator.free(sub);
 
    sub = Source.substring(src, 100, 5);
    Assert.isNull(sub, "Substring beyond end should be null");
@@ -334,7 +334,7 @@ static void test_source_reset(void) {
    Source.dispose(src);
 }
 
-__attribute__((constructor)) static void register_test_source(void) {
+static void _register(void) {
    testset("Source Interface", set_config, set_teardown);
 
    testcase("Create", test_source_create);
@@ -361,4 +361,7 @@ __attribute__((constructor)) static void register_test_source(void) {
    testcase("Dialect: Invalid Shebang", test_source_dialect_invalid_shebang);
 
    testcase("Get Position", test_source_get_position);
+}
+__attribute__((constructor)) static void register_test_source(void) {
+   Tests.enqueue(_register);
 }

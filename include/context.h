@@ -26,6 +26,7 @@
 #include "types.h"
 #include "utils.h"
 #include <sigma.core/types.h>
+#include <sigma.memory/memory.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -109,6 +110,7 @@ extern const anvl_source_i Source;
 typedef struct anvl_context_t *context;
 struct anvl_context_t {
    source source;
+   bump_allocator arena; // parse-scoped bump controller — owns all parse-time allocations (FT-12)
    // List of parsed statements
    struct {
       statement *statements; // array of statement pointers

@@ -2,7 +2,7 @@
 **Target: Anvil v1.0.0-rel**  
 **Reference: `~/repos/anvil.net/docs/CoreBoundary.md` (frozen spec authority)**  
 **Target: Anvil.Net `~/repos/anvil.net/Anvil.Net/Anvil.Net.csproj` (frozen backend project)**
-**Last updated: 2026-03-12**
+**Last updated: 2026-03-21**
 
 ---
 
@@ -42,6 +42,7 @@ This is the guiding document for porting all remaining Anvil features from the f
 | `v0.4.0-alpha` | ASL parser + evaluator core complete | ✅ |
 | `v0.4.3-alpha` | AMP scalar arrays/tuples complete | ✅ (retroactive — landed in v0.1.1-alpha) |
 | `v0.4.5-alpha` | Schema validation core complete | ✅ |
+| `v0.5.0-alpha` | Sigma.Core migration complete; all 19 unit suites pass | ✅ |
 | `v1.0.0-rel` | All Phase 1–3 items complete, Sigma.Memory integrated, public API frozen, benchmarks documented |
 
 ---
@@ -172,14 +173,14 @@ All items below must be true before tagging `v1.0.0-rel`:
 
 | Gate Condition | Status |
 |----------------|--------|
-| All Phase 1 items complete | ❌ |
-| All Phase 2 core items complete | ❌ |
-| Sigma.Memory fully integrated (replaces all internal alloc) | ❌ |
+| All Phase 1 items complete | ✅ |
+| All Phase 2 core items complete | ✅ |
+| Sigma.Memory fully integrated (replaces all internal alloc) | ✅ | sigma.core migration — `Allocator.create_bump`, `Allocator.free`, `arena->alloc`; module system in `src/core/module.c` |
 | Sigma.Collections used for AST node/token storage | ❌ |
 | Sigma.Text used for string building (vars, serializer) | ✅ | `StringBuilder` in `vars.c` + `serializer.c`; `String` in `context.c` |
 | Public API frozen — `include/anvil.h` matches C ABI sketch in CoreBoundary.md §6 | ❌ |
 | Zero memory leaks (Valgrind) across all test suites | ✅ (current scope) |
-| Performance benchmarks documented in `docs/benchmarks.md` | ❌ |
+| Performance benchmarks documented in `docs/benchmarks.md` | ✅ | Numbers in `README.md §Performance Metrics`; full suite via `./rtest benchmarks` |
 | CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.4.5-alpha |
 | All test samples updated for v1.0 feature set | ❌ |
 
@@ -203,3 +204,67 @@ All items below must be true before tagging `v1.0.0-rel`:
 | Import graph | `src/import/import.c` | 568 | ✅ Full implementation (v0.3.0-alpha) |
 | ASL | `src/asl/asl.c` | 1560 | ✅ Full implementation (v0.4.0-alpha) |
 | Schema | `src/schema/schema.c` | ~440 | ✅ Full implementation (v0.4.5-alpha) |
+
+---
+
+## Post-v1.0 Enhancements (Not in CoreBoundary.md)
+
+Items below are new/additive features — not backports from Anvil.Net. They do not block v1.0.0-rel.
+
+### E1 · Anonymous Top-Level Object Definitions
+
+**Observed need**: `../q-or/registry.anvl` (may still be `.aml`) uses a bare block form:
+```anvl
+registry {
+    ...
+}
+```
+This is currently invalid — the parser requires `registry := { ... }`. However, the pattern
+is natural and worth supporting as a first-class syntax for top-level named blocks.
+
+**Design notes** (2026-03-21):
+- `key { ... }` at top level would make `key` a **module-global name** (effectively a keyword
+  within that document's scope), meaning no imported file can declare a conflicting top-level
+  `registry` definition with the same name — import collision semantics TBD.
+- `${registry.field}` remains a valid VarRef into an anonymous block.
+- `vars { ... }` already works (`vars` is a reserved keyword); anonymous blocks extend that
+  pattern to arbitrary identifiers.
+- Parser decision tree is unambiguous: at top level, if the next token after an identifier is
+  `{` (not `:=` or `:`), treat it as an anonymous object block. Identifiers declared this way
+  could be implicitly desugared to `<ident> := { ... }` internally.
+- **Not breaking** — the syntax currently errors, so accepting it adds no ambiguity.
+- Needs a new error code for duplicate anonymous block names at module scope.
+
+| Item | Status |
+|------|--------|
+| Audit `../q-or/registry.anvl` usage patterns | ❌ |
+| Parser: recognise `IDENT LBRACE` at top level as anonymous block | ❌ |
+| Desugar to assignment internally or add new stmt type | ❌ |
+| Import collision semantics for anonymous global names | ❌ |
+| Tests | ❌ |
+
+### E2 · Bitwise OR Flag Composition in Values
+
+**Observed need**: flag field assignments of the form:
+```anvl
+flag := TOP | LEFT | RIGHT | BOTTOM | FLOAT
+```
+where the values on the right-hand side are Enum or Flags schema members being OR-combined.
+
+**Design notes** (2026-03-21):
+- This is a value-level binary operator (`|`) applied to bare-literal tokens.
+- The parser currently does not support binary operators in value position.
+- Could be implemented as a new `ANVL_VAL_FLAGS_EXPR` value type: a list of identifiers
+  combined with `|`, evaluated against a schema Flags type at validation time.
+- Alternatively, treat as an ASL expression (reuse ASL's `|` operator) — heavier but
+  consistent with the existing expression evaluator.
+- Needs interaction design with Schema: the LHS type would need to be a `ANVL_SCHEMA_FLAGS`
+  kind for the expression to resolve correctly.
+
+| Item | Status |
+|------|--------|
+| Spec decision: `ANVL_VAL_FLAGS_EXPR` vs ASL reuse | ❌ |
+| Parser: recognise `IDENT (PIPE IDENT)+` in value position | ❌ |
+| Schema validation: OR-compose Flags values | ❌ |
+| Serializer: emit `TOP | LEFT | RIGHT` form faithfully | ❌ |
+| Tests | ❌ |

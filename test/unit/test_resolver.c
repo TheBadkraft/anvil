@@ -445,7 +445,7 @@ static void test_missing_base_deferred_error(void) {
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_resolver(void) {
+static void _register(void) {
    testset("Resolver Tests", set_config, set_teardown);
 
    testcase("No inheritance fast-path", test_no_inheritance_fast_path);
@@ -458,4 +458,7 @@ __attribute__((constructor)) static void register_test_resolver(void) {
    testcase("Cycle detected", test_cycle_detected);
    testcase("warm_all idempotent", test_warm_all_idempotent);
    testcase("Missing base deferred error", test_missing_base_deferred_error);
+}
+__attribute__((constructor)) static void register_test_resolver(void) {
+   Tests.enqueue(_register);
 }

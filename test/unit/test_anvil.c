@@ -12,7 +12,7 @@
 
 #include "anvil.h"
 #include <sigma.memory/memory.h>
-#include <sigma.text/strings.h>
+#include <sigma.core/strings.h>
 #include <sigma.test/sigtest.h>
 #include <string.h>
 
@@ -65,7 +65,7 @@ static void test_error_handling(void) {
    Assert.isFalse(Anvil.error_is_set(), "Error should be cleared");
 }
 
-__attribute__((constructor)) static void register_test_test(void) {
+static void _register(void) {
    testset("Anvil Entry API", set_config, set_teardown);
 
    testcase("Anvil Load", test_anvil_load);
@@ -73,4 +73,7 @@ __attribute__((constructor)) static void register_test_test(void) {
    testcase("Anvil Dispose", test_anvil_dispose);
    testcase("Context Get Builder", test_context_get_builder);
    testcase("Error Handling", test_error_handling);
+}
+__attribute__((constructor)) static void register_test_test(void) {
+   Tests.enqueue(_register);
 }

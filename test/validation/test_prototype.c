@@ -96,10 +96,13 @@ static void test_stmt_buffer_attribs(void) {
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_prototype(void) {
+static void _register(void) {
    testset("Compact Blob Buffer Prototype", NULL, NULL);
 
    testcase("PB01 Header fields and sub-buffer slots", test_stmt_buffer_basic);
    testcase("PB02 Flat buffer memory contiguity", test_stmt_buffer_contiguity);
    testcase("PB03 Attribs sub-buffer pairs", test_stmt_buffer_attribs);
+}
+__attribute__((constructor)) static void register_test_prototype(void) {
+   Tests.enqueue(_register);
 }

@@ -645,7 +645,7 @@ static void test_sc20_two_object_types_both_validated(void) {
 /* ================================================================
  * Registration
  * ================================================================ */
-__attribute__((constructor)) static void register_test_schema(void) {
+static void _register(void) {
    testset("Schema Tests", set_config, set_teardown);
 
    testcase("SC01: Parse enum schema returns not null", test_sc01_parse_enum_schema_not_null);
@@ -668,4 +668,7 @@ __attribute__((constructor)) static void register_test_schema(void) {
    testcase("SC18: File-based data validates correctly", test_sc18_validate_file_based_data);
    testcase("SC19: Two typed stmts both missing fields", test_sc19_two_typed_stmts_both_missing_fields);
    testcase("SC20: Two schema object types both validated", test_sc20_two_object_types_both_validated);
+}
+__attribute__((constructor)) static void register_test_schema(void) {
+   Tests.enqueue(_register);
 }

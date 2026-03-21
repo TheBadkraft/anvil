@@ -20,7 +20,7 @@ SRC_DIR=${SRC_DIR:-src}
 TEST_DIR=${TEST_DIR:-test}
 
 # Supported test subdirectories
-TEST_SUBDIRS=("unit" "integration" "performance" "stress" "validation")
+TEST_SUBDIRS=("unit" "integration" "benchmarks" "performance" "stress" "validation")
 
 # Parse arguments
 USE_VALGRIND=false
@@ -159,9 +159,12 @@ compile_proto_objects() {
 # Resolve package objects for test linking (TST_REQUIRES or REQUIRES)
 # ---------------------------------------------------------------------------
 resolve_test_packages() {
+    local tname="${1:-}"
     TEST_PKG_OBJECTS=()
     local req_list=()
-    if declare -p TST_REQUIRES >/dev/null 2>&1; then
+    if [[ -n "$tname" ]] && declare -p TEST_PKG_OVERRIDES >/dev/null 2>&1 && [[ -v "TEST_PKG_OVERRIDES[$tname]" ]]; then
+        read -ra req_list <<< "${TEST_PKG_OVERRIDES[$tname]}"
+    elif declare -p TST_REQUIRES >/dev/null 2>&1; then
         req_list=("${TST_REQUIRES[@]}")
     elif declare -p REQUIRES >/dev/null 2>&1; then
         req_list=("${REQUIRES[@]}")
@@ -229,7 +232,7 @@ compile_and_run_test() {
     fi
 
     # Resolve packages for this run
-    resolve_test_packages
+    resolve_test_packages "$test_basename"
 
     local exe="$TST_BUILD_DIR/test_${test_basename}"
     local helper_obj="${ANVIL_HELPER_OBJ:-$TST_BUILD_DIR/helpers.o}"
@@ -252,7 +255,11 @@ compile_and_run_test() {
         # Add any extra (proto) objects
         [ ${#extra_objects[@]} -gt 0 ] && link_objs+=("${extra_objects[@]}")
 
-        ${CC:-gcc} "${link_objs[@]}" ${TST_LDFLAGS} -o "$exe"
+        local link_ldflags="${TST_LDFLAGS}"
+        if declare -p TEST_LDFLAGS_OVERRIDES >/dev/null 2>&1 && [[ -v "TEST_LDFLAGS_OVERRIDES[$test_basename]" ]]; then
+            link_ldflags="${TEST_LDFLAGS_OVERRIDES[$test_basename]}"
+        fi
+        ${CC:-gcc} "${link_objs[@]}" ${link_ldflags} -o "$exe"
     fi
 
     echo ""

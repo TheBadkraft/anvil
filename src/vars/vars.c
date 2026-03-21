@@ -17,7 +17,7 @@
 #include "context.h"
 #include "errors.h"
 #include <sigma.memory/memory.h>
-#include <sigma.text/strings.h>
+#include <sigma.core/strings.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
@@ -48,7 +48,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
    state->entries = Allocator.alloc(sizeof(struct anvl_vars_resolved) * n);
    if (!state->entries) {
-      Allocator.dispose(state);
+      Allocator.free(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -79,8 +79,8 @@ static anvl_vars_state_t *vars_build(context ctx) {
     */
    uint8_t *done = Allocator.alloc(n);
    if (!done) {
-      Allocator.dispose(state->entries);
-      Allocator.dispose(state);
+      Allocator.free(state->entries);
+      Allocator.free(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -91,9 +91,9 @@ static anvl_vars_state_t *vars_build(context ctx) {
    /* Stack to track current DFS path (maximum chain = n entries) */
    usize *path = Allocator.alloc(sizeof(usize) * (n + 1));
    if (!path) {
-      Allocator.dispose(done);
-      Allocator.dispose(state->entries);
-      Allocator.dispose(state);
+      Allocator.free(done);
+      Allocator.free(state->entries);
+      Allocator.free(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -127,10 +127,10 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
          if (done[cur] == 1) {
             /* cur is already on the current path → cycle detected */
-            Allocator.dispose(path);
-            Allocator.dispose(done);
-            Allocator.dispose(state->entries);
-            Allocator.dispose(state);
+            Allocator.free(path);
+            Allocator.free(done);
+            Allocator.free(state->entries);
+            Allocator.free(state);
             anvl_error_set(ANVL_ERR_VARS_CIRCULAR_REF,
                            anvl_error_code_message(ANVL_ERR_VARS_CIRCULAR_REF),
                            0, 0, __FILE__);
@@ -182,8 +182,8 @@ static anvl_vars_state_t *vars_build(context ctx) {
       }
    }
 
-   Allocator.dispose(path);
-   Allocator.dispose(done);
+   Allocator.free(path);
+   Allocator.free(done);
    return state;
 }
 
@@ -272,8 +272,8 @@ static void vars_dispose(anvl_vars_state_t *state) {
    if (!state)
       return;
    if (state->entries)
-      Allocator.dispose(state->entries);
-   Allocator.dispose(state);
+      Allocator.free(state->entries);
+   Allocator.free(state);
 }
 
 /* ------------------------------------------------------------------ */

@@ -55,7 +55,7 @@ static void test_ST20_out_of_range_returns_null(void);
 static context parse_and_check(const char *source, anvl_dialect dialect) {
    anvl_ctx_builder_i *builder = Context.get_builder();
    if (!builder) {
-      writelnf("ERROR: Failed to get builder");
+      fprintf(stderr, "ERROR: Failed to get builder\n");
       return NULL;
    }
 
@@ -66,9 +66,9 @@ static context parse_and_check(const char *source, anvl_dialect dialect) {
    if (!ctx) {
       const anvl_error_state *err = Anvil.error_get();
       if (err)
-         writelnf("ERROR: Build failed - %s (code: %d)", err->message, err->code);
+         fprintf(stderr, "ERROR: Build failed - %s (code: %d)\n", err->message, err->code);
       else
-         writelnf("ERROR: Build failed - unknown error");
+         fprintf(stderr, "ERROR: Build failed - unknown error\n");
       builder->dispose(builder);
       return NULL;
    }
@@ -76,9 +76,9 @@ static context parse_and_check(const char *source, anvl_dialect dialect) {
    if (!Context.parse(ctx)) {
       const anvl_error_state *err = Anvil.error_get();
       if (err)
-         writelnf("ERROR: Parse failed - %s (code: %d)", err->message, err->code);
+         fprintf(stderr, "ERROR: Parse failed - %s (code: %d)\n", err->message, err->code);
       else
-         writelnf("ERROR: Parse failed - unknown error");
+         fprintf(stderr, "ERROR: Parse failed - unknown error\n");
       builder->dispose(builder);
       Context.dispose(ctx);
       return NULL;
@@ -94,7 +94,7 @@ static statement get_first_statement(const char *source, anvl_dialect dialect, c
       return NULL;
 
    if (Context.statement_count(ctx) == 0) {
-      writelnf("ERROR: No statements parsed");
+      fprintf(stderr, "ERROR: No statements parsed\n");
       Context.dispose(ctx);
       return NULL;
    }
@@ -127,7 +127,7 @@ static void test_ST01_single_statement_count(void) {
    }
 
    usize count = Context.statement_count(ctx);
-   writelnf("ST01: statement_count = %zu (expected 1)", count);
+   fprintf(stderr, "ST01: statement_count = %zu (expected 1)\n", count);
    Assert.isTrue(count == 1, "Single statement source should yield count 1");
 
    Context.dispose(ctx);
@@ -594,44 +594,47 @@ static void test_ST20_out_of_range_returns_null(void) {
  * Registration
  * ======================================================================== */
 
-__attribute__((constructor)) static void register_test_statements(void) {
+static void _register(void) {
    testset("Statement Meta-Buffer", set_config, set_teardown);
 
    // ST01-ST03: statement count
-   testcase("ST01 single statement count",   test_ST01_single_statement_count);
-   testcase("ST02 multi statement count",    test_ST02_multi_statement_count);
-   testcase("ST03 empty document count",     test_ST03_empty_document_count);
+   testcase("ST01 single statement count", test_ST01_single_statement_count);
+   testcase("ST02 multi statement count", test_ST02_multi_statement_count);
+   testcase("ST03 empty document count", test_ST03_empty_document_count);
 
    // ST04-ST05: get_statement + identifier
-   testcase("ST04 get_statement valid index",   test_ST04_get_statement_valid_index);
-   testcase("ST05 statement identifier span",   test_ST05_statement_identifier_span);
+   testcase("ST04 get_statement valid index", test_ST04_get_statement_valid_index);
+   testcase("ST05 statement identifier span", test_ST05_statement_identifier_span);
 
    // ST06-ST07: scalar
-   testcase("ST06 scalar value type",  test_ST06_scalar_value_type);
-   testcase("ST07 scalar value span",  test_ST07_scalar_value_span);
+   testcase("ST06 scalar value type", test_ST06_scalar_value_type);
+   testcase("ST07 scalar value span", test_ST07_scalar_value_span);
 
    // ST08-ST10: object
-   testcase("ST08 object value type",    test_ST08_object_value_type);
-   testcase("ST09 object field count",   test_ST09_object_field_count);
+   testcase("ST08 object value type", test_ST08_object_value_type);
+   testcase("ST09 object field count", test_ST09_object_field_count);
    testcase("ST10 object field key span", test_ST10_object_field_key_span);
 
    // ST11-ST12: array
-   testcase("ST11 array value type",      test_ST11_array_value_type);
-   testcase("ST12 array element count",   test_ST12_array_element_count);
+   testcase("ST11 array value type", test_ST11_array_value_type);
+   testcase("ST12 array element count", test_ST12_array_element_count);
 
    // ST13: tuple
    testcase("ST13 tuple value type", test_ST13_tuple_value_type);
 
    // ST14-ST16: attributes
-   testcase("ST14 attribute presence",   test_ST14_attribute_presence);
-   testcase("ST15 attribute key span",   test_ST15_attribute_key_span);
-   testcase("ST16 attribute count",      test_ST16_attribute_count);
+   testcase("ST14 attribute presence", test_ST14_attribute_presence);
+   testcase("ST15 attribute key span", test_ST15_attribute_key_span);
+   testcase("ST16 attribute count", test_ST16_attribute_count);
 
    // ST17-ST19: base_meta
-   testcase("ST17 base_meta absent",   test_ST17_base_meta_absent);
-   testcase("ST18 base_meta present",  test_ST18_base_meta_present);
-   testcase("ST19 base_meta span",     test_ST19_base_meta_span);
+   testcase("ST17 base_meta absent", test_ST17_base_meta_absent);
+   testcase("ST18 base_meta present", test_ST18_base_meta_present);
+   testcase("ST19 base_meta span", test_ST19_base_meta_span);
 
    // ST20: boundary
    testcase("ST20 out-of-range returns NULL", test_ST20_out_of_range_returns_null);
+}
+__attribute__((constructor)) static void register_test_statements(void) {
+   Tests.enqueue(_register);
 }

@@ -13,8 +13,8 @@
 #include "anvil.h"
 #include "utilities/helpers.h"
 #include <sigma.memory/memory.h>
-#include <sigma.text/strings.h>
 #include <sigma.test/sigtest.h>
+#include <sigma.core/strings.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -77,7 +77,7 @@ static void test_load_source_valid(void) {
    Assert.isNotNull((void *)source, "source pointer should be set");
    Assert.isTrue(len > 0, "source length should be greater than zero");
    // load_source uses Allocator.alloc — dispose via Allocator
-   Allocator.dispose((void *)source);
+   Allocator.free((void *)source);
 }
 
 // UT07 — load_source returns false for a non-existent path
@@ -96,22 +96,25 @@ static void test_load_source_length(void) {
    bool ok = load_source(filepath, &source, &len);
    Assert.isTrue(ok, "load_source should succeed for numbers.anvl");
    Assert.isTrue(len == strlen(source), "Reported length should match null-terminated string length");
-   Allocator.dispose((void *)source);
+   Allocator.free((void *)source);
 }
 
 // ============================================================================
 // Registration
 // ============================================================================
 
-__attribute__((constructor)) static void register_test_utils(void) {
+static void _register(void) {
    testset("Utils", set_config, set_teardown);
 
-   testcase("UT01 dialect hint .aml  → AML",         test_dialect_hint_anvl);
-   testcase("UT02 dialect hint .anvl → AML",         test_dialect_hint_aml);
+   testcase("UT01 dialect hint .aml  → AML", test_dialect_hint_anvl);
+   testcase("UT02 dialect hint .anvl → AML", test_dialect_hint_aml);
    testcase("UT03 dialect hint .asl  → ASL default", test_dialect_hint_asl);
-   testcase("UT04 dialect hint NULL no crash",        test_dialect_hint_null);
-   testcase("UT05 dialect hint unknown no crash",     test_dialect_hint_unknown);
-   testcase("UT06 load_source valid file",            test_load_source_valid);
-   testcase("UT07 load_source missing file",          test_load_source_missing);
-   testcase("UT08 load_source length accurate",       test_load_source_length);
+   testcase("UT04 dialect hint NULL no crash", test_dialect_hint_null);
+   testcase("UT05 dialect hint unknown no crash", test_dialect_hint_unknown);
+   testcase("UT06 load_source valid file", test_load_source_valid);
+   testcase("UT07 load_source missing file", test_load_source_missing);
+   testcase("UT08 load_source length accurate", test_load_source_length);
+}
+__attribute__((constructor)) static void register_test_utils(void) {
+   Tests.enqueue(_register);
 }

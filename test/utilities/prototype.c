@@ -36,18 +36,18 @@ void stmt_buffer_free(stmt_buffer sb) {
    // Free sub-buffers
    void *ptr_base = PTR_BASE(sb);
    if (ptr_base) {
-      Allocator.dispose(ptr_base);
+      Allocator.free(ptr_base);
    }
    void *ptr_attribs = PTR_ATTRIBS(sb);
    if (ptr_attribs) {
-      Allocator.dispose(ptr_attribs);
+      Allocator.free(ptr_attribs);
    }
    void *ptr_value = PTR_VALUE(sb);
    if (ptr_value) {
-      Allocator.dispose(ptr_value);
+      Allocator.free(ptr_value);
    }
 
-   Allocator.dispose(sb);
+   Allocator.free(sb);
 }
 
 /* ------------------------------------------------------------------ */
@@ -75,7 +75,7 @@ void stmt_buffer_set_base(stmt_buffer sb, usize pos, usize len) {
 
    void *old_ptr = PTR_BASE(sb);
    if (old_ptr) {
-      Allocator.dispose(old_ptr);
+      Allocator.free(old_ptr);
    }
 
    base_buffer *bb = Allocator.alloc(sizeof(base_buffer));
@@ -91,7 +91,7 @@ void stmt_buffer_set_attribs(stmt_buffer sb, usize count, usize len, usize *pair
 
    void *old_ptr = PTR_ATTRIBS(sb);
    if (old_ptr) {
-      Allocator.dispose(old_ptr);
+      Allocator.free(old_ptr);
    }
 
    // Allocate for count, len, and 2*count pairs
@@ -110,7 +110,7 @@ void stmt_buffer_set_value(stmt_buffer sb, usize pos, usize len) {
 
    void *old_ptr = PTR_VALUE(sb);
    if (old_ptr) {
-      Allocator.dispose(old_ptr);
+      Allocator.free(old_ptr);
    }
 
    value_buffer *vb = Allocator.alloc(sizeof(value_buffer));

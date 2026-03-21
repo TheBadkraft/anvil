@@ -19,7 +19,7 @@
 
 #include "constants.h"
 #include "context.h"
-#include <sigma.text/strings.h>
+#include <sigma.core/strings.h>
 #include <stdbool.h>
 #include <stdio.h>
 

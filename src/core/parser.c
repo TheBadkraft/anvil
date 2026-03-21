@@ -76,11 +76,8 @@ static void dispose_value_tree(value v) {
 }
 
 static void dispose_statement(statement stmt) {
-   // Free statements that failed to parse before being added to context list
-   // Statements successfully added to context->stmt_list are freed via Context.dispose()
-   if (stmt) {
-      Allocator.dispose(stmt);
-   }
+   // All statements live in the context parse arena; no individual free needed.
+   (void)stmt;
 }
 
 static bool parse_source(parser_ctx *p) {
@@ -217,7 +214,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       if (!read_identifier(p, &base_pos, &base_len))
          return false;
       // Allocate base_meta and store inheritance information
-      base_meta = ci_new_base_meta();
+      base_meta = ci_new_base_meta(p->ctx);
       if (!base_meta) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
          return false;
@@ -234,8 +231,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       // AMP dialect does not allow attributes
       if (Source.dialect(s) == ANVL_DIALECT_AMP) {
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-         if (base_meta)
-            Allocator.dispose(base_meta);
          return false;
       }
       if (!parse_attribute_block(p, NULL, NULL))
@@ -245,11 +240,9 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    usize attrib_count = p->ctx->attr_list.count - attrib_start;
    if (attrib_count > 0) {
       // Allocate attr_meta array and populate with attribute information
-      attr_meta = ci_new_attr_meta_array(attrib_count);
+      attr_meta = ci_new_attr_meta_array(p->ctx, attrib_count);
       if (!attr_meta) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-         if (base_meta)
-            Allocator.dispose(base_meta);
          return false;
       }
       // TODO: Populate attr_meta array from ctx->attr_list
@@ -262,9 +255,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
          attribute attr = ci_get_attribute(p->ctx, attrib_start + i);
          if (!attr) {
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-            Allocator.dispose(attr_meta);
-            if (base_meta)
-               Allocator.dispose(base_meta);
             return false;
          }
          attr_meta[i].pos = attr->key_pos;
@@ -276,10 +266,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
    // Expect assignment operator
    if (si_match_length(s, ":=", 2) != 2) {
-      if (base_meta)
-         Allocator.dispose(base_meta);
-      if (attr_meta)
-         Allocator.dispose(attr_meta);
       parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
       return false;
    }
@@ -291,31 +277,18 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    value val = parse_value(p);
    usize value_end_pos = si_position(s);
    if (!val) {
-      if (base_meta)
-         Allocator.dispose(base_meta);
-      if (attr_meta)
-         Allocator.dispose(attr_meta);
       return false;
    }
 
    // Validate: attributes only valid on complex types
    if (attr_meta && val->type != ANVL_VALUE_OBJECT && val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE) {
-      if (base_meta)
-         Allocator.dispose(base_meta);
-      Allocator.dispose(attr_meta);
-      Allocator.dispose(val);
       parser_error(ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE, s);
       return false;
    }
 
    // Allocate value_meta for this statement's value
-   struct anvl_value_meta *value_meta = ci_new_value_meta(val->type);
+   struct anvl_value_meta *value_meta = ci_new_value_meta(p->ctx, val->type);
    if (!value_meta) {
-      if (base_meta)
-         Allocator.dispose(base_meta);
-      if (attr_meta)
-         Allocator.dispose(attr_meta);
-      Allocator.dispose(val);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return false;
    }
@@ -330,13 +303,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       value_meta->data.collection.element_count = elem_count;
 
       if (elem_count > 0) {
-         struct anvl_element_meta *elem_meta = ci_new_element_meta_array(elem_count);
+         struct anvl_element_meta *elem_meta = ci_new_element_meta_array(p->ctx, elem_count);
          if (!elem_meta) {
-            if (base_meta)
-               Allocator.dispose(base_meta);
-            if (attr_meta)
-               Allocator.dispose(attr_meta);
-            Allocator.dispose(value_meta);
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
             return false;
          }
@@ -350,7 +318,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
                elem_meta[i].pos = elem_temp[i].pos;
                elem_meta[i].len = elem_temp[i].len;
             }
-            Allocator.dispose(elem_temp);
             val->data.collection._elem_types_temp = NULL;
          }
 
@@ -387,8 +354,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    stmt->attr_meta = attr_meta;
    stmt->value_meta = value_meta;
 
-   // Dispose the temporary value object (metadata is now in value_meta)
-   Allocator.dispose(val);
+   // val was a temporary value object; its metadata is now in value_meta.
+   // The arena owns val; no individual free needed.
 
    si_skip_whitespace_and_comments(s);
    if (si_match_length(s, ",", 1) == 1) {
@@ -541,11 +508,10 @@ static value parse_blob(parser_ctx *p) {
       }
 
       /* Allocate for up to 2 elements (tag + content) */
-      struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 2);
+      struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * 2);
       if (elem_temp)
          memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 2);
       if (!elem_temp) {
-         Allocator.dispose(blob_collection);
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
          return NULL;
       }
@@ -683,12 +649,12 @@ static value parse_array(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary element_meta array to track type + source position/length per element
-   struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 256);
-   if (elem_temp)
-      memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 256);
+   // Grow-by-doubling temp buffer: start small, never over-allocate.
+   // Old buffers are orphaned in the arena (reclaimed at context dispose).
+   // No frames used — parse_array is recursive (frames don't stack on one scope).
+   usize elem_cap = 8;
+   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
    if (!elem_temp) {
-      Allocator.dispose(v);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }
@@ -700,7 +666,6 @@ static value parse_array(parser_ctx *p) {
       value elem = parse_value(p);
       usize elem_end = si_position(s);
       if (!elem) {
-         Allocator.dispose(elem_temp);
          return NULL;
       }
 
@@ -708,17 +673,25 @@ static value parse_array(parser_ctx *p) {
       if (Source.dialect(s) == ANVL_DIALECT_AMP &&
           elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
-         Allocator.dispose(elem_temp);
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
       }
 
-      // Track element type, start position, and length for use in element_meta
-      if (element_count < 256) {
-         elem_temp[element_count].type = elem->type;
-         elem_temp[element_count].pos = elem_start;
-         elem_temp[element_count].len = elem_end - elem_start;
+      // Grow buffer if full: alloc new (old stays in arena, harmless)
+      if (element_count == elem_cap) {
+         elem_cap *= 2;
+         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         if (!grown) {
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+            return NULL;
+         }
+         memcpy(grown, elem_temp, sizeof(struct anvl_element_meta) * element_count);
+         elem_temp = grown;
       }
+
+      elem_temp[element_count].type = elem->type;
+      elem_temp[element_count].pos = elem_start;
+      elem_temp[element_count].len = elem_end - elem_start;
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -729,14 +702,12 @@ static value parse_array(parser_ctx *p) {
          break;
       } else {
          parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY, s);
-         Allocator.dispose(elem_temp);
          return NULL;
       }
    }
 
    if (si_match_length(s, "]", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE, s);
-      Allocator.dispose(elem_temp);
       return NULL;
    }
 
@@ -760,12 +731,12 @@ static value parse_tuple(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary element_meta array to track type + source position/length per element
-   struct anvl_element_meta *elem_temp = Allocator.alloc(sizeof(struct anvl_element_meta) * 256);
-   if (elem_temp)
-      memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 256);
+   // Grow-by-doubling temp buffer: start small, never over-allocate.
+   // Old buffers are orphaned in the arena (reclaimed at context dispose).
+   // No frames used — parse_tuple is recursive (frames don't stack on one scope).
+   usize elem_cap = 8;
+   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
    if (!elem_temp) {
-      Allocator.dispose(v);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }
@@ -777,7 +748,6 @@ static value parse_tuple(parser_ctx *p) {
       value elem = parse_value(p);
       usize elem_end = si_position(s);
       if (!elem) {
-         Allocator.dispose(elem_temp);
          return NULL;
       }
 
@@ -785,17 +755,25 @@ static value parse_tuple(parser_ctx *p) {
       if (Source.dialect(s) == ANVL_DIALECT_AMP &&
           elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
-         Allocator.dispose(elem_temp);
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
       }
 
-      // Track element type, start position, and length for use in element_meta
-      if (element_count < 256) {
-         elem_temp[element_count].type = elem->type;
-         elem_temp[element_count].pos = elem_start;
-         elem_temp[element_count].len = elem_end - elem_start;
+      // Grow buffer if full: alloc new (old stays in arena, harmless)
+      if (element_count == elem_cap) {
+         elem_cap *= 2;
+         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         if (!grown) {
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+            return NULL;
+         }
+         memcpy(grown, elem_temp, sizeof(struct anvl_element_meta) * element_count);
+         elem_temp = grown;
       }
+
+      elem_temp[element_count].type = elem->type;
+      elem_temp[element_count].pos = elem_start;
+      elem_temp[element_count].len = elem_end - elem_start;
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -809,14 +787,12 @@ static value parse_tuple(parser_ctx *p) {
             parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
          else
             parser_error(ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE, s);
-         Allocator.dispose(elem_temp);
          return NULL;
       }
    }
 
    if (si_match_length(s, ")", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
-      Allocator.dispose(elem_temp);
       return NULL;
    }
 
@@ -1031,9 +1007,6 @@ static bool parse_vars_block(parser_ctx *p) {
 
       // Interpolated strings are not allowed as vars block values
       if (val->type == ANVL_VALUE_INTERP_STRING) {
-         if (val->data.interp.segments_temp)
-            Allocator.dispose(val->data.interp.segments_temp);
-         Allocator.dispose(val);
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
          return false;
       }
@@ -1041,7 +1014,6 @@ static bool parse_vars_block(parser_ctx *p) {
       // Clean up temporary internal data for collection types
       if ((val->type == ANVL_VALUE_ARRAY || val->type == ANVL_VALUE_TUPLE) &&
           val->data.collection._elem_types_temp) {
-         Allocator.dispose(val->data.collection._elem_types_temp);
          val->data.collection._elem_types_temp = NULL;
       }
 
@@ -1057,7 +1029,7 @@ static bool parse_vars_block(parser_ctx *p) {
                                     .value_len = vlen,
                                     .value_type = val->type,
                                 });
-      Allocator.dispose(val);
+      // val lives in the arena; no individual free needed.
 
       si_skip_whitespace_and_comments(s);
       if (si_match_length(s, ",", 1) == 1) {
@@ -1199,10 +1171,10 @@ static value parse_interp_string(parser_ctx *p) {
    si_consume(s, 1); // consume '$'
    si_consume(s, 1); // consume '"'
 
-   // Dynamic segment array
+   // Dynamic segment array (allocated from context parse arena)
    usize cap = 16;
    struct anvl_interp_segment *segs =
-       Allocator.alloc(sizeof(struct anvl_interp_segment) * cap);
+       p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * cap);
    if (!segs) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -1210,21 +1182,19 @@ static value parse_interp_string(parser_ctx *p) {
    memset(segs, 0, sizeof(struct anvl_interp_segment) * cap);
    usize nseg = 0;
 
-   // Helper: grow segment array if needed
+   // Helper: grow segment array if needed (old buffer left in arena; new buffer allocated)
 #define SEGS_PUSH(is_r, p_, l_)                                                                \
    do {                                                                                        \
       if (nseg >= cap) {                                                                       \
          usize newcap_ = cap * 2;                                                              \
          struct anvl_interp_segment *nb_ =                                                     \
-             Allocator.alloc(sizeof(struct anvl_interp_segment) * newcap_);                    \
+             p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_);              \
          if (!nb_) {                                                                           \
-            Allocator.dispose(segs);                                                           \
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                \
             return NULL;                                                                       \
          }                                                                                     \
          memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                         \
          memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                         \
-         Allocator.dispose(segs);                                                              \
          segs = nb_;                                                                           \
          cap = newcap_;                                                                        \
       }                                                                                        \
@@ -1263,7 +1233,6 @@ static value parse_interp_string(parser_ctx *p) {
             SEGS_PUSH(false, lit_start, lit_len);
          si_consume(s, 1); // consume '{'
          if (!Source.is_identifier_start(si_peek(s))) {
-            Allocator.dispose(segs);
             parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
             return NULL;
          }
@@ -1274,7 +1243,6 @@ static value parse_interp_string(parser_ctx *p) {
             ilen++;
          }
          if (si_peek(s) != '}') {
-            Allocator.dispose(segs);
             parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
             return NULL;
          }
@@ -1306,14 +1274,12 @@ static value parse_interp_string(parser_ctx *p) {
 #undef SEGS_PUSH
 
    if (!closed) {
-      Allocator.dispose(segs);
       parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
       return NULL;
    }
 
    value v = ci_new_value(p->ctx, ANVL_VALUE_INTERP_STRING);
    if (!v) {
-      Allocator.dispose(segs);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }

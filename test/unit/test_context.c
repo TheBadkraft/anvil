@@ -279,7 +279,7 @@ static void test_context_add_statement_null(void) {
 #if 0
 #endif
 
-__attribute__((constructor)) static void register_test_context(void) {
+static void _register(void) {
    testset("Context Interface", set_config, set_teardown);
 
    testcase("Ctx: Get Builder", test_context_get_builder);
@@ -297,4 +297,7 @@ __attribute__((constructor)) static void register_test_context(void) {
    testcase("Ctx: Parse Multiple Statements", test_context_multiple_statements);
    testcase("Ctx: Get Statement Bounds", test_context_get_statement_bounds);
    testcase("Ctx: Add Statement Null", test_context_add_statement_null);
+}
+__attribute__((constructor)) static void register_test_context(void) {
+   Tests.enqueue(_register);
 }
