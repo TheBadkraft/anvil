@@ -43,7 +43,7 @@ This is the guiding document for porting all remaining Anvil features from the f
 | `v0.4.3-alpha` | AMP scalar arrays/tuples complete | ✅ (retroactive — landed in v0.1.1-alpha) |
 | `v0.4.5-alpha` | Schema validation core complete | ✅ |
 | `v0.5.0-alpha` | Sigma.Core migration complete; all 19 unit suites pass | ✅ |
-| `v1.0.0-rel` | All Phase 1–3 items complete, Sigma.Memory integrated, public API frozen, benchmarks documented |
+| `v1.0.0-rel` | All Phase 1–3 items complete, Sigma.Memory integrated, public API soft-frozen, benchmarks documented |
 
 ---
 
@@ -176,9 +176,9 @@ All items below must be true before tagging `v1.0.0-rel`:
 | All Phase 1 items complete | ✅ |
 | All Phase 2 core items complete | ✅ |
 | Sigma.Memory fully integrated (replaces all internal alloc) | ✅ | sigma.core migration — `Allocator.create_bump`, `Allocator.free`, `arena->alloc`; module system in `src/core/module.c` |
-| Sigma.Collections used for AST node/token storage | ❌ |
+| Sigma.Collections: judicious integration where it replaces manual grow-arrays | ⚠️ | Audit-driven; not a blanket adoption — only where a collection type is a clear fit |
 | Sigma.Text used for string building (vars, serializer) | ✅ | `StringBuilder` in `vars.c` + `serializer.c`; `String` in `context.c` |
-| Public API frozen — `include/anvil.h` matches C ABI sketch in CoreBoundary.md §6 | ❌ |
+| Public API soft-frozen — no new breaking changes; `include/anvil.h` ≈ stable | ✅ | API freeze as defined by CoreBoundary.md §6 applies to Anvil.Net, not this C port; soft freeze in effect here |
 | Zero memory leaks (Valgrind) across all test suites | ✅ (current scope) |
 | Performance benchmarks documented in `docs/benchmarks.md` | ✅ | Numbers in `README.md §Performance Metrics`; full suite via `./rtest benchmarks` |
 | CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.4.5-alpha |
@@ -249,22 +249,64 @@ is natural and worth supporting as a first-class syntax for top-level named bloc
 ```anvl
 flag := TOP | LEFT | RIGHT | BOTTOM | FLOAT
 ```
-where the values on the right-hand side are Enum or Flags schema members being OR-combined.
+where the values are Enum/Flags schema members being OR-combined.
 
-**Design notes** (2026-03-21):
-- This is a value-level binary operator (`|`) applied to bare-literal tokens.
-- The parser currently does not support binary operators in value position.
-- Could be implemented as a new `ANVL_VAL_FLAGS_EXPR` value type: a list of identifiers
-  combined with `|`, evaluated against a schema Flags type at validation time.
-- Alternatively, treat as an ASL expression (reuse ASL's `|` operator) — heavier but
-  consistent with the existing expression evaluator.
-- Needs interaction design with Schema: the LHS type would need to be a `ANVL_SCHEMA_FLAGS`
-  kind for the expression to resolve correctly.
+**Design decision** (2026-03-21): `|` is a scripting operator — **not allowed in strict AML**.
+- `#!aml` shebang present: `|` in value position → `ANVL_ERR_PARSER_UNEXPECTED_TOKEN`. No exceptions.
+- `#!asl` or **no shebang**: valid; parser routes `IDENT (PIPE IDENT)+` through the ASL
+  evaluator. No new value type needed — ASL already owns binary expressions including `|`.
+- "No shebang = permissive mode" is an established Anvil rule; expression values fit naturally.
+- Schema interaction: a `ANVL_SCHEMA_FLAGS` field accepts an ASL-evaluated OR result.
 
 | Item | Status |
 |------|--------|
-| Spec decision: `ANVL_VAL_FLAGS_EXPR` vs ASL reuse | ❌ |
-| Parser: recognise `IDENT (PIPE IDENT)+` in value position | ❌ |
-| Schema validation: OR-compose Flags values | ❌ |
-| Serializer: emit `TOP | LEFT | RIGHT` form faithfully | ❌ |
+| Parser: `|` error in strict AML (shebang present + dialect == AML) | ❌ |
+| Parser: route `IDENT (PIPE IDENT)+` through ASL evaluator in non-strict/no-shebang mode | ❌ |
+| Schema validation: accept ASL OR-expression result against Flags type | ❌ |
+| Serializer: emit `TOP \| LEFT \| RIGHT` form faithfully (round-trip) | ❌ |
 | Tests | ❌ |
+
+---
+
+### E3 · Query Path Primitives (Node Navigation)
+
+**Design decision** (2026-03-21): Node traversal stays **out of Anvil core**, mirroring how
+`Anvil.Net.Api` is separate from `Anvil.Net`. Core = parse/serial/resolve. Navigation policy
+lives in a consumer library (`anvil.api` C package or future binding).
+
+**Philosophy**: primitives, not policy. No single pathing algorithm fits every application.
+Expose raw iteration primitives; let consumers build their own traversal strategies without
+being locked into one approach.
+
+**Access model**: both **index** and **name** access where semantically applicable:
+- Arrays and tuples: index only (`[0]`, `[1]`, …) — elements have no names
+- Objects: index (`[0]`, `[1]`, …) for ordered walk, **or named** (`["field"]`) for direct
+  lookup — object fields have both a position and a key
+- Statements: index via `Context.get_statement(ctx, i)` — already exists
+
+**Gap in current public API**: field and element iteration require raw struct access.
+Proposed additions to `include/context.h` / `include/anvil.h`:
+```c
+// Object field iteration
+usize  Context.field_count(ctx, stmt);              // count of fields in an object-valued stmt
+field  Context.get_field(ctx, stmt, usize i);       // i-th field by index
+field  Context.get_field_by_name(ctx, stmt, name);  // field by key name (NULL if absent)
+
+// Array / tuple element iteration
+usize      Context.element_count(ctx, stmt);        // count of elements
+value_meta Context.get_element(ctx, stmt, usize i); // i-th element span (index only — no names)
+```
+With these six functions a consumer can implement any traversal: depth-first, jq-style path
+expressions, jsonpath-style selectors, or a simple `node["field"]["subfield"]` accessor —
+without Anvil having a policy opinion. An `anvil.api` package (post-v1.0) would be the
+opinionated layer on top.
+
+| Item | Status |
+|------|--------|
+| Audit current API: what field/element access already exists in `context.h` | ❌ |
+| Add `Context.field_count` / `Context.get_field` (by index) | ❌ |
+| Add `Context.get_field_by_name` (by key string) | ❌ |
+| Add `Context.element_count` / `Context.get_element` (index-only) | ❌ |
+| Document traversal primitives in `docs/reference.md` | ❌ |
+| Tests | ❌ |
+| `anvil.api` package for higher-level path helpers (separate from core) | ❌ |
