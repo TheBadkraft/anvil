@@ -236,6 +236,14 @@ typedef struct anvl_context_i {
    // Attribute Builder
    attr_builder (*begin_attribute)(context self);
    void (*end_attribute)(context self, attr_builder bldr);
+   // Query path primitives (E3)
+   // Object field traversal
+   usize (*field_count)(context self, statement stmt);
+   field (*get_field)(context self, statement stmt, usize index);
+   field (*get_field_by_name)(context self, statement stmt, const char *name, usize len);
+   // Array/tuple element traversal
+   usize (*element_count)(context self, statement stmt);
+   struct anvl_element_meta *(*get_element)(context self, statement stmt, usize index);
 } anvl_context_i;
 extern const anvl_context_i Context;
 

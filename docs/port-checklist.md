@@ -303,10 +303,10 @@ opinionated layer on top.
 
 | Item | Status |
 |------|--------|
-| Audit current API: what field/element access already exists in `context.h` | ❌ |
-| Add `Context.field_count` / `Context.get_field` (by index) | ❌ |
-| Add `Context.get_field_by_name` (by key string) | ❌ |
-| Add `Context.element_count` / `Context.get_element` (index-only) | ❌ |
+| Audit current API: what field/element access already exists in `context.h` | ✅ |
+| Add `Context.field_count` / `Context.get_field` (by index) | ✅ |
+| Add `Context.get_field_by_name` (by key string) | ✅ |
+| Add `Context.element_count` / `Context.get_element` (index-only) | ✅ |
 | Document traversal primitives in `docs/reference.md` | ❌ |
-| Tests | ❌ |
+| Tests (QP01–QP15 in `test_interrogators.c`) | ✅ |
 | `anvil.api` package for higher-level path helpers (separate from core) | ❌ |

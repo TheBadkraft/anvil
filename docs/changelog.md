@@ -11,6 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.2-alpha] — pre-release (2026-03-21)
+
+**Status:** E3 query path primitives implemented; all unit tests passing (19/19 suites, 0 failures)
+**Milestone:** v1.0.0-rel gate clearance — E3 field/element navigation API complete
+
+### Added
+
+- **E3 query path primitives** (`include/context.h`, `src/core/context.c`) — five new
+  slots on `anvl_context_i` enabling field and element navigation without raw struct access:
+  - `Context.field_count(ctx, stmt)` — count of fields in an object-valued statement
+  - `Context.get_field(ctx, stmt, i)` — i-th field by index
+  - `Context.get_field_by_name(ctx, stmt, name, len)` — field by key name (NULL if absent);
+    O(n) linear scan now, O(1) after `Map` backing lands (FR-2603-sigma-collections-002)
+  - `Context.element_count(ctx, stmt)` — count of elements in an array or tuple statement
+  - `Context.get_element(ctx, stmt, i)` — i-th element span (index-only — no names)
+- **Tests: QP01–QP15** (`test/unit/test_interrogators.c`) — 15 new test cases covering all
+  five primitives including NULL guards, out-of-range returns, and nested object traversal
+
+### Fixed
+
+- **Parser: `parse_object` nested field pool ordering** — outer object fields were added to
+  `ctx->field_list` before inner (nested) object fields had been added, causing the outer
+  object's `field_start` to index the wrong entries.  Fields are now collected in a
+  temporary arena-allocated linked list during the parse loop and bulk-flushed to the pool
+  after all descendant fields are committed, so `field_start` always points past all
+  descendant entries.  This was a latent bug — not observable in practice until the E3
+  `get_field_by_name` traversal exposed it.
+
+### Added (docs)
+
+- **Port-checklist E3 gate** — four of seven items now ✅:
+  `field_count`, `get_field`, `get_field_by_name`, `element_count`, `get_element`, tests
+  (remaining: `docs/reference.md` traversal docs, `anvil.api` package)
+
+---
+
 ## [v0.5.1-alpha] — pre-release (2026-03-21)
 
 **Status:** Phase 4 gates complete; all unit tests passing (19/19 suites, 73/73 parser tests, 0 failures)

@@ -581,6 +581,68 @@ static void context_end_value(context self, value_builder bldr) {
    (void)bldr;
 }
 
+/* ------------------------------------------------------------------ */
+/* E3 — Query path primitives                                         */
+/* ------------------------------------------------------------------ */
+
+static usize context_field_count(context self, statement stmt) {
+   if (!self || !stmt || !stmt->value_meta)
+      return 0;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return 0;
+   return stmt->value_meta->data.object.field_count;
+}
+
+static field context_get_field(context self, statement stmt, usize index) {
+   if (!self || !stmt || !stmt->value_meta)
+      return NULL;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return NULL;
+   usize start = stmt->value_meta->data.object.field_start;
+   usize count = stmt->value_meta->data.object.field_count;
+   if (index >= count)
+      return NULL;
+   return self->field_list.fields[start + index];
+}
+
+static field context_get_field_by_name(context self, statement stmt, const char *name, usize len) {
+   if (!self || !stmt || !stmt->value_meta || !name || len == 0)
+      return NULL;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return NULL;
+   usize start = stmt->value_meta->data.object.field_start;
+   usize count = stmt->value_meta->data.object.field_count;
+   const char *raw = Source.data(self->source);
+   for (usize i = 0; i < count; i++) {
+      field f = self->field_list.fields[start + i];
+      if (f && f->key_len == len && memcmp(raw + f->key_pos, name, len) == 0)
+         return f;
+   }
+   return NULL;
+}
+
+static usize context_element_count(context self, statement stmt) {
+   if (!self || !stmt || !stmt->value_meta)
+      return 0;
+   anvl_value_type t = stmt->value_meta->type;
+   if (t != ANVL_VALUE_ARRAY && t != ANVL_VALUE_TUPLE)
+      return 0;
+   return stmt->value_meta->data.collection.element_count;
+}
+
+static struct anvl_element_meta *context_get_element(context self, statement stmt, usize index) {
+   if (!self || !stmt || !stmt->value_meta)
+      return NULL;
+   anvl_value_type t = stmt->value_meta->type;
+   if (t != ANVL_VALUE_ARRAY && t != ANVL_VALUE_TUPLE)
+      return NULL;
+   if (index >= stmt->value_meta->data.collection.element_count)
+      return NULL;
+   if (!stmt->value_meta->data.collection.elements)
+      return NULL;
+   return &stmt->value_meta->data.collection.elements[index];
+}
+
 const struct anvl_context_i Context = {
     .get_builder = context_get_builder,
     .dialect = context_dialect,
@@ -598,6 +660,11 @@ const struct anvl_context_i Context = {
     .end_value = context_end_value,
     .begin_attribute = context_begin_attribute,
     .end_attribute = context_end_attribute,
+    .field_count = context_field_count,
+    .get_field = context_get_field,
+    .get_field_by_name = context_get_field_by_name,
+    .element_count = context_element_count,
+    .get_element = context_get_element,
 };
 
 const struct anvl_statement_i Statement = {

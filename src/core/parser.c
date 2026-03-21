@@ -560,8 +560,13 @@ static value parse_object(parser_ctx *p) {
       return NULL;
    }
 
-   // Track where fields start in the context pool
-   usize field_start = p->ctx->field_list.count;
+   /* Collect outer fields into a temporary linked list (arena-allocated).
+    * We must NOT add fields to the pool until after all values are parsed,
+    * because nested parse_object calls will add inner fields into the pool
+    * first.  Deferring the ci_add_field calls ensures that field_start for
+    * this object correctly follows all descendent fields. */
+   struct tmp_fnode { field f; struct tmp_fnode *next; };
+   struct tmp_fnode *head = NULL, *tail = NULL;
    usize field_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != '}') {
@@ -597,14 +602,19 @@ static value parse_object(parser_ctx *p) {
          return NULL;
       }
 
-      // Create field and add to context pool
+      /* Create field but defer ci_add_field until after all values parsed */
       field f = ci_new_field(p->ctx);
       f->key_pos = key_pos;
       f->key_len = key_len;
       f->val = field_val;
       f->attrib_start = attrib_start;
       f->attrib_count = attrib_count;
-      ci_add_field(p->ctx, f);
+
+      struct tmp_fnode *node = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct tmp_fnode));
+      node->f = f;
+      node->next = NULL;
+      if (!tail) { head = tail = node; }
+      else        { tail->next = node; tail = node; }
       field_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -626,6 +636,12 @@ static value parse_object(parser_ctx *p) {
    }
 
    si_consume(s, 1);
+
+   /* All inner fields are now in the pool; bulk-add outer fields here so
+    * field_start correctly points past all descendant fields. */
+   usize field_start = p->ctx->field_list.count;
+   for (struct tmp_fnode *n = head; n; n = n->next)
+      ci_add_field(p->ctx, n->f);
 
    v->data.object.field_start = field_start;
    v->data.object.field_count = field_count;
