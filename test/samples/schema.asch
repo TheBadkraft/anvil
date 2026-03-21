@@ -1,0 +1,23 @@
+#!aml
+@[schema]
+
+// EntitySide: which runtime environment handles this entity
+EntitySide : enum := (client, server, both)
+
+// FilePerms: bitfield-composable permission flags
+FilePerms : flags := (read, write, execute)
+
+// BlockConfig: typed definition for a world block entry
+BlockConfig := {
+    id        := ""
+    hardness  := 1.0
+    stackable := true
+    side      := EntitySide
+}
+
+// ItemConfig: typed definition for an inventory item
+ItemConfig := {
+    name   := ""
+    damage := 0
+    perms  := FilePerms
+}

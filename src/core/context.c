@@ -20,8 +20,8 @@
 #include "context_internal.h"
 #include "parser.h"
 #include "utils.h"
-#include <sigma.memory/memory.h>
 #include <sigma.core/strings.h>
+#include <sigma.memory/memory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

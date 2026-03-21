@@ -647,7 +647,23 @@ static void test_parse_generic_aurora(void) {
    Assert.isTrue(stmt_count == 0, "generic.aurora (comment-only) should have 0 statements");
    Context.dispose(ctx);
 }
-// Test 29: Stress test - Deep nesting
+// Test 29: Sample vars.anvl file
+static void test_parse_vars_sample(void) {
+   context ctx = parse_file("vars.anvl", ANVL_DIALECT_AML, 7, 3, 1);
+   // vars block stored separately; label, desc, mod are the 3 data statements
+   usize stmt_count = Context.statement_count(ctx);
+   Assert.isTrue(stmt_count == 3, "vars.anvl should have 3 statements (label, desc, mod)");
+   Context.dispose(ctx);
+}
+// Test 30: Sample schema.asch file
+static void test_parse_schema_asch(void) {
+   context ctx = parse_file("schema.asch", ANVL_DIALECT_AML, 6, 2, 1);
+   // EntitySide, FilePerms, BlockConfig, ItemConfig = 4 type definitions
+   usize stmt_count = Context.statement_count(ctx);
+   Assert.isTrue(stmt_count == 4, "schema.asch should have 4 type definitions");
+   Context.dispose(ctx);
+}
+// Test 31: Stress test - Deep nesting
 static void test_parse_deep_nesting(void) {
    // Generate deeply nested structure (10+ levels deep)
    char *source = generate_deep_nested_structure();
@@ -1596,6 +1612,8 @@ static void _register(void) {
    testcase("Sample objects.anvl", test_parse_objects_sample);
    testcase("Sample tuples.anvl", test_parse_tuples_sample);
    testcase("Sample generic.aurora", test_parse_generic_aurora);
+   testcase("Sample vars.anvl", test_parse_vars_sample);
+   testcase("Sample schema.asch", test_parse_schema_asch);
 
    // Stress tests
    testcase("Deep nesting", test_parse_deep_nesting);
@@ -1647,7 +1665,7 @@ static context parse_file(const char *filename, anvl_dialect exp_dialect, usize 
       const anvl_error_state *err = Anvil.error_get();
       Assert.isNotNull((void *)err, "Error state should be available");
       fprintf(stderr, "[DEBUG]: Unexpected parse failure for %s: %s at line %ld, col %ld\n",
-               filename, err->message, err->line, err->column);
+              filename, err->message, err->line, err->column);
       Anvil.error_clear();
    }
    Assert.isTrue(result, "Sample file parsing should succeed");

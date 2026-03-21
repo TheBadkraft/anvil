@@ -2,7 +2,7 @@
 **Target: Anvil v1.0.0-rel**  
 **Reference: `~/repos/anvil.net/docs/CoreBoundary.md` (frozen spec authority)**  
 **Target: Anvil.Net `~/repos/anvil.net/Anvil.Net/Anvil.Net.csproj` (frozen backend project)**
-**Last updated: 2026-03-21**
+**Last updated: 2026-03-21 (Phase 4 complete)**
 
 ---
 
@@ -176,13 +176,13 @@ All items below must be true before tagging `v1.0.0-rel`:
 | All Phase 1 items complete | ✅ |
 | All Phase 2 core items complete | ✅ |
 | Sigma.Memory fully integrated (replaces all internal alloc) | ✅ | sigma.core migration — `Allocator.create_bump`, `Allocator.free`, `arena->alloc`; module system in `src/core/module.c` |
-| Sigma.Collections: judicious integration where it replaces manual grow-arrays | ⚠️ | Audit-driven; not a blanket adoption — only where a collection type is a clear fit |
+| Sigma.Collections: judicious integration where it replaces manual grow-arrays | ✅ | Audit complete (2026-03-21): none of the sigma.collections types (farray, parray, list) expose a pluggable allocator hook. All `ci_ensure_*_capacity` arrays in `context_internal.h` allocate from `ctx->arena` (bump); abandoned grow-buffers are reclaimed together at `Context.dispose`. The bump-arena lifecycle is fundamentally incompatible with external-heap collections. Manual grow-arrays retained by design. Sigma.Collections remains applicable for future heap-lifetime data structures (e.g., module registry, symbol resolver) where arena coupling is not required. |
 | Sigma.Text used for string building (vars, serializer) | ✅ | `StringBuilder` in `vars.c` + `serializer.c`; `String` in `context.c` |
 | Public API soft-frozen — no new breaking changes; `include/anvil.h` ≈ stable | ✅ | API freeze as defined by CoreBoundary.md §6 applies to Anvil.Net, not this C port; soft freeze in effect here |
 | Zero memory leaks (Valgrind) across all test suites | ✅ (current scope) |
 | Performance benchmarks documented in `docs/benchmarks.md` | ✅ | Numbers in `README.md §Performance Metrics`; full suite via `./rtest benchmarks` |
 | CHANGELOG complete and up to date | ✅ | v0.1.0-alpha through v0.4.5-alpha |
-| All test samples updated for v1.0 feature set | ❌ |
+| All test samples updated for v1.0 feature set | ✅ | Added `vars.anvl` (vars block, VarRef, InterpolatedString) and `schema.asch` (enum/flags/object schema); tests registered in `test_parser.c` (73/73 pass) |
 
 ---
 

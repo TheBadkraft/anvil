@@ -11,7 +11,8 @@
 // Atomic function 1: Allocate source struct
 static source alloc_source_struct(void) {
    source src = Allocator.alloc(sizeof(struct anvl_source_t));
-   if (src) memset(src, 0, sizeof(struct anvl_source_t));
+   if (src)
+      memset(src, 0, sizeof(struct anvl_source_t));
    return src; // Returns allocated struct or NULL on failure
 }
 
@@ -21,7 +22,7 @@ static char *alloc_buffer(const char *data, usize len) {
       return NULL;
    }
    char *buffer = Allocator.alloc(len + 1); // +1 for null terminator
-   return buffer;                  // Returns allocated buffer or NULL on failure
+   return buffer;                           // Returns allocated buffer or NULL on failure
 }
 
 // Atomic function 3: Copy data to buffer

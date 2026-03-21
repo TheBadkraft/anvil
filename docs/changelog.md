@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.1-alpha] — pre-release (2026-03-21)
+
+**Status:** Phase 4 gates complete; all unit tests passing (19/19 suites, 73/73 parser tests, 0 failures)
+**Milestone:** v1.0.0-rel gate clearance — Sigma.Collections audit, test samples updated
+
+### Added
+
+- **Test sample: `test/samples/vars.anvl`** — reference sample demonstrating the `vars {}` block,
+  `$varref` fields in objects, and `$"interpolated {string}"` top-level statements
+- **Test sample: `test/samples/schema.asch`** — reference sample demonstrating `@[schema]` enum,
+  flags, and object type definitions (EntitySide, FilePerms, BlockConfig, ItemConfig)
+- **Parser tests** (`test/unit/test_parser.c`) — two new sample-parse tests registered:
+  `test_parse_vars_sample` and `test_parse_schema_asch`; parser test count raised to 73
+
+### Added (docs)
+
+- **Port-checklist Phase 4** — all gates now ✅:
+  - Sigma.Collections audit complete: no allocator hook exists in any collection type;
+    bump-arena lifecycle is incompatible; manual grow-arrays retained by design
+  - Test samples: `vars.anvl` and `schema.asch` added; tests verified green
+
+---
+
 ## [v0.5.0-alpha] — pre-release (2026-03-21)
 
 **Status:** Sigma.Core migration complete; all unit tests passing (19/19 suites, 0 failures)
