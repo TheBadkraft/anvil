@@ -119,6 +119,8 @@ clean:
 
 ## 5. The Public Header (include/anvil.h)
 
+> **Design sketch — December 2025.** The types and interface shape here (`anvil_root`, `anvil_node`, `anvil_object`, …) reflect the original design intent. The canonical, implemented C API is documented in §9.
+
 ```c
 // include/anvil.h
 #pragma once
@@ -241,6 +243,183 @@ extern const anvil_interface Anvil;
 - AnvilBuild – the first real build system using `.anvl` instead of CMakeLists.txt  
 - ASL VM – lightweight stack-based interpreter, fully pluggable opcodes  
 - Bindings for Java, C#, Python, Rust, Zig, Odin, Hare, etc. – all consume exactly the interface above  
+
+## 9. The Implemented C API
+
+> **This is the canonical reference for the Anvil C library as shipped.** §5 is a historical design sketch; the types and interface names here are what the code actually exports.
+
+### 9.1 Overview
+
+Anvil's public API is structured as a set of global `const struct` vtables. Each vtable groups related operations and is accessed as a namespace:
+
+| Global | Header | Purpose |
+|--------|--------|---------|
+| `Anvil` | `anvil.h` | Top-level load / dispose / error |
+| `Context` | `context.h` | Parse context lifecycle + navigation |
+| `Source` | `context.h` | Zero-copy source interrogation |
+| `Statement` | `context.h` | Statement metadata queries |
+
+All parse-time allocations are owned by a per-context bump arena (`ctx->arena`). Handles (`context`, `statement`, `field`, `value`, `attribute`) are opaque pointers into that arena — **do not `free()` them directly**. Call `Context.dispose(ctx)` to release everything at once.
+
+### 9.2 Lifecycle
+
+```c
+// 1. Get a builder
+anvl_ctx_builder_i *b = Context.get_builder();
+
+// 2. Configure: string source
+b->set_source(b, src, len);                // parse from memory
+// … or file:
+b->load_file(b, "/path/to/file.anvl");    // parse from file, detects dialect
+
+// 3. Build the context
+context ctx = b->build(b);
+
+// 4. Parse
+if (!Context.parse(ctx)) {
+    const anvl_error_state *e = Anvil.error_get();
+    // handle error …
+}
+
+// 5. Use …
+
+// 6. Release everything
+Context.dispose(ctx);
+```
+
+The builder (`anvl_ctx_builder_i`) is stack-allocated and reusable within a single call sequence.
+
+### 9.3 Statement Navigation
+
+After a successful `Context.parse()`, all top-level statements are available via index:
+
+```c
+usize n = Context.statement_count(ctx);
+for (usize i = 0; i < n; i++) {
+    statement stmt = Context.get_statement(ctx, i);
+    anvl_stmt_type t = Statement.type(stmt);
+    const char *id   = Statement.identifier(stmt, ctx->source);
+    // …
+}
+```
+
+`Context.get_statement` returns `NULL` for out-of-range indices.
+
+### 9.4 Query Path Primitives (E3)
+
+**Philosophy**: primitives, not policy. No single traversal algorithm suits every consumer. Anvil core exposes minimal iteration primitives; the consumer builds whatever traversal strategy fits — depth-first, jq-style, jsonpath, simple `node["field"]` chaining, etc. An `anvil.api` package (post-v1.0, out-of-core) will provide opinionated helpers on top.
+
+**Access model**:
+
+| Node kind | Index access | Named access |
+|-----------|--------------|--------------|
+| Statement | `Context.get_statement(ctx, i)` | — |
+| Object field | `Context.get_field(ctx, stmt, i)` | `Context.get_field_by_name(ctx, stmt, name, len)` |
+| Array element | `Context.get_element(ctx, stmt, i)` | — |
+| Tuple element | `Context.get_element(ctx, stmt, i)` | — |
+
+#### Object Field Traversal
+
+```c
+usize Context.field_count(context self, statement stmt);
+```
+Returns the number of key-value fields in an object-valued statement. Returns `0` if `self` or `stmt` is `NULL`, if `stmt->value_meta` is `NULL`, or if the statement's value type is not `ANVL_VALUE_OBJECT`.
+
+```c
+field Context.get_field(context self, statement stmt, usize index);
+```
+Returns the `index`-th field (0-based) of an object-valued statement. Returns `NULL` for `NULL` arguments, non-object value type, or `index >= field_count`. Fields are ordered as they appear in source.
+
+```c
+field Context.get_field_by_name(context self, statement stmt,
+                                const char *name, usize len);
+```
+Returns the field whose key matches `name` (byte-exact, `len` bytes). Returns `NULL` for `NULL` arguments, non-object value type, or if no field with that key exists. The search is case-sensitive.
+
+> **Performance note**: `get_field_by_name` is currently O(n) — a linear `memcmp` scan over the object's fields against the raw source buffer. It will be upgraded to O(1) once `Map` (`FR-2603-sigma-collections-002`) lands in `sigma.collections`.
+
+#### Collection Element Traversal
+
+```c
+usize Context.element_count(context self, statement stmt);
+```
+Returns the number of elements in an array- or tuple-valued statement. Returns `0` if `self` or `stmt` is `NULL`, if `stmt->value_meta` is `NULL`, or if the value type is neither `ANVL_VALUE_ARRAY` nor `ANVL_VALUE_TUPLE`.
+
+```c
+struct anvl_element_meta *Context.get_element(context self, statement stmt, usize index);
+```
+Returns a pointer to the metadata for the `index`-th element (0-based). Returns `NULL` for `NULL` arguments, non-collection value type, or `index >= element_count`. The pointer is into the arena — do not `free()` it.
+
+#### The `field` Structure
+
+```c
+struct anvl_field {
+    usize key_pos;      // byte offset of the key in source
+    usize key_len;      // byte length of the key
+    usize attrib_start; // start index in context->attr_list (field-level attributes)
+    usize attrib_count; // number of field-level attributes
+    value val;          // the field's value (recursive)
+};
+```
+
+Key span extraction (zero-copy):
+
+```c
+const char *raw = Source.data(ctx->source);
+// key text is raw[f->key_pos .. f->key_pos + f->key_len]
+printf("%.*s", (int)f->key_len, raw + f->key_pos);
+```
+
+The `val` pointer contains the field's `type` (`anvl_value_type`) and, for nested objects, its own field list indices — enabling recursive descent.
+
+#### The `anvl_element_meta` Structure
+
+```c
+struct anvl_element_meta {
+    anvl_value_type type; // type of this element (scalar, object, array, …)
+    usize pos;            // byte offset of the element value in source
+    usize len;            // byte length of the element value in source
+};
+```
+
+Element values are always scalars in the current parser (objects and arrays as elements are stored by reference via their own `statement` or `value` structures).
+
+#### Worked Example — Depth-First Object Walk
+
+```c
+// Source: config := { server := { host := localhost, port := 8080 }, timeout := 30 }
+
+context ctx = /* … build + parse … */;
+statement root = Context.get_statement(ctx, 0);
+
+const char *raw = Source.data(ctx->source);
+
+usize fc = Context.field_count(ctx, root);
+for (usize i = 0; i < fc; i++) {
+    field f = Context.get_field(ctx, root, i);
+    printf("field: %.*s\n", (int)f->key_len, raw + f->key_pos);
+
+    if (f->val && f->val->type == ANVL_VALUE_OBJECT) {
+        // recurse — wrap in a synthetic stmt or walk field_list directly
+        // (anvil.api will provide a helper for this; in core, access raw)
+        usize inner_start = f->val->data.object.field_start;
+        usize inner_count = f->val->data.object.field_count;
+        for (usize j = 0; j < inner_count; j++) {
+            field inner = ctx->field_list.fields[inner_start + j];
+            printf("  field: %.*s\n", (int)inner->key_len, raw + inner->key_pos);
+        }
+    }
+}
+Context.dispose(ctx);
+```
+
+> **Note**: the inner-field direct access (`ctx->field_list.fields[…]`) is intentional for core consumers. `anvil.api` (post-v1.0) will wrap this in a cleaner recursive API.
+
+### 9.5 anvil.api (deferred — post-v1.0)
+
+Higher-level path helpers — `node["field"]["subfield"]`, jq-style selectors, jsonpath-style queries — will live in a separate `anvil.api` C package that sits on top of the primitives above. This keeps Anvil core free of policy. `anvil.api` is explicitly out of scope for v1.0.
+
+---
 
 ## 8. This Document Is Law
 
