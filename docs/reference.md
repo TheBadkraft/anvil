@@ -336,7 +336,7 @@ field Context.get_field_by_name(context self, statement stmt,
 ```
 Returns the field whose key matches `name` (byte-exact, `len` bytes). Returns `NULL` for `NULL` arguments, non-object value type, or if no field with that key exists. The search is case-sensitive.
 
-> **Performance note**: `get_field_by_name` is currently O(n) — a linear `memcmp` scan over the object's fields against the raw source buffer. It will be upgraded to O(1) once `Map` (`FR-2603-sigma-collections-002`) lands in `sigma.collections`.
+> **Performance note**: `get_field_by_name` uses a lazy-built FNV-1a hash map (`sigma.collections` `Map`) for O(1) lookup. The map is constructed on the first call for a given object statement and cached in `value_meta->name_index` for all subsequent calls. Map lifetime is tied to the context — `Context.dispose` drains all cached maps before releasing the arena.
 
 #### Collection Element Traversal
 

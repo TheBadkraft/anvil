@@ -34,10 +34,10 @@ TST_BUILD_DIR="$BUILD_DIR/test"
 LIB_NAME="anvil"
 
 # Runtime dependencies (cbuild resolves these as /usr/local/packages/<name>.o)
-REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text")
+REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text" "sigma.collections")
 
 # Test dependencies (rtest resolves these — adds sigma.test on top of REQUIRES)
-TST_REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text" "sigma.core.utils" "sigma.test")
+TST_REQUIRES=("sigma.memory" "sigma.core.module" "sigma.core.text" "sigma.core.utils" "sigma.collections" "sigma.test")
 
 # ---------------------------------------------------------------------------
 # Package: anvil (mandatory core)

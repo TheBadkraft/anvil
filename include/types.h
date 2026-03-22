@@ -167,6 +167,7 @@ struct anvl_value_meta {
    anvl_value_type type; // scalar, object, array, tuple, blob, varref, interp_string
    usize pos;            // position in source
    usize len;            // length in source
+   void *name_index;     // lazy Map cache for get_field_by_name (NULL until first call)
    union {
       // For objects: field information
       struct {

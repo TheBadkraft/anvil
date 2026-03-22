@@ -18,6 +18,7 @@
 
 #include "context.h"
 #include "context_internal.h"
+#include <sigma.collections/map.h>
 #include "parser.h"
 #include "utils.h"
 #include <sigma.core/strings.h>
@@ -180,6 +181,15 @@ __attribute__((unused)) static void dispose_value_recursive(value v) {
 
 static void context_dispose(context self) {
    if (self) {
+      // Drain any lazily-built name index maps before the arena is released.
+      // Maps are malloc-backed (not arena) so they must be freed explicitly.
+      for (usize i = 0; i < self->stmt_list.count; i++) {
+         statement s = self->stmt_list.statements[i];
+         if (s && s->value_meta && s->value_meta->name_index) {
+            Map.dispose((map)s->value_meta->name_index);
+            s->value_meta->name_index = NULL;
+         }
+      }
       // Source lives outside the arena (loaded independently), dispose it first.
       if (self->source)
          Source.dispose(self->source);
@@ -610,9 +620,37 @@ static field context_get_field_by_name(context self, statement stmt, const char 
       return NULL;
    if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
       return NULL;
-   usize start = stmt->value_meta->data.object.field_start;
-   usize count = stmt->value_meta->data.object.field_count;
+
+   struct anvl_value_meta *vm = stmt->value_meta;
+
+   /* Lazy-build the name→field_list_index map on first call for this object. */
+   if (!vm->name_index) {
+      map m = Map.new(vm->data.object.field_count * 2 + 4);
+      if (m) {
+         const char *raw = Source.data(self->source);
+         usize start = vm->data.object.field_start;
+         usize count = vm->data.object.field_count;
+         for (usize i = 0; i < count; i++) {
+            field f = self->field_list.fields[start + i];
+            if (f)
+               Map.set(m, raw + f->key_pos, f->key_len, (usize)(start + i));
+         }
+         vm->name_index = (void *)m;
+      }
+   }
+
+   /* O(1) lookup via map; fall back to linear scan if map allocation failed. */
+   if (vm->name_index) {
+      usize idx;
+      if (Map.get((map)vm->name_index, name, len, &idx))
+         return self->field_list.fields[idx];
+      return NULL;
+   }
+
+   /* Fallback: linear scan (only reached if Map.new failed). */
    const char *raw = Source.data(self->source);
+   usize start = vm->data.object.field_start;
+   usize count = vm->data.object.field_count;
    for (usize i = 0; i < count; i++) {
       field f = self->field_list.fields[start + i];
       if (f && f->key_len == len && memcmp(raw + f->key_pos, name, len) == 0)
