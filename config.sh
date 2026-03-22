@@ -273,7 +273,7 @@ declare -A BUILD_TARGETS=(
 # Usage:  cpkg anvil  |  cpkg resolver
 # ---------------------------------------------------------------------------
 declare -A PACKAGES=(
-    ["anvil"]="anvil | anvil context errors operators parser symbols types utils"
+    ["anvil"]="anvil | anvil_impl context errors module operators parser symbols types utils"
     ["resolver"]="anvil.resolver | resolver"
     ["anvil.serializer"]="anvil.serializer | serializer"
     ["anvil.import"]="anvil.import | import"
