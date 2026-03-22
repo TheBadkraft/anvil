@@ -384,6 +384,59 @@ struct anvl_element_meta {
 
 Element values are always scalars in the current parser (objects and arrays as elements are stored by reference via their own `statement` or `value` structures).
 
+#### Field Value Types and Dispatch
+
+A `field->val` is a `value` pointer (`struct anvl_value *`). The `type` member identifies how to read it:
+
+```c
+typedef enum {
+    ANVL_VALUE_SCALAR,        // bare word, number, or string literal
+    ANVL_VALUE_OBJECT,        // { key := val, … }
+    ANVL_VALUE_ARRAY,         // [ elem, … ]
+    ANVL_VALUE_TUPLE,         // ( elem, … )
+    ANVL_VALUE_BLOB,          // ![ raw bytes ]
+    ANVL_VALUE_VARREF,        // $identifier — unresolved variable reference
+    ANVL_VALUE_INTERP_STRING, // $"…{ref}…" — interpolated string
+} anvl_value_type;
+```
+
+Dispatch pattern for a field value:
+
+```c
+const char *raw = Source.data(ctx->source);
+
+void handle_value(context ctx, value v) {
+    switch (v->type) {
+        case ANVL_VALUE_SCALAR:
+            // zero-copy span: raw[v->data.scalar.pos .. +v->data.scalar.len]
+            printf("%.*s", (int)v->data.scalar.len, raw + v->data.scalar.pos);
+            break;
+        case ANVL_VALUE_OBJECT:
+            // recurse via ctx->field_list.fields[v->data.object.field_start … +field_count]
+            for (usize i = 0; i < v->data.object.field_count; i++) {
+                field f = ctx->field_list.fields[v->data.object.field_start + i];
+                handle_value(ctx, f->val);
+            }
+            break;
+        case ANVL_VALUE_ARRAY:
+        case ANVL_VALUE_TUPLE:
+            // elements live in value_meta->data.collection.elements, not in value->data
+            // (field values do not have value_meta — access via parent statement's value_meta
+            //  or use element_count / get_element on the parent statement)
+            break;
+        case ANVL_VALUE_VARREF:
+            // identifier span (excludes '$'): raw[v->data.scalar.pos .. +v->data.scalar.len]
+            break;
+        case ANVL_VALUE_BLOB:
+        case ANVL_VALUE_INTERP_STRING:
+            // pos/len in source; interp segment list in value_meta (top-level stmts only)
+            break;
+    }
+}
+```
+
+> **Note — collection field values**: when an object field's value is itself an array or tuple, `v->data` holds `collection.element_start` / `element_count` as indices into a separate element pool. These are not directly usable through `get_element` (which operates on statement-level `value_meta`). For the common case — reading collection fields — inspect `v->data.collection.element_count` and visit `v->data.collection` directly, or restructure the data model to promote the field to a statement.
+
 #### Worked Example — Depth-First Object Walk
 
 ```c

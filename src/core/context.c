@@ -18,9 +18,9 @@
 
 #include "context.h"
 #include "context_internal.h"
-#include <sigma.collections/map.h>
 #include "parser.h"
 #include "utils.h"
+#include <sigma.collections/map.h>
 #include <sigma.core/strings.h>
 #include <sigma.memory/memory.h>
 #include <stdio.h>

@@ -565,7 +565,10 @@ static value parse_object(parser_ctx *p) {
     * because nested parse_object calls will add inner fields into the pool
     * first.  Deferring the ci_add_field calls ensures that field_start for
     * this object correctly follows all descendent fields. */
-   struct tmp_fnode { field f; struct tmp_fnode *next; };
+   struct tmp_fnode {
+      field f;
+      struct tmp_fnode *next;
+   };
    struct tmp_fnode *head = NULL, *tail = NULL;
    usize field_count = 0;
 
@@ -613,8 +616,12 @@ static value parse_object(parser_ctx *p) {
       struct tmp_fnode *node = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct tmp_fnode));
       node->f = f;
       node->next = NULL;
-      if (!tail) { head = tail = node; }
-      else        { tail->next = node; tail = node; }
+      if (!tail) {
+         head = tail = node;
+      } else {
+         tail->next = node;
+         tail = node;
+      }
       field_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -1199,22 +1206,22 @@ static value parse_interp_string(parser_ctx *p) {
    usize nseg = 0;
 
    // Helper: grow segment array if needed (old buffer left in arena; new buffer allocated)
-#define SEGS_PUSH(is_r, p_, l_)                                                                \
-   do {                                                                                        \
-      if (nseg >= cap) {                                                                       \
-         usize newcap_ = cap * 2;                                                              \
-         struct anvl_interp_segment *nb_ =                                                     \
-             p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_);              \
-         if (!nb_) {                                                                           \
-            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                \
-            return NULL;                                                                       \
-         }                                                                                     \
-         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                         \
-         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                         \
-         segs = nb_;                                                                           \
-         cap = newcap_;                                                                        \
-      }                                                                                        \
-      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)}; \
+#define SEGS_PUSH(is_r, p_, l_)                                                                 \
+   do {                                                                                         \
+      if (nseg >= cap) {                                                                        \
+         usize newcap_ = cap * 2;                                                               \
+         struct anvl_interp_segment *nb_ =                                                      \
+             p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_); \
+         if (!nb_) {                                                                            \
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                 \
+            return NULL;                                                                        \
+         }                                                                                      \
+         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                          \
+         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                          \
+         segs = nb_;                                                                            \
+         cap = newcap_;                                                                         \
+      }                                                                                         \
+      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)};  \
    } while (0)
 
    usize lit_start = si_position(s);
