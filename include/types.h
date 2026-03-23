@@ -38,9 +38,10 @@
 /* Statement Types                                                   */
 /* ------------------------------------------------------------------ */
 typedef enum {
-   ANVL_STMT_ASSN, // assignment statement (all current statements)
-   ANVL_STMT_FUNC, // function statement (AnvilScript, future)
-   ANVL_STMT_MSSG  // message statement (AMPP, future)
+   ANVL_STMT_ASSN,   // assignment statement (all current statements)
+   ANVL_STMT_FUNC,   // function statement (AnvilScript, future)
+   ANVL_STMT_MSSG,   // message statement (AMPP, future)
+   ANVL_ANON_OBJECT  // anonymous top-level object block (read-only)
 } anvl_stmt_type;
 
 /* ------------------------------------------------------------------ */
@@ -59,7 +60,7 @@ typedef enum {
 /* ------------------------------------------------------------------ */
 /* Statement Metadata Indices                                        */
 /* ------------------------------------------------------------------ */
-#define STMT_META_TYPE 0       // ASSN, FUNC, or MSSG
+#define STMT_META_TYPE 0       // ASSN, FUNC, MSSG, or ANON_OBJECT
 #define STMT_META_RESERVED_1 1 // reserved for future use
 #define STMT_META_IDENT_POS 2  // identifier position in source
 #define STMT_META_IDENT_LEN 3  // identifier length

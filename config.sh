@@ -287,6 +287,7 @@ declare -A TEST_CONFIGS=(
     ["prototype"]="with_proto_objects"
     ["resolver"]="with_resolver_objects"
     ["serializer"]="with_serializer_objects"
+    ["anon_block"]="with_serializer_objects"
     ["vars"]="with_vars_objects"
     ["import"]="with_import_objects"
     ["asl"]="with_asl_objects"

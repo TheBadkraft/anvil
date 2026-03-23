@@ -241,13 +241,13 @@ is natural and worth supporting as a first-class syntax for top-level named bloc
 | Item | Status |
 |------|--------|
 | Audit `../q-or/registry.anvl` usage patterns | ❌ |
-| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ❌ |
-| New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ❌ |
-| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ❌ |
-| Parser: reject `:=` assignment to a previously declared anonymous block name | ❌ |
-| Serializer: emit `ident { }` form for `ANVL_ANON_OBJECT` | ❌ |
+| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ✅ |
+| New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ✅ |
+| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ✅ |
+| Parser: reject `:=` assignment to a previously declared anonymous block name | ✅ |
+| Serializer: emit `ident { }` form for `ANVL_ANON_OBJECT` | ✅ |
 | Import collision semantics for anonymous global names | ❌ |
-| Tests (AB01–AB08 in FR) | ❌ |
+| Tests (AB01–AB08 in FR) | ✅ |
 
 ### E2 · Bitwise OR Flag Composition in Values
 

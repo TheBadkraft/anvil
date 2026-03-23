@@ -72,6 +72,8 @@ static const char *error_messages[] = {
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK] = "Invalid attribute block; must be `@[...]`",
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE] = "The attribute identifier is invalid",
     [ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY] = "Duplicate attribute identifier",
+    [ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE] = "Attributes are not allowed on scalar, array, or tuple types",
+    [ANVL_ERR_ANON_BLOCK_REDECLARATION] = "Anonymous block name conflicts with an existing declaration",
 
     [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "Cycle detected in inheritance chain",
     [ANVL_ERR_RESOLVER_MISSING_BASE] = "Base identifier not found in document",
@@ -163,6 +165,8 @@ static const char *error_names[] = {
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK] = "ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK",
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE] = "ANVL_ERR_PARSER_INVALID_ATTRIBUTE",
     [ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY] = "ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY",
+    [ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE] = "ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE",
+    [ANVL_ERR_ANON_BLOCK_REDECLARATION] = "ANVL_ERR_ANON_BLOCK_REDECLARATION",
 
     [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "ANVL_ERR_RESOLVER_CYCLE_DETECTED",
     [ANVL_ERR_RESOLVER_MISSING_BASE] = "ANVL_ERR_RESOLVER_MISSING_BASE",

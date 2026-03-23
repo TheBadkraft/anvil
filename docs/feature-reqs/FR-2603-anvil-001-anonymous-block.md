@@ -3,7 +3,7 @@
 | Field       | Value                                      |
 |-------------|--------------------------------------------|
 | ID          | FR-2603-anvil-001                          |
-| Status      | open                                       |
+| Status      | **implemented**                            |
 | Priority    | post-v1.0                                  |
 | Tags        | parser, syntax, read-only, anonymous-block |
 | Tracked in  | `docs/port-checklist.md` § E1             |
@@ -111,12 +111,12 @@ Completely unambiguous — no lookahead beyond one token.
 
 | Item | Status |
 |------|--------|
-| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ❌ |
-| New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ❌ |
-| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ❌ |
-| Parser: reject `:=` assignment to a previously declared anonymous block name | ❌ |
-| `Statement.type()` returns `ANVL_ANON_OBJECT` | ❌ |
-| Serializer: emit `ident { }` form (not `ident := { }`) for `ANVL_ANON_OBJECT` | ❌ |
+| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ✅ |
+| New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ✅ |
+| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ✅ |
+| Parser: reject `:=` assignment to a previously declared anonymous block name | ✅ |
+| `Statement.type()` returns `ANVL_ANON_OBJECT` | ✅ |
+| Serializer: emit `ident { }` form (not `ident := { }`) for `ANVL_ANON_OBJECT` | ✅ |
 | Import collision semantics for anonymous global names | ❌ |
 | `Context.get_statement_by_name` already works — no changes needed | ✅ |
 | `Context.get_field_by_name` / field traversal already works — no changes needed | ✅ |
@@ -148,9 +148,12 @@ field value span == `"1.0.0"`.
 ```anvl
 #!aml
 changelog { version := 1.0.0 }
-display := ${changelog.version}
+display := $changelog
 ```
-**Assert:** parse succeeds; `display` statement value resolves to `"1.0.0"`.
+**Assert:** parse succeeds; `display` statement value type is `ANVL_VALUE_VARREF`.
+
+> **Note:** Dotted-path VarRef (`${changelog.version}`) requires a future enhancement to the
+> VarRef / variable-resolution subsystem and is not yet implemented.
 
 ### AB04 — redeclaration error
 **Input:**

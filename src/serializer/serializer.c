@@ -433,11 +433,20 @@ static bool write_statement(context ctx, iw w, statement stmt,
 
    const char *src_data = Source.data(ctx->source);
 
+   bool is_anon = ((anvl_stmt_type)stmt->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT);
+
    /* Identifier */
    usize ident_pos = stmt->meta[STMT_META_IDENT_POS];
    usize ident_len = stmt->meta[STMT_META_IDENT_LEN];
    iw_write(w, ""); /* emit indent if needed */
    iw_appendn(w, src_data + ident_pos, ident_len);
+
+   if (is_anon) {
+      /* Anonymous block: emit `ident { ... }` (no := operator) */
+      iw_append(w, " ");
+      write_value_meta(ctx, w, stmt->value_meta, opts, /*inner_inline=*/false);
+      return true;
+   }
 
    /* Inheritance :base */
    if (stmt->base_meta && stmt->meta[STMT_META_BASE_IDX]) {

@@ -34,6 +34,8 @@ const char *anvl_stmt_type_name(anvl_stmt_type type) {
       return "function";
    case ANVL_STMT_MSSG:
       return "message";
+   case ANVL_ANON_OBJECT:
+      return "anon_object";
    default:
       return "unknown";
    }

@@ -46,6 +46,8 @@ static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_co
 static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type);
 static bool read_identifier(parser_ctx *p, usize *pos, usize *len);
 static bool parse_vars_block(parser_ctx *p);
+static bool lookahead_is_anon_object(parser_ctx *p);
+static bool parse_anon_object(parser_ctx *p, statement stmt);
 static value parse_varref(parser_ctx *p);
 static value parse_interp_string(parser_ctx *p);
 static bool parse_import_decl(parser_ctx *p);
@@ -163,13 +165,14 @@ static bool parse_source(parser_ctx *p) {
          return false;
       }
 
-      statement stmt = ci_new_statement(p->ctx, ANVL_STMT_ASSN);
+      bool is_anon = lookahead_is_anon_object(p);
+      statement stmt = ci_new_statement(p->ctx, is_anon ? ANVL_ANON_OBJECT : ANVL_STMT_ASSN);
       if (!stmt) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, p->src);
          return false;
       }
 
-      if (!parse_statement(p, stmt)) {
+      if (!(is_anon ? parse_anon_object(p, stmt) : parse_statement(p, stmt))) {
          dispose_statement(stmt);
          return false;
       }
@@ -196,6 +199,23 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    usize ident_pos = 0, ident_len = 0;
    if (!read_identifier(p, &ident_pos, &ident_len))
       return false;
+
+   // Reject assignment to a name that was declared as an anonymous block
+   {
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->stmt_list.count; i++) {
+         statement existing = p->ctx->stmt_list.statements[i];
+         if ((anvl_stmt_type)existing->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT) {
+            usize ex_pos = existing->meta[STMT_META_IDENT_POS];
+            usize ex_len = existing->meta[STMT_META_IDENT_LEN];
+            if (ex_len == ident_len &&
+                strncmp(src_data + ex_pos, src_data + ident_pos, ident_len) == 0) {
+               parser_error(ANVL_ERR_ANON_BLOCK_REDECLARATION, s);
+               return false;
+            }
+         }
+      }
+   }
 
    si_skip_whitespace_and_comments(s);
 
@@ -963,6 +983,119 @@ static bool read_identifier(parser_ctx *p, usize *pos, usize *len) {
       parser_error(ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD, s);
       return false;
    }
+   return true;
+}
+
+/* ========================================================================
+ * lookahead_is_anon_object() - Non-consuming check for IDENT '{' at current position
+ *
+ * Returns true when the source at the current position starts with an
+ * identifier token immediately followed (after optional whitespace) by '{'.
+ * Does not advance the source cursor.
+ * ======================================================================== */
+static bool lookahead_is_anon_object(parser_ctx *p) {
+   source s = p->src;
+   usize la = 0;
+   if (si_is_eof_offset(s, la) || !Source.is_identifier_start(si_peek_offset(s, la)))
+      return false;
+   while (!si_is_eof_offset(s, la) && Source.is_identifier_part(si_peek_offset(s, la)))
+      la++;
+   while (!si_is_eof_offset(s, la)) {
+      char c = si_peek_offset(s, la);
+      if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+         break;
+      la++;
+   }
+   return !si_is_eof_offset(s, la) && si_peek_offset(s, la) == '{';
+}
+
+/* ========================================================================
+ * parse_anon_object() - Parse an anonymous top-level object block
+ *
+ * Grammar: ident { key := value, ... }
+ *
+ * Constraints:
+ *   - Not allowed in AMP dialect
+ *   - Identifier must not already exist in the statement list (any type)
+ *   - Body is parsed as an ANVL_VALUE_OBJECT (same rules as := { })
+ *
+ * Sets stmt->meta[STMT_META_TYPE] = ANVL_ANON_OBJECT.
+ * ======================================================================== */
+static bool parse_anon_object(parser_ctx *p, statement stmt) {
+   source s = p->src;
+
+   // AMP dialect does not support anonymous object blocks
+   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+
+   // Parse identifier
+   usize ident_pos = 0, ident_len = 0;
+   if (!read_identifier(p, &ident_pos, &ident_len))
+      return false;
+
+   // Reject if this name already exists as any top-level statement
+   {
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->stmt_list.count; i++) {
+         statement existing = p->ctx->stmt_list.statements[i];
+         usize ex_pos = existing->meta[STMT_META_IDENT_POS];
+         usize ex_len = existing->meta[STMT_META_IDENT_LEN];
+         if (ex_len == ident_len &&
+             strncmp(src_data + ex_pos, src_data + ident_pos, ident_len) == 0) {
+            parser_error(ANVL_ERR_ANON_BLOCK_REDECLARATION, s);
+            return false;
+         }
+      }
+   }
+
+   si_skip_whitespace_and_comments(s);
+
+   // Record start position (at '{')
+   usize value_start_pos = si_position(s);
+
+   // parse_value sees '{' and dispatches to parse_object
+   value val = parse_value(p);
+   usize value_end_pos = si_position(s);
+   if (!val)
+      return false;
+
+   if (val->type != ANVL_VALUE_OBJECT) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+
+   // Allocate and populate value_meta
+   struct anvl_value_meta *value_meta = ci_new_value_meta(p->ctx, ANVL_VALUE_OBJECT);
+   if (!value_meta) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return false;
+   }
+   value_meta->pos = value_start_pos;
+   value_meta->len = value_end_pos - value_start_pos;
+   value_meta->data.object.field_start = val->data.object.field_start;
+   value_meta->data.object.field_count = val->data.object.field_count;
+
+   // Fill statement metadata
+   stmt->meta[STMT_META_TYPE]       = (usize)ANVL_ANON_OBJECT;
+   stmt->meta[STMT_META_RESERVED_1] = 0;
+   stmt->meta[STMT_META_IDENT_POS]  = ident_pos;
+   stmt->meta[STMT_META_IDENT_LEN]  = ident_len;
+   stmt->meta[STMT_META_BASE_IDX]   = 0;
+   stmt->meta[STMT_META_ATTR_IDX]   = 0;
+   stmt->meta[STMT_META_RESERVED_6] = 0;
+   stmt->meta[STMT_META_VALUE_IDX]  = 1;
+   stmt->meta[STMT_META_RESERVED_8] = 0;
+
+   stmt->base_meta  = NULL;
+   stmt->attr_meta  = NULL;
+   stmt->value_meta = value_meta;
+
+   si_skip_whitespace_and_comments(s);
+   if (si_match_length(s, ",", 1) == 1)
+      si_consume(s, 1);
+
    return true;
 }
 
