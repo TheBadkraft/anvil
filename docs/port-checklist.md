@@ -228,7 +228,7 @@ is natural and worth supporting as a first-class syntax for top-level named bloc
 - `key { ... }` at top level is **read-only** — the absence of `:=` signals a declaration, not
   an assignment. The block cannot be reassigned after parse; enforcement at parse time.
 - Must **not** desugar to `key := { ... }` internally. Requires a distinct stmt type
-  (`ANVL_STMT_BLOCK` or similar) so `Statement.type()` is unambiguous and serialization
+  `ANVL_ANON_OBJECT` so `Statement.type()` is unambiguous and serialization
   preserves the `ident { }` form (round-trip correctness).
 - `key` becomes a **module-global name**; duplicate declarations → `ANVL_ERR_ANON_BLOCK_REDECLARATION`.
 - `${key.field}` remains a valid VarRef into an anonymous block.
@@ -241,11 +241,11 @@ is natural and worth supporting as a first-class syntax for top-level named bloc
 | Item | Status |
 |------|--------|
 | Audit `../q-or/registry.anvl` usage patterns | ❌ |
-| Decide `ANVL_STMT_BLOCK` enum value | ❌ |
+| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ❌ |
 | New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ❌ |
-| Parser: recognise `IDENT LBRACE` at top level → `ANVL_STMT_BLOCK` | ❌ |
+| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ❌ |
 | Parser: reject `:=` assignment to a previously declared anonymous block name | ❌ |
-| Serializer: emit `ident { }` form for `ANVL_STMT_BLOCK` | ❌ |
+| Serializer: emit `ident { }` form for `ANVL_ANON_OBJECT` | ❌ |
 | Import collision semantics for anonymous global names | ❌ |
 | Tests (AB01–AB08 in FR) | ❌ |
 

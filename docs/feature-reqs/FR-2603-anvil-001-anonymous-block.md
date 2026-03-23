@@ -61,7 +61,7 @@ the block cannot be patched through any API call.
 
 Anonymous blocks must **not** desugar internally to `ident := { ... }`. They warrant a distinct
 stmt type so that:
-- `Statement.type(s)` returns an unambiguous `ANVL_STMT_BLOCK` (or similar) value
+- `Statement.type(s)` returns `ANVL_ANON_OBJECT`
 - The read-only flag is encoded at the type level, not as a runtime attribute
 - Serialization preserves the `ident { }` form faithfully (round-trip correctness)
 
@@ -111,12 +111,12 @@ Completely unambiguous — no lookahead beyond one token.
 
 | Item | Status |
 |------|--------|
-| Decide `ANVL_STMT_BLOCK` enum value (after `ANVL_STMT_FUNC`?) | ❌ |
+| Add `ANVL_ANON_OBJECT` to `anvl_stmt_type` enum | ❌ |
 | New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ❌ |
-| Parser: recognise `IDENT LBRACE` at top level → `ANVL_STMT_BLOCK` | ❌ |
+| Parser: recognise `IDENT LBRACE` at top level → `ANVL_ANON_OBJECT` | ❌ |
 | Parser: reject `:=` assignment to a previously declared anonymous block name | ❌ |
-| `Statement.type()` returns `ANVL_STMT_BLOCK` | ❌ |
-| Serializer: emit `ident { }` form (not `ident := { }`) for `ANVL_STMT_BLOCK` | ❌ |
+| `Statement.type()` returns `ANVL_ANON_OBJECT` | ❌ |
+| Serializer: emit `ident { }` form (not `ident := { }`) for `ANVL_ANON_OBJECT` | ❌ |
 | Import collision semantics for anonymous global names | ❌ |
 | `Context.get_statement_by_name` already works — no changes needed | ✅ |
 | `Context.get_field_by_name` / field traversal already works — no changes needed | ✅ |
@@ -136,7 +136,7 @@ changelog {
 }
 ```
 **Assert:** parse succeeds; `Context.statement_count(ctx) == 1`;
-`Statement.type(s) == ANVL_STMT_BLOCK`; `Context.field_count(ctx, s) == 2`.
+`Statement.type(s) == ANVL_ANON_OBJECT`; `Context.field_count(ctx, s) == 2`.
 
 ### AB02 — field access by name
 **Input:** same as AB01.
