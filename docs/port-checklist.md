@@ -213,6 +213,8 @@ Items below are new/additive features — not backports from Anvil.Net. They do 
 
 ### E1 · Anonymous Top-Level Object Definitions
 
+**FR**: `docs/feature-reqs/FR-2603-anvil-001-anonymous-block.md`
+
 **Observed need**: `../q-or/registry.anvl` (may still be `.aml`) uses a bare block form:
 ```anvl
 registry {
@@ -222,26 +224,30 @@ registry {
 This is currently invalid — the parser requires `registry := { ... }`. However, the pattern
 is natural and worth supporting as a first-class syntax for top-level named blocks.
 
-**Design notes** (2026-03-21):
-- `key { ... }` at top level would make `key` a **module-global name** (effectively a keyword
-  within that document's scope), meaning no imported file can declare a conflicting top-level
-  `registry` definition with the same name — import collision semantics TBD.
-- `${registry.field}` remains a valid VarRef into an anonymous block.
+**Design decisions** (2026-03-21, updated 2026-03-23):
+- `key { ... }` at top level is **read-only** — the absence of `:=` signals a declaration, not
+  an assignment. The block cannot be reassigned after parse; enforcement at parse time.
+- Must **not** desugar to `key := { ... }` internally. Requires a distinct stmt type
+  (`ANVL_STMT_BLOCK` or similar) so `Statement.type()` is unambiguous and serialization
+  preserves the `ident { }` form (round-trip correctness).
+- `key` becomes a **module-global name**; duplicate declarations → `ANVL_ERR_ANON_BLOCK_REDECLARATION`.
+- `${key.field}` remains a valid VarRef into an anonymous block.
 - `vars { ... }` already works (`vars` is a reserved keyword); anonymous blocks extend that
   pattern to arbitrary identifiers.
-- Parser decision tree is unambiguous: at top level, if the next token after an identifier is
-  `{` (not `:=` or `:`), treat it as an anonymous object block. Identifiers declared this way
-  could be implicitly desugared to `<ident> := { ... }` internally.
-- **Not breaking** — the syntax currently errors, so accepting it adds no ambiguity.
-- Needs a new error code for duplicate anonymous block names at module scope.
+- Parser lookahead is one token: `IDENT LBRACE` → anonymous block; `IDENT ASSIGN` → assignment.
+- `Context.get_statement_by_name` and field traversal already work — no API changes needed.
+- Import collision semantics TBD in the import subsystem.
 
 | Item | Status |
 |------|--------|
 | Audit `../q-or/registry.anvl` usage patterns | ❌ |
-| Parser: recognise `IDENT LBRACE` at top level as anonymous block | ❌ |
-| Desugar to assignment internally or add new stmt type | ❌ |
+| Decide `ANVL_STMT_BLOCK` enum value | ❌ |
+| New error code `ANVL_ERR_ANON_BLOCK_REDECLARATION` | ❌ |
+| Parser: recognise `IDENT LBRACE` at top level → `ANVL_STMT_BLOCK` | ❌ |
+| Parser: reject `:=` assignment to a previously declared anonymous block name | ❌ |
+| Serializer: emit `ident { }` form for `ANVL_STMT_BLOCK` | ❌ |
 | Import collision semantics for anonymous global names | ❌ |
-| Tests | ❌ |
+| Tests (AB01–AB08 in FR) | ❌ |
 
 ### E2 · Bitwise OR Flag Composition in Values
 
