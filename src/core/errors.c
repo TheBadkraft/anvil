@@ -83,6 +83,7 @@ static const char *error_messages[] = {
     [ANVL_ERR_VARS_DUPLICATE_KEY] = "Duplicate key in vars block",
     [ANVL_ERR_VARS_CIRCULAR_REF] = "Circular reference detected in vars block",
     [ANVL_ERR_VARS_KEY_NOT_FOUND] = "vars key not found",
+    [ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF] = "Unterminated braced VarRef: '${' missing closing '}'",
 
     [ANVL_ERR_IMPORT_NOT_FIRST] = "import declarations must precede statements",
     [ANVL_ERR_IMPORT_AMP_FORBIDDEN] = "import is not allowed in AMP dialect",
@@ -176,6 +177,7 @@ static const char *error_names[] = {
     [ANVL_ERR_VARS_DUPLICATE_KEY] = "ANVL_ERR_VARS_DUPLICATE_KEY",
     [ANVL_ERR_VARS_CIRCULAR_REF] = "ANVL_ERR_VARS_CIRCULAR_REF",
     [ANVL_ERR_VARS_KEY_NOT_FOUND] = "ANVL_ERR_VARS_KEY_NOT_FOUND",
+    [ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF] = "ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF",
 
     [ANVL_ERR_IMPORT_NOT_FIRST] = "ANVL_ERR_IMPORT_NOT_FIRST",
     [ANVL_ERR_IMPORT_AMP_FORBIDDEN] = "ANVL_ERR_IMPORT_AMP_FORBIDDEN",

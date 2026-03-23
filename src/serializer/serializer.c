@@ -351,6 +351,24 @@ static void write_field_value(context ctx, iw w,
             iw_blank(w);
       }
       break;
+
+   case ANVL_VALUE_VARREF: {
+      const char *src = Source.data(ctx->source);
+      usize pos = val->data.scalar.pos;
+      usize len = val->data.scalar.len;
+      bool dotted = false;
+      for (usize i = 0; i < len; i++) {
+         if (src[pos + i] == '.') { dotted = true; break; }
+      }
+      if (dotted)
+         StringBuilder.appendf(w->sb, "${%.*s}", (int)len, src + pos);
+      else
+         StringBuilder.appendf(w->sb, "$%.*s", (int)len, src + pos);
+      w->at_line_start = false;
+      if (!inner_inline)
+         iw_blank(w);
+      break;
+   }
    }
 }
 
@@ -410,6 +428,22 @@ static void write_value_meta(context ctx, iw w,
       if (!inner_inline)
          iw_blank(w);
       break;
+
+   case ANVL_VALUE_VARREF: {
+      const char *src = Source.data(ctx->source);
+      bool dotted = false;
+      for (usize i = 0; i < vm->len; i++) {
+         if (src[vm->pos + i] == '.') { dotted = true; break; }
+      }
+      if (dotted)
+         StringBuilder.appendf(w->sb, "${%.*s}", (int)vm->len, src + vm->pos);
+      else
+         StringBuilder.appendf(w->sb, "$%.*s", (int)vm->len, src + vm->pos);
+      w->at_line_start = false;
+      if (!inner_inline)
+         iw_blank(w);
+      break;
+   }
    }
 }
 

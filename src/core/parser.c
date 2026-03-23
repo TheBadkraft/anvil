@@ -1285,7 +1285,12 @@ static value parse_varref(parser_ctx *p) {
    source s = p->src;
    si_consume(s, 1); // consume '$'
 
-   if (!Source.is_identifier_start(si_peek(s))) {
+   /* Support both bare ($ident.path) and braced (${ident.path}) forms. */
+   bool braced = (!si_is_eof(s) && si_peek(s) == '{');
+   if (braced)
+      si_consume(s, 1); // consume '{'
+
+   if (si_is_eof(s) || !Source.is_identifier_start(si_peek(s))) {
       parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
       return NULL;
    }
@@ -1295,6 +1300,14 @@ static value parse_varref(parser_ctx *p) {
    while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
       si_consume(s, 1);
       ident_len++;
+   }
+
+   if (braced) {
+      if (si_is_eof(s) || si_peek(s) != '}') {
+         parser_error(ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF, s);
+         return NULL;
+      }
+      si_consume(s, 1); // consume '}'
    }
 
    value v = ci_new_value(p->ctx, ANVL_VALUE_VARREF);

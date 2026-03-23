@@ -69,6 +69,16 @@ typedef struct anvl_vars_i {
                    usize *out_pos, usize *out_len,
                    anvl_value_type *out_type);
 
+   /* Resolve a dotted path (e.g. "changelog.version") to a value span.
+    * First component is looked up as a statement name; remaining components
+    * traverse object fields.  Single-level paths fall back to Vars.resolve.
+    * Returns false + sets error code on failure.
+    * NOTE: multi-level (a.b.c) is WIP — only one dot supported. */
+   bool (*resolve_path)(anvl_vars_state_t *state, context ctx,
+                        const char *path, usize path_len,
+                        usize *out_pos, usize *out_len,
+                        anvl_value_type *out_type);
+
    /* Materialise an interpolated string value_meta to a heap string.
     * vm must have type ANVL_VALUE_INTERP_STRING.
     * Returns heap-allocated NUL-terminated string; caller must Allocator.dispose().
