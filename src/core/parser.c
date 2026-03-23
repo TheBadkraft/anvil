@@ -20,8 +20,9 @@
 #include "context_internal.h"
 #include "errors.h"
 #include "source_internal.h"
+#include "vars.h"
 
-#include <sigcore/memory.h>
+#include <sigma.memory/memory.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -44,6 +45,12 @@ static value parse_blob(parser_ctx *p);
 static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_count);
 static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_value_type *type);
 static bool read_identifier(parser_ctx *p, usize *pos, usize *len);
+static bool parse_vars_block(parser_ctx *p);
+static bool lookahead_is_anon_object(parser_ctx *p);
+static bool parse_anon_object(parser_ctx *p, statement stmt);
+static value parse_varref(parser_ctx *p);
+static value parse_interp_string(parser_ctx *p);
+static bool parse_import_decl(parser_ctx *p);
 
 bool anvl_parse(context ctx) {
    if (!ctx || !ctx->source) {
@@ -71,15 +78,25 @@ static void dispose_value_tree(value v) {
 }
 
 static void dispose_statement(statement stmt) {
-   // Free statements that failed to parse before being added to context list
-   // Statements successfully added to context->stmt_list are freed via Context.dispose()
-   if (stmt) {
-      Memory.dispose(stmt);
-   }
+   // All statements live in the context parse arena; no individual free needed.
+   (void)stmt;
 }
 
 static bool parse_source(parser_ctx *p) {
    si_skip_whitespace_and_comments(p->src);
+
+   // import declarations — must precede module attributes, vars, and all statements
+   // import is not allowed in AMP dialect
+   while (si_match_length(p->src, "import", 6) == 6 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 6))) {
+      if (Source.dialect(p->src) == ANVL_DIALECT_AMP) {
+         parser_error(ANVL_ERR_IMPORT_AMP_FORBIDDEN, p->src);
+         return false;
+      }
+      if (!parse_import_decl(p))
+         return false;
+      si_skip_whitespace_and_comments(p->src);
+   }
 
    // Module attributes (prefix only)
    // AMP dialect does not allow module-level attributes
@@ -95,6 +112,25 @@ static bool parse_source(parser_ctx *p) {
       si_skip_whitespace_and_comments(p->src);
    }
 
+   // vars block must come before all statements (optional; at most one)
+   // Only trigger if "vars" is followed by '{' (after whitespace) — not ':='
+   if (si_match_length(p->src, "vars", 4) == 4 &&
+       !Source.is_identifier_part(si_peek_offset(p->src, 4))) {
+      // Peek past 'vars' and any whitespace to look for '{'
+      usize la = 4;
+      while (!si_is_eof_offset(p->src, la)) {
+         char lc = si_peek_offset(p->src, la);
+         if (lc != ' ' && lc != '\t' && lc != '\r' && lc != '\n')
+            break;
+         la++;
+      }
+      if (!si_is_eof_offset(p->src, la) && si_peek_offset(p->src, la) == '{') {
+         if (!parse_vars_block(p))
+            return false;
+         si_skip_whitespace_and_comments(p->src);
+      }
+   }
+
    while (!si_is_eof(p->src)) {
       // Shebang is illegal after statements
       if (si_match_length(p->src, "#!", 2) == 2) {
@@ -102,13 +138,41 @@ static bool parse_source(parser_ctx *p) {
          return false;
       }
 
-      statement stmt = ci_new_statement(p->ctx, ANVL_STMT_ASSN);
+      // vars block is illegal after statements (or if already seen)
+      // Only check when "vars" is followed by '{' (real block, not vars-as-identifier)
+      if (si_match_length(p->src, "vars", 4) == 4 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 4))) {
+         usize la = 4;
+         while (!si_is_eof_offset(p->src, la)) {
+            char lc = si_peek_offset(p->src, la);
+            if (lc != ' ' && lc != '\t' && lc != '\r' && lc != '\n')
+               break;
+            la++;
+         }
+         if (!si_is_eof_offset(p->src, la) && si_peek_offset(p->src, la) == '{') {
+            parser_error(p->ctx->vars_list.parsed
+                             ? ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED
+                             : ANVL_ERR_VARS_NOT_FIRST,
+                         p->src);
+            return false;
+         }
+      }
+
+      // import after statements is illegal
+      if (si_match_length(p->src, "import", 6) == 6 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 6))) {
+         parser_error(ANVL_ERR_IMPORT_NOT_FIRST, p->src);
+         return false;
+      }
+
+      bool is_anon = lookahead_is_anon_object(p);
+      statement stmt = ci_new_statement(p->ctx, is_anon ? ANVL_ANON_OBJECT : ANVL_STMT_ASSN);
       if (!stmt) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, p->src);
          return false;
       }
 
-      if (!parse_statement(p, stmt)) {
+      if (!(is_anon ? parse_anon_object(p, stmt) : parse_statement(p, stmt))) {
          dispose_statement(stmt);
          return false;
       }
@@ -136,6 +200,23 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    if (!read_identifier(p, &ident_pos, &ident_len))
       return false;
 
+   // Reject assignment to a name that was declared as an anonymous block
+   {
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->stmt_list.count; i++) {
+         statement existing = p->ctx->stmt_list.statements[i];
+         if ((anvl_stmt_type)existing->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT) {
+            usize ex_pos = existing->meta[STMT_META_IDENT_POS];
+            usize ex_len = existing->meta[STMT_META_IDENT_LEN];
+            if (ex_len == ident_len &&
+                strncmp(src_data + ex_pos, src_data + ident_pos, ident_len) == 0) {
+               parser_error(ANVL_ERR_ANON_BLOCK_REDECLARATION, s);
+               return false;
+            }
+         }
+      }
+   }
+
    si_skip_whitespace_and_comments(s);
 
    // Parse optional inheritance base FIRST (before attributes)
@@ -153,7 +234,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       if (!read_identifier(p, &base_pos, &base_len))
          return false;
       // Allocate base_meta and store inheritance information
-      base_meta = ci_new_base_meta();
+      base_meta = ci_new_base_meta(p->ctx);
       if (!base_meta) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
          return false;
@@ -170,8 +251,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       // AMP dialect does not allow attributes
       if (Source.dialect(s) == ANVL_DIALECT_AMP) {
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-         if (base_meta)
-            Memory.dispose(base_meta);
          return false;
       }
       if (!parse_attribute_block(p, NULL, NULL))
@@ -181,11 +260,9 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    usize attrib_count = p->ctx->attr_list.count - attrib_start;
    if (attrib_count > 0) {
       // Allocate attr_meta array and populate with attribute information
-      attr_meta = ci_new_attr_meta_array(attrib_count);
+      attr_meta = ci_new_attr_meta_array(p->ctx, attrib_count);
       if (!attr_meta) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-         if (base_meta)
-            Memory.dispose(base_meta);
          return false;
       }
       // TODO: Populate attr_meta array from ctx->attr_list
@@ -198,9 +275,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
          attribute attr = ci_get_attribute(p->ctx, attrib_start + i);
          if (!attr) {
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-            Memory.dispose(attr_meta);
-            if (base_meta)
-               Memory.dispose(base_meta);
             return false;
          }
          attr_meta[i].pos = attr->key_pos;
@@ -212,10 +286,6 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
    // Expect assignment operator
    if (si_match_length(s, ":=", 2) != 2) {
-      if (base_meta)
-         Memory.dispose(base_meta);
-      if (attr_meta)
-         Memory.dispose(attr_meta);
       parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
       return false;
    }
@@ -227,31 +297,18 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    value val = parse_value(p);
    usize value_end_pos = si_position(s);
    if (!val) {
-      if (base_meta)
-         Memory.dispose(base_meta);
-      if (attr_meta)
-         Memory.dispose(attr_meta);
       return false;
    }
 
    // Validate: attributes only valid on complex types
    if (attr_meta && val->type != ANVL_VALUE_OBJECT && val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE) {
-      if (base_meta)
-         Memory.dispose(base_meta);
-      Memory.dispose(attr_meta);
-      Memory.dispose(val);
       parser_error(ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE, s);
       return false;
    }
 
    // Allocate value_meta for this statement's value
-   struct anvl_value_meta *value_meta = ci_new_value_meta(val->type);
+   struct anvl_value_meta *value_meta = ci_new_value_meta(p->ctx, val->type);
    if (!value_meta) {
-      if (base_meta)
-         Memory.dispose(base_meta);
-      if (attr_meta)
-         Memory.dispose(attr_meta);
-      Memory.dispose(val);
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return false;
    }
@@ -266,43 +323,38 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       value_meta->data.collection.element_count = elem_count;
 
       if (elem_count > 0) {
-         struct anvl_element_meta *elem_meta = ci_new_element_meta_array(elem_count);
+         struct anvl_element_meta *elem_meta = ci_new_element_meta_array(p->ctx, elem_count);
          if (!elem_meta) {
-            if (base_meta)
-               Memory.dispose(base_meta);
-            if (attr_meta)
-               Memory.dispose(attr_meta);
-            Memory.dispose(value_meta);
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
             return false;
          }
 
-         // Populate element_meta array from temporary elem_types stored in val
-         anvl_value_type *elem_types = (anvl_value_type *)val->data.collection._elem_types_temp;
-         if (elem_types) {
+         // Populate element_meta from the temporary tracking array (type + pos + len)
+         struct anvl_element_meta *elem_temp =
+             (struct anvl_element_meta *)val->data.collection._elem_types_temp;
+         if (elem_temp) {
             for (usize i = 0; i < elem_count; i++) {
-               elem_meta[i].type = elem_types[i];
-               // TODO: Store pos/len for each element when available
-               // Strategy: Track element source positions during parse_array/parse_tuple
-               // Currently, we only have elem_types from temporary buffer
-               // Need to capture start/end position for each element as it's parsed
-               // Would require position tracking in array/tuple parsing loops
+               elem_meta[i].type = elem_temp[i].type;
+               elem_meta[i].pos = elem_temp[i].pos;
+               elem_meta[i].len = elem_temp[i].len;
             }
-            // Clean up temporary elem_types array
-            Memory.dispose(elem_types);
             val->data.collection._elem_types_temp = NULL;
          }
 
          value_meta->data.collection.elements = elem_meta;
       }
    } else if (val->type == ANVL_VALUE_OBJECT) {
-      usize field_count = val->data.object.field_count;
-      value_meta->data.object.field_count = field_count;
-      // TODO: Allocate and populate field metadata
-      // Strategy: Create an array of field metadata structs in value_meta
-      // Would need to iterate val->data.object fields and extract pos/len info
-      // Currently fields store key_pos, key_len + field values
-      // Deferred until field metadata structure is finalized
+      value_meta->data.object.field_start = val->data.object.field_start;
+      value_meta->data.object.field_count = val->data.object.field_count;
+   } else if (val->type == ANVL_VALUE_VARREF) {
+      // Override pos/len to identifier span (not including the '$' sigil)
+      value_meta->pos = val->data.scalar.pos;
+      value_meta->len = val->data.scalar.len;
+   } else if (val->type == ANVL_VALUE_INTERP_STRING) {
+      // Transfer segment ownership from temporary value to value_meta
+      value_meta->data.interp_string.segment_count = val->data.interp.segment_count;
+      value_meta->data.interp_string.segments = val->data.interp.segments_temp;
+      val->data.interp.segments_temp = NULL; // ownership transferred
    }
 
    // Fill statement metadata buffer with directional indices
@@ -322,8 +374,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    stmt->attr_meta = attr_meta;
    stmt->value_meta = value_meta;
 
-   // Dispose the temporary value object (metadata is now in value_meta)
-   Memory.dispose(val);
+   // val was a temporary value object; its metadata is now in value_meta.
+   // The arena owns val; no individual free needed.
 
    si_skip_whitespace_and_comments(s);
    if (si_match_length(s, ",", 1) == 1) {
@@ -336,18 +388,10 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 static value parse_value(parser_ctx *p) {
    source s = p->src;
 
-   // AMP dialect validation: no complex types allowed
+   // AMP dialect validation: objects not allowed
    anvl_dialect dialect = Source.dialect(s);
    if (dialect == ANVL_DIALECT_AMP) {
       if (si_match_length(s, "{", 1) == 1) {
-         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-         return NULL;
-      }
-      if (si_match_length(s, "[", 1) == 1) {
-         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-         return NULL;
-      }
-      if (si_match_length(s, "(", 1) == 1) {
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
          return NULL;
       }
@@ -361,6 +405,19 @@ static value parse_value(parser_ctx *p) {
       return parse_tuple(p);
    if (si_match_length(s, "@", 1) == 1 || si_match_length(s, "`", 1) == 1)
       return parse_blob(p);
+
+   // VarRef ($identifier) or interpolated string ($"...")
+   if (si_peek(s) == '$') {
+      char next = si_peek_offset(s, 1);
+      if (next == '"')
+         return parse_interp_string(p);
+      if (next == '`') {
+         // '$' before backtick is invalid — blobs are always verbatim
+         parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+         return NULL;
+      }
+      return parse_varref(p);
+   }
 
    usize start = 0, len = 0;
    anvl_value_type type = ANVL_VALUE_SCALAR;
@@ -471,29 +528,30 @@ static value parse_blob(parser_ctx *p) {
       }
 
       /* Allocate for up to 2 elements (tag + content) */
-      anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 2, true);
-      if (!elem_types) {
-         Memory.dispose(blob_collection);
+      struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * 2);
+      if (elem_temp)
+         memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 2);
+      if (!elem_temp) {
          parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
          return NULL;
       }
 
       usize element_count = 0;
 
-      /* Element [0]: Tag metadata (if tag present) */
+      /* Element [0]: Tag metadata (if tag present) — pos/len are 0 (not needed by serializer) */
       if (tag_len > 0) {
-         elem_types[0] = ANVL_VALUE_BLOB;
+         elem_temp[0].type = ANVL_VALUE_BLOB;
          element_count = 1;
       }
 
-      /* Element [0 or 1]: Content */
-      elem_types[element_count] = ANVL_VALUE_BLOB;
+      /* Element [0 or 1]: Content — pos/len are 0 (serializer uses value_meta->pos/len) */
+      elem_temp[element_count].type = ANVL_VALUE_BLOB;
       element_count++;
 
       /* Set up collection metadata */
       blob_collection->data.collection.element_start = 0;
       blob_collection->data.collection.element_count = element_count;
-      blob_collection->data.collection._elem_types_temp = elem_types;
+      blob_collection->data.collection._elem_types_temp = elem_temp;
 
       return blob_collection;
    }
@@ -522,8 +580,16 @@ static value parse_object(parser_ctx *p) {
       return NULL;
    }
 
-   // Track where fields start in the context pool
-   usize field_start = p->ctx->field_list.count;
+   /* Collect outer fields into a temporary linked list (arena-allocated).
+    * We must NOT add fields to the pool until after all values are parsed,
+    * because nested parse_object calls will add inner fields into the pool
+    * first.  Deferring the ci_add_field calls ensures that field_start for
+    * this object correctly follows all descendent fields. */
+   struct tmp_fnode {
+      field f;
+      struct tmp_fnode *next;
+   };
+   struct tmp_fnode *head = NULL, *tail = NULL;
    usize field_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != '}') {
@@ -559,14 +625,23 @@ static value parse_object(parser_ctx *p) {
          return NULL;
       }
 
-      // Create field and add to context pool
+      /* Create field but defer ci_add_field until after all values parsed */
       field f = ci_new_field(p->ctx);
       f->key_pos = key_pos;
       f->key_len = key_len;
       f->val = field_val;
       f->attrib_start = attrib_start;
       f->attrib_count = attrib_count;
-      ci_add_field(p->ctx, f);
+
+      struct tmp_fnode *node = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct tmp_fnode));
+      node->f = f;
+      node->next = NULL;
+      if (!tail) {
+         head = tail = node;
+      } else {
+         tail->next = node;
+         tail = node;
+      }
       field_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -575,11 +650,10 @@ static value parse_object(parser_ctx *p) {
          si_skip_whitespace_and_comments(s);
       } else if (si_match_length(s, "}", 1) == 1) {
          break;
-      } else {
-         dispose_value_tree(v);
-         parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES, s);
-         return NULL;
       }
+      /* Otherwise: field was newline-separated — continue to next field.
+         si_skip_whitespace_and_comments already consumed any newlines, so
+         the loop condition (peek != '}') will terminate correctly. */
    }
 
    if (si_match_length(s, "}", 1) != 1) {
@@ -590,6 +664,12 @@ static value parse_object(parser_ctx *p) {
 
    si_consume(s, 1);
 
+   /* All inner fields are now in the pool; bulk-add outer fields here so
+    * field_start correctly points past all descendant fields. */
+   usize field_start = p->ctx->field_list.count;
+   for (struct tmp_fnode *n = head; n; n = n->next)
+      ci_add_field(p->ctx, n->f);
+
    v->data.object.field_start = field_start;
    v->data.object.field_count = field_count;
    return v;
@@ -597,12 +677,6 @@ static value parse_object(parser_ctx *p) {
 
 static value parse_array(parser_ctx *p) {
    source s = p->src;
-
-   // AMP dialect validation: arrays not allowed
-   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
-      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-      return NULL;
-   }
 
    si_consume(s, 1); // consume '['
    si_skip_whitespace_and_comments(s);
@@ -618,10 +692,12 @@ static value parse_array(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary array to track element types
-   anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 256, true);
-   if (!elem_types) {
-      Memory.dispose(v);
+   // Grow-by-doubling temp buffer: start small, never over-allocate.
+   // Old buffers are orphaned in the arena (reclaimed at context dispose).
+   // No frames used — parse_array is recursive (frames don't stack on one scope).
+   usize elem_cap = 8;
+   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+   if (!elem_temp) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }
@@ -629,16 +705,36 @@ static value parse_array(parser_ctx *p) {
    usize element_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != ']') {
+      usize elem_start = si_position(s);
       value elem = parse_value(p);
+      usize elem_end = si_position(s);
       if (!elem) {
-         Memory.dispose(elem_types);
          return NULL;
       }
 
-      // Store element type for later use in element_meta population
-      if (element_count < 256) {
-         elem_types[element_count] = elem->type;
+      // AMP: array elements must be scalar or blob
+      if (Source.dialect(s) == ANVL_DIALECT_AMP &&
+          elem->type != ANVL_VALUE_SCALAR &&
+          elem->type != ANVL_VALUE_BLOB) {
+         parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
+         return NULL;
       }
+
+      // Grow buffer if full: alloc new (old stays in arena, harmless)
+      if (element_count == elem_cap) {
+         elem_cap *= 2;
+         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         if (!grown) {
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+            return NULL;
+         }
+         memcpy(grown, elem_temp, sizeof(struct anvl_element_meta) * element_count);
+         elem_temp = grown;
+      }
+
+      elem_temp[element_count].type = elem->type;
+      elem_temp[element_count].pos = elem_start;
+      elem_temp[element_count].len = elem_end - elem_start;
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -649,34 +745,25 @@ static value parse_array(parser_ctx *p) {
          break;
       } else {
          parser_error(ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY, s);
-         Memory.dispose(elem_types);
          return NULL;
       }
    }
 
    if (si_match_length(s, "]", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE, s);
-      Memory.dispose(elem_types);
       return NULL;
    }
 
    si_consume(s, 1);
 
-   v->data.collection.element_start = 0; // Will be populated by value_meta
+   v->data.collection.element_start = 0;
    v->data.collection.element_count = element_count;
-   // Store element types pointer temporarily (will be used in parse_statement to populate element_meta)
-   v->data.collection._elem_types_temp = elem_types;
+   v->data.collection._elem_types_temp = elem_temp;
    return v;
 }
 
 static value parse_tuple(parser_ctx *p) {
    source s = p->src;
-
-   // AMP dialect validation: tuples not allowed
-   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
-      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
-      return NULL;
-   }
 
    si_consume(s, 1); // consume '('
    si_skip_whitespace_and_comments(s);
@@ -687,10 +774,12 @@ static value parse_tuple(parser_ctx *p) {
       return NULL;
    }
 
-   // Build a temporary array to track element types
-   anvl_value_type *elem_types = Memory.alloc(sizeof(anvl_value_type) * 256, true);
-   if (!elem_types) {
-      Memory.dispose(v);
+   // Grow-by-doubling temp buffer: start small, never over-allocate.
+   // Old buffers are orphaned in the arena (reclaimed at context dispose).
+   // No frames used — parse_tuple is recursive (frames don't stack on one scope).
+   usize elem_cap = 8;
+   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+   if (!elem_temp) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
    }
@@ -698,16 +787,36 @@ static value parse_tuple(parser_ctx *p) {
    usize element_count = 0;
 
    while (!si_is_eof(s) && si_peek(s) != ')') {
+      usize elem_start = si_position(s);
       value elem = parse_value(p);
+      usize elem_end = si_position(s);
       if (!elem) {
-         Memory.dispose(elem_types);
          return NULL;
       }
 
-      // Store element type for later use in element_meta population
-      if (element_count < 256) {
-         elem_types[element_count] = elem->type;
+      // AMP: tuple elements must be scalar or blob
+      if (Source.dialect(s) == ANVL_DIALECT_AMP &&
+          elem->type != ANVL_VALUE_SCALAR &&
+          elem->type != ANVL_VALUE_BLOB) {
+         parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
+         return NULL;
       }
+
+      // Grow buffer if full: alloc new (old stays in arena, harmless)
+      if (element_count == elem_cap) {
+         elem_cap *= 2;
+         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         if (!grown) {
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+            return NULL;
+         }
+         memcpy(grown, elem_temp, sizeof(struct anvl_element_meta) * element_count);
+         elem_temp = grown;
+      }
+
+      elem_temp[element_count].type = elem->type;
+      elem_temp[element_count].pos = elem_start;
+      elem_temp[element_count].len = elem_end - elem_start;
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -721,23 +830,20 @@ static value parse_tuple(parser_ctx *p) {
             parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
          else
             parser_error(ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE, s);
-         Memory.dispose(elem_types);
          return NULL;
       }
    }
 
    if (si_match_length(s, ")", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
-      Memory.dispose(elem_types);
       return NULL;
    }
 
    si_consume(s, 1);
 
-   v->data.collection.element_start = 0; // Will be populated by value_meta
+   v->data.collection.element_start = 0;
    v->data.collection.element_count = element_count;
-   // Store element types pointer temporarily (will be used in parse_statement to populate element_meta)
-   v->data.collection._elem_types_temp = elem_types;
+   v->data.collection._elem_types_temp = elem_temp;
    return v;
 }
 
@@ -872,5 +978,468 @@ static bool read_identifier(parser_ctx *p, usize *pos, usize *len) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
       return false;
    }
+   // Guard reserved keyword: 'vars'
+   if (*len == 4 && strncmp(si_data(s) + *pos, "vars", 4) == 0) {
+      parser_error(ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD, s);
+      return false;
+   }
    return true;
+}
+
+/* ========================================================================
+ * lookahead_is_anon_object() - Non-consuming check for IDENT '{' at current position
+ *
+ * Returns true when the source at the current position starts with an
+ * identifier token immediately followed (after optional whitespace) by '{'.
+ * Does not advance the source cursor.
+ * ======================================================================== */
+static bool lookahead_is_anon_object(parser_ctx *p) {
+   source s = p->src;
+   usize la = 0;
+   if (si_is_eof_offset(s, la) || !Source.is_identifier_start(si_peek_offset(s, la)))
+      return false;
+   while (!si_is_eof_offset(s, la) && Source.is_identifier_part(si_peek_offset(s, la)))
+      la++;
+   while (!si_is_eof_offset(s, la)) {
+      char c = si_peek_offset(s, la);
+      if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+         break;
+      la++;
+   }
+   return !si_is_eof_offset(s, la) && si_peek_offset(s, la) == '{';
+}
+
+/* ========================================================================
+ * parse_anon_object() - Parse an anonymous top-level object block
+ *
+ * Grammar: ident { key := value, ... }
+ *
+ * Constraints:
+ *   - Not allowed in AMP dialect
+ *   - Identifier must not already exist in the statement list (any type)
+ *   - Body is parsed as an ANVL_VALUE_OBJECT (same rules as := { })
+ *
+ * Sets stmt->meta[STMT_META_TYPE] = ANVL_ANON_OBJECT.
+ * ======================================================================== */
+static bool parse_anon_object(parser_ctx *p, statement stmt) {
+   source s = p->src;
+
+   // AMP dialect does not support anonymous object blocks
+   if (Source.dialect(s) == ANVL_DIALECT_AMP) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+
+   // Parse identifier
+   usize ident_pos = 0, ident_len = 0;
+   if (!read_identifier(p, &ident_pos, &ident_len))
+      return false;
+
+   // Reject if this name already exists as any top-level statement
+   {
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->stmt_list.count; i++) {
+         statement existing = p->ctx->stmt_list.statements[i];
+         usize ex_pos = existing->meta[STMT_META_IDENT_POS];
+         usize ex_len = existing->meta[STMT_META_IDENT_LEN];
+         if (ex_len == ident_len &&
+             strncmp(src_data + ex_pos, src_data + ident_pos, ident_len) == 0) {
+            parser_error(ANVL_ERR_ANON_BLOCK_REDECLARATION, s);
+            return false;
+         }
+      }
+   }
+
+   si_skip_whitespace_and_comments(s);
+
+   // Record start position (at '{')
+   usize value_start_pos = si_position(s);
+
+   // parse_value sees '{' and dispatches to parse_object
+   value val = parse_value(p);
+   usize value_end_pos = si_position(s);
+   if (!val)
+      return false;
+
+   if (val->type != ANVL_VALUE_OBJECT) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+
+   // Allocate and populate value_meta
+   struct anvl_value_meta *value_meta = ci_new_value_meta(p->ctx, ANVL_VALUE_OBJECT);
+   if (!value_meta) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return false;
+   }
+   value_meta->pos = value_start_pos;
+   value_meta->len = value_end_pos - value_start_pos;
+   value_meta->data.object.field_start = val->data.object.field_start;
+   value_meta->data.object.field_count = val->data.object.field_count;
+
+   // Fill statement metadata
+   stmt->meta[STMT_META_TYPE]       = (usize)ANVL_ANON_OBJECT;
+   stmt->meta[STMT_META_RESERVED_1] = 0;
+   stmt->meta[STMT_META_IDENT_POS]  = ident_pos;
+   stmt->meta[STMT_META_IDENT_LEN]  = ident_len;
+   stmt->meta[STMT_META_BASE_IDX]   = 0;
+   stmt->meta[STMT_META_ATTR_IDX]   = 0;
+   stmt->meta[STMT_META_RESERVED_6] = 0;
+   stmt->meta[STMT_META_VALUE_IDX]  = 1;
+   stmt->meta[STMT_META_RESERVED_8] = 0;
+
+   stmt->base_meta  = NULL;
+   stmt->attr_meta  = NULL;
+   stmt->value_meta = value_meta;
+
+   si_skip_whitespace_and_comments(s);
+   if (si_match_length(s, ",", 1) == 1)
+      si_consume(s, 1);
+
+   return true;
+}
+
+/* ========================================================================
+ * parse_vars_block() - Parse a vars { } block
+ *
+ * Grammar: vars { key := value, ... }
+ *
+ * Constraints (enforced here):
+ *   - Must appear before all statements (enforced in parse_source)
+ *   - At most one vars block per source (enforced in parse_source)
+ *   - No duplicate keys
+ *   - No interpolated string values (interp strings not allowed in vars block)
+ *
+ * Populates ctx->vars_list.entries; sets ctx->vars_list.parsed = true.
+ * ======================================================================== */
+static bool parse_vars_block(parser_ctx *p) {
+   source s = p->src;
+
+   si_consume(s, 4); // consume "vars"
+   si_skip_whitespace_and_comments(s);
+
+   if (si_match_length(s, "{", 1) != 1) {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+      return false;
+   }
+   si_consume(s, 1); // consume '{'
+   si_skip_whitespace_and_comments(s);
+
+   p->ctx->vars_list.parsed = true;
+
+   while (!si_is_eof(s) && si_peek(s) != '}') {
+      // Parse key
+      usize key_pos = 0, key_len = 0;
+      if (!read_identifier(p, &key_pos, &key_len))
+         return false;
+
+      si_skip_whitespace_and_comments(s);
+
+      // Check for duplicate key
+      const char *src_data = si_data(s);
+      for (usize i = 0; i < p->ctx->vars_list.count; i++) {
+         struct anvl_vars_entry *e = &p->ctx->vars_list.entries[i];
+         if (e->key_len == key_len &&
+             strncmp(src_data + e->key_pos, src_data + key_pos, key_len) == 0) {
+            parser_error(ANVL_ERR_VARS_DUPLICATE_KEY, s);
+            return false;
+         }
+      }
+
+      // Expect ':='
+      if (si_match_length(s, ":=", 2) != 2) {
+         parser_error(ANVL_ERR_PARSER_EXPECTED_ASSIGN, s);
+         return false;
+      }
+      si_consume(s, 2);
+      si_skip_whitespace_and_comments(s);
+
+      // Parse value
+      usize value_start = si_position(s);
+      value val = parse_value(p);
+      usize value_end = si_position(s);
+      if (!val)
+         return false;
+
+      // Interpolated strings are not allowed as vars block values
+      if (val->type == ANVL_VALUE_INTERP_STRING) {
+         parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
+         return false;
+      }
+
+      // Clean up temporary internal data for collection types
+      if ((val->type == ANVL_VALUE_ARRAY || val->type == ANVL_VALUE_TUPLE) &&
+          val->data.collection._elem_types_temp) {
+         val->data.collection._elem_types_temp = NULL;
+      }
+
+      // Determine value span: for VARREF, store the identifier span (not '$')
+      usize vpos = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.pos : value_start;
+      usize vlen = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.len
+                                                    : (value_end - value_start);
+
+      ci_add_vars_entry(p->ctx, (struct anvl_vars_entry){
+                                    .key_pos = key_pos,
+                                    .key_len = key_len,
+                                    .value_pos = vpos,
+                                    .value_len = vlen,
+                                    .value_type = val->type,
+                                });
+      // val lives in the arena; no individual free needed.
+
+      si_skip_whitespace_and_comments(s);
+      if (si_match_length(s, ",", 1) == 1) {
+         si_consume(s, 1);
+         si_skip_whitespace_and_comments(s);
+      }
+   }
+
+   if (si_match_length(s, "}", 1) != 1) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE, s);
+      return false;
+   }
+   si_consume(s, 1); // consume '}'
+
+   return true;
+}
+
+/* ========================================================================
+ * parse_import_decl() - Parse a single import declaration
+ *
+ * Grammar:  import "path/to/file.aml" [as alias]
+ *
+ * Called from parse_source() before module attributes, vars, and statements.
+ * The "import" keyword has already been confirmed (but not consumed) by the
+ * caller.  All positions/lengths are byte offsets into the source buffer.
+ * ======================================================================== */
+static bool parse_import_decl(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 6); // consume "import"
+   si_skip_whitespace_and_comments(s);
+
+   // Expect opening '"'
+   if (si_peek(s) != '"') {
+      parser_error(ANVL_ERR_PARSER_UNEXPECTED_CHAR, s);
+      return false;
+   }
+   si_consume(s, 1); // opening '"'
+
+   usize path_pos = si_position(s);
+   bool closed = false;
+   while (!si_is_eof(s)) {
+      char c = si_peek(s);
+      if (c == '"') {
+         closed = true;
+         break;
+      }
+      if (c == '\\') {
+         si_consume(s, 1);
+         if (!si_is_eof(s))
+            si_consume(s, 1);
+      } else {
+         si_consume(s, 1);
+      }
+   }
+   usize path_len = si_position(s) - path_pos;
+   if (!closed) {
+      parser_error(ANVL_ERR_PARSER_UNTERMINATED_STRING, s);
+      return false;
+   }
+   si_consume(s, 1); // closing '"'
+   si_skip_whitespace_and_comments(s);
+
+   // Optional:  as <alias>
+   usize alias_pos = 0;
+   usize alias_len = 0;
+   if (si_match_length(s, "as", 2) == 2 &&
+       !Source.is_identifier_part(si_peek_offset(s, 2))) {
+      si_consume(s, 2); // consume "as"
+      si_skip_whitespace_and_comments(s);
+      if (!Source.is_identifier_start(si_peek(s))) {
+         parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+         return false;
+      }
+      alias_pos = si_position(s);
+      while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+         si_consume(s, 1);
+         alias_len++;
+      }
+   }
+
+   ci_add_import_decl(p->ctx, (struct anvl_import_decl){
+                                  .path_pos = path_pos,
+                                  .path_len = path_len,
+                                  .alias_pos = alias_pos,
+                                  .alias_len = alias_len,
+                              });
+   return true;
+}
+
+/* ========================================================================
+ * parse_varref() - Parse $identifier
+ *
+ * Consumes the '$' sigil and reads the following identifier.
+ * Returns a ANVL_VALUE_VARREF value with scalar.pos/len = identifier span.
+ * ======================================================================== */
+static value parse_varref(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '$'
+
+   if (!Source.is_identifier_start(si_peek(s))) {
+      parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+      return NULL;
+   }
+
+   usize ident_pos = si_position(s);
+   usize ident_len = 0;
+   while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+      si_consume(s, 1);
+      ident_len++;
+   }
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_VARREF);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   v->data.scalar.pos = ident_pos;
+   v->data.scalar.len = ident_len;
+   return v;
+}
+
+/* ========================================================================
+ * parse_interp_string() - Parse $"…{ref}…"
+ *
+ * Grammar:
+ *   $"  ( literal_char | '{{' | '}}' | '{' identifier '}' )*  "
+ *
+ * Segments:
+ *   - Literal span: is_ref=false, pos=source_start, len=source_length
+ *   - '{{' escape:  is_ref=false, pos=first_brace_pos, len=1 (emits single '{')
+ *   - '}}' escape:  is_ref=false, pos=first_brace_pos, len=1 (emits single '}')
+ *   - Ref hole:     is_ref=true,  pos=identifier_start, len=identifier_length
+ *
+ * Returns ANVL_VALUE_INTERP_STRING with interp.segments_temp set.
+ * Caller (parse_statement) must transfer ownership to value_meta.
+ * ======================================================================== */
+static value parse_interp_string(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 1); // consume '$'
+   si_consume(s, 1); // consume '"'
+
+   // Dynamic segment array (allocated from context parse arena)
+   usize cap = 16;
+   struct anvl_interp_segment *segs =
+       p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * cap);
+   if (!segs) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   memset(segs, 0, sizeof(struct anvl_interp_segment) * cap);
+   usize nseg = 0;
+
+   // Helper: grow segment array if needed (old buffer left in arena; new buffer allocated)
+#define SEGS_PUSH(is_r, p_, l_)                                                                 \
+   do {                                                                                         \
+      if (nseg >= cap) {                                                                        \
+         usize newcap_ = cap * 2;                                                               \
+         struct anvl_interp_segment *nb_ =                                                      \
+             p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_); \
+         if (!nb_) {                                                                            \
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                 \
+            return NULL;                                                                        \
+         }                                                                                      \
+         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                          \
+         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                          \
+         segs = nb_;                                                                            \
+         cap = newcap_;                                                                         \
+      }                                                                                         \
+      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)};  \
+   } while (0)
+
+   usize lit_start = si_position(s);
+   usize lit_len = 0;
+   bool closed = false;
+
+   while (!si_is_eof(s)) {
+      char ch = si_peek(s);
+
+      if (ch == '"') {
+         // Closing quote: flush any pending literal, then done
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         si_consume(s, 1);
+         closed = true;
+         break;
+      }
+
+      if (ch == '{') {
+         if (si_peek_offset(s, 1) == '{') {
+            // '{{' → escaped literal '{'
+            if (lit_len > 0)
+               SEGS_PUSH(false, lit_start, lit_len);
+            SEGS_PUSH(false, si_position(s), 1); // only first '{'
+            si_consume(s, 2);
+            lit_start = si_position(s);
+            lit_len = 0;
+            continue;
+         }
+         // '{identifier}' — reference hole
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         si_consume(s, 1); // consume '{'
+         if (!Source.is_identifier_start(si_peek(s))) {
+            parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
+            return NULL;
+         }
+         usize ipos = si_position(s);
+         usize ilen = 0;
+         while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+            si_consume(s, 1);
+            ilen++;
+         }
+         if (si_peek(s) != '}') {
+            parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
+            return NULL;
+         }
+         si_consume(s, 1); // consume '}'
+         SEGS_PUSH(true, ipos, ilen);
+         lit_start = si_position(s);
+         lit_len = 0;
+         continue;
+      }
+
+      if (ch == '}' && si_peek_offset(s, 1) == '}') {
+         // '}}' → escaped literal '}'
+         if (lit_len > 0)
+            SEGS_PUSH(false, lit_start, lit_len);
+         SEGS_PUSH(false, si_position(s), 1); // only first '}'
+         si_consume(s, 2);
+         lit_start = si_position(s);
+         lit_len = 0;
+         continue;
+      }
+
+      // Ordinary character — accumulate into literal span
+      if (lit_len == 0)
+         lit_start = si_position(s);
+      si_consume(s, 1);
+      lit_len++;
+   }
+
+#undef SEGS_PUSH
+
+   if (!closed) {
+      parser_error(ANVL_ERR_VARS_UNTERMINATED_INTERP, s);
+      return NULL;
+   }
+
+   value v = ci_new_value(p->ctx, ANVL_VALUE_INTERP_STRING);
+   if (!v) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
+   }
+   v->data.interp.segment_count = nseg;
+   v->data.interp.segments_temp = segs;
+   return v;
 }

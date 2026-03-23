@@ -24,25 +24,26 @@
 #pragma once
 
 #include "context.h"
-#include <sigcore/memory.h>
+#include <sigma.memory/memory.h>
+#include <string.h>
 
 // Ensure capacity helpers (grow by 2x, minimal 8)
+// Old buffers are intentionally left in the resource scope — reclaimed together at Context.dispose.
+// ctx->arena->alloc(ctx->arena, size) bumps the resource slab — O(1), never touches R7.
 static inline void ci_ensure_stmt_capacity(context ctx, usize need) {
    if (ctx->stmt_list.capacity >= need)
       return;
    usize newcap = ctx->stmt_list.capacity ? ctx->stmt_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
-   if (ctx->stmt_list.statements) {
-      ctx->stmt_list.statements = Memory.realloc(ctx->stmt_list.statements, sizeof(statement) * newcap);
-   } else {
-      ctx->stmt_list.statements = Memory.alloc(sizeof(statement) * newcap, true);
-      if (!ctx->stmt_list.statements) {
-         // Allocation failed - log error
-         anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement array", 0, 0, __FILE__);
-         return;
-      }
+   statement *newbuf = ctx->arena->alloc(ctx->arena, sizeof(statement) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate statement array", 0, 0, __FILE__);
+      return;
    }
+   if (ctx->stmt_list.statements)
+      memcpy(newbuf, ctx->stmt_list.statements, sizeof(statement) * ctx->stmt_list.count);
+   ctx->stmt_list.statements = newbuf;
    ctx->stmt_list.capacity = newcap;
 }
 
@@ -52,11 +53,12 @@ static inline void ci_ensure_attr_capacity(context ctx, usize need) {
    usize newcap = ctx->attr_list.capacity ? ctx->attr_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
-   if (ctx->attr_list.attributes) {
-      ctx->attr_list.attributes = Memory.realloc(ctx->attr_list.attributes, sizeof(attribute) * newcap);
-   } else {
-      ctx->attr_list.attributes = Memory.alloc(sizeof(attribute) * newcap, true);
-   }
+   attribute *newbuf = ctx->arena->alloc(ctx->arena, sizeof(attribute) * newcap);
+   if (!newbuf)
+      return;
+   if (ctx->attr_list.attributes)
+      memcpy(newbuf, ctx->attr_list.attributes, sizeof(attribute) * ctx->attr_list.count);
+   ctx->attr_list.attributes = newbuf;
    ctx->attr_list.capacity = newcap;
 }
 
@@ -66,34 +68,93 @@ static inline void ci_ensure_field_capacity(context ctx, usize need) {
    usize newcap = ctx->field_list.capacity ? ctx->field_list.capacity * 2 : 8;
    while (newcap < need)
       newcap *= 2;
-   if (ctx->field_list.fields) {
-      ctx->field_list.fields = Memory.realloc(ctx->field_list.fields, sizeof(field) * newcap);
-   } else {
-      ctx->field_list.fields = Memory.alloc(sizeof(field) * newcap, true);
-   }
+   field *newbuf = ctx->arena->alloc(ctx->arena, sizeof(field) * newcap);
+   if (!newbuf)
+      return;
+   if (ctx->field_list.fields)
+      memcpy(newbuf, ctx->field_list.fields, sizeof(field) * ctx->field_list.count);
+   ctx->field_list.fields = newbuf;
    ctx->field_list.capacity = newcap;
 }
 
-// Constructors (zero-initialized)
-static inline statement ci_new_statement(context ctx __attribute__((unused)), anvl_stmt_type type) {
-   statement s = Memory.alloc(sizeof(*s), true);
-   s->meta[STMT_META_TYPE] = (usize)type;
+static inline void ci_ensure_vars_capacity(context ctx, usize need) {
+   if (ctx->vars_list.capacity >= need)
+      return;
+   usize newcap = ctx->vars_list.capacity ? ctx->vars_list.capacity * 2 : 8;
+   while (newcap < need)
+      newcap *= 2;
+   struct anvl_vars_entry *newbuf = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_vars_entry) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate vars entry array", 0, 0, __FILE__);
+      return;
+   }
+   if (ctx->vars_list.entries)
+      memcpy(newbuf, ctx->vars_list.entries, sizeof(struct anvl_vars_entry) * ctx->vars_list.count);
+   ctx->vars_list.entries = newbuf;
+   ctx->vars_list.capacity = newcap;
+}
+
+static inline void ci_add_vars_entry(context ctx, struct anvl_vars_entry e) {
+   ci_ensure_vars_capacity(ctx, ctx->vars_list.count + 1);
+   if (!ctx->vars_list.entries)
+      return;
+   ctx->vars_list.entries[ctx->vars_list.count++] = e;
+}
+
+static inline void ci_ensure_import_capacity(context ctx, usize need) {
+   if (ctx->import_list.capacity >= need)
+      return;
+   usize newcap = ctx->import_list.capacity ? ctx->import_list.capacity * 2 : 4;
+   while (newcap < need)
+      newcap *= 2;
+   struct anvl_import_decl *newbuf = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_import_decl) * newcap);
+   if (!newbuf) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate import decl array", 0, 0, __FILE__);
+      return;
+   }
+   if (ctx->import_list.decls)
+      memcpy(newbuf, ctx->import_list.decls, sizeof(struct anvl_import_decl) * ctx->import_list.count);
+   ctx->import_list.decls = newbuf;
+   ctx->import_list.capacity = newcap;
+}
+
+static inline void ci_add_import_decl(context ctx, struct anvl_import_decl d) {
+   ci_ensure_import_capacity(ctx, ctx->import_list.count + 1);
+   if (!ctx->import_list.decls)
+      return;
+   ctx->import_list.decls[ctx->import_list.count++] = d;
+}
+
+// Constructors — allocated from the context resource scope via ctx->arena->alloc(ctx->arena, size).
+static inline statement ci_new_statement(context ctx, anvl_stmt_type type) {
+   statement s = ctx->arena->alloc(ctx->arena, sizeof(*s));
+   if (s) {
+      memset(s, 0, sizeof(*s));
+      s->meta[STMT_META_TYPE] = (usize)type;
+   }
    return s;
 }
 
-static inline value ci_new_value(context ctx __attribute__((unused)), anvl_value_type type) {
-   value v = Memory.alloc(sizeof(*v), true);
-   v->type = type;
+static inline value ci_new_value(context ctx, anvl_value_type type) {
+   value v = ctx->arena->alloc(ctx->arena, sizeof(*v));
+   if (v) {
+      memset(v, 0, sizeof(*v));
+      v->type = type;
+   }
    return v;
 }
 
-static inline field ci_new_field(context ctx __attribute__((unused))) {
-   field f = Memory.alloc(sizeof(*f), true);
+static inline field ci_new_field(context ctx) {
+   field f = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_field));
+   if (f)
+      memset(f, 0, sizeof(struct anvl_field));
    return f;
 }
 
-static inline attribute ci_new_attribute(context ctx __attribute__((unused))) {
-   attribute a = Memory.alloc(sizeof(*a), true);
+static inline attribute ci_new_attribute(context ctx) {
+   attribute a = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_attribute));
+   if (a)
+      memset(a, 0, sizeof(struct anvl_attribute));
    return a;
 }
 
@@ -129,20 +190,21 @@ static inline void ci_add_field(context ctx, field f) {
 
 /**
  * Allocate and return a base_meta structure for inheritance metadata.
- * Returns the allocated base_meta pointer (caller's responsibility to store).
  */
-static inline struct anvl_base_meta *ci_new_base_meta(void) {
-   struct anvl_base_meta *bm = Memory.alloc(sizeof(*bm), true);
+static inline struct anvl_base_meta *ci_new_base_meta(context ctx) {
+   struct anvl_base_meta *bm = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_base_meta));
+   if (bm)
+      memset(bm, 0, sizeof(struct anvl_base_meta));
    return bm;
 }
 
 /**
  * Allocate and return a value_meta structure for detailed value information.
- * Returns the allocated value_meta pointer (caller's responsibility to store).
  */
-static inline struct anvl_value_meta *ci_new_value_meta(anvl_value_type type) {
-   struct anvl_value_meta *vm = Memory.alloc(sizeof(*vm), true);
+static inline struct anvl_value_meta *ci_new_value_meta(context ctx, anvl_value_type type) {
+   struct anvl_value_meta *vm = ctx->arena->alloc(ctx->arena, sizeof(*vm));
    if (vm) {
+      memset(vm, 0, sizeof(*vm));
       vm->type = type;
    }
    return vm;
@@ -150,18 +212,20 @@ static inline struct anvl_value_meta *ci_new_value_meta(anvl_value_type type) {
 
 /**
  * Allocate an element_meta array for collection types (arrays/tuples).
- * Returns the allocated array pointer (caller responsible for storing).
  */
-static inline struct anvl_element_meta *ci_new_element_meta_array(usize count) {
-   struct anvl_element_meta *em = Memory.alloc(sizeof(struct anvl_element_meta) * count, true);
+static inline struct anvl_element_meta *ci_new_element_meta_array(context ctx, usize count) {
+   struct anvl_element_meta *em = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_element_meta) * count);
+   if (em)
+      memset(em, 0, sizeof(struct anvl_element_meta) * count);
    return em;
 }
 
 /**
  * Allocate an attr_meta array for statement-level attributes.
- * Returns the allocated array pointer (caller responsible for storing).
  */
-static inline struct anvl_attr_meta *ci_new_attr_meta_array(usize count) {
-   struct anvl_attr_meta *am = Memory.alloc(sizeof(struct anvl_attr_meta) * count, true);
+static inline struct anvl_attr_meta *ci_new_attr_meta_array(context ctx, usize count) {
+   struct anvl_attr_meta *am = ctx->arena->alloc(ctx->arena, sizeof(struct anvl_attr_meta) * count);
+   if (am)
+      memset(am, 0, sizeof(struct anvl_attr_meta) * count);
    return am;
 }

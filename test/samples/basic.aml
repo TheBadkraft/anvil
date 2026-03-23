@@ -1,0 +1,47 @@
+// basic.aml
+#!aml
+
+// exhaustive primitive literal test suite
+
+// --- Basic primitive types ---
+name := "Anvil.Engine"
+debug := true
+enabled := false
+nothing := null
+
+// --- Integer literal variants ---
+count := 42
+big_int := 9223372036854775807
+zero := 0
+negative := -123
+
+// --- Floating-point literal variants ---
+pi := 3.14159
+small := 0.0001
+negative_float := -2.5
+trailing_dot := 10.     // allowed in many languages, test it
+
+// --- Scientific notation variants ---
+e_positive := 1e10          // 10,000,000,000
+e_negative := 1e-10         // 0.0000000001
+E_mixed := 5.5E+5           // 550,000.0
+e_lower := 9.1093837e-31    // electron mass
+E_upper := 6.626E-34        // Planck constant
+neg_exp := -1.23e-7
+mixed := 123.456e+789       // huge number
+tiny := 1.23e-4932          // underflow → 0.0 in double
+//hex_float := 0x1.8p10       // 1536.0 (Java supports, AML does NOT — should reject)
+
+// Bare literal variants
+material := stone
+variant := deepslate_bricks
+texture := block.stone.top
+namespace := my_mod:stone_variant
+
+// --- Blob variants ---
+empty_blob := ``
+data_blob := `\xDE\xAD\xBE\xEF\x00\xFF`
+text_blob := `Hello, AML!\nThis is a blob.`
+attributed_blob := @bin`\x01\x02\x03\x04`
+guid_blob := @guid`7f3e9a2b-4c8d-4f1a-9b6e-2d5c8a1f4e7b`
+markdown_blob := @md`# Title\nThis is **bold** text and this is *italic* text.`

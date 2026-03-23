@@ -20,9 +20,9 @@
 #include "context_internal.h"
 #include "parser.h"
 #include "utils.h"
-#include <sigcore/memory.h>
-#include <sigcore/strings.h>
-#include <sigtest/sigtest.h>
+#include <sigma.collections/map.h>
+#include <sigma.core/strings.h>
+#include <sigma.memory/memory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,7 +87,7 @@ static bool builder_load_file(struct anvl_ctx_builder_i *self, const char *filep
 
    // Create source from content
    source src = Source.create(data, len);
-   free((void *)data); // Free the file buffer allocated by load_source
+   free((void *)data); // Free the file buffer allocated by load_source (malloc'd in utils.c)
    if (src->dialect != ANVL_DIALECT_AML) {
       src->dialect = dialect_hint_from_ext(filepath);
    }
@@ -129,17 +129,13 @@ static bool context_add_statement(context self, statement stmt) {
    if (!self || !stmt)
       return false;
 
-   // Add to statement list
    if (self->stmt_list.count >= self->stmt_list.capacity) {
-      usize new_capacity = self->stmt_list.capacity == 0 ? 1 : self->stmt_list.capacity * 2;
-      statement *new_statements = Memory.alloc(sizeof(statement) * new_capacity, false);
-      if (!new_statements) {
+      usize new_capacity = self->stmt_list.capacity == 0 ? 8 : self->stmt_list.capacity * 2;
+      statement *new_statements = self->arena->alloc(self->arena, sizeof(statement) * new_capacity);
+      if (!new_statements)
          return false;
-      }
-      if (self->stmt_list.statements) {
+      if (self->stmt_list.statements)
          memcpy(new_statements, self->stmt_list.statements, sizeof(statement) * self->stmt_list.count);
-         Memory.dispose(self->stmt_list.statements);
-      }
       self->stmt_list.statements = new_statements;
       self->stmt_list.capacity = new_capacity;
    }
@@ -163,14 +159,13 @@ static bool context_add_attribute(context self, attribute attr) {
    if (!self || !attr)
       return false;
 
-   // Add to attribute list
    if (self->attr_list.count >= self->attr_list.capacity) {
       usize new_capacity = self->attr_list.capacity == 0 ? 8 : self->attr_list.capacity * 2;
-      attribute *new_attributes = Memory.alloc(sizeof(attribute) * new_capacity, false);
-      if (self->attr_list.attributes) {
+      attribute *new_attributes = self->arena->alloc(self->arena, sizeof(attribute) * new_capacity);
+      if (!new_attributes)
+         return false;
+      if (self->attr_list.attributes)
          memcpy(new_attributes, self->attr_list.attributes, sizeof(attribute) * self->attr_list.count);
-         Memory.dispose(self->attr_list.attributes);
-      }
       self->attr_list.attributes = new_attributes;
       self->attr_list.capacity = new_capacity;
    }
@@ -178,85 +173,40 @@ static bool context_add_attribute(context self, attribute attr) {
    return true;
 }
 
-static void dispose_value_recursive(value v) {
-   if (!v)
-      return;
-
-   // Recursively dispose nested values based on type
-   switch (v->type) {
-   case ANVL_VALUE_OBJECT: {
-      // Objects don't directly own their fields; fields are in context pool
-      // But we should not dispose them here as context handles it
-      break;
-   }
-   case ANVL_VALUE_ARRAY:
-   case ANVL_VALUE_TUPLE: {
-      // Arrays/tuples also don't directly own their elements
-      // Elements are managed elsewhere - don't dispose here
-      break;
-   }
-   case ANVL_VALUE_SCALAR:
-   case ANVL_VALUE_BLOB:
-   default:
-      // These are simple values, nothing to dispose
-      break;
-   }
-   // Dispose the value itself
-   Memory.dispose(v);
+// dispose_value_recursive: values live in the context arena; kept as a no-op
+// for any residual callers; reclaimed wholesale by Allocator.Arena.dispose(ctx->arena).
+__attribute__((unused)) static void dispose_value_recursive(value v) {
+   (void)v;
 }
 
 static void context_dispose(context self) {
    if (self) {
-      if (self->source) {
+      // Drain any lazily-built name index maps before the arena is released.
+      // Maps are malloc-backed (not arena) so they must be freed explicitly.
+      for (usize i = 0; i < self->stmt_list.count; i++) {
+         statement s = self->stmt_list.statements[i];
+         if (s && s->value_meta && s->value_meta->name_index) {
+            Map.dispose((map)s->value_meta->name_index);
+            s->value_meta->name_index = NULL;
+         }
+      }
+      // Drain the context-level statement name index map.
+      if (self->stmt_name_index) {
+         Map.dispose((map)self->stmt_name_index);
+         self->stmt_name_index = NULL;
+      }
+      // Source lives outside the arena (loaded independently), dispose it first.
+      if (self->source)
          Source.dispose(self->source);
+      // Release the parse resource scope: reclaims the entire parse tree in one shot.
+      // Resource scopes are never in the R7 chain — no LIFO constraint, no BUG-001 risk.
+      // Null immediately after release: slot is freed and may be recycled.
+      if (self->arena) {
+         Allocator.release((sc_ctrl_base_s *)self->arena);
+         self->arena = NULL;
       }
-      // Dispose fields FIRST (they contain values), before disposing statements
-      if (self->field_list.fields) {
-         for (usize i = 0; i < self->field_list.count; i++) {
-            field f = self->field_list.fields[i];
-            if (f) {
-               // Dispose the field's value recursively
-               if (f->val) {
-                  dispose_value_recursive(f->val);
-               }
-               // Dispose the field itself
-               Memory.dispose(f);
-            }
-         }
-         // Then dispose the fields array
-         Memory.dispose(self->field_list.fields);
-      }
-      // Dispose meta-buffers for each statement before disposing the statements array
-      if (self->stmt_list.statements) {
-         for (usize i = 0; i < self->stmt_list.count; i++) {
-            statement stmt = self->stmt_list.statements[i];
-            if (stmt) {
-               // Free individual meta-buffers
-               if (stmt->base_meta) {
-                  Memory.dispose(stmt->base_meta);
-               }
-               if (stmt->attr_meta) {
-                  Memory.dispose(stmt->attr_meta);
-               }
-               if (stmt->value_meta) {
-                  // Also free nested element_meta array if present
-                  if (stmt->value_meta->data.collection.elements) {
-                     Memory.dispose(stmt->value_meta->data.collection.elements);
-                  }
-                  Memory.dispose(stmt->value_meta);
-               }
-               // Free the statement itself
-               Memory.dispose(stmt);
-            }
-         }
-         // Then dispose the statements array
-         Memory.dispose(self->stmt_list.statements);
-      }
-      // Clear attributes pool
-      if (self->attr_list.attributes) {
-         Memory.dispose(self->attr_list.attributes);
-      }
-      Memory.dispose(self);
+      // The context struct itself was allocated from the reclaiming allocator.
+      Allocator.free(self);
    }
 }
 
@@ -290,7 +240,8 @@ static attr_builder context_begin_attribute(context self) {
    }
 
    // Allocate builder
-   attr_builder bldr = Memory.alloc(sizeof(struct anvl_attr_builder_t), true);
+   attr_builder bldr = Allocator.alloc(sizeof(struct anvl_attr_builder_t));
+   if (bldr) memset(bldr, 0, sizeof(struct anvl_attr_builder_t));
    if (!bldr) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate attribute builder", 0, 0, __FILE__);
       return NULL;
@@ -318,7 +269,7 @@ static void context_end_attribute(context self, attr_builder bldr) {
    }
 
    // Free builder
-   Memory.dispose(bldr);
+   Allocator.free(bldr);
 }
 #endif
 
@@ -343,7 +294,8 @@ static value_builder context_begin_value(context self, anvl_value_type type) {
    }
 
    // Allocate value
-   value val = Memory.alloc(sizeof(struct anvl_value), true);
+   value val = Allocator.alloc(sizeof(struct anvl_value));
+   if (val) memset(val, 0, sizeof(struct anvl_value));
    if (!val) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate value", 0, 0, __FILE__);
       return NULL;
@@ -351,9 +303,10 @@ static value_builder context_begin_value(context self, anvl_value_type type) {
    val->type = type;
 
    // Allocate builder
-   value_builder bldr = Memory.alloc(sizeof(struct anvl_value_builder_t), true);
+   value_builder bldr = Allocator.alloc(sizeof(struct anvl_value_builder_t));
+   if (bldr) memset(bldr, 0, sizeof(struct anvl_value_builder_t));
    if (!bldr) {
-      Memory.dispose(val);
+      Allocator.free(val);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate value builder", 0, 0, __FILE__);
       return NULL;
    }
@@ -383,7 +336,7 @@ static void context_end_value(context self, value_builder bldr) {
 
    // Values are now self-contained in statements' value_meta
    // This function kept for API compatibility but does minimal work
-   Memory.dispose(bldr);
+   Allocator.free(bldr);
 }
 // DISABLED: Builder method implementations
 // The direct parser is the primary method now; builders kept for reference only
@@ -452,7 +405,8 @@ void attr_builder_value(attr_builder self, usize pos, usize len) {
 
 void attr_builder_add(attr_builder self) {
    // Create attribute
-   attribute attr = Memory.alloc(sizeof(struct anvl_attribute), true);
+   attribute attr = Allocator.alloc(sizeof(struct anvl_attribute));
+   if (attr) memset(attr, 0, sizeof(struct anvl_attribute));
    if (!attr) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate attribute", 0, 0, __FILE__);
       return;
@@ -470,7 +424,7 @@ void attr_builder_add(attr_builder self) {
 
    // Add to context
    if (!context_add_attribute(self->ctx, attr)) {
-      Memory.dispose(attr);
+      Allocator.free(attr);
       return;
    }
 
@@ -497,10 +451,11 @@ void value_builder_field(value_builder self, usize key_pos, usize key_len, usize
    // Ensure capacity
    if (self->temp.field_count >= self->temp.field_capacity) {
       self->temp.field_capacity = self->temp.field_capacity == 0 ? 4 : self->temp.field_capacity * 2;
-      self->temp.fields = Memory.realloc(self->temp.fields, sizeof(field) * self->temp.field_capacity);
+      self->temp.fields = Allocator.realloc(self->temp.fields, sizeof(field) * self->temp.field_capacity);
    }
    // Allocate field
-   field f = Memory.alloc(sizeof(struct anvl_field), true);
+   field f = Allocator.alloc(sizeof(struct anvl_field));
+   if (f) memset(f, 0, sizeof(struct anvl_field));
    f->key_pos = key_pos;
    f->key_len = key_len;
    f->attrib_start = attrib_start;
@@ -527,7 +482,7 @@ void value_builder_end_object(value_builder self) {
       // Set the value data for nested object
       self->val->data.object.field_start = field_start;
       self->val->data.object.field_count = self->temp.field_count;
-      Memory.dispose(self->temp.fields);
+      Allocator.free(self->temp.fields);
    }
 }
 
@@ -545,7 +500,7 @@ void value_builder_element(value_builder self, value val) {
    // Ensure capacity
    if (self->temp.value_count >= self->temp.value_capacity) {
       self->temp.value_capacity = self->temp.value_capacity == 0 ? 4 : self->temp.value_capacity * 2;
-      self->temp.values = Memory.realloc(self->temp.values, sizeof(value) * self->temp.value_capacity);
+      self->temp.values = Allocator.realloc(self->temp.values, sizeof(value) * self->temp.value_capacity);
    }
    self->temp.values[self->temp.value_count++] = val;
 }
@@ -557,7 +512,7 @@ void value_builder_end_array(value_builder self) {
       // Just track element count
       self->val->data.collection.element_start = 0;
       self->val->data.collection.element_count = self->temp.value_count;
-      Memory.dispose(self->temp.values);
+      Allocator.free(self->temp.values);
    }
 }
 
@@ -571,15 +526,17 @@ void value_builder_scalar(value_builder self, usize pos, usize len, anvl_value_t
 }
 
 value_builder create_temp_value_builder(context ctx) {
-   value val = Memory.alloc(sizeof(struct anvl_value), true);
+   value val = Allocator.alloc(sizeof(struct anvl_value));
+   if (val) memset(val, 0, sizeof(struct anvl_value));
    if (!val) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate temp value", 0, 0, __FILE__);
       return NULL;
    }
    val->type = ANVL_VALUE_SCALAR; // default
-   value_builder bldr = Memory.alloc(sizeof(struct anvl_value_builder_t), true);
+   value_builder bldr = Allocator.alloc(sizeof(struct anvl_value_builder_t));
+   if (bldr) memset(bldr, 0, sizeof(struct anvl_value_builder_t));
    if (!bldr) {
-      Memory.dispose(val);
+      Allocator.free(val);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate temp value builder", 0, 0, __FILE__);
       return NULL;
    }
@@ -611,17 +568,17 @@ void dispose_temp_value_builder(value_builder bldr) {
             if (f) {
                // Attributes are owned by context->attr_list, not the field
                // f->val is owned by parent
-               Memory.dispose(f);
+               Allocator.free(f);
             }
          }
-         Memory.dispose(bldr->temp.fields);
+         Allocator.free(bldr->temp.fields);
       }
       if (bldr->temp.values) {
          // values owned by parent
-         Memory.dispose(bldr->temp.values);
+         Allocator.free(bldr->temp.values);
       }
       // val is owned by parent
-      Memory.dispose(bldr);
+      Allocator.free(bldr);
    }
 }
 #endif
@@ -637,6 +594,136 @@ static value_builder context_begin_value(context self, anvl_value_type type) {
 static void context_end_value(context self, value_builder bldr) {
    (void)self;
    (void)bldr;
+}
+
+/* ------------------------------------------------------------------ */
+/* E3 — Query path primitives                                         */
+/* ------------------------------------------------------------------ */
+
+static statement context_get_statement_by_name(context self, const char *name, usize len) {
+   if (!self || !name || len == 0)
+      return NULL;
+
+   /* Lazy-build a statement identifier → stmt_list index map on first call. */
+   if (!self->stmt_name_index) {
+      map m = Map.new(self->stmt_list.count * 2 + 4);
+      if (m) {
+         const char *raw = Source.data(self->source);
+         for (usize i = 0; i < self->stmt_list.count; i++) {
+            statement s = self->stmt_list.statements[i];
+            if (!s)
+               continue;
+            usize id_pos = s->meta[STMT_META_IDENT_POS];
+            usize id_len = s->meta[STMT_META_IDENT_LEN];
+            if (id_len > 0)
+               Map.set(m, raw + id_pos, id_len, (usize)i);
+         }
+         self->stmt_name_index = (void *)m;
+      }
+   }
+
+   /* O(1) lookup; fall back to linear scan if map allocation failed. */
+   if (self->stmt_name_index) {
+      usize idx;
+      if (Map.get((map)self->stmt_name_index, name, len, &idx))
+         return self->stmt_list.statements[idx];
+      return NULL;
+   }
+
+   /* Fallback: linear scan (only reached if Map.new failed). */
+   const char *raw = Source.data(self->source);
+   for (usize i = 0; i < self->stmt_list.count; i++) {
+      statement s = self->stmt_list.statements[i];
+      if (s && s->meta[STMT_META_IDENT_LEN] == len && memcmp(raw + s->meta[STMT_META_IDENT_POS], name, len) == 0)
+         return s;
+   }
+   return NULL;
+}
+
+static usize context_field_count(context self, statement stmt) {
+   if (!self || !stmt || !stmt->value_meta)
+      return 0;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return 0;
+   return stmt->value_meta->data.object.field_count;
+}
+
+static field context_get_field(context self, statement stmt, usize index) {
+   if (!self || !stmt || !stmt->value_meta)
+      return NULL;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return NULL;
+   usize start = stmt->value_meta->data.object.field_start;
+   usize count = stmt->value_meta->data.object.field_count;
+   if (index >= count)
+      return NULL;
+   return self->field_list.fields[start + index];
+}
+
+static field context_get_field_by_name(context self, statement stmt, const char *name, usize len) {
+   if (!self || !stmt || !stmt->value_meta || !name || len == 0)
+      return NULL;
+   if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
+      return NULL;
+
+   struct anvl_value_meta *vm = stmt->value_meta;
+
+   /* Lazy-build the name→field_list_index map on first call for this object. */
+   if (!vm->name_index) {
+      map m = Map.new(vm->data.object.field_count * 2 + 4);
+      if (m) {
+         const char *raw = Source.data(self->source);
+         usize start = vm->data.object.field_start;
+         usize count = vm->data.object.field_count;
+         for (usize i = 0; i < count; i++) {
+            field f = self->field_list.fields[start + i];
+            if (f)
+               Map.set(m, raw + f->key_pos, f->key_len, (usize)(start + i));
+         }
+         vm->name_index = (void *)m;
+      }
+   }
+
+   /* O(1) lookup via map; fall back to linear scan if map allocation failed. */
+   if (vm->name_index) {
+      usize idx;
+      if (Map.get((map)vm->name_index, name, len, &idx))
+         return self->field_list.fields[idx];
+      return NULL;
+   }
+
+   /* Fallback: linear scan (only reached if Map.new failed). */
+   const char *raw = Source.data(self->source);
+   usize start = vm->data.object.field_start;
+   usize count = vm->data.object.field_count;
+   for (usize i = 0; i < count; i++) {
+      field f = self->field_list.fields[start + i];
+      if (f && f->key_len == len && memcmp(raw + f->key_pos, name, len) == 0)
+         return f;
+   }
+   return NULL;
+}
+
+static usize context_element_count(context self, statement stmt) {
+   if (!self || !stmt || !stmt->value_meta)
+      return 0;
+   anvl_value_type t = stmt->value_meta->type;
+   if (t != ANVL_VALUE_ARRAY && t != ANVL_VALUE_TUPLE)
+      return 0;
+   return stmt->value_meta->data.collection.element_count;
+}
+
+static struct anvl_element_meta *context_get_element(context self, statement stmt, usize index) {
+   if (!self || !stmt || !stmt->value_meta)
+      return NULL;
+   anvl_value_type t = stmt->value_meta->type;
+   if (t != ANVL_VALUE_ARRAY && t != ANVL_VALUE_TUPLE)
+      return NULL;
+   if (index >= stmt->value_meta->data.collection.element_count)
+      return NULL;
+   if (!stmt->value_meta->data.collection.elements)
+      return NULL;
+   return &stmt->value_meta->data.collection.elements[index];
 }
 
 const struct anvl_context_i Context = {
@@ -656,6 +743,12 @@ const struct anvl_context_i Context = {
     .end_value = context_end_value,
     .begin_attribute = context_begin_attribute,
     .end_attribute = context_end_attribute,
+    .field_count = context_field_count,
+    .get_field = context_get_field,
+    .get_field_by_name = context_get_field_by_name,
+    .element_count = context_element_count,
+    .get_element = context_get_element,
+    .get_statement_by_name = context_get_statement_by_name,
 };
 
 const struct anvl_statement_i Statement = {
@@ -680,7 +773,9 @@ static void builder_set_source(struct anvl_ctx_builder_i *self, const char *data
 }
 
 static context builder_build(struct anvl_ctx_builder_i *self) {
-   context ctx = Memory.alloc(sizeof(struct anvl_context_t), true);
+   context ctx = Allocator.alloc(sizeof(struct anvl_context_t));
+   if (ctx)
+      memset(ctx, 0, sizeof(struct anvl_context_t));
    if (!ctx) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate context", 0, 0, __FILE__);
       return NULL;
@@ -693,12 +788,28 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
                         anvl_error_code_message(ANVL_ERR_BUILDER_NO_SOURCE),
                         0, 0, NULL);
       }
-      Memory.dispose(ctx); // Clean up the context we just allocated
+      Allocator.free(ctx); // Clean up the context we just allocated
       return NULL;
    }
    // Transfer ownership - clear builder's reference
    self->source = NULL;
    self->dialect = ANVL_DIALECT_ASL; // reset to default
+
+   // Acquire a resource scope sized to the source: pure bump, no R7 coupling, no LIFO
+   // constraint.  16× source length accounts for the parse tree structs AND the doubling
+   // overhead in ci_ensure_*_capacity (old arrays are left in the bump by design and
+   // reclaimed together at Context.dispose — worst case 2× the live set).
+   // 64KB floor handles small/typical files comfortably.
+   // context_dispose() MUST be called to release.
+   usize src_len = Source.length(ctx->source);
+   usize slab_sz = src_len * 16 < 64 * 1024 ? 64 * 1024 : src_len * 16;
+   ctx->arena = Allocator.create_bump(slab_sz);
+   if (!ctx->arena) {
+      anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to acquire parse resource scope", 0, 0, __FILE__);
+      Source.dispose(ctx->source);
+      Allocator.free(ctx);
+      return NULL;
+   }
 
    return ctx;
 }
@@ -786,10 +897,16 @@ static source source_create(const char *data, usize len) {
    if (String.length((string)data) == 0 || len == 0)
       return NULL;
 
-   source src = Memory.alloc(sizeof(struct anvl_source_t), true);
+   source src = Allocator.alloc(sizeof(struct anvl_source_t));
+   if (src)
+      memset(src, 0, sizeof(struct anvl_source_t));
 
    if (data && len > 0) {
-      char *buffer = Memory.alloc(len + 1, false);
+      char *buffer = malloc(len + 1);
+      if (!buffer) {
+         Allocator.free(src);
+         return NULL;
+      }
       memcpy(buffer, data, len);
       buffer[len] = '\0';
       src->buffer.bucket = buffer;
@@ -806,30 +923,35 @@ static source source_create(const char *data, usize len) {
    src->col = 1;
 
    if (data && len > 0) {
-      source_skip_whitespace_and_comments(src);
+      source_consume(src, source_skip_whitespace_and_comments(src));
       if (source_is_shebang(src)) {
          src->dialect = source_parse_dialect(src, src->dialect);
-         source_skip_whitespace_and_comments(src);
+         source_consume(src, source_skip_whitespace_and_comments(src));
          if (source_is_shebang(src)) {
             anvl_error_set(ANVL_ERR_PARSER_MULTIPLE_SHEBANG, "Multiple shebangs not allowed", src->line, src->col, NULL);
-            Memory.dispose(src);
+            free(src->buffer.bucket);
+            Allocator.free(src);
             return NULL;
          }
       }
-      source_skip_whitespace_and_comments(src);
+      source_consume(src, source_skip_whitespace_and_comments(src));
    }
 
    return src;
 }
 
 static void source_dispose(source self) {
+   if (!self)
+      return;
    if (self->buffer.bucket) {
-      Memory.dispose(self->buffer.bucket);
+      free(self->buffer.bucket);
    }
-   Memory.dispose(self);
+   Allocator.free(self);
 }
 
 static anvl_dialect source_get_dialect(source self) {
+   if (!self)
+      return ANVL_DIALECT_ASL;
    return self->dialect;
 }
 
@@ -924,7 +1046,7 @@ static char *source_substring(source self, usize start, usize len) {
    usize available = (usize)(self->buffer.end - self->buffer.bucket) - start;
    usize actual_len = len < available ? len : available;
 
-   char *result = Memory.alloc(actual_len + 1, false);
+   char *result = Allocator.alloc(actual_len + 1);
    memcpy(result, self->buffer.bucket + start, actual_len);
    result[actual_len] = '\0';
    return result;
@@ -984,18 +1106,20 @@ static usize source_skip_whitespace_and_comments(source self) {
       changed = (pos != old_pos);
    }
 
-   self->pos += pos;
-   return self->pos;
+   return pos;
 }
 
 static bool source_is_shebang(source self) {
-   if (source_peek(self) == '#' && source_peek_offset(self, 1) == '!') {
-      return true;
-   }
-   return false;
+   if (source_peek(self) != '#' || source_peek_offset(self, 1) != '!')
+      return false;
+   char d1 = source_peek_offset(self, 2);
+   char d2 = source_peek_offset(self, 3);
+   char d3 = source_peek_offset(self, 4);
+   return (d1 == 'a' && d2 == 'm' && d3 == 'l') || (d1 == 'a' && d2 == 's' && d3 == 'l') || (d1 == 'a' && d2 == 'm' && d3 == 'p');
 }
 
 static anvl_dialect source_parse_dialect(source self, anvl_dialect current) {
+   source_consume(self, source_skip_whitespace_and_comments(self));
    if (source_is_shebang(self)) {
       source_consume(self, 2);
 

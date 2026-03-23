@@ -72,6 +72,36 @@ static const char *error_messages[] = {
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK] = "Invalid attribute block; must be `@[...]`",
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE] = "The attribute identifier is invalid",
     [ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY] = "Duplicate attribute identifier",
+    [ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE] = "Attributes are not allowed on scalar, array, or tuple types",
+    [ANVL_ERR_ANON_BLOCK_REDECLARATION] = "Anonymous block name conflicts with an existing declaration",
+
+    [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "Cycle detected in inheritance chain",
+    [ANVL_ERR_RESOLVER_MISSING_BASE] = "Base identifier not found in document",
+
+    [ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED] = "vars block is already defined",
+    [ANVL_ERR_VARS_NOT_FIRST] = "vars block must appear before all statements",
+    [ANVL_ERR_VARS_DUPLICATE_KEY] = "Duplicate key in vars block",
+    [ANVL_ERR_VARS_CIRCULAR_REF] = "Circular reference detected in vars block",
+    [ANVL_ERR_VARS_KEY_NOT_FOUND] = "vars key not found",
+
+    [ANVL_ERR_IMPORT_NOT_FIRST] = "import declarations must precede statements",
+    [ANVL_ERR_IMPORT_AMP_FORBIDDEN] = "import is not allowed in AMP dialect",
+    [ANVL_ERR_IMPORT_DUPLICATE_ALIAS] = "Duplicate import alias",
+    [ANVL_ERR_IMPORT_FILE_NOT_FOUND] = "Imported file not found",
+    [ANVL_ERR_IMPORT_CYCLIC] = "Cyclic import detected",
+
+    [ANVL_ERR_USING_MODULE_NOT_FOUND] = "using: module not found",
+    [ANVL_ERR_USING_IN_AMP] = "using is not allowed in AMP dialect",
+    [ANVL_ERR_USING_AFTER_STATEMENTS] = "using declarations must precede statements",
+
+    [ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR] = "AMP array/tuple elements must be scalar or blob values",
+
+    [ANVL_ERR_SCHEMA_ATTR_MISSING] = "Schema document is missing the required @[schema] module attribute",
+    [ANVL_ERR_SCHEMA_TYPE_UNRESOLVED] = "Schema field references a type name that is not defined in the schema",
+    [ANVL_ERR_SCHEMA_BASE_UNKNOWN] = "Schema statement base is not a virtual base ('enum', 'flags') or a known schema type",
+    [ANVL_ERR_SCHEMA_VALIDATION_REQUIRED] = "Required field is missing in the data document",
+    [ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH] = "Data field value type does not match the declared schema field type",
+    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] = "Data document contains a field not declared in the schema type",
 
     [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "Unexpected character",
     [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "Unterminated string literal",
@@ -82,6 +112,12 @@ static const char *error_messages[] = {
     [ANVL_ERR_PARSER_INVALID_HEX_LITERAL] = "Invalid hex number format",
     [ANVL_ERR_PARSER_INVALID_EXPONENT] = "Invalid exponent format",
     [ANVL_ERR_PARSER_INVALID_NUMBER] = "Invalid number format",
+
+    [ANVL_ERR_ASL_PARSE_ERROR] = "ASL parse error",
+    [ANVL_ERR_ASL_RUNTIME_ERROR] = "ASL runtime error",
+    [ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED] = "ASL call depth exceeded",
+    [ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP] = "break outside loop",
+    [ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP] = "continue outside loop",
 
     [ANVL_ERR_IO_FILE_NOT_FOUND] = "File not found",
     [ANVL_ERR_IO_READ_FAILED] = "Failed to read file",
@@ -129,6 +165,36 @@ static const char *error_names[] = {
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK] = "ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK",
     [ANVL_ERR_PARSER_INVALID_ATTRIBUTE] = "ANVL_ERR_PARSER_INVALID_ATTRIBUTE",
     [ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY] = "ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY",
+    [ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE] = "ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE",
+    [ANVL_ERR_ANON_BLOCK_REDECLARATION] = "ANVL_ERR_ANON_BLOCK_REDECLARATION",
+
+    [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "ANVL_ERR_RESOLVER_CYCLE_DETECTED",
+    [ANVL_ERR_RESOLVER_MISSING_BASE] = "ANVL_ERR_RESOLVER_MISSING_BASE",
+
+    [ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED] = "ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED",
+    [ANVL_ERR_VARS_NOT_FIRST] = "ANVL_ERR_VARS_NOT_FIRST",
+    [ANVL_ERR_VARS_DUPLICATE_KEY] = "ANVL_ERR_VARS_DUPLICATE_KEY",
+    [ANVL_ERR_VARS_CIRCULAR_REF] = "ANVL_ERR_VARS_CIRCULAR_REF",
+    [ANVL_ERR_VARS_KEY_NOT_FOUND] = "ANVL_ERR_VARS_KEY_NOT_FOUND",
+
+    [ANVL_ERR_IMPORT_NOT_FIRST] = "ANVL_ERR_IMPORT_NOT_FIRST",
+    [ANVL_ERR_IMPORT_AMP_FORBIDDEN] = "ANVL_ERR_IMPORT_AMP_FORBIDDEN",
+    [ANVL_ERR_IMPORT_DUPLICATE_ALIAS] = "ANVL_ERR_IMPORT_DUPLICATE_ALIAS",
+    [ANVL_ERR_IMPORT_FILE_NOT_FOUND] = "ANVL_ERR_IMPORT_FILE_NOT_FOUND",
+    [ANVL_ERR_IMPORT_CYCLIC] = "ANVL_ERR_IMPORT_CYCLIC",
+
+    [ANVL_ERR_USING_MODULE_NOT_FOUND] = "ANVL_ERR_USING_MODULE_NOT_FOUND",
+    [ANVL_ERR_USING_IN_AMP] = "ANVL_ERR_USING_IN_AMP",
+    [ANVL_ERR_USING_AFTER_STATEMENTS] = "ANVL_ERR_USING_AFTER_STATEMENTS",
+
+    [ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR] = "ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR",
+
+    [ANVL_ERR_SCHEMA_ATTR_MISSING] = "ANVL_ERR_SCHEMA_ATTR_MISSING",
+    [ANVL_ERR_SCHEMA_TYPE_UNRESOLVED] = "ANVL_ERR_SCHEMA_TYPE_UNRESOLVED",
+    [ANVL_ERR_SCHEMA_BASE_UNKNOWN] = "ANVL_ERR_SCHEMA_BASE_UNKNOWN",
+    [ANVL_ERR_SCHEMA_VALIDATION_REQUIRED] = "ANVL_ERR_SCHEMA_VALIDATION_REQUIRED",
+    [ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH] = "ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH",
+    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] = "ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD",
 
     [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "ANVL_ERR_PARSER_UNEXPECTED_CHAR",
     [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "ANVL_ERR_PARSER_UNTERMINATED_STRING",
@@ -139,6 +205,12 @@ static const char *error_names[] = {
     [ANVL_ERR_PARSER_INVALID_HEX_LITERAL] = "ANVL_ERR_PARSER_INVALID_HEX_LITERAL",
     [ANVL_ERR_PARSER_INVALID_EXPONENT] = "ANVL_ERR_PARSER_INVALID_EXPONENT",
     [ANVL_ERR_PARSER_INVALID_NUMBER] = "ANVL_ERR_PARSER_INVALID_NUMBER",
+
+    [ANVL_ERR_ASL_PARSE_ERROR] = "ANVL_ERR_ASL_PARSE_ERROR",
+    [ANVL_ERR_ASL_RUNTIME_ERROR] = "ANVL_ERR_ASL_RUNTIME_ERROR",
+    [ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED] = "ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED",
+    [ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP] = "ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP",
+    [ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP] = "ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP",
 
     [ANVL_ERR_IO_FILE_NOT_FOUND] = "ANVL_ERR_IO_FILE_NOT_FOUND",
     [ANVL_ERR_IO_READ_FAILED] = "ANVL_ERR_IO_READ_FAILED",

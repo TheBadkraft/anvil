@@ -1,0 +1,19 @@
+#!aml
+
+vars {
+    mod_name  := anvil
+    version   := 1
+    tag       := alpha
+    base_path := assets/textures/blocks
+}
+
+// InterpolatedString statements — resolved against the vars block above
+label := $"Anvil v{version}-{tag}"
+desc  := $"Module: {mod_name} v{version}"
+
+// Object with VarRef fields
+mod := {
+    id      := $mod_name
+    version := $version
+    base    := $base_path
+}

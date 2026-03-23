@@ -1,0 +1,101 @@
+// merge.aml — merge/inheritance benchmark fixture
+// Covers: single-level chains, low/high override density, deep 3-level chains
+#!aml
+
+// -----------------------------------------------------------------------
+// Base type — 8 fields, all scalars
+// -----------------------------------------------------------------------
+
+BaseItem := {
+    category    := item
+    rarity      := common
+    weight      := 1.0
+    stackable   := true
+    max_stack   := 64
+    tradeable   := true
+    craftable   := true
+    lootable    := true
+}
+
+// -----------------------------------------------------------------------
+// Low-override density — inherits 7 of 8 fields from base, overrides 1
+// -----------------------------------------------------------------------
+
+RubyGem:BaseItem := {
+    name := Ruby
+}
+
+// -----------------------------------------------------------------------
+// High-override density — overrides 7 of 8 fields from base
+// -----------------------------------------------------------------------
+
+AncientRelic:BaseItem := {
+    name      := "Ancient Relic"
+    rarity    := legendary
+    weight    := 5.0
+    stackable := false
+    max_stack := 1
+    tradeable := false
+    craftable := false
+}
+
+// -----------------------------------------------------------------------
+// Deep chain — 3-level inheritance (EntityBase → MobBase → Creeper)
+// -----------------------------------------------------------------------
+
+EntityBase := {
+    collidable  := true
+    gravity     := true
+    pushable    := true
+    visible     := true
+    health      := 20
+    armor       := 0
+    speed       := 1.0
+    ai_enabled  := true
+}
+
+MobBase:EntityBase := {
+    hostile     := false
+    drops_xp    := true
+    spawn_group := land
+}
+
+Creeper:MobBase := {
+    name    := "Creeper"
+    hostile := true
+    health  := 20
+    speed   := 0.8
+}
+
+// -----------------------------------------------------------------------
+// Sibling access — 3 derived types sharing same base
+// -----------------------------------------------------------------------
+
+BaseOre := {
+    category    := ore
+    hardness    := 3.0
+    resistance  := 3.0
+    tool        := pickaxe
+    stackable   := true
+}
+
+IronOreDeep:BaseOre := {
+    name        := "Deepslate Iron Ore"
+    hardness    := 4.5
+    tool_level  := 2
+    drop_chance := 1.0
+}
+
+GoldOreDeep:BaseOre := {
+    name        := "Deepslate Gold Ore"
+    hardness    := 4.5
+    tool_level  := 3
+    drop_chance := 1.0
+}
+
+DiamondOreDeep:BaseOre := {
+    name        := "Deepslate Diamond Ore"
+    hardness    := 4.5
+    tool_level  := 3
+    drop_chance := 0.5
+}

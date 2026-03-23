@@ -1,3 +1,29 @@
 Copyright © 2025 Quantum Override. All rights reserved.
 
 This software is proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software, via any medium, is strictly prohibited without express written permission from the copyright holder.
+
+---
+
+Tiered Licensing
+
+Anvil is available for commercial licensing under two tiers:
+
+  Tier 1 — Anvil Core License
+  Includes: Anvil parser (anvil.o), all dialect support (AML, AMP, ASL),
+  and all public API headers. Suitable for embedding the parser in a
+  product or service.
+
+  Tier 2 — Anvil Security License (add-on; requires Tier 1)
+  Includes: anvil.security module (anvil.security.o), the AMP Secure
+  Packet specification, cipher registry API, and envelope validation.
+  Grants use of the reserved @amp.* proposed tag namespace under
+  compliance terms.
+
+  Perpetual Author Grant
+  Quantum Override and its principals retain a perpetual, royalty-free,
+  irrevocable license to use all Anvil components in any product or
+  service without restriction.
+
+Contact: [TBD]
+
+[TODO] Full commercial license terms to be published.

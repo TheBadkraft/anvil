@@ -3,15 +3,16 @@
  */
 
 #include "anvil.h"
-#include <sigcore/memory.h>
-#include <sigtest/sigtest.h>
+#include <sigma.memory/memory.h>
+#include <sigma.test/sigtest.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 // Atomic function 1: Allocate source struct
 static source alloc_source_struct(void) {
-   source src = Memory.alloc(sizeof(struct anvl_source_t), true);
+   source src = Allocator.alloc(sizeof(struct anvl_source_t));
+   if (src)
+      memset(src, 0, sizeof(struct anvl_source_t));
    return src; // Returns allocated struct or NULL on failure
 }
 
@@ -20,8 +21,8 @@ static char *alloc_buffer(const char *data, usize len) {
    if (!data || len == 0) {
       return NULL;
    }
-   char *buffer = malloc(len + 1); // +1 for null terminator
-   return buffer;                  // Returns allocated buffer or NULL on failure
+   char *buffer = Allocator.alloc(len + 1); // +1 for null terminator
+   return buffer;                           // Returns allocated buffer or NULL on failure
 }
 
 // Atomic function 3: Copy data to buffer
@@ -102,9 +103,9 @@ static source source_create_diagnostic(const char *data, usize len) {
 cleanup:
    if (!success) {
       if (buffer)
-         free(buffer);
+         Allocator.free(buffer);
       if (src)
-         Memory.dispose(src);
+         Allocator.free(src);
       return NULL;
    }
 
@@ -113,32 +114,32 @@ cleanup:
 
 // Test function to run diagnostics
 void run_memory_diagnostic(void) {
-   writelnf("Running memory leak diagnostic...");
+   fprintf(stderr, "Running memory leak diagnostic...\n");
 
    // Test case 1: Empty source
-   writelnf("Test 1: Empty source");
+   fprintf(stderr, "Test 1: Empty source\n");
    source src1 = source_create_diagnostic(NULL, 0);
    if (src1) {
-      writelnf("  Created empty source successfully");
+      fprintf(stderr, "  Created empty source successfully\n");
       // Dispose to check for leaks
       Source.dispose(src1);
-      writelnf("  Disposed empty source");
+      fprintf(stderr, "  Disposed empty source\n");
    } else {
-      writelnf("  Failed to create empty source");
+      fprintf(stderr, "  Failed to create empty source\n");
    }
 
    // Test case 2: Source with data
-   writelnf("Test 2: Source with data");
+   fprintf(stderr, "Test 2: Source with data\n");
    const char *test_data = "#!anvl-aml\nsome content";
    source src2 = source_create_diagnostic(test_data, strlen(test_data));
    if (src2) {
-      writelnf("  Created source with data successfully");
+      fprintf(stderr, "  Created source with data successfully\n");
       // Dispose to check for leaks
       Source.dispose(src2);
-      writelnf("  Disposed source with data");
+      fprintf(stderr, "  Disposed source with data\n");
    } else {
-      writelnf("  Failed to create source with data");
+      fprintf(stderr, "  Failed to create source with data\n");
    }
 
-   writelnf("Diagnostic complete - check memory state");
+   fprintf(stderr, "Diagnostic complete - check memory state\n");
 }

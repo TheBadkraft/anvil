@@ -1,0 +1,347 @@
+// large.aml — deterministic benchmark fixture  (~500 lines)
+// Covers: vars block, 20 block definitions, biome list, inventory tuples,
+//         inheritance chains, blobs, mixed scalar types.
+#!aml
+
+vars {
+    default_hardness    := 5
+    default_resistance  := 6.0
+    default_drop_chance := 0.75
+    atlas               := terrain.png
+    base_path           := assets/textures/blocks
+    sounds_path         := assets/sounds
+    mod_id              := benchmark_mod
+    spawn_world         := overworld
+    max_stack           := 64
+    tool_level          := 0
+}
+
+// -----------------------------------------------------------------------
+// Block definitions (20 blocks)
+// -----------------------------------------------------------------------
+
+stone := {
+    name        := "Stone"
+    hardness    := $default_hardness
+    resistance  := $default_resistance
+    drop_chance := $default_drop_chance
+    texture     := block.stone
+    tool        := pickaxe
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+granite := {
+    name        := "Granite"
+    hardness    := 6
+    resistance  := 6.0
+    drop_chance := 1.0
+    texture     := block.granite
+    tool        := pickaxe
+    tool_level  := 1
+    stackable   := true
+}
+
+diorite := {
+    name        := "Diorite"
+    hardness    := 6
+    resistance  := 6.0
+    drop_chance := 1.0
+    texture     := block.diorite
+    tool        := pickaxe
+    tool_level  := 1
+    stackable   := true
+}
+
+andesite := {
+    name        := "Andesite"
+    hardness    := 6
+    resistance  := 6.0
+    drop_chance := 1.0
+    texture     := block.andesite
+    tool        := pickaxe
+    tool_level  := 1
+    stackable   := true
+}
+
+dirt := {
+    name        := "Dirt"
+    hardness    := 0.5
+    resistance  := 0.5
+    drop_chance := 1.0
+    texture     := block.dirt
+    tool        := shovel
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+grass_block := {
+    name        := "Grass Block"
+    hardness    := 0.6
+    resistance  := 0.6
+    drop_chance := 1.0
+    texture     := block.grass_top
+    tool        := shovel
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+sand := {
+    name        := "Sand"
+    hardness    := 0.5
+    resistance  := 0.5
+    drop_chance := 1.0
+    texture     := block.sand
+    tool        := shovel
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+gravel := {
+    name        := "Gravel"
+    hardness    := 0.6
+    resistance  := 0.6
+    drop_chance := 0.1
+    texture     := block.gravel
+    tool        := shovel
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+oak_log := {
+    name        := "Oak Log"
+    hardness    := 2.0
+    resistance  := 2.0
+    drop_chance := 1.0
+    texture     := block.oak_log
+    tool        := axe
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+oak_planks := {
+    name        := "Oak Planks"
+    hardness    := 2.0
+    resistance  := 3.0
+    drop_chance := 1.0
+    texture     := block.oak_planks
+    tool        := axe
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+cobblestone := {
+    name        := "Cobblestone"
+    hardness    := 2.0
+    resistance  := 6.0
+    drop_chance := 1.0
+    texture     := block.cobblestone
+    tool        := pickaxe
+    tool_level  := 1
+    stackable   := true
+}
+
+iron_ore := {
+    name        := "Iron Ore"
+    hardness    := 3.0
+    resistance  := 3.0
+    drop_chance := 1.0
+    texture     := block.iron_ore
+    tool        := pickaxe
+    tool_level  := 2
+    stackable   := true
+}
+
+gold_ore := {
+    name        := "Gold Ore"
+    hardness    := 3.0
+    resistance  := 3.0
+    drop_chance := 1.0
+    texture     := block.gold_ore
+    tool        := pickaxe
+    tool_level  := 3
+    stackable   := true
+}
+
+diamond_ore := {
+    name        := "Diamond Ore"
+    hardness    := 3.0
+    resistance  := 3.0
+    drop_chance := 1.0
+    texture     := block.diamond_ore
+    tool        := pickaxe
+    tool_level  := 3
+    stackable   := true
+}
+
+emerald_ore := {
+    name        := "Emerald Ore"
+    hardness    := 3.0
+    resistance  := 3.0
+    drop_chance := 1.0
+    texture     := block.emerald_ore
+    tool        := pickaxe
+    tool_level  := 3
+    stackable   := true
+}
+
+obsidian := {
+    name        := "Obsidian"
+    hardness    := 50.0
+    resistance  := 1200.0
+    drop_chance := 1.0
+    texture     := block.obsidian
+    tool        := pickaxe
+    tool_level  := 4
+    stackable   := true
+}
+
+glass := {
+    name        := "Glass"
+    hardness    := 0.3
+    resistance  := 0.3
+    drop_chance := 0.0
+    texture     := block.glass
+    tool        := none
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+bookshelf := {
+    name        := "Bookshelf"
+    hardness    := 1.5
+    resistance  := 1.5
+    drop_chance := 0.0
+    texture     := block.bookshelf
+    tool        := axe
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+crafting_table := {
+    name        := "Crafting Table"
+    hardness    := 2.5
+    resistance  := 2.5
+    drop_chance := 1.0
+    texture     := block.crafting_table_top
+    tool        := axe
+    tool_level  := .tool_level
+    stackable   := true
+}
+
+furnace := {
+    name        := "Furnace"
+    hardness    := 3.5
+    resistance  := 3.5
+    drop_chance := 1.0
+    texture     := block.furnace_front
+    tool        := pickaxe
+    tool_level  := 1
+    stackable   := true
+}
+
+// -----------------------------------------------------------------------
+// Inheritance chains
+// -----------------------------------------------------------------------
+
+BaseOreBlock := {
+    category    := ore
+    hardness    := 3.0
+    resistance  := 3.0
+    tool        := pickaxe
+    stackable   := true
+}
+
+DeepslateIronOre:BaseOreBlock := {
+    name        := "Deepslate Iron Ore"
+    hardness    := 4.5
+    texture     := block.deepslate_iron_ore
+    tool_level  := 2
+    drop_chance := 1.0
+}
+
+DeepslateGoldOre:BaseOreBlock := {
+    name        := "Deepslate Gold Ore"
+    hardness    := 4.5
+    texture     := block.deepslate_gold_ore
+    tool_level  := 3
+    drop_chance := 1.0
+}
+
+DeepslateDiamondOre:BaseOreBlock := {
+    name        := "Deepslate Diamond Ore"
+    hardness    := 4.5
+    texture     := block.deepslate_diamond_ore
+    tool_level  := 3
+    drop_chance := 1.0
+}
+
+// -----------------------------------------------------------------------
+// Biomes array — 15 biome objects
+// -----------------------------------------------------------------------
+
+biomes := [
+    { id := plains,           temp := 0.8,   rainfall := 0.4, depth := 0.125, scale := 0.05 },
+    { id := forest,           temp := 0.7,   rainfall := 0.8, depth := 0.1,   scale := 0.2  },
+    { id := desert,           temp := 2.0,   rainfall := 0.0, depth := 0.125, scale := 0.05 },
+    { id := taiga,            temp := 0.25,  rainfall := 0.8, depth := 0.2,   scale := 0.2  },
+    { id := swamp,            temp := 0.8,   rainfall := 0.9, depth := -0.2,  scale := 0.1  },
+    { id := jungle,           temp := 0.95,  rainfall := 0.9, depth := 0.1,   scale := 0.2  },
+    { id := savanna,          temp := 1.2,   rainfall := 0.0, depth := 0.125, scale := 0.05 },
+    { id := ocean,            temp := 0.5,   rainfall := 0.5, depth := -1.0,  scale := 0.1  },
+    { id := deep_ocean,       temp := 0.5,   rainfall := 0.5, depth := -1.8,  scale := 0.1  },
+    { id := frozen_ocean,     temp := 0.0,   rainfall := 0.5, depth := -1.0,  scale := 0.1  },
+    { id := mushroom_island,  temp := 0.9,   rainfall := 1.0, depth := 0.2,   scale := 0.3  },
+    { id := badlands,         temp := 2.0,   rainfall := 0.0, depth := 1.5,   scale := 0.025 },
+    { id := dark_forest,      temp := 0.7,   rainfall := 0.8, depth := 0.1,   scale := 0.2  },
+    { id := snowy_tundra,     temp := 0.0,   rainfall := 0.5, depth := 0.125, scale := 0.05 },
+    { id := flower_forest,    temp := 0.7,   rainfall := 0.8, depth := 0.1,   scale := 0.4  }
+]
+
+// -----------------------------------------------------------------------
+// Inventory — 50 item tuples  (item_id, count, metadata)
+// -----------------------------------------------------------------------
+
+inventory := [
+    (stone,            64, 0), (granite,          64, 0), (diorite,          64, 0),
+    (andesite,         64, 0), (dirt,              64, 0), (grass_block,      32, 0),
+    (sand,             64, 0), (gravel,            64, 0), (oak_log,          64, 0),
+    (oak_planks,       64, 0), (cobblestone,       64, 0), (iron_ore,         32, 0),
+    (gold_ore,         16, 0), (diamond_ore,        8, 0), (emerald_ore,       4, 0),
+    (obsidian,         10, 0), (glass,             64, 0), (bookshelf,        20, 0),
+    (crafting_table,    1, 0), (furnace,            2, 0), (iron_ingot,       64, 0),
+    (gold_ingot,       32, 0), (diamond,           16, 0), (emerald,           8, 0),
+    (coal,             64, 0), (charcoal,          64, 0), (flint,            32, 0),
+    (bone,             24, 0), (string,            48, 0), (feather,          32, 0),
+    (arrow,            64, 0), (bow,                1, 384), (sword_iron,       1, 250),
+    (sword_diamond,     1, 1561), (pickaxe_iron,   1, 250), (pickaxe_diamond,  1, 1561),
+    (shovel_iron,       1, 250), (axe_iron,         1, 250), (hoe_iron,         1, 250),
+    (helmet_iron,       1, 165), (chestplate_iron,  1, 240), (leggings_iron,    1, 225),
+    (boots_iron,        1, 195), (bread,            32, 0), (apple,            16, 0),
+    (cooked_pork,       24, 0), (golden_apple,      4, 0), (potion_heal,       3, 0),
+    (ender_pearl,       8, 0), (nether_star,        1, 0)
+]
+
+// -----------------------------------------------------------------------
+// World config
+// -----------------------------------------------------------------------
+
+world_config := {
+    seed        := 9174825061234567890
+    name        := "Benchmark World"
+    generator   := default
+    difficulty  := 2
+    game_mode   := 0
+    max_players := 100
+    view_distance := 10
+    spawn_world := .spawn_world
+    allow_pvp   := true
+    allow_flight := false
+}
+
+// -----------------------------------------------------------------------
+// Blobs
+// -----------------------------------------------------------------------
+
+level_dat := @nbt`CgAFTGV2ZWwIAAhTZWF0VHlwZQAAAAAA`
+shader_src := @glsl`void main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }`

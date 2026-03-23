@@ -1,138 +1,153 @@
 {
     "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "testPath",
+            "description": "Test path (e.g. unit/parser, unit, performance)",
+            "default": "unit",
+            "type": "promptString"
+        }
+    ],
     "tasks": [
         {
-            "label": "Build libanvil.a (static)",
+            "label": "cbuild: lib",
             "type": "shell",
-            "command": "sh",
+            "command": "cbuild",
             "args": [
-                "-c",
-                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/context.c -o build/context.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/operators.c -o build/operators.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/symbols.c -o build/symbols.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/errors.c -o build/errors.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && ar rcs bin/libanvil.a build/anvil.o build/parser.o build/resolver.o build/context.o build/types.o build/writer.o build/operators.o build/symbols.o build/errors.o build/utils.o"
+                "lib"
             ],
-            "group": "build"
-        },
-        {
-            "label": "Build libanvil.so (shared)",
-            "type": "shell",
-            "command": "sh",
-            "args": [
-                "-c",
-                "mkdir -p build bin && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/anvil.c -o build/anvil.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/parser.c -o build/parser.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/resolver.c -o build/resolver.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/context.c -o build/context.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/types.c -o build/types.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/writer.c -o build/writer.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/operators.c -o build/operators.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/symbols.c -o build/symbols.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/core/errors.c -o build/errors.o && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -c src/utilities/utils.c -o build/utils.o && gcc -shared -o bin/libanvil.so build/anvil.o build/parser.o build/resolver.o build/context.o build/types.o build/writer.o build/operators.o build/symbols.o build/errors.o build/utils.o"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "Build CLI",
-            "type": "shell",
-            "command": "make",
-            "args": [
-                "cli"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "Run Tests",
-            "type": "shell",
-            "command": "make",
-            "args": [
-                "test_anvil"
-            ],
-            "group": "test"
-        },
-        {
-            "label": "Clean",
-            "type": "shell",
-            "command": "make",
-            "args": [
-                "clean"
-            ]
-        },
-        {
-            "label": "gcc: compile active test",
-            "type": "shell",
-            "command": "gcc",
-            "args": [
-                "-Wall",
-                "-Wextra",
-                "-g",
-                "-fPIC",
-                "-std=c2x",
-                "-Iinclude",
-                "-Iinclude/test",
-                "-I/usr/include/sigtest",
-                "-I/usr/include/sigcore",
-                "-DTSTDBG",
-                "-c",
-                "${file}",
-                "-o",
-                "build/test/${fileBasenameNoExtension}.o"
-            ],
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "presentation": {
-                "echo": true,
-                "reveal": "silent",
+                "reveal": "always",
                 "panel": "shared"
             },
             "problemMatcher": "$gcc"
         },
         {
-            "label": "Build test utils.o",
+            "label": "cbuild: compile",
             "type": "shell",
-            "command": "sh",
+            "command": "cbuild",
             "args": [
-                "-c",
-                "mkdir -p build/test && gcc -std=c2x -Wall -Wextra -Werror -O0 -fPIC -g -Iinclude -Iinclude/test -I/usr/include/sigtest -I/usr/include/sigcore -DTSTDBG -c test/utilities/helpers.c -o build/test/utils.o"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "gcc: link active test",
-            "type": "shell",
-            "command": "gcc",
-            "args": [
-                "build/test/${fileBasenameNoExtension}.o",
-                "bin/libanvil.so",
-                "build/test/utils.o",
-                "-o",
-                "build/test/${fileBasenameNoExtension}",
-                "-lsigcore",
-                "-lstest",
-                "-L/usr/lib",
-                "-Wl,--wrap=malloc",
-                "-Wl,--wrap=free",
-                "-Wl,--wrap=calloc",
-                "-Wl,--wrap=realloc"
-            ],
-            "dependsOn": [
-                "gcc: compile active test",
-                "Build libanvil.so (shared)",
-                "Build test utils.o"
+                "compile"
             ],
             "group": "build",
             "presentation": {
-                "echo": true,
                 "reveal": "always",
                 "panel": "shared"
             },
-            "problemMatcher": []
+            "problemMatcher": "$gcc"
         },
         {
-            "label": "Run test_anvil",
+            "label": "cbuild: clean",
             "type": "shell",
-            "command": "./build/test/test_anvil",
-            "group": "test"
+            "command": "cbuild",
+            "args": [
+                "clean"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
         },
         {
-            "label": "Run test_parser",
+            "label": "cbuild: clean_all",
             "type": "shell",
-            "command": "./bin/test_parser",
-            "group": "test"
+            "command": "cbuild",
+            "args": [
+                "clean_all"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
         },
         {
-            "label": "Run test_bool",
+            "label": "rtest: prompt",
             "type": "shell",
-            "command": "./build/test/test_bool",
-            "group": "test"
+            "command": "./rtest",
+            "args": [
+                "${input:testPath}"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": [
+                "cbuild: lib"
+            ]
+        },
+        {
+            "label": "rtest: unit",
+            "type": "shell",
+            "command": "./rtest",
+            "args": [
+                "unit"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": [
+                "cbuild: lib"
+            ]
+        },
+        {
+            "label": "rtest: performance",
+            "type": "shell",
+            "command": "./rtest",
+            "args": [
+                "performance"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": [
+                "cbuild: lib"
+            ]
+        },
+        {
+            "label": "rtest: active test",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "name=$(basename '${fileBasenameNoExtension}' | sed 's/^test_//'); subdir=$(dirname '${relativeFile}' | sed 's|^test/||;s|/.*||'); ./rtest ${subdir}/${name}"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": [
+                "cbuild: lib"
+            ]
+        },
+        {
+            "label": "rtest: active test (valgrind)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "name=$(basename '${fileBasenameNoExtension}' | sed 's/^test_//'); subdir=$(dirname '${relativeFile}' | sed 's|^test/||;s|/.*||'); ./rtest ${subdir}/${name} --valgrind"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": [
+                "cbuild: lib"
+            ]
         }
     ]
 }
