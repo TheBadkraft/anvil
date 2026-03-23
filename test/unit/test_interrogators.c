@@ -24,6 +24,9 @@ static void test_qp12_get_element_oob(void);
 static void test_qp13_field_count_null_guard(void);
 static void test_qp14_element_count_null_guard(void);
 static void test_qp15_nested_object_field_traversal(void);
+static void test_qp16_get_statement_by_name_hit(void);
+static void test_qp17_get_statement_by_name_miss(void);
+static void test_qp18_get_statement_by_name_null_guard(void);
 
 static void set_config(FILE **logger) {
    // configure logging stream
@@ -263,6 +266,9 @@ static void _register(void) {
    testcase("QP13: field_count NULL guard", test_qp13_field_count_null_guard);
    testcase("QP14: element_count NULL guard", test_qp14_element_count_null_guard);
    testcase("QP15: nested object field traversal", test_qp15_nested_object_field_traversal);
+   testcase("QP16: get_statement_by_name hit", test_qp16_get_statement_by_name_hit);
+   testcase("QP17: get_statement_by_name miss returns NULL", test_qp17_get_statement_by_name_miss);
+   testcase("QP18: get_statement_by_name NULL guard", test_qp18_get_statement_by_name_null_guard);
 }
 __attribute__((constructor)) static void register_test_interrogators(void) {
    Tests.enqueue(_register);
@@ -467,5 +473,41 @@ static void test_qp15_nested_object_field_traversal(void) {
    Assert.isNotNull(f_timeout, "'timeout' field found");
    Assert.isNotNull(f_server->val, "'server' field has a value");
    Assert.isTrue(f_server->val->type == ANVL_VALUE_OBJECT, "'server' value is an object");
+   Context.dispose(ctx);
+}
+
+/* QP16 — get_statement_by_name returns the matching top-level statement */
+static void test_qp16_get_statement_by_name_hit(void) {
+   context ctx = qp_parse("#!aml\nalpha := 1\nbeta := 2\ngamma := 3\n");
+   Assert.isNotNull(ctx, "context builds");
+
+   statement s = Context.get_statement_by_name(ctx, "beta", 4);
+   Assert.isNotNull(s, "'beta' statement found");
+
+   const char *raw = Source.data(ctx->source);
+   Assert.isTrue(
+       strncmp(raw + s->meta[STMT_META_IDENT_POS], "beta", s->meta[STMT_META_IDENT_LEN]) == 0,
+       "identifier span matches 'beta'");
+   Context.dispose(ctx);
+}
+
+/* QP17 — get_statement_by_name returns NULL for an unknown identifier */
+static void test_qp17_get_statement_by_name_miss(void) {
+   context ctx = qp_parse("#!aml\nfoo := 1\n");
+   Assert.isNotNull(ctx, "context builds");
+
+   statement s = Context.get_statement_by_name(ctx, "bar", 3);
+   Assert.isNull(s, "unknown name returns NULL");
+   Context.dispose(ctx);
+}
+
+/* QP18 — get_statement_by_name NULL / zero-length guards */
+static void test_qp18_get_statement_by_name_null_guard(void) {
+   context ctx = qp_parse("#!aml\nfoo := 1\n");
+   Assert.isNotNull(ctx, "context builds");
+
+   Assert.isNull(Context.get_statement_by_name(NULL, "foo", 3), "NULL ctx returns NULL");
+   Assert.isNull(Context.get_statement_by_name(ctx, NULL, 3), "NULL name returns NULL");
+   Assert.isNull(Context.get_statement_by_name(ctx, "foo", 0), "zero len returns NULL");
    Context.dispose(ctx);
 }

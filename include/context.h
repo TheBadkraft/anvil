@@ -143,6 +143,9 @@ struct anvl_context_t {
       usize count;                    // number of declarations
       usize capacity;                 // allocated capacity
    } import_list;
+   // Lazy-built statement name → index map (FNV-1a, sigma.collections Map).
+   // NULL until the first get_statement_by_name call. Freed by context_dispose.
+   void *stmt_name_index;
 };
 
 /* ------------------------------------------------------------------ */
@@ -237,6 +240,8 @@ typedef struct anvl_context_i {
    attr_builder (*begin_attribute)(context self);
    void (*end_attribute)(context self, attr_builder bldr);
    // Query path primitives (E3)
+   // Statement lookup by name
+   statement (*get_statement_by_name)(context self, const char *name, usize len);
    // Object field traversal
    usize (*field_count)(context self, statement stmt);
    field (*get_field)(context self, statement stmt, usize index);

@@ -190,6 +190,11 @@ static void context_dispose(context self) {
             s->value_meta->name_index = NULL;
          }
       }
+      // Drain the context-level statement name index map.
+      if (self->stmt_name_index) {
+         Map.dispose((map)self->stmt_name_index);
+         self->stmt_name_index = NULL;
+      }
       // Source lives outside the arena (loaded independently), dispose it first.
       if (self->source)
          Source.dispose(self->source);
@@ -595,6 +600,46 @@ static void context_end_value(context self, value_builder bldr) {
 /* E3 — Query path primitives                                         */
 /* ------------------------------------------------------------------ */
 
+static statement context_get_statement_by_name(context self, const char *name, usize len) {
+   if (!self || !name || len == 0)
+      return NULL;
+
+   /* Lazy-build a statement identifier → stmt_list index map on first call. */
+   if (!self->stmt_name_index) {
+      map m = Map.new(self->stmt_list.count * 2 + 4);
+      if (m) {
+         const char *raw = Source.data(self->source);
+         for (usize i = 0; i < self->stmt_list.count; i++) {
+            statement s = self->stmt_list.statements[i];
+            if (!s)
+               continue;
+            usize id_pos = s->meta[STMT_META_IDENT_POS];
+            usize id_len = s->meta[STMT_META_IDENT_LEN];
+            if (id_len > 0)
+               Map.set(m, raw + id_pos, id_len, (usize)i);
+         }
+         self->stmt_name_index = (void *)m;
+      }
+   }
+
+   /* O(1) lookup; fall back to linear scan if map allocation failed. */
+   if (self->stmt_name_index) {
+      usize idx;
+      if (Map.get((map)self->stmt_name_index, name, len, &idx))
+         return self->stmt_list.statements[idx];
+      return NULL;
+   }
+
+   /* Fallback: linear scan (only reached if Map.new failed). */
+   const char *raw = Source.data(self->source);
+   for (usize i = 0; i < self->stmt_list.count; i++) {
+      statement s = self->stmt_list.statements[i];
+      if (s && s->meta[STMT_META_IDENT_LEN] == len && memcmp(raw + s->meta[STMT_META_IDENT_POS], name, len) == 0)
+         return s;
+   }
+   return NULL;
+}
+
 static usize context_field_count(context self, statement stmt) {
    if (!self || !stmt || !stmt->value_meta)
       return 0;
@@ -703,6 +748,7 @@ const struct anvl_context_i Context = {
     .get_field_by_name = context_get_field_by_name,
     .element_count = context_element_count,
     .get_element = context_get_element,
+    .get_statement_by_name = context_get_statement_by_name,
 };
 
 const struct anvl_statement_i Statement = {
