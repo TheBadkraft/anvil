@@ -8,7 +8,7 @@
                 "/usr/local/include",
                 "/usr/local/include/sigma.test",
                 "/usr/local/include/sigma.memory",
-                "/usr/local/include/sigma.text",
+                "/usr/local/include/sigma.core",
                 "/usr/include"
             ],
             "defines": [],
