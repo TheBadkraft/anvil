@@ -38,10 +38,10 @@
 /* Statement Types                                                   */
 /* ------------------------------------------------------------------ */
 typedef enum {
-   ANVL_STMT_ASSN,   // assignment statement (all current statements)
-   ANVL_STMT_FUNC,   // function statement (AnvilScript, future)
-   ANVL_STMT_MSSG,   // message statement (AMPP, future)
-   ANVL_ANON_OBJECT  // anonymous top-level object block (read-only)
+   ANVL_STMT_ASSN,  // assignment statement (all current statements)
+   ANVL_STMT_FUNC,  // function statement (AnvilScript, future)
+   ANVL_STMT_MSSG,  // message statement (AMPP, future)
+   ANVL_ANON_OBJECT // anonymous top-level object block (read-only)
 } anvl_stmt_type;
 
 /* ------------------------------------------------------------------ */

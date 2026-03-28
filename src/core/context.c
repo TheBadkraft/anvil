@@ -206,7 +206,7 @@ static void context_dispose(context self) {
          self->arena = NULL;
       }
       // The context struct itself was allocated from the reclaiming allocator.
-      Allocator.free(self);
+      Allocator.dispose(self);
    }
 }
 
@@ -269,7 +269,7 @@ static void context_end_attribute(context self, attr_builder bldr) {
    }
 
    // Free builder
-   Allocator.free(bldr);
+   Allocator.dispose(bldr);
 }
 #endif
 
@@ -306,7 +306,7 @@ static value_builder context_begin_value(context self, anvl_value_type type) {
    value_builder bldr = Allocator.alloc(sizeof(struct anvl_value_builder_t));
    if (bldr) memset(bldr, 0, sizeof(struct anvl_value_builder_t));
    if (!bldr) {
-      Allocator.free(val);
+      Allocator.dispose(val);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate value builder", 0, 0, __FILE__);
       return NULL;
    }
@@ -336,7 +336,7 @@ static void context_end_value(context self, value_builder bldr) {
 
    // Values are now self-contained in statements' value_meta
    // This function kept for API compatibility but does minimal work
-   Allocator.free(bldr);
+   Allocator.dispose(bldr);
 }
 // DISABLED: Builder method implementations
 // The direct parser is the primary method now; builders kept for reference only
@@ -424,7 +424,7 @@ void attr_builder_add(attr_builder self) {
 
    // Add to context
    if (!context_add_attribute(self->ctx, attr)) {
-      Allocator.free(attr);
+      Allocator.dispose(attr);
       return;
    }
 
@@ -482,7 +482,7 @@ void value_builder_end_object(value_builder self) {
       // Set the value data for nested object
       self->val->data.object.field_start = field_start;
       self->val->data.object.field_count = self->temp.field_count;
-      Allocator.free(self->temp.fields);
+      Allocator.dispose(self->temp.fields);
    }
 }
 
@@ -512,7 +512,7 @@ void value_builder_end_array(value_builder self) {
       // Just track element count
       self->val->data.collection.element_start = 0;
       self->val->data.collection.element_count = self->temp.value_count;
-      Allocator.free(self->temp.values);
+      Allocator.dispose(self->temp.values);
    }
 }
 
@@ -536,7 +536,7 @@ value_builder create_temp_value_builder(context ctx) {
    value_builder bldr = Allocator.alloc(sizeof(struct anvl_value_builder_t));
    if (bldr) memset(bldr, 0, sizeof(struct anvl_value_builder_t));
    if (!bldr) {
-      Allocator.free(val);
+      Allocator.dispose(val);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to allocate temp value builder", 0, 0, __FILE__);
       return NULL;
    }
@@ -568,17 +568,17 @@ void dispose_temp_value_builder(value_builder bldr) {
             if (f) {
                // Attributes are owned by context->attr_list, not the field
                // f->val is owned by parent
-               Allocator.free(f);
+               Allocator.dispose(f);
             }
          }
-         Allocator.free(bldr->temp.fields);
+         Allocator.dispose(bldr->temp.fields);
       }
       if (bldr->temp.values) {
          // values owned by parent
-         Allocator.free(bldr->temp.values);
+         Allocator.dispose(bldr->temp.values);
       }
       // val is owned by parent
-      Allocator.free(bldr);
+      Allocator.dispose(bldr);
    }
 }
 #endif
@@ -788,7 +788,7 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
                         anvl_error_code_message(ANVL_ERR_BUILDER_NO_SOURCE),
                         0, 0, NULL);
       }
-      Allocator.free(ctx); // Clean up the context we just allocated
+      Allocator.dispose(ctx); // Clean up the context we just allocated
       return NULL;
    }
    // Transfer ownership - clear builder's reference
@@ -807,7 +807,7 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
    if (!ctx->arena) {
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED, "Failed to acquire parse resource scope", 0, 0, __FILE__);
       Source.dispose(ctx->source);
-      Allocator.free(ctx);
+      Allocator.dispose(ctx);
       return NULL;
    }
 
@@ -904,7 +904,7 @@ static source source_create(const char *data, usize len) {
    if (data && len > 0) {
       char *buffer = malloc(len + 1);
       if (!buffer) {
-         Allocator.free(src);
+         Allocator.dispose(src);
          return NULL;
       }
       memcpy(buffer, data, len);
@@ -930,7 +930,7 @@ static source source_create(const char *data, usize len) {
          if (source_is_shebang(src)) {
             anvl_error_set(ANVL_ERR_PARSER_MULTIPLE_SHEBANG, "Multiple shebangs not allowed", src->line, src->col, NULL);
             free(src->buffer.bucket);
-            Allocator.free(src);
+            Allocator.dispose(src);
             return NULL;
          }
       }
@@ -946,7 +946,7 @@ static void source_dispose(source self) {
    if (self->buffer.bucket) {
       free(self->buffer.bucket);
    }
-   Allocator.free(self);
+   Allocator.dispose(self);
 }
 
 static anvl_dialect source_get_dialect(source self) {
