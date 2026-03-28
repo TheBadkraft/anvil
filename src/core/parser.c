@@ -1078,18 +1078,18 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    value_meta->data.object.field_count = val->data.object.field_count;
 
    // Fill statement metadata
-   stmt->meta[STMT_META_TYPE]       = (usize)ANVL_ANON_OBJECT;
+   stmt->meta[STMT_META_TYPE] = (usize)ANVL_ANON_OBJECT;
    stmt->meta[STMT_META_RESERVED_1] = 0;
-   stmt->meta[STMT_META_IDENT_POS]  = ident_pos;
-   stmt->meta[STMT_META_IDENT_LEN]  = ident_len;
-   stmt->meta[STMT_META_BASE_IDX]   = 0;
-   stmt->meta[STMT_META_ATTR_IDX]   = 0;
+   stmt->meta[STMT_META_IDENT_POS] = ident_pos;
+   stmt->meta[STMT_META_IDENT_LEN] = ident_len;
+   stmt->meta[STMT_META_BASE_IDX] = 0;
+   stmt->meta[STMT_META_ATTR_IDX] = 0;
    stmt->meta[STMT_META_RESERVED_6] = 0;
-   stmt->meta[STMT_META_VALUE_IDX]  = 1;
+   stmt->meta[STMT_META_VALUE_IDX] = 1;
    stmt->meta[STMT_META_RESERVED_8] = 0;
 
-   stmt->base_meta  = NULL;
-   stmt->attr_meta  = NULL;
+   stmt->base_meta = NULL;
+   stmt->attr_meta = NULL;
    stmt->value_meta = value_meta;
 
    si_skip_whitespace_and_comments(s);

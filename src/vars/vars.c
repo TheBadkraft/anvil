@@ -16,8 +16,8 @@
 #include "vars.h"
 #include "context.h"
 #include "errors.h"
-#include <sigma.memory/memory.h>
 #include <sigma.core/strings.h>
+#include <sigma.memory/memory.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */

@@ -17,8 +17,8 @@
 #include "serializer.h"
 #include "anvil.h"
 
-#include <sigma.memory/memory.h>
 #include <sigma.core/strings.h>
+#include <sigma.memory/memory.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -358,7 +358,10 @@ static void write_field_value(context ctx, iw w,
       usize len = val->data.scalar.len;
       bool dotted = false;
       for (usize i = 0; i < len; i++) {
-         if (src[pos + i] == '.') { dotted = true; break; }
+         if (src[pos + i] == '.') {
+            dotted = true;
+            break;
+         }
       }
       if (dotted)
          StringBuilder.appendf(w->sb, "${%.*s}", (int)len, src + pos);
@@ -433,7 +436,10 @@ static void write_value_meta(context ctx, iw w,
       const char *src = Source.data(ctx->source);
       bool dotted = false;
       for (usize i = 0; i < vm->len; i++) {
-         if (src[vm->pos + i] == '.') { dotted = true; break; }
+         if (src[vm->pos + i] == '.') {
+            dotted = true;
+            break;
+         }
       }
       if (dotted)
          StringBuilder.appendf(w->sb, "${%.*s}", (int)vm->len, src + vm->pos);
