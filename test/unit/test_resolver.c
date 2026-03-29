@@ -69,9 +69,9 @@ static context build_context(const char *src_str) {
 /* Return source string from context (convenience) */
 static inline source ctx_src(context ctx) { return ctx->source; }
 
-/* Get identifier from statement using raw meta */
-static const char *stmt_ident(statement stmt, source src) {
-   return Statement.identifier(stmt, src);
+/* Get identifier from statement into buffer (convenience; FR-002) */
+static void stmt_ident(statement stmt, source src, char *out_buf) {
+   Statement.identifier(stmt, src, out_buf);
 }
 
 /* Find merged field by key name; returns NULL when not found */
@@ -170,9 +170,11 @@ static void test_single_level_inherits_unoverridden(void) {
 
    /* Find Derived statement index */
    usize derived_idx = (usize)-1;
+   char id[128];
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Derived") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Derived") == 0) {
          derived_idx = i;
          break;
       }
@@ -205,9 +207,10 @@ static void test_single_level_derived_override(void) {
    Assert.isNotNull(state, "State should be built");
 
    usize derived_idx = (usize)-1;
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Derived") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Derived") == 0) {
          derived_idx = i;
          break;
       }
@@ -238,9 +241,11 @@ static void test_single_level_base_unchanged(void) {
    Assert.isNotNull(state, "State should be built");
 
    usize base_idx = (usize)-1;
+   char id[128];
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Base") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Base") == 0) {
          base_idx = i;
          break;
       }
@@ -271,9 +276,11 @@ static void test_three_level_full_resolve(void) {
    Assert.isNotNull(state, "State should be built");
 
    usize gamma_idx = (usize)-1;
+   char id[128];
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Gamma") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Gamma") == 0) {
          gamma_idx = i;
          break;
       }
@@ -310,9 +317,11 @@ static void test_three_level_beta_correct(void) {
    Assert.isNotNull(state, "State should be built");
 
    usize beta_idx = (usize)-1;
+   char id[128];
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Beta") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Beta") == 0) {
          beta_idx = i;
          break;
       }
@@ -342,9 +351,11 @@ static void test_forward_reference(void) {
    Assert.isNotNull(state, "State should be built for forward ref doc");
 
    usize child_idx = (usize)-1;
+   char id[128];
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Child") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Child") == 0) {
          child_idx = i;
          break;
       }
@@ -399,9 +410,10 @@ static void test_warm_all_idempotent(void) {
 
    /* Verify cached result still correct after double warm */
    usize derived_idx = (usize)-1;
+   char id[128];
    for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      const char *id = stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx));
-      if (id && strcmp(id, "Derived") == 0) {
+      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
+      if (id[0] && strcmp(id, "Derived") == 0) {
          derived_idx = i;
          break;
       }

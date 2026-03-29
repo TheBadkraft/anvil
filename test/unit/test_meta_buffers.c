@@ -221,15 +221,17 @@ static void test_base_meta_retrieve_entry(void) {
    }
 
    // Get identifier
-   const char *ident = Statement.identifier(stmt, ctx->source);
-   Assert.isNotNull((void *)ident, "Identifier should exist");
+   char ident[128];
+   Statement.identifier(stmt, ctx->source, ident);
+   Assert.isTrue(ident[0] != '\0', "Identifier should exist");
    Assert.isTrue(strcmp(ident, "child") == 0, "Identifier should be 'child'");
 
    // Get base from base_meta buffer
    if (stmt->base_meta && ctx->source) {
-      const char *base = Source.substring(ctx->source, stmt->base_meta->pos, stmt->base_meta->len);
+      char base[128];
+      Source.substring(ctx->source, stmt->base_meta->pos, stmt->base_meta->len, base);
       writelnf("Retrieved base: %.*s", (int)stmt->base_meta->len, base);
-      Assert.isNotNull((void *)base, "Base should be retrievable from source");
+      Assert.isTrue(base[0] != '\0', "Base should be retrievable from source");
    } else {
       Assert.fail("Base metadata not available");
    }
@@ -250,7 +252,8 @@ static void test_inheritance_simple(void) {
                  "Statement should be ASSN type (inheritance is metadata)");
 
    // Verify identifier
-   const char *ident = Statement.identifier(stmt, ctx->source);
+   char ident[128];
+   Statement.identifier(stmt, ctx->source, ident);
    Assert.isTrue(strcmp(ident, "myclass") == 0, "Identifier should be 'myclass'");
 
    // Verify base_meta exists

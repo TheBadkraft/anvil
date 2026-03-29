@@ -12,9 +12,9 @@
 
 #include "anvil.h"
 #include "utilities/helpers.h"
+#include <sigma.core/strings.h>
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
-#include <sigma.core/strings.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -76,8 +76,8 @@ static void test_load_source_valid(void) {
    Assert.isTrue(ok, "load_source should return true for an existing file");
    Assert.isNotNull((void *)source, "source pointer should be set");
    Assert.isTrue(len > 0, "source length should be greater than zero");
-   // load_source uses Allocator.alloc — dispose via Allocator
-   Allocator.free((void *)source);
+   // load_source uses malloc — caller frees with free()
+   free((void *)source);
 }
 
 // UT07 — load_source returns false for a non-existent path
@@ -96,7 +96,7 @@ static void test_load_source_length(void) {
    bool ok = load_source(filepath, &source, &len);
    Assert.isTrue(ok, "load_source should succeed for numbers.anvl");
    Assert.isTrue(len == strlen(source), "Reported length should match null-terminated string length");
-   Allocator.free((void *)source);
+   free((void *)source);
 }
 
 // ============================================================================

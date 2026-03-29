@@ -33,7 +33,7 @@ static attr_builder context_begin_attribute(context self);
 static void context_end_attribute(context self, attr_builder bldr);
 
 // Statement interface functions
-static const char *statement_identifier(statement self, source src);
+static void statement_identifier(statement self, source src, char *out_identifier);
 static const char *statement_base(statement self, source src);
 static anvl_stmt_type statement_type(statement self);
 static anvl_value_type statement_value_type(statement self);
@@ -822,10 +822,13 @@ static void builder_dispose(struct anvl_ctx_builder_i *self) {
 }
 
 // Statement interface implementations
-static const char *statement_identifier(statement self, source src) {
-   if (!self || !src || self->meta[STMT_META_IDENT_LEN] == 0)
-      return NULL;
-   return Source.substring(src, self->meta[STMT_META_IDENT_POS], self->meta[STMT_META_IDENT_LEN]);
+static void statement_identifier(statement self, source src, char *out_identifier) {
+   if (!self || !src || !out_identifier || self->meta[STMT_META_IDENT_LEN] == 0) {
+      if (out_identifier)
+         out_identifier[0] = '\0';
+      return;
+   }
+   Source.substring(src, self->meta[STMT_META_IDENT_POS], self->meta[STMT_META_IDENT_LEN], out_identifier);
 }
 
 static const char *statement_base(statement self, source src) {
@@ -888,7 +891,7 @@ static void source_reset(source self);
 static usize source_skip_whitespace_and_comments(source);
 static anvl_dialect source_parse_dialect(source, anvl_dialect);
 static usize source_consume(source, usize);
-static char *source_substring(source, usize, usize);
+static void source_substring(source, usize, usize, char *);
 static usize source_scan_whitespace(source self, usize offset);
 static usize source_scan_line_comment(source self, usize offset);
 static usize source_scan_block_comment(source self, usize offset);
@@ -1038,18 +1041,21 @@ static usize source_length(source self) {
    return (usize)(self->buffer.end - self->buffer.bucket);
 }
 
-static char *source_substring(source self, usize start, usize len) {
-   if (start >= (usize)(self->buffer.end - self->buffer.bucket) || len == 0) {
-      return NULL;
+static void source_substring(source self, usize start, usize len, char *out_buf) {
+   if (!out_buf) {
+      return;
+   }
+
+   if (!self || start >= (usize)(self->buffer.end - self->buffer.bucket) || len == 0) {
+      out_buf[0] = '\0';
+      return;
    }
 
    usize available = (usize)(self->buffer.end - self->buffer.bucket) - start;
    usize actual_len = len < available ? len : available;
 
-   char *result = Allocator.alloc(actual_len + 1);
-   memcpy(result, self->buffer.bucket + start, actual_len);
-   result[actual_len] = '\0';
-   return result;
+   memcpy(out_buf, self->buffer.bucket + start, actual_len);
+   out_buf[actual_len] = '\0';
 }
 
 static usize source_scan_whitespace(source self, usize offset) {

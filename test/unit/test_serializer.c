@@ -104,12 +104,14 @@ static context round_trip(const char *src_str, const anvl_serializer_options_t *
    return ctx2;
 }
 
-/* Return raw source substring for statement value at stmt_idx. Caller must Allocator.free(). */
-static char *stmt_value_str(context ctx, usize idx) {
+/* Write raw source substring for statement value at stmt_idx to out_buf. */
+static void stmt_value_str(context ctx, usize idx, char *out_buf) {
    statement stmt = Context.get_statement(ctx, idx);
-   if (!stmt || !stmt->value_meta)
-      return NULL;
-   return Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   if (!stmt || !stmt->value_meta) {
+      out_buf[0] = '\0';
+      return;
+   }
+   Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len, out_buf);
 }
 
 /* Return the number of fields in the object value of statement at stmt_idx. */
@@ -122,30 +124,40 @@ static usize stmt_object_field_count(context ctx, usize idx) {
    return stmt->value_meta->data.object.field_count;
 }
 
-/* Return raw key string for field at field_start + offset. Caller must Allocator.free(). */
-static char *field_key_str(context ctx, usize stmt_idx, usize field_offset) {
+/* Write raw key string for field at field_start + offset to out_buf. */
+static void field_key_str(context ctx, usize stmt_idx, usize field_offset, char *out_buf) {
    statement stmt = Context.get_statement(ctx, stmt_idx);
-   if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT)
-      return NULL;
+   if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT) {
+      out_buf[0] = '\0';
+      return;
+   }
    usize fi = stmt->value_meta->data.object.field_start + field_offset;
-   if (fi >= ctx->field_list.count)
-      return NULL;
+   if (fi >= ctx->field_list.count) {
+      out_buf[0] = '\0';
+      return;
+   }
    field f = ctx->field_list.fields[fi];
-   return Source.substring(ctx->source, f->key_pos, f->key_len);
+   Source.substring(ctx->source, f->key_pos, f->key_len, out_buf);
 }
 
-/* Return raw value string for field at field_start + offset. Caller must Allocator.free(). */
-static char *field_val_str(context ctx, usize stmt_idx, usize field_offset) {
+/* Write raw value string for field at field_start + offset to out_buf. */
+static void field_val_str(context ctx, usize stmt_idx, usize field_offset, char *out_buf) {
    statement stmt = Context.get_statement(ctx, stmt_idx);
-   if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT)
-      return NULL;
+   if (!stmt || !stmt->value_meta || stmt->value_meta->type != ANVL_VALUE_OBJECT) {
+      out_buf[0] = '\0';
+      return;
+   }
    usize fi = stmt->value_meta->data.object.field_start + field_offset;
-   if (fi >= ctx->field_list.count)
-      return NULL;
+   if (fi >= ctx->field_list.count) {
+      out_buf[0] = '\0';
+      return;
+   }
    field f = ctx->field_list.fields[fi];
-   if (!f->val || f->val->type != ANVL_VALUE_SCALAR)
-      return NULL;
-   return Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len);
+   if (!f->val || f->val->type != ANVL_VALUE_SCALAR) {
+      out_buf[0] = '\0';
+      return;
+   }
+   Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len, out_buf);
 }
 
 /* ================================================================
@@ -163,27 +175,23 @@ static void test_st01_scalars_round_trip(void) {
    Assert.isNotNull(ctx, "Round-trip context should exist");
    Assert.isTrue(Context.statement_count(ctx) == 4, "Should have 4 statements");
 
-   char *v;
+   char v[256];
 
-   v = stmt_value_str(ctx, 0);
-   Assert.isNotNull(v, "name value present");
+   stmt_value_str(ctx, 0, v);
+   Assert.isTrue(v[0], "name value present");
    Assert.isTrue(strcmp(v, "\"Anvil.Engine\"") == 0, "name := \"Anvil.Engine\"");
-   Allocator.free(v);
 
-   v = stmt_value_str(ctx, 1);
-   Assert.isNotNull(v, "count value present");
+   stmt_value_str(ctx, 1, v);
+   Assert.isTrue(v[0], "count value present");
    Assert.isTrue(strcmp(v, "42") == 0, "count := 42");
-   Allocator.free(v);
 
-   v = stmt_value_str(ctx, 2);
-   Assert.isNotNull(v, "debug value present");
+   stmt_value_str(ctx, 2, v);
+   Assert.isTrue(v[0], "debug value present");
    Assert.isTrue(strcmp(v, "true") == 0, "debug := true");
-   Allocator.free(v);
 
-   v = stmt_value_str(ctx, 3);
-   Assert.isNotNull(v, "material value present");
+   stmt_value_str(ctx, 3, v);
+   Assert.isTrue(v[0], "material value present");
    Assert.isTrue(strcmp(v, "stone") == 0, "material := stone");
-   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -202,16 +210,14 @@ static void test_st02_inline_object_round_trip(void) {
    Assert.isTrue(Context.statement_count(ctx) == 1, "Should have 1 statement");
    Assert.isTrue(stmt_object_field_count(ctx, 0) == 2, "point has 2 fields");
 
-   char *v;
-   v = field_val_str(ctx, 0, 0); /* x */
-   Assert.isNotNull(v, "x value present");
+   char v[256];
+   field_val_str(ctx, 0, 0, v); /* x */
+   Assert.isTrue(v[0], "x value present");
    Assert.isTrue(strcmp(v, "10") == 0, "x := 10");
-   Allocator.free(v);
 
-   v = field_val_str(ctx, 0, 1); /* y */
-   Assert.isNotNull(v, "y value present");
+   field_val_str(ctx, 0, 1, v); /* y */
+   Assert.isTrue(v[0], "y value present");
    Assert.isTrue(strcmp(v, "20") == 0, "y := 20");
-   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -234,21 +240,18 @@ static void test_st03_block_object_round_trip(void) {
    Assert.isTrue(Context.statement_count(ctx) == 1, "Should have 1 statement");
    Assert.isTrue(stmt_object_field_count(ctx, 0) == 3, "config has 3 fields");
 
-   char *v;
-   v = field_val_str(ctx, 0, 0); /* name */
-   Assert.isNotNull(v, "name value present");
+   char v[256];
+   field_val_str(ctx, 0, 0, v); /* name */
+   Assert.isTrue(v[0], "name value present");
    Assert.isTrue(strcmp(v, "\"server\"") == 0, "name := \"server\"");
-   Allocator.free(v);
 
-   v = field_val_str(ctx, 0, 1); /* port */
-   Assert.isNotNull(v, "port value present");
+   field_val_str(ctx, 0, 1, v); /* port */
+   Assert.isTrue(v[0], "port value present");
    Assert.isTrue(strcmp(v, "8080") == 0, "port := 8080");
-   Allocator.free(v);
 
-   v = field_val_str(ctx, 0, 2); /* debug */
-   Assert.isNotNull(v, "debug value present");
+   field_val_str(ctx, 0, 2, v); /* debug */
+   Assert.isTrue(v[0], "debug value present");
    Assert.isTrue(strcmp(v, "false") == 0, "debug := false");
-   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();
@@ -270,18 +273,20 @@ static void test_st04a_inline_array_round_trip(void) {
    Assert.isNotNull(stmt->value_meta, "value_meta present");
    Assert.isTrue(stmt->value_meta->data.collection.element_count == 2, "2 elements");
 
-   char *e0 = Source.substring(ctx->source,
-                               stmt->value_meta->data.collection.elements[0].pos,
-                               stmt->value_meta->data.collection.elements[0].len);
-   char *e1 = Source.substring(ctx->source,
-                               stmt->value_meta->data.collection.elements[1].pos,
-                               stmt->value_meta->data.collection.elements[1].len);
+   usize e0_len = stmt->value_meta->data.collection.elements[0].len;
+   usize e1_len = stmt->value_meta->data.collection.elements[1].len;
+   char *e0 = malloc(e0_len + 1);
+   char *e1 = malloc(e1_len + 1);
+   Source.substring(ctx->source,
+                    stmt->value_meta->data.collection.elements[0].pos, e0_len, e0);
+   Source.substring(ctx->source,
+                    stmt->value_meta->data.collection.elements[1].pos, e1_len, e1);
 
    Assert.isTrue(strcmp(e0, "alpha") == 0, "element[0] == alpha");
    Assert.isTrue(strcmp(e1, "beta") == 0, "element[1] == beta");
 
-   Allocator.free(e0);
-   Allocator.free(e1);
+   free(e0);
+   free(e1);
    Context.dispose(ctx);
    teardown();
 }
@@ -306,23 +311,27 @@ static void test_st04b_block_array_round_trip(void) {
    Assert.isTrue(stmt->value_meta->data.collection.element_count == 3, "3 elements");
 
    char *e;
-   e = Source.substring(ctx->source,
-                        stmt->value_meta->data.collection.elements[0].pos,
-                        stmt->value_meta->data.collection.elements[0].len);
+   usize len;
+   len = stmt->value_meta->data.collection.elements[0].len;
+   e = malloc(len + 1);
+   Source.substring(ctx->source,
+                    stmt->value_meta->data.collection.elements[0].pos, len, e);
    Assert.isTrue(strcmp(e, "8080") == 0, "element[0] == 8080");
-   Allocator.free(e);
+   free(e);
 
-   e = Source.substring(ctx->source,
-                        stmt->value_meta->data.collection.elements[1].pos,
-                        stmt->value_meta->data.collection.elements[1].len);
+   len = stmt->value_meta->data.collection.elements[1].len;
+   e = malloc(len + 1);
+   Source.substring(ctx->source,
+                    stmt->value_meta->data.collection.elements[1].pos, len, e);
    Assert.isTrue(strcmp(e, "8443") == 0, "element[1] == 8443");
-   Allocator.free(e);
+   free(e);
 
-   e = Source.substring(ctx->source,
-                        stmt->value_meta->data.collection.elements[2].pos,
-                        stmt->value_meta->data.collection.elements[2].len);
+   len = stmt->value_meta->data.collection.elements[2].len;
+   e = malloc(len + 1);
+   Source.substring(ctx->source,
+                    stmt->value_meta->data.collection.elements[2].pos, len, e);
    Assert.isTrue(strcmp(e, "9000") == 0, "element[2] == 9000");
-   Allocator.free(e);
+   free(e);
 
    Context.dispose(ctx);
    teardown();
@@ -357,17 +366,20 @@ static void test_st05_tuple_always_inline(void) {
    Assert.isTrue(stmt->value_meta->data.collection.element_count == 3, "3 tuple elements");
 
    char *e;
-   e = Source.substring(ctx2->source,
-                        stmt->value_meta->data.collection.elements[0].pos,
-                        stmt->value_meta->data.collection.elements[0].len);
+   usize len;
+   len = stmt->value_meta->data.collection.elements[0].len;
+   e = malloc(len + 1);
+   Source.substring(ctx2->source,
+                    stmt->value_meta->data.collection.elements[0].pos, len, e);
    Assert.isTrue(strcmp(e, "10") == 0, "element[0] == 10");
-   Allocator.free(e);
+   free(e);
 
-   e = Source.substring(ctx2->source,
-                        stmt->value_meta->data.collection.elements[2].pos,
-                        stmt->value_meta->data.collection.elements[2].len);
+   len = stmt->value_meta->data.collection.elements[2].len;
+   e = malloc(len + 1);
+   Source.substring(ctx2->source,
+                    stmt->value_meta->data.collection.elements[2].pos, len, e);
    Assert.isTrue(strcmp(e, "-200") == 0, "element[2] == -200");
-   Allocator.free(e);
+   free(e);
 
    Context.dispose(ctx2);
    teardown();
@@ -584,22 +596,17 @@ static void test_st07_full_document_values_preserved(void) {
    Assert.isNotNull(ctx, "Round-trip context should exist");
    Assert.isTrue(Context.statement_count(ctx) == 5, "5 statements");
 
-   char *v;
-   v = stmt_value_str(ctx, 0);
+   char v[256];
+   stmt_value_str(ctx, 0, v);
    Assert.isTrue(strcmp(v, "\"Anvil.Engine\"") == 0, "name");
-   Allocator.free(v);
-   v = stmt_value_str(ctx, 1);
+   stmt_value_str(ctx, 1, v);
    Assert.isTrue(strcmp(v, "true") == 0, "debug");
-   Allocator.free(v);
-   v = stmt_value_str(ctx, 2);
+   stmt_value_str(ctx, 2, v);
    Assert.isTrue(strcmp(v, "42") == 0, "count");
-   Allocator.free(v);
-   v = stmt_value_str(ctx, 3);
+   stmt_value_str(ctx, 3, v);
    Assert.isTrue(strcmp(v, "3.14159") == 0, "pi");
-   Allocator.free(v);
-   v = stmt_value_str(ctx, 4);
+   stmt_value_str(ctx, 4, v);
    Assert.isTrue(strcmp(v, "vanilla") == 0, "flavor");
-   Allocator.free(v);
 
    Context.dispose(ctx);
    teardown();

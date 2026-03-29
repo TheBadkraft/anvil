@@ -22,6 +22,7 @@
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ========================================================================
@@ -177,10 +178,11 @@ static void test_AB02_field_access_by_name(void) {
    field f = Context.get_field_by_name(ctx, stmt, "version", 7);
    Assert.isNotNull(f, "AB02: get_field_by_name('version') != NULL");
    if (f) {
-      char *val_str = Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len);
+      char *val_str = malloc(f->val->data.scalar.len + 1);
+      Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len, val_str);
       writelnf("AB02: version value = '%s' (expected '1.0.0')", val_str ? val_str : "(null)");
       Assert.isTrue(val_str && strcmp(val_str, "1.0.0") == 0, "AB02: version value is '1.0.0'");
-      Allocator.free(val_str);
+      free(val_str);
    }
 
    Context.dispose(ctx);
@@ -219,14 +221,15 @@ static void test_AB03_braced_dotpath_varref(void) {
                     "AB03: display value is VARREF");
 
       /* The stored identifier span should be "changelog.version" (no $ or {}) */
-      char *path = Source.substring(ctx->source,
-                                    display->value_meta->pos,
-                                    display->value_meta->len);
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len, path);
       writelnf("AB03: varref path = '%s' (expected 'changelog.version')",
                path ? path : "(null)");
       Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
                     "AB03: varref path is 'changelog.version'");
-      Allocator.free(path);
+      free(path);
    } else {
       Assert.isTrue(false, "AB03: display->value_meta must not be NULL");
    }
@@ -334,7 +337,7 @@ static void test_AB06_serializer_round_trip(void) {
          Context.dispose(ctx2);
       }
 
-      Allocator.free(output);
+      Allocator.dispose(output);
    }
 
    Context.dispose(ctx);
@@ -421,14 +424,15 @@ static void test_AB09_unbraced_dotpath_varref(void) {
       Assert.isTrue(display->value_meta->type == ANVL_VALUE_VARREF,
                     "AB09: display value is VARREF");
 
-      char *path = Source.substring(ctx->source,
-                                    display->value_meta->pos,
-                                    display->value_meta->len);
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len, path);
       writelnf("AB09: varref path = '%s' (expected 'changelog.version')",
                path ? path : "(null)");
       Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
                     "AB09: unbraced varref path is 'changelog.version'");
-      Allocator.free(path);
+      free(path);
    } else {
       Assert.isTrue(false, "AB09: display->value_meta must not be NULL");
    }

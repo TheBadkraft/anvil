@@ -3,10 +3,11 @@
 | Field      | Value                                               |
 |------------|-----------------------------------------------------|
 | ID         | FR-2603-anvil-002                                   |
-| Status     | **open**                                            |
+| Status     | **resolved**                                        |
 | Priority   | high                                                |
 | Tags       | source, api, ownership, allocation, breaking-change |
 | Filed      | 2026-03-23                                          |
+| Resolved   | 2026-03-29                                          |
 | Owner      | anvil                                               |
 
 ---
@@ -122,3 +123,51 @@ char id[stmt_ident_len + 1];
 Statement.identifier(stmt, src, id);
 strcmp(id, "suite");
 ```
+
+---
+
+## Resolution
+
+**Implemented:** 2026-03-29  
+**Branch:** `feat/fr-002-output-buffers`
+
+### Changes Made
+
+1. **API Signatures Updated** (`include/context.h`, `package/include/context.h`):
+   - `char *Source.substring(src, start, len)` → `void Source.substring(src, start, len, char *out_buf)`
+   - `const char *Statement.identifier(stmt, src)` → `void Statement.identifier(stmt, src, char *out_identifier)`
+
+2. **Implementation** (`src/core/context.c`):
+   - `source_substring()` — writes to caller buffer, no allocation
+   - `statement_identifier()` — writes to caller buffer, no allocation
+
+3. **Test Migration** (11 files, 40+ call sites):
+   - Caller-supplied buffers: stack for known-small, heap for variable-length
+   - Pattern: `char *buf = malloc(len+1); API(..., buf); free(buf);`
+   - Files: test_resolver, test_parser, test_meta_buffers, test_import, test_anon_block, test_source, test_vars, test_serializer
+
+4. **Allocator Cleanup**:
+   - Removed `Allocator.free()` calls from `src/asl/asl.c` (8 sites) — bump allocator pattern
+   - Removed `Allocator.free()` calls from `src/vars/vars.c` (5 sites) — bump allocator pattern
+   - Updated test helpers to use `free()` for malloc'd buffers, `Allocator.dispose()` for API strings
+
+### Test Results
+
+All 20 unit tests passing:
+```
+Test Suite Summary (unit/)
+========================================
+  Total:  20
+  Passed: 20
+  Failed: 0
+========================================
+```
+
+### Breaking Changes
+
+This is a **breaking API change**. All external callers must:
+1. Allocate buffer before calling API
+2. Remove old free/dispose logic on returned pointer
+3. Use new output-parameter pattern
+
+No ABI compatibility layer provided — clean break for v0.1.0-alpha.
