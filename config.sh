@@ -109,7 +109,23 @@ anvil_compile() {
     done
 }
 
+anvil_build_object() {
+    anvil_compile
+    mkdir -p "$BIN_DIR"
+    local obj="$BIN_DIR/${LIB_NAME}.o"
+    echo "Linking (partial) $obj"
+    ld -r "${ANVIL_OBJECTS[@]}" -o "$obj"
+}
+
 anvil_build_lib() {
+    anvil_compile
+    local lib="$LIB_DIR/lib${LIB_NAME}.a"
+    mkdir -p "$LIB_DIR"
+    echo "Archiving $lib"
+    ar rcs "$lib" "${ANVIL_OBJECTS[@]}"
+}
+
+anvil_build_shared() {
     anvil_compile
     local lib="$LIB_DIR/lib${LIB_NAME}.so"
     mkdir -p "$LIB_DIR"
@@ -257,9 +273,10 @@ compile_schema_objects() {
 # Build targets
 # ---------------------------------------------------------------------------
 declare -A BUILD_TARGETS=(
-    ["all"]="anvil_compile"
-    ["lib"]="anvil_build_lib"
-    ["compile"]="anvil_compile"
+    ["all"]="anvil_build_object"    # bare .o — no runtime deps baked in
+    ["lib"]="anvil_build_lib"        # static archive (.a)
+    ["so"]="anvil_build_shared"      # shared library (.so) with deps linked
+    ["compile"]="anvil_compile"       # compile individual .o files only
     ["clean"]="clean"
     ["clean_all"]="clean_all"
     ["install"]="anvil_build_lib && install_lib"
@@ -272,6 +289,10 @@ declare -A BUILD_TARGETS=(
 # Format: "output_name | src_basename1 src_basename2 ..."
 # Usage:  cpkg anvil  |  cpkg resolver
 # ---------------------------------------------------------------------------
+# Packages listed here use a bare partial link (no REQUIRES baked in).
+# Consumers are expected to supply the runtime dependencies themselves.
+PACKAGE_BARE=("anvil")
+
 declare -A PACKAGES=(
     ["anvil"]="anvil | anvil_impl context errors module operators parser symbols types utils"
     ["resolver"]="anvil.resolver | resolver"

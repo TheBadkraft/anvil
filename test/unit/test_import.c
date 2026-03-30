@@ -14,6 +14,7 @@
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
@@ -125,9 +126,10 @@ static void test_i02_single_import_stored(void) {
    Assert.isTrue(ctx->import_list.count == 1, "one import declaration");
 
    const struct anvl_import_decl *d = &ctx->import_list.decls[0];
-   char *path = Source.substring(ctx->source, d->path_pos, d->path_len);
+   char *path = malloc(d->path_len + 1);
+   Source.substring(ctx->source, d->path_pos, d->path_len, path);
    Assert.isTrue(strcmp(path, "blocks/terrain.aml") == 0, "path is 'blocks/terrain.aml'");
-   Allocator.free(path);
+   free(path);
 
    Assert.isTrue(d->alias_len == 0, "no explicit alias");
 
@@ -148,9 +150,10 @@ static void test_i03_import_with_explicit_alias_stored(void) {
    Assert.isTrue(ctx->import_list.count == 1, "one import declaration");
 
    const struct anvl_import_decl *d = &ctx->import_list.decls[0];
-   char *alias = Source.substring(ctx->source, d->alias_pos, d->alias_len);
+   char *alias = malloc(d->alias_len + 1);
+   Source.substring(ctx->source, d->alias_pos, d->alias_len, alias);
    Assert.isTrue(strcmp(alias, "terrain") == 0, "alias is 'terrain'");
-   Allocator.free(alias);
+   free(alias);
 
    Context.dispose(ctx);
    teardown();

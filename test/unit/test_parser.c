@@ -7,6 +7,7 @@
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // External functions from context.c
@@ -237,8 +238,9 @@ static void test_parse_inheritance_placeholder(void) {
    Assert.isNotNull(stmt->base_meta, "Should have base_meta (inheritance)");
 
    // Check identifier
-   const char *ident = Statement.identifier(stmt, ctx->source);
-   Assert.isNotNull((void *)ident, "Identifier should not be null");
+   char ident[128];
+   Statement.identifier(stmt, ctx->source, ident);
+   Assert.isTrue(ident[0] != '\0', "Identifier should not be empty");
    Assert.isTrue(strcmp(ident, "child") == 0, "Identifier should be 'child'");
 
    // Check base — use base_meta directly (Statement.base() is not yet implemented)
@@ -279,16 +281,20 @@ static void test_parse_numbers(void) {
    stmt = Context.get_statement(ctx, 0);
    Assert.isNotNull(stmt, "First statement should exist");
    Assert.isNotNull(stmt->value_meta, "Should have value_meta");
-   char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
-   Assert.isNotNull(value_text, "Should be able to extract value text");
+   usize len = stmt->value_meta->len;
+   char *value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
+   Assert.isTrue(value_text[0], "Should be able to extract value text");
    Assert.isTrue(strcmp(value_text, "42") == 0, "Value should be '42'");
-   Allocator.free(value_text);
+   free(value_text);
 
    // Check neg_int := -123
    stmt = Context.get_statement(ctx, 1);
-   value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   len = stmt->value_meta->len;
+   value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "-123") == 0, "Value should be '-123'");
-   Allocator.free(value_text);
+   free(value_text);
 
    Context.dispose(ctx);
 }
@@ -321,19 +327,25 @@ static void test_parse_booleans_and_null(void) {
    statement stmt;
 
    stmt = Context.get_statement(ctx, 0); // bool_true := true
-   char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   usize len = stmt->value_meta->len;
+   char *value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "true") == 0, "Value should be 'true'");
-   Allocator.free(value_text);
+   free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // bool_false := false
-   value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   len = stmt->value_meta->len;
+   value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "false") == 0, "Value should be 'false'");
-   Allocator.free(value_text);
+   free(value_text);
 
    stmt = Context.get_statement(ctx, 2); // null_val := null
-   value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   len = stmt->value_meta->len;
+   value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "null") == 0, "Value should be 'null'");
-   Allocator.free(value_text);
+   free(value_text);
 
    Context.dispose(ctx);
 }
@@ -360,14 +372,18 @@ static void test_parse_bare_literals(void) {
    statement stmt;
 
    stmt = Context.get_statement(ctx, 0); // bare1 := some_value
-   char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   usize len = stmt->value_meta->len;
+   char *value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "some_value") == 0, "Value should be 'some_value'");
-   Allocator.free(value_text);
+   free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // bare2 := another.value
-   value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   len = stmt->value_meta->len;
+   value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strcmp(value_text, "another.value") == 0, "Value should be 'another.value'");
-   Allocator.free(value_text);
+   free(value_text);
 
    Context.dispose(ctx);
 }
@@ -425,10 +441,12 @@ static void test_parse_blobs(void) {
 
    stmt = Context.get_statement(ctx, 0); // email := @email`user@example.com`
    Assert.isNotNull(stmt->value_meta, "Should have value_meta");
-   char *value_text = Source.substring(ctx->source, stmt->value_meta->pos, stmt->value_meta->len);
+   usize len = stmt->value_meta->len;
+   char *value_text = malloc(len + 1);
+   Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
    Assert.isTrue(strstr(value_text, "@email") != NULL || strstr(value_text, "user@example.com") != NULL,
                  "Should contain blob content");
-   Allocator.free(value_text);
+   free(value_text);
 
    stmt = Context.get_statement(ctx, 1); // url := @http`https://example.com`
    Assert.isNotNull(stmt->value_meta, "Should have value_meta");
@@ -564,7 +582,7 @@ static void test_parse_moderate_stress(void) {
    Assert.isNotNull(stmt->value_meta, "Should have value metadata");
 
    Context.dispose(ctx);
-   Allocator.free(source);
+   free(source);
 }
 // Test 21: Sample arrays.anvl file
 static void test_parse_arrays_sample(void) {
@@ -679,7 +697,7 @@ static void test_parse_deep_nesting(void) {
    Assert.isTrue(result, "Deep nesting parsing should succeed");
    Assert.isTrue(Context.statement_count(ctx) == 1, "Should have one statement");
 
-   Allocator.free(source);
+   free(source);
    Context.dispose(ctx);
 }
 // Test 30: Stress test - Real world data conversion
@@ -699,7 +717,7 @@ static void test_parse_real_world_data(void) {
       Assert.isTrue(result, "Real world data parsing should succeed");
       Assert.isTrue(Context.statement_count(ctx) > 0, "Should have statements");
 
-      Allocator.free(source);
+      free(source);
       Context.dispose(ctx);
    } else {
       // If we can't fetch data, just pass the test

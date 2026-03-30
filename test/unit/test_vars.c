@@ -21,6 +21,7 @@
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
@@ -75,7 +76,7 @@ static context build_context(const char *src_str) {
 }
 
 /* Resolve a top-level VarRef statement's value to a source string.
- * Returns heap string (caller disposes) or NULL on error. */
+ * Returns heap string (caller frees with free()) or NULL on error. */
 static char *resolve_stmt_varref(context ctx, anvl_vars_state_t *vs, usize stmt_idx) {
    statement stmt = Context.get_statement(ctx, stmt_idx);
    if (!stmt || !stmt->value_meta)
@@ -87,7 +88,9 @@ static char *resolve_stmt_varref(context ctx, anvl_vars_state_t *vs, usize stmt_
    if (!Vars.resolve(vs, Source.data(ctx->source) + stmt->value_meta->pos,
                      stmt->value_meta->len, &rpos, &rlen, &rtype))
       return NULL;
-   return Source.substring(ctx->source, rpos, rlen);
+   char *result = malloc(rlen + 1);
+   Source.substring(ctx->source, rpos, rlen, result);
+   return result;
 }
 
 /* ================================================================
@@ -120,13 +123,15 @@ static void test_v02_single_entry_stored(void) {
    Assert.isTrue(ctx->vars_list.count == 1, "vars list has 1 entry");
 
    const struct anvl_vars_entry *e = &ctx->vars_list.entries[0];
-   char *key = Source.substring(ctx->source, e->key_pos, e->key_len);
+   char *key = malloc(e->key_len + 1);
+   Source.substring(ctx->source, e->key_pos, e->key_len, key);
    Assert.isTrue(strcmp(key, "atlas") == 0, "key is 'atlas'");
-   Allocator.free(key);
+   free(key);
 
-   char *val = Source.substring(ctx->source, e->value_pos, e->value_len);
+   char *val = malloc(e->value_len + 1);
+   Source.substring(ctx->source, e->value_pos, e->value_len, val);
    Assert.isTrue(strcmp(val, "terrain.png") == 0, "value is 'terrain.png'");
-   Allocator.free(val);
+   free(val);
 
    Context.dispose(ctx);
    teardown();
@@ -240,7 +245,7 @@ static void test_v08_scalar_varref_resolves(void) {
    char *resolved = resolve_stmt_varref(ctx, vs, 0);
    Assert.isNotNull(resolved, "resolved value exists");
    Assert.isTrue(strcmp(resolved, "terrain.png") == 0, "resolved to terrain.png");
-   Allocator.free(resolved);
+   free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -275,9 +280,10 @@ static void test_v09_varref_in_object_field_resolves(void) {
    bool ok = Vars.resolve(vs, Source.data(ctx->source) + f->val->data.scalar.pos,
                           f->val->data.scalar.len, &rpos, &rlen, &rtype);
    Assert.isTrue(ok, "resolve succeeded");
-   char *resolved = Source.substring(ctx->source, rpos, rlen);
+   char *resolved = malloc(rlen + 1);
+   Source.substring(ctx->source, rpos, rlen, resolved);
    Assert.isTrue(strcmp(resolved, "stone.png") == 0, "resolved to stone.png");
-   Allocator.free(resolved);
+   free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -359,9 +365,10 @@ static void test_v12_varref_in_derived_object_resolves(void) {
    field tex_field = NULL;
    for (usize i = 0; i < fcount; i++) {
       field f = ctx->field_list.fields[fstart + i];
-      char *k = Source.substring(ctx->source, f->key_pos, f->key_len);
+      char *k = malloc(f->key_len + 1);
+      Source.substring(ctx->source, f->key_pos, f->key_len, k);
       bool match = strcmp(k, "texture") == 0;
-      Allocator.free(k);
+      free(k);
       if (match) {
          tex_field = f;
          break;
@@ -374,9 +381,10 @@ static void test_v12_varref_in_derived_object_resolves(void) {
    anvl_value_type rtype;
    Vars.resolve(vs, Source.data(ctx->source) + tex_field->val->data.scalar.pos,
                 tex_field->val->data.scalar.len, &rpos, &rlen, &rtype);
-   char *resolved = Source.substring(ctx->source, rpos, rlen);
+   char *resolved = malloc(rlen + 1);
+   Source.substring(ctx->source, rpos, rlen, resolved);
    Assert.isTrue(strcmp(resolved, "missing.png") == 0, "resolved to missing.png");
-   Allocator.free(resolved);
+   free(resolved);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -405,9 +413,10 @@ static void test_v13_varref_chain_resolves_to_scalar(void) {
    anvl_value_type rtype;
    bool ok = Vars.resolve(vs, "atlas", 5, &rpos, &rlen, &rtype);
    Assert.isTrue(ok, "atlas resolves");
-   char *val = Source.substring(ctx->source, rpos, rlen);
+   char *val = malloc(rlen + 1);
+   Source.substring(ctx->source, rpos, rlen, val);
    Assert.isTrue(strcmp(val, "terrain.png") == 0, "atlas chain -> terrain.png");
-   Allocator.free(val);
+   free(val);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -486,7 +495,7 @@ static void test_v16_single_ref_interpolation(void) {
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "Hello, Lattice!") == 0,
                  "materialised: Hello, Lattice!");
-   Allocator.free(result);
+   Allocator.dispose(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -512,7 +521,7 @@ static void test_v17_multi_ref_interpolation(void) {
    char *result = Vars.materialise_interp(vs, ctx, stmt->value_meta);
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "v1.0") == 0, "materialised: v1.0");
-   Allocator.free(result);
+   Allocator.dispose(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -541,7 +550,7 @@ static void test_v18_literal_only_interpolation(void) {
    char *result = Vars.materialise_interp(vs, ctx, stmt->value_meta);
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "no refs here") == 0, "materialised: no refs here");
-   Allocator.free(result);
+   Allocator.dispose(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);
@@ -568,7 +577,7 @@ static void test_v19_escaped_braces_materialise(void) {
    Assert.isNotNull(result, "materialised result exists");
    Assert.isTrue(strcmp(result, "open { and close }") == 0,
                  "materialised: open { and close }");
-   Allocator.free(result);
+   Allocator.dispose(result);
 
    Vars.dispose(vs);
    Context.dispose(ctx);

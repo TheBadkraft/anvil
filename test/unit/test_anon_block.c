@@ -1,17 +1,19 @@
 /*
  * test_anon_block.c - Tests for anonymous top-level object blocks (ANVL_ANON_OBJECT)
  *
- * Implements FR-2603-anvil-001 test cases AB01-AB08.
+ * Implements FR-2603-anvil-001 test cases AB01-AB10.
  *
  * Coverage:
  *   AB01  basic parse: statement count, stmt type, field count
  *   AB02  field access by name
- *   AB03  VarRef into anonymous block
+ *   AB03  braced dotted-path VarRef (${changelog.version})
  *   AB04  redeclaration error (anon block then assignment)
  *   AB05  duplicate block name error
  *   AB06  serializer round-trip: emits `ident {` not `ident := {`
  *   AB07  get_statement_by_name finds the block
  *   AB08  no-shebang (permissive) also accepts the syntax
+ *   AB09  unbraced dotted-path VarRef ($changelog.version)
+ *   AB10  unterminated braced VarRef error (${... no closing })
  */
 
 #include "../src/core/context_internal.h"
@@ -20,6 +22,7 @@
 #include <sigma.memory/memory.h>
 #include <sigma.test/sigtest.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ========================================================================
@@ -28,12 +31,14 @@
 
 static void test_AB01_basic_parse(void);
 static void test_AB02_field_access_by_name(void);
-static void test_AB03_varref_into_anon_block(void);
+static void test_AB03_braced_dotpath_varref(void);
 static void test_AB04_redeclaration_error(void);
 static void test_AB05_duplicate_block_error(void);
 static void test_AB06_serializer_round_trip(void);
 static void test_AB07_get_statement_by_name(void);
 static void test_AB08_no_shebang(void);
+static void test_AB09_unbraced_dotpath_varref(void);
+static void test_AB10_unterminated_braced_varref(void);
 
 /* ========================================================================
  * Helpers
@@ -173,10 +178,11 @@ static void test_AB02_field_access_by_name(void) {
    field f = Context.get_field_by_name(ctx, stmt, "version", 7);
    Assert.isNotNull(f, "AB02: get_field_by_name('version') != NULL");
    if (f) {
-      char *val_str = Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len);
+      char *val_str = malloc(f->val->data.scalar.len + 1);
+      Source.substring(ctx->source, f->val->data.scalar.pos, f->val->data.scalar.len, val_str);
       writelnf("AB02: version value = '%s' (expected '1.0.0')", val_str ? val_str : "(null)");
       Assert.isTrue(val_str && strcmp(val_str, "1.0.0") == 0, "AB02: version value is '1.0.0'");
-      Allocator.free(val_str);
+      free(val_str);
    }
 
    Context.dispose(ctx);
@@ -184,18 +190,14 @@ static void test_AB02_field_access_by_name(void) {
 }
 
 /* ========================================================================
- * AB03 — VarRef into anonymous block
- *
- * Note: Dotted-path VarRef (${changelog.version}) is a future enhancement.
- * This test verifies that a bare $changelog VarRef (referencing the block
- * name) parses successfully in the presence of an ANVL_ANON_OBJECT stmt.
+ * AB03 — braced dotted-path VarRef (${changelog.version})
  * ======================================================================== */
 
-static void test_AB03_varref_into_anon_block(void) {
+static void test_AB03_braced_dotpath_varref(void) {
    const char *src =
        "#!aml\n"
        "changelog { version := 1.0.0 }\n"
-       "display := $changelog\n";
+       "display := ${changelog.version}\n";
 
    context ctx = parse_ok(src);
    Assert.isNotNull(ctx, "AB03: parse should succeed");
@@ -214,9 +216,23 @@ static void test_AB03_varref_into_anon_block(void) {
    if (anon)
       Assert.isTrue(Statement.type(anon) == ANVL_ANON_OBJECT, "AB03: first stmt is ANVL_ANON_OBJECT");
 
-   if (display)
-      Assert.isTrue(display->value_meta && display->value_meta->type == ANVL_VALUE_VARREF,
+   if (display && display->value_meta) {
+      Assert.isTrue(display->value_meta->type == ANVL_VALUE_VARREF,
                     "AB03: display value is VARREF");
+
+      /* The stored identifier span should be "changelog.version" (no $ or {}) */
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len, path);
+      writelnf("AB03: varref path = '%s' (expected 'changelog.version')",
+               path ? path : "(null)");
+      Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
+                    "AB03: varref path is 'changelog.version'");
+      free(path);
+   } else {
+      Assert.isTrue(false, "AB03: display->value_meta must not be NULL");
+   }
 
    Context.dispose(ctx);
    teardown();
@@ -321,7 +337,7 @@ static void test_AB06_serializer_round_trip(void) {
          Context.dispose(ctx2);
       }
 
-      Allocator.free(output);
+      Allocator.dispose(output);
    }
 
    Context.dispose(ctx);
@@ -384,6 +400,70 @@ static void test_AB08_no_shebang(void) {
 }
 
 /* ========================================================================
+ * AB09 — unbraced dotted-path VarRef ($changelog.version)
+ *
+ * Since '.' is an identifier_part, $changelog.version parses as a single
+ * VARREF with path "changelog.version" — same semantics as the braced form.
+ * ======================================================================== */
+
+static void test_AB09_unbraced_dotpath_varref(void) {
+   const char *src =
+       "#!aml\n"
+       "changelog { version := 1.0.0 }\n"
+       "display := $changelog.version\n";
+
+   context ctx = parse_ok(src);
+   Assert.isNotNull(ctx, "AB09: parse should succeed");
+   if (!ctx)
+      return;
+
+   statement display = Context.get_statement(ctx, 1);
+   Assert.isNotNull(display, "AB09: second stmt (display)");
+
+   if (display && display->value_meta) {
+      Assert.isTrue(display->value_meta->type == ANVL_VALUE_VARREF,
+                    "AB09: display value is VARREF");
+
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len, path);
+      writelnf("AB09: varref path = '%s' (expected 'changelog.version')",
+               path ? path : "(null)");
+      Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
+                    "AB09: unbraced varref path is 'changelog.version'");
+      free(path);
+   } else {
+      Assert.isTrue(false, "AB09: display->value_meta must not be NULL");
+   }
+
+   Context.dispose(ctx);
+   teardown();
+}
+
+/* ========================================================================
+ * AB10 — unterminated braced VarRef: ${... no closing }
+ * ======================================================================== */
+
+static void test_AB10_unterminated_braced_varref(void) {
+   const char *src =
+       "#!aml\n"
+       "display := ${changelog.version\n";
+
+   anvl_error_code code = ANVL_ERR_NONE;
+   bool failed = parse_fails(src, &code);
+
+   writelnf("AB10: parse failed = %s, error code = %d (expected %d)",
+            failed ? "true" : "false", code,
+            ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF);
+   Assert.isTrue(failed, "AB10: must fail on unterminated braced VarRef");
+   Assert.isTrue(code == ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF,
+                 "AB10: error code must be ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF");
+
+   teardown();
+}
+
+/* ========================================================================
  * Registration
  * ======================================================================== */
 
@@ -392,12 +472,14 @@ static void _register(void) {
 
    testcase("AB01 basic parse", test_AB01_basic_parse);
    testcase("AB02 field access by name", test_AB02_field_access_by_name);
-   testcase("AB03 VarRef into anonymous block", test_AB03_varref_into_anon_block);
+   testcase("AB03 braced dotted-path VarRef", test_AB03_braced_dotpath_varref);
    testcase("AB04 redeclaration error", test_AB04_redeclaration_error);
    testcase("AB05 duplicate block name error", test_AB05_duplicate_block_error);
    testcase("AB06 serializer round-trip", test_AB06_serializer_round_trip);
    testcase("AB07 get_statement_by_name", test_AB07_get_statement_by_name);
    testcase("AB08 no-shebang permissive", test_AB08_no_shebang);
+   testcase("AB09 unbraced dotted-path VarRef", test_AB09_unbraced_dotpath_varref);
+   testcase("AB10 unterminated braced VarRef error", test_AB10_unterminated_braced_varref);
 }
 
 __attribute__((constructor)) static void register_test_anon_block(void) {

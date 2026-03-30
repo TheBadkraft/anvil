@@ -16,8 +16,8 @@
 #include "vars.h"
 #include "context.h"
 #include "errors.h"
-#include <sigma.memory/memory.h>
 #include <sigma.core/strings.h>
+#include <sigma.memory/memory.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
@@ -48,7 +48,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
    state->entries = Allocator.alloc(sizeof(struct anvl_vars_resolved) * n);
    if (!state->entries) {
-      Allocator.free(state);
+      /* state stays in bump allocator — will be freed with controller */
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -79,8 +79,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
     */
    uint8_t *done = Allocator.alloc(n);
    if (!done) {
-      Allocator.free(state->entries);
-      Allocator.free(state);
+      /* state and entries stay in bump allocator — will be freed with controller */
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -91,9 +90,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
    /* Stack to track current DFS path (maximum chain = n entries) */
    usize *path = Allocator.alloc(sizeof(usize) * (n + 1));
    if (!path) {
-      Allocator.free(done);
-      Allocator.free(state->entries);
-      Allocator.free(state);
+      /* done, state, and entries stay in bump allocator — will be freed with controller */
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -127,10 +124,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
          if (done[cur] == 1) {
             /* cur is already on the current path → cycle detected */
-            Allocator.free(path);
-            Allocator.free(done);
-            Allocator.free(state->entries);
-            Allocator.free(state);
+            /* path, done, state, and entries stay in bump allocator — will be freed with controller */
             anvl_error_set(ANVL_ERR_VARS_CIRCULAR_REF,
                            anvl_error_code_message(ANVL_ERR_VARS_CIRCULAR_REF),
                            0, 0, __FILE__);
@@ -182,8 +176,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
       }
    }
 
-   Allocator.free(path);
-   Allocator.free(done);
+   /* path and done stay in bump allocator — no free needed */
    return state;
 }
 
@@ -266,14 +259,72 @@ static char *vars_materialise_interp(anvl_vars_state_t *state, context ctx,
 }
 
 /* ------------------------------------------------------------------ */
+/* vars_resolve_path                                                  */
+/*                                                                    */
+/* Resolves a dotted VarRef path against statement fields.           */
+/* "stmt.field" → looks up stmt by name, then field within it.       */
+/* Plain (no dot) paths delegate to vars_resolve.                    */
+/*                                                                    */
+/* WIP: only single-level dot ("a.b") is supported.  Deeper paths   */
+/* ("a.b.c") are not yet implemented.                                */
+/* ------------------------------------------------------------------ */
+static bool vars_resolve_path(anvl_vars_state_t *state, context ctx,
+                              const char *path, usize path_len,
+                              usize *out_pos, usize *out_len,
+                              anvl_value_type *out_type) {
+   if (!path || path_len == 0) {
+      anvl_error_set(ANVL_ERR_VARS_KEY_NOT_FOUND,
+                     anvl_error_code_message(ANVL_ERR_VARS_KEY_NOT_FOUND),
+                     0, 0, __FILE__);
+      return false;
+   }
+
+   /* Find first dot separator */
+   const char *dot = NULL;
+   for (usize i = 0; i < path_len; i++) {
+      if (path[i] == '.') {
+         dot = path + i;
+         break;
+      }
+   }
+
+   /* No dot — delegate to flat vars_resolve */
+   if (!dot)
+      return vars_resolve(state, path, path_len, out_pos, out_len, out_type);
+
+   usize head_len = (usize)(dot - path);
+   const char *tail = dot + 1;
+   usize tail_len = path_len - head_len - 1;
+
+   /* Look up the leading name as a statement */
+   statement stmt = Context.get_statement_by_name(ctx, path, head_len);
+   if (!stmt) {
+      /* Not a statement — try flat vars_resolve with the full key */
+      return vars_resolve(state, path, path_len, out_pos, out_len, out_type);
+   }
+
+   /* Find named field within that statement */
+   field f = Context.get_field_by_name(ctx, stmt, tail, tail_len);
+   if (!f || !f->val) {
+      anvl_error_set(ANVL_ERR_VARS_KEY_NOT_FOUND,
+                     anvl_error_code_message(ANVL_ERR_VARS_KEY_NOT_FOUND),
+                     0, 0, __FILE__);
+      return false;
+   }
+
+   /* TODO: if f->val->type == ANVL_VALUE_OBJECT, support deeper traversal */
+   *out_pos = f->val->data.scalar.pos;
+   *out_len = f->val->data.scalar.len;
+   *out_type = f->val->type;
+   return true;
+}
+
+/* ------------------------------------------------------------------ */
 /* vars_dispose                                                       */
 /* ------------------------------------------------------------------ */
 static void vars_dispose(anvl_vars_state_t *state) {
-   if (!state)
-      return;
-   if (state->entries)
-      Allocator.free(state->entries);
-   Allocator.free(state);
+   /* Bump allocator — state and entries stay in allocator, freed with controller */
+   (void)state;
 }
 
 /* ------------------------------------------------------------------ */
@@ -282,6 +333,7 @@ static void vars_dispose(anvl_vars_state_t *state) {
 const anvl_vars_i Vars = {
     .build = vars_build,
     .resolve = vars_resolve,
+    .resolve_path = vars_resolve_path,
     .materialise_interp = vars_materialise_interp,
     .dispose = vars_dispose,
 };

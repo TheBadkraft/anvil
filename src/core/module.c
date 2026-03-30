@@ -48,18 +48,22 @@ static int _anvil_init(void *ctx) {
       return 1;
 
    _anvil_alloc_use = (sc_alloc_use_t){
+       .ctrl = (sc_ctrl_base_s *)_anvil_bump,
        .alloc = _bump_alloc,
        .release = _bump_release,
        .resize = _bump_resize,
+       .frame_begin = NULL,
+       .frame_end = NULL,
    };
 
-   StringBuilder.alloc_use(&_anvil_alloc_use);
+   /* NOTE: StringBuilder.alloc_use() removed in FR-005/006.
+    * StringBuilder now always uses global Allocator.
+    * Bump controller remains available for future allocator-configurable features. */
    return 0;
 }
 
 static void _anvil_shutdown(void) {
-   StringBuilder.alloc_use(NULL); /* restore global Allocator fallback before
-                                     any module disposes its own StringBuilders */
+   /* StringBuilder.alloc_use() removed in FR-005/006 — no restoration needed */
    /* Do NOT release _anvil_bump here: sigma.memory will drain all registered
       controllers on its own shutdown, which runs after every USER module. */
 }
@@ -70,8 +74,8 @@ static const char *_anvil_deps[] = {"sigma.memory", NULL};
 static const sigma_module_t _anvil_module = {
     .name = "anvil",
     .version = "0.1.0-alpha",
-    .role = SIGMA_ROLE_USER,
-    .alloc = SIGMA_ALLOC_DEFAULT,
+    .role = SIGMA_ROLE_PERIPHERAL,
+    .alloc = SIGMA_ALLOC_DEFAULT, // defaults to `Application` set allocator
     .deps = _anvil_deps,
     .init = _anvil_init,
     .shutdown = _anvil_shutdown,

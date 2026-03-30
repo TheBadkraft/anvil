@@ -230,17 +230,15 @@ static void test_source_substring(void) {
    usize len = strlen(content);
    source src = Source.create(content, len);
 
-   char *sub = Source.substring(src, 0, 5);
-   Assert.isNotNull(sub, "Substring should be created");
+   char sub[16];
+   Source.substring(src, 0, 5, sub);
    Assert.isTrue(strcmp(sub, "hello") == 0, "Substring should be 'hello'");
-   Allocator.free(sub);
 
-   sub = Source.substring(src, 6, 5);
+   Source.substring(src, 6, 5, sub);
    Assert.isTrue(strcmp(sub, "world") == 0, "Substring should be 'world'");
-   Allocator.free(sub);
 
-   sub = Source.substring(src, 100, 5);
-   Assert.isNull(sub, "Substring beyond end should be null");
+   Source.substring(src, 100, 5, sub);
+   Assert.isTrue(sub[0] == '\0', "Substring beyond end should be empty string");
 
    Source.dispose(src);
 }

@@ -1078,18 +1078,18 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    value_meta->data.object.field_count = val->data.object.field_count;
 
    // Fill statement metadata
-   stmt->meta[STMT_META_TYPE]       = (usize)ANVL_ANON_OBJECT;
+   stmt->meta[STMT_META_TYPE] = (usize)ANVL_ANON_OBJECT;
    stmt->meta[STMT_META_RESERVED_1] = 0;
-   stmt->meta[STMT_META_IDENT_POS]  = ident_pos;
-   stmt->meta[STMT_META_IDENT_LEN]  = ident_len;
-   stmt->meta[STMT_META_BASE_IDX]   = 0;
-   stmt->meta[STMT_META_ATTR_IDX]   = 0;
+   stmt->meta[STMT_META_IDENT_POS] = ident_pos;
+   stmt->meta[STMT_META_IDENT_LEN] = ident_len;
+   stmt->meta[STMT_META_BASE_IDX] = 0;
+   stmt->meta[STMT_META_ATTR_IDX] = 0;
    stmt->meta[STMT_META_RESERVED_6] = 0;
-   stmt->meta[STMT_META_VALUE_IDX]  = 1;
+   stmt->meta[STMT_META_VALUE_IDX] = 1;
    stmt->meta[STMT_META_RESERVED_8] = 0;
 
-   stmt->base_meta  = NULL;
-   stmt->attr_meta  = NULL;
+   stmt->base_meta = NULL;
+   stmt->attr_meta = NULL;
    stmt->value_meta = value_meta;
 
    si_skip_whitespace_and_comments(s);
@@ -1285,7 +1285,12 @@ static value parse_varref(parser_ctx *p) {
    source s = p->src;
    si_consume(s, 1); // consume '$'
 
-   if (!Source.is_identifier_start(si_peek(s))) {
+   /* Support both bare ($ident.path) and braced (${ident.path}) forms. */
+   bool braced = (!si_is_eof(s) && si_peek(s) == '{');
+   if (braced)
+      si_consume(s, 1); // consume '{'
+
+   if (si_is_eof(s) || !Source.is_identifier_start(si_peek(s))) {
       parser_error(ANVL_ERR_VARS_INVALID_VARREF, s);
       return NULL;
    }
@@ -1295,6 +1300,14 @@ static value parse_varref(parser_ctx *p) {
    while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
       si_consume(s, 1);
       ident_len++;
+   }
+
+   if (braced) {
+      if (si_is_eof(s) || si_peek(s) != '}') {
+         parser_error(ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF, s);
+         return NULL;
+      }
+      si_consume(s, 1); // consume '}'
    }
 
    value v = ci_new_value(p->ctx, ANVL_VALUE_VARREF);

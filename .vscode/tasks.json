@@ -10,6 +10,19 @@
     ],
     "tasks": [
         {
+            "label": "cpkg: anvil",
+            "type": "shell",
+            "command": "cpkg anvil && sudo cp package/anvil.o /usr/local/packages/anvil.o",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "cbuild: lib",
             "type": "shell",
             "command": "cbuild",

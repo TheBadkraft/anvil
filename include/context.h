@@ -86,8 +86,8 @@ typedef struct anvl_source_i {
    const char *(*data)(source);
    usize (*length)(source);
 
-   // Substring extraction
-   char *(*substring)(source, usize, usize);
+   // Substring extraction (caller-supplied buffer; FR-2603-anvil-002)
+   void (*substring)(source, usize start, usize len, char *out_buf);
 
    // Whitespace & comments
    usize (*skip_whitespace_and_comments)(source);
@@ -256,7 +256,7 @@ extern const anvl_context_i Context;
 /* Statement Interface                                               */
 /* ------------------------------------------------------------------ */
 typedef struct anvl_statement_i {
-   const char *(*identifier)(statement self, source src);
+   void (*identifier)(statement self, source src, char *out_identifier);
    const char *(*base)(statement self, source src);
    anvl_stmt_type (*type)(statement self);
    anvl_value_type (*value_type)(statement self);
