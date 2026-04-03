@@ -28,6 +28,23 @@ static void test_qp16_get_statement_by_name_hit(void);
 static void test_qp17_get_statement_by_name_miss(void);
 static void test_qp18_get_statement_by_name_null_guard(void);
 
+/* Forward declarations — VT value traversal tests (value-level collections) */
+static void test_vt01_value_element_count_nested_array(void);
+static void test_vt02_get_value_element_by_index(void);
+static void test_vt03_get_value_element_oob(void);
+static void test_vt04_value_element_count_on_non_collection(void);
+static void test_vt05_value_element_count_null_guard(void);
+static void test_vt06_value_field_count_nested_object(void);
+static void test_vt07_get_value_field_by_index(void);
+static void test_vt08_get_value_field_by_name_found(void);
+static void test_vt09_get_value_field_by_name_not_found(void);
+static void test_vt10_value_field_count_on_non_object(void);
+static void test_vt11_get_value_field_null_guard(void);
+static void test_vt12_get_value_field_by_name_null_guard(void);
+static void test_vt13_deeply_nested_traversal(void);
+static void test_vt14_tuple_traversal(void);
+static void test_vt15_empty_collection(void);
+
 static void set_config(FILE **logger) {
    // configure logging stream
    *logger = fopen("logs/test_interrogators.log", "w");
@@ -269,6 +286,23 @@ static void _register(void) {
    testcase("QP16: get_statement_by_name hit", test_qp16_get_statement_by_name_hit);
    testcase("QP17: get_statement_by_name miss returns NULL", test_qp17_get_statement_by_name_miss);
    testcase("QP18: get_statement_by_name NULL guard", test_qp18_get_statement_by_name_null_guard);
+
+   // VT — Value traversal tests (value-level collections, E3 extension)
+   testcase("VT01: value_element_count on nested array", test_vt01_value_element_count_nested_array);
+   testcase("VT02: get_value_element by index", test_vt02_get_value_element_by_index);
+   testcase("VT03: get_value_element out-of-range returns NULL", test_vt03_get_value_element_oob);
+   testcase("VT04: value_element_count on non-collection returns 0", test_vt04_value_element_count_on_non_collection);
+   testcase("VT05: value_element_count NULL guard", test_vt05_value_element_count_null_guard);
+   testcase("VT06: value_field_count on nested object", test_vt06_value_field_count_nested_object);
+   testcase("VT07: get_value_field by index", test_vt07_get_value_field_by_index);
+   testcase("VT08: get_value_field_by_name found", test_vt08_get_value_field_by_name_found);
+   testcase("VT09: get_value_field_by_name not found returns NULL", test_vt09_get_value_field_by_name_not_found);
+   testcase("VT10: value_field_count on non-object returns 0", test_vt10_value_field_count_on_non_object);
+   testcase("VT11: get_value_field NULL guard", test_vt11_get_value_field_null_guard);
+   testcase("VT12: get_value_field_by_name NULL guard", test_vt12_get_value_field_by_name_null_guard);
+   testcase("VT13: deeply nested traversal", test_vt13_deeply_nested_traversal);
+   testcase("VT14: tuple traversal", test_vt14_tuple_traversal);
+   testcase("VT15: empty collection", test_vt15_empty_collection);
 }
 __attribute__((constructor)) static void register_test_interrogators(void) {
    Tests.enqueue(_register);
@@ -509,5 +543,282 @@ static void test_qp18_get_statement_by_name_null_guard(void) {
    Assert.isNull(Context.get_statement_by_name(NULL, "foo", 3), "NULL ctx returns NULL");
    Assert.isNull(Context.get_statement_by_name(ctx, NULL, 3), "NULL name returns NULL");
    Assert.isNull(Context.get_statement_by_name(ctx, "foo", 0), "zero len returns NULL");
+   Context.dispose(ctx);
+}
+
+/* ================================================================
+ * VT — Value traversal tests (value-level collections, E3 extension)
+ * These test the five new Context.value_* functions for traversing
+ * arrays/tuples/objects nested inside field values.
+ * ================================================================ */
+
+/* VT01 — value_element_count on nested array field */
+static void test_vt01_value_element_count_nested_array(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "sigma := { plugin_path := [\"a\", \"b\", \"c\"] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   Assert.isNotNull(stmt, "sigma stmt exists");
+   
+   field plugin_path_field = Context.get_field_by_name(ctx, stmt, "plugin_path", 11);
+   Assert.isNotNull(plugin_path_field, "'plugin_path' field found");
+   Assert.isNotNull(plugin_path_field->val, "field has value");
+   Assert.isTrue(plugin_path_field->val->type == ANVL_VALUE_ARRAY, "value is array");
+   
+   usize count = Context.value_element_count(ctx, plugin_path_field->val);
+   Assert.areEqual(&(usize){3}, &count, INT, "array has 3 elements");
+   Context.dispose(ctx);
+}
+
+/* VT02 — get_value_element by index */
+static void test_vt02_get_value_element_by_index(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "sigma := { plugin_path := [\"a\", \"b\", \"c\"] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field plugin_path_field = Context.get_field_by_name(ctx, stmt, "plugin_path", 11);
+   value val = plugin_path_field->val;
+   
+   struct anvl_element_meta *elem = Context.get_value_element(ctx, val, 1);
+   Assert.isNotNull(elem, "element at index 1 exists");
+   
+   // Verify element points to "b" in source
+   const char *raw = Source.data(ctx->source);
+   char buf[16];
+   Source.substring(ctx->source, elem->pos, elem->len, buf);
+   Assert.isTrue(strcmp(buf, "\"b\"") == 0, "element points to \"b\"");
+   Context.dispose(ctx);
+}
+
+/* VT03 — get_value_element out of range returns NULL */
+static void test_vt03_get_value_element_oob(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { paths := [\"x\", \"y\"] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field paths_field = Context.get_field_by_name(ctx, stmt, "paths", 5);
+   value val = paths_field->val;
+   
+   Assert.isNull(Context.get_value_element(ctx, val, 99), "out-of-range index returns NULL");
+   Context.dispose(ctx);
+}
+
+/* VT04 — value_element_count on non-collection returns 0 */
+static void test_vt04_value_element_count_on_non_collection(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { version := \"1.0.0\" }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field version_field = Context.get_field_by_name(ctx, stmt, "version", 7);
+   value val = version_field->val;
+   
+   usize count = Context.value_element_count(ctx, val);
+   Assert.areEqual(&(usize){0}, &count, INT, "scalar value returns 0 count");
+   Context.dispose(ctx);
+}
+
+/* VT05 — value_element_count NULL guard */
+static void test_vt05_value_element_count_null_guard(void) {
+   context ctx = qp_parse("#!aml\nfoo := { x := [1, 2] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   Assert.areEqual(&(usize){0}, &(usize){Context.value_element_count(ctx, NULL)}, INT,
+                   "NULL value returns 0");
+   Assert.areEqual(&(usize){0}, &(usize){Context.value_element_count(NULL, (value)0x1)}, INT,
+                   "NULL context returns 0");
+   Context.dispose(ctx);
+}
+
+/* VT06 — value_field_count on nested object */
+static void test_vt06_value_field_count_nested_object(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { plugins := { demo := {}, core := {} } }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field plugins_field = Context.get_field_by_name(ctx, stmt, "plugins", 7);
+   Assert.isNotNull(plugins_field, "'plugins' field found");
+   value val = plugins_field->val;
+   Assert.isTrue(val->type == ANVL_VALUE_OBJECT, "value is object");
+   
+   usize count = Context.value_field_count(ctx, val);
+   Assert.areEqual(&(usize){2}, &count, INT, "nested object has 2 fields");
+   Context.dispose(ctx);
+}
+
+/* VT07 — get_value_field by index */
+static void test_vt07_get_value_field_by_index(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { plugins := { demo := {}, core := {} } }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field plugins_field = Context.get_field_by_name(ctx, stmt, "plugins", 7);
+   value val = plugins_field->val;
+   
+   field f = Context.get_value_field(ctx, val, 0);
+   Assert.isNotNull(f, "field at index 0 exists");
+   
+   // Verify field key is either "demo" or "core" (order preserved)
+   const char *raw = Source.data(ctx->source);
+   char key[32];
+   Source.substring(ctx->source, f->key_pos, f->key_len, key);
+   Assert.isTrue(strcmp(key, "demo") == 0 || strcmp(key, "core") == 0,
+                "field key is 'demo' or 'core'");
+   Context.dispose(ctx);
+}
+
+/* VT08 — get_value_field_by_name found */
+static void test_vt08_get_value_field_by_name_found(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { plugins := { demo := { version := \"1.0\" }, core := {} } }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field plugins_field = Context.get_field_by_name(ctx, stmt, "plugins", 7);
+   value val = plugins_field->val;
+   
+   field demo_field = Context.get_value_field_by_name(ctx, val, "demo", 4);
+   Assert.isNotNull(demo_field, "'demo' field found in nested object");
+   
+   // Verify field key
+   char key[32];
+   Source.substring(ctx->source, demo_field->key_pos, demo_field->key_len, key);
+   Assert.isTrue(strcmp(key, "demo") == 0, "field key is 'demo'");
+   Context.dispose(ctx);
+}
+
+/* VT09 — get_value_field_by_name not found returns NULL */
+static void test_vt09_get_value_field_by_name_not_found(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { plugins := { demo := {}, core := {} } }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field plugins_field = Context.get_field_by_name(ctx, stmt, "plugins", 7);
+   value val = plugins_field->val;
+   
+   field missing = Context.get_value_field_by_name(ctx, val, "missing", 7);
+   Assert.isNull(missing, "non-existent field returns NULL");
+   Context.dispose(ctx);
+}
+
+/* VT10 — value_field_count on non-object returns 0 */
+static void test_vt10_value_field_count_on_non_object(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { paths := [\"a\", \"b\"] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field paths_field = Context.get_field_by_name(ctx, stmt, "paths", 5);
+   value val = paths_field->val;
+   
+   usize count = Context.value_field_count(ctx, val);
+   Assert.areEqual(&(usize){0}, &count, INT, "array value returns 0 field count");
+   Context.dispose(ctx);
+}
+
+/* VT11 — get_value_field NULL guard */
+static void test_vt11_get_value_field_null_guard(void) {
+   context ctx = qp_parse("#!aml\nfoo := { x := {} }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   Assert.isNull(Context.get_value_field(ctx, NULL, 0), "NULL value returns NULL");
+   Assert.isNull(Context.get_value_field(NULL, (value)0x1, 0), "NULL context returns NULL");
+   Context.dispose(ctx);
+}
+
+/* VT12 — get_value_field_by_name NULL guard */
+static void test_vt12_get_value_field_by_name_null_guard(void) {
+   context ctx = qp_parse("#!aml\nfoo := { x := {} }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   Assert.isNull(Context.get_value_field_by_name(ctx, NULL, "key", 3),
+                "NULL value returns NULL");
+   Assert.isNull(Context.get_value_field_by_name(NULL, (value)0x1, "key", 3),
+                "NULL context returns NULL");
+   Assert.isNull(Context.get_value_field_by_name(ctx, (value)0x1, NULL, 3),
+                "NULL name returns NULL");
+   Context.dispose(ctx);
+}
+
+/* VT13 — deeply nested traversal (3 levels) */
+static void test_vt13_deeply_nested_traversal(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { database := { replicas := [\"db1.example.com\", \"db2.example.com\"] } }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   // Level 1: Get 'config' statement
+   statement config_stmt = Context.get_statement(ctx, 0);
+   Assert.isNotNull(config_stmt, "config stmt exists");
+   
+   // Level 2: Get 'database' field from config object
+   field db_field = Context.get_field_by_name(ctx, config_stmt, "database", 8);
+   Assert.isNotNull(db_field, "'database' field found");
+   Assert.isTrue(db_field->val->type == ANVL_VALUE_OBJECT, "database value is object");
+   
+   // Level 3: Get 'replicas' field from database object (value-level access!)
+   field replicas_field = Context.get_value_field_by_name(ctx, db_field->val, "replicas", 8);
+   Assert.isNotNull(replicas_field, "'replicas' field found in nested object");
+   Assert.isTrue(replicas_field->val->type == ANVL_VALUE_ARRAY, "replicas value is array");
+   
+   // Level 4: Get array element count (value-level access!)
+   usize count = Context.value_element_count(ctx, replicas_field->val);
+   Assert.areEqual(&(usize){2}, &count, INT, "replicas array has 2 elements");
+   Context.dispose(ctx);
+}
+
+/* VT14 — tuple traversal at value level */
+static void test_vt14_tuple_traversal(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "point := { coords := (10, 20, 30) }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field coords_field = Context.get_field_by_name(ctx, stmt, "coords", 6);
+   Assert.isNotNull(coords_field, "'coords' field found");
+   value val = coords_field->val;
+   Assert.isTrue(val->type == ANVL_VALUE_TUPLE, "value is tuple");
+   
+   usize count = Context.value_element_count(ctx, val);
+   Assert.areEqual(&(usize){3}, &count, INT, "tuple has 3 elements");
+   
+   struct anvl_element_meta *elem = Context.get_value_element(ctx, val, 0);
+   Assert.isNotNull(elem, "first element exists");
+   Context.dispose(ctx);
+}
+
+/* VT15 — empty collection returns 0 count, get returns NULL */
+static void test_vt15_empty_collection(void) {
+   context ctx = qp_parse(
+       "#!aml\n"
+       "config := { empty := [] }\n");
+   Assert.isNotNull(ctx, "context builds");
+   
+   statement stmt = Context.get_statement(ctx, 0);
+   field empty_field = Context.get_field_by_name(ctx, stmt, "empty", 5);
+   Assert.isNotNull(empty_field, "'empty' field found");
+   value val = empty_field->val;
+   Assert.isTrue(val->type == ANVL_VALUE_ARRAY, "value is array");
+   
+   usize count = Context.value_element_count(ctx, val);
+   Assert.areEqual(&(usize){0}, &count, INT, "empty array has 0 elements");
+   
+   Assert.isNull(Context.get_value_element(ctx, val, 0), "get on empty array returns NULL");
    Context.dispose(ctx);
 }

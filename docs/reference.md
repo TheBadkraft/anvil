@@ -468,13 +468,99 @@ Context.dispose(ctx);
 
 > **Note**: the inner-field direct access (`ctx->field_list.fields[…]`) is intentional for core consumers. `anvil.api` (post-v1.0) will wrap this in a cleaner recursive API.
 
-### 9.5 anvil.api (deferred — post-v1.0)
+### 9.5 Value-Level Collection Traversal (E3 Extension — v0.6.0-alpha)
+
+**Problem**: E3 query primitives operate on **statement-level** collections only. When an object field contains a nested array, tuple, or object (e.g., `sigma := { plugin_path := ["a", "b", "c"] }`), the  statement-level API cannot traverse the field value — `Context.element_count(ctx, stmt)` only works for top-level statement values, not field values.
+
+**Solution**: Five value-level primitives mirror the statement-level API but operate directly on `value` structures (nested in field values):
+
+#### Value Collection Element Traversal
+
+```c
+usize Context.value_element_count(context self, value val);
+```
+Returns the number of elements in an array- or tuple-valued `value`. Returns `0` if `self` or `val` is `NULL`, or if the value type is neither `ANVL_VALUE_ARRAY` nor `ANVL_VALUE_TUPLE`.
+
+**Usage**: After retrieving a field whose value is an array or tuple, call this to get the element count.
+
+```c
+struct anvl_element_meta *Context.get_value_element(context self, value val, usize index);
+```
+Returns a pointer to the metadata for the `index`-th element (0-based) of a collection-valued `value`. Returns `NULL` for `NULL` arguments, non-collection value type, or `index >= element_count`. The pointer is into the arena — do not `free()` it.
+
+**Implementation note**: Element metadata for field-level collections is stored in `val->data.collection._elem_types_temp` (kept allocated for field values, unlike statement values where it's transferred to `value_meta`).
+
+#### Value Object Field Traversal
+
+```c
+usize Context.value_field_count(context self, value val);
+```
+Returns the number of key-value fields in an object-valued `value`. Returns `0` if `self` or `val` is `NULL`, or if the value type is not `ANVL_VALUE_OBJECT`.
+
+```c
+field Context.get_value_field(context self, value val, usize index);
+```
+Returns the `index`-th field (0-based) of an object-valued `value`. Returns `NULL` for `NULL` arguments, non-object value type, or `index >= field_count`. Fields are ordered as they appear in source.
+
+```c
+field Context.get_value_field_by_name(context self, value val,
+                                     const char *name, usize len);
+```
+Returns the field whose key matches `name` (byte-exact, `len` bytes). Returns `NULL` for `NULL` arguments, non-object value type, or if no field with that key exists. The search is case-sensitive.
+
+**Performance note**: Unlike `get_field_by_name` (which uses a lazy-built hash map), `get_value_field_by_name` performs a **linear scan** over the field list. No hash map is built for value-level objects (v0.6.0 implementation). This is intentional — field-level objects are typically small (< 10 fields in practice). Lazy map caching can be added in a future version if profiling shows a need.
+
+#### Worked Example — Traverse Nested Array in Field Value
+
+```c
+// Source: sigma := { plugin_path := ["core", "ui", "auth"] }
+
+context ctx = /* … build + parse … */;
+statement stmt = Context.get_statement(ctx, 0);
+
+// Navigate to the "plugin_path" field
+field plugin_field = Context.get_field_by_name(ctx, stmt, "plugin_path", 11);
+if (!plugin_field || !plugin_field->val)
+    return; // field not found or no value
+
+value path_array = plugin_field->val;
+if (path_array->type != ANVL_VALUE_ARRAY)
+    return; // not an array
+
+// Traverse array elements using value-level API
+usize count = Context.value_element_count(ctx, path_array);
+const char *raw = Source.data(ctx->source);
+
+for (usize i = 0; i < count; i++) {
+    struct anvl_element_meta *elem = Context.get_value_element(ctx, path_array, i);
+    if (!elem)
+        continue; // should not happen for i < count
+    
+    // Extract element value (zero-copy)
+    printf("plugin[%zu]: %.*s\n", i, (int)elem->len, raw + elem->pos);
+}
+
+Context.dispose(ctx);
+```
+
+**Rationale**: This API addresses a common pain point in config-driven applications. Before v0.6.0, consumers had to either:
+1. Promote field values to statement-level declarations (restructure source), or
+2. Access internal `ctx->field_list` / `ctx->value_list` structures directly (fragile).
+
+The value-level API enables natural traversal of config patterns like:
+- `server := { replicas := ["r1", "r2", "r3"] }` — iterate replicas
+- `ui := { themes := { light := { … }, dark := { … } } }` — navigate nested objects
+- `data := { matrix := [[1,2], [3,4], [5,6]] }` — multi-level collection nesting
+
+> **Migration note**: Existing code using statement-level API (`Context.element_count(ctx, stmt)`) continues to work unchanged. Value-level API is additive, not breaking.
+
+### 9.6 anvil.api (deferred — post-v1.0)
 
 Higher-level path helpers — `node["field"]["subfield"]`, jq-style selectors, jsonpath-style queries — will live in a separate `anvil.api` C package that sits on top of the primitives above. This keeps Anvil core free of policy. `anvil.api` is explicitly out of scope for v1.0.
 
 ---
 
-## 8. This Document Is Law
+## Addendum: Law 42
 
 Any deviation requires a signed confession and a public apology. And probably steak dinners for the team.
 
