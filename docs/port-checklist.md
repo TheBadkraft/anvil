@@ -316,3 +316,32 @@ opinionated layer on top.
 | Document traversal primitives in `docs/reference.md` | ✅ |
 | Tests (QP01–QP15 in `test_interrogators.c`) | ✅ |
 | `anvil.api` package for higher-level path helpers (separate from core) | ❌ |
+
+**Extension — Value-Level Collection Traversal** (v0.6.0-alpha, 2026-04-03):
+
+E3 API above operates on **statement-level** collections only. Gap: cannot traverse nested
+collections in field values (e.g., `sigma := { plugin_path := ["a", "b", "c"] }` — the array
+is a field value, not a statement).
+
+**Solution**: Five value-level primitives that mirror statement-level API but operate on `value`
+structures directly:
+
+```c
+// Value-level collection element iteration
+usize      Context.value_element_count(ctx, val);        // count of elements in field-value array/tuple
+value_meta Context.get_value_element(ctx, val, usize i); // i-th element metadata
+
+// Value-level object field iteration
+usize Context.value_field_count(ctx, val);              // count of fields in field-value object
+field Context.get_value_field(ctx, val, usize i);       // i-th field by index
+field Context.get_value_field_by_name(ctx, val, name);  // field by key name (NULL if absent)
+```
+
+| Item | Status |
+|------|--------|
+| Add `Context.value_element_count` / `Context.get_value_element` | ✅ |
+| Add `Context.value_field_count` / `Context.get_value_field` | ✅ |
+| Add `Context.get_value_field_by_name` (linear scan, no lazy map) | ✅ |
+| Document value-level API in `docs/reference.md` § 9.5 | ✅ |
+| Tests (VT01–VT15 in `test_interrogators.c`) | ✅ |
+| Validate use case for IN-2604-sigcli-anvl-001 (sigma.cli config traversal) | ⏳ |

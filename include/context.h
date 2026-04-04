@@ -249,6 +249,12 @@ typedef struct anvl_context_i {
    // Array/tuple element traversal
    usize (*element_count)(context self, statement stmt);
    struct anvl_element_meta *(*get_element)(context self, statement stmt, usize index);
+   // Value-level collection traversal (nested arrays/tuples/objects in field values)
+   usize (*value_element_count)(context self, value val);
+   struct anvl_element_meta *(*get_value_element)(context self, value val, usize index);
+   usize (*value_field_count)(context self, value val);
+   field (*get_value_field)(context self, value val, usize index);
+   field (*get_value_field_by_name)(context self, value val, const char *name, usize len);
 } anvl_context_i;
 extern const anvl_context_i Context;
 

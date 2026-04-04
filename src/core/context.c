@@ -726,6 +726,74 @@ static struct anvl_element_meta *context_get_element(context self, statement stm
    return &stmt->value_meta->data.collection.elements[index];
 }
 
+/* ================================================================
+ * Value-level collection traversal (E3 extension)
+ * Primitives for traversing arrays/tuples/objects nested in field values
+ * ================================================================ */
+
+static usize context_value_element_count(context self, value val) {
+   if (!self || !val)
+      return 0;
+   if (val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE)
+      return 0;
+   return val->data.collection.element_count;
+}
+
+static struct anvl_element_meta *context_get_value_element(context self, value val, usize index) {
+   if (!self || !val)
+      return NULL;
+   if (val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE)
+      return NULL;
+   if (index >= val->data.collection.element_count)
+      return NULL;
+   // For field values, element metadata is in _elem_types_temp
+   struct anvl_element_meta *elements = (struct anvl_element_meta *)val->data.collection._elem_types_temp;
+   if (!elements)
+      return NULL;
+   return &elements[index];
+}
+
+static usize context_value_field_count(context self, value val) {
+   if (!self || !val)
+      return 0;
+   if (val->type != ANVL_VALUE_OBJECT)
+      return 0;
+   return val->data.object.field_count;
+}
+
+static field context_get_value_field(context self, value val, usize index) {
+   if (!self || !val)
+      return NULL;
+   if (val->type != ANVL_VALUE_OBJECT)
+      return NULL;
+   if (index >= val->data.object.field_count)
+      return NULL;
+   // Access context field_list directly
+   usize field_idx = val->data.object.field_start + index;
+   if (field_idx >= self->field_list.count)
+      return NULL;
+   return self->field_list.fields[field_idx];
+}
+
+static field context_get_value_field_by_name(context self, value val, const char *name, usize len) {
+   if (!self || !val || !name)
+      return NULL;
+   if (val->type != ANVL_VALUE_OBJECT)
+      return NULL;
+   
+   // Linear scan (no lazy map caching in v0.6.0)
+   usize start = val->data.object.field_start;
+   usize count = val->data.object.field_count;
+   
+   const char *raw = Source.data(self->source);
+   for (usize i = 0; i < count; i++) {
+      field f = self->field_list.fields[start + i];
+      if (f->key_len == len && strncmp(raw + f->key_pos, name, len) == 0)
+         return f;
+   }
+   return NULL;
+}
+
 const struct anvl_context_i Context = {
     .get_builder = context_get_builder,
     .dialect = context_dialect,
@@ -748,6 +816,11 @@ const struct anvl_context_i Context = {
     .get_field_by_name = context_get_field_by_name,
     .element_count = context_element_count,
     .get_element = context_get_element,
+    .value_element_count = context_value_element_count,
+    .get_value_element = context_get_value_element,
+    .value_field_count = context_value_field_count,
+    .get_value_field = context_get_value_field,
+    .get_value_field_by_name = context_get_value_field_by_name,
     .get_statement_by_name = context_get_statement_by_name,
 };
 

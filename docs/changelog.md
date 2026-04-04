@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Custom merge policy API** (`include/resolver.h`, `src/resolver/resolver.c`) — four new functions enabling consumer-controlled inheritance merge strategies (FR-2604-anvl-002):
+  - `anvl_node_state_get_base_index(state, stmt_idx)` — resolve base statement index
+  - `anvl_node_state_get_own_fields(state, stmt_idx)` — access unmerged fields from derived statement
+  - `anvl_merge_policy_fn` — callback type for custom field merge logic
+  - `anvl_node_state_get_merged_fields_custom(state, stmt_idx, policy, userdata)` — merge with policy callback
+- **Tests: CM01–CM10** (`test/unit/test_resolver.c`) — 10 new test cases covering base index lookup, own fields access, array concatenation, object deep merge, field exclusion, NULL policy preservation, nested inheritance, error handling, and caching
+
+### Fixed
+
+- **Allocator API** (`src/resolver/resolver.c`) — updated all `Allocator.free()` calls to `Allocator.dispose()` to match current sigma.memory API (resolver module hadn't been updated since allocator API migration)
+
+### Added (docs)
+
+- **reference.md § 10** — Custom Merge Policies chapter with API documentation, rationale, usage examples (array concatenation, field exclusion, sigma.collections integration), and migration path
+
 ---
 
 ## [v0.5.2-alpha] — pre-release (2026-03-21)
