@@ -510,6 +510,23 @@ usize anvl_node_state_get_base_index(anvl_node_state_t *state, usize stmt_idx) {
 
    /* Look up base identifier in id_to_idx map */
    usize base_idx = id_map_lookup(&state->id_to_idx, raw, base_pos, base_len);
+
+   if (base_idx == (usize)-1)
+      return (usize)-1; /* Base not found */
+
+   /* Validate: base must not be anonymous */
+   statement base_stmt = Context.get_statement(state->ctx, base_idx);
+   if (base_stmt &&
+       (anvl_stmt_type)base_stmt->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT) {
+      anvl_error_set(
+          ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
+          "cannot inherit from anonymous object",
+          base_pos,
+          base_len,
+          __FILE__);
+      return (usize)-1;
+   }
+
    return base_idx;
 }
 

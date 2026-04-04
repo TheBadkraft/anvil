@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Allocator API** (`src/resolver/resolver.c`) — updated all `Allocator.free()` calls to `Allocator.dispose()` to match current sigma.memory API (resolver module hadn't been updated since allocator API migration)
+- **BR-2604-anvil-001:** Parser now rejects inheritance from anonymous objects. Anonymous object syntax (`Base { x := 10 }`) is incompatible with inheritance — statements that use inheritance (`:Base`) must use explicit assignment syntax (`Base := { x := 10 }` or `Derived:Base := { y := 20 }`). Added `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` error code (4052) and validation in `anvl_node_state_get_base_index()`. This enforces semantic consistency: anonymous objects are truly immutable and cannot be inherited from.
 
 ### Added (docs)
 
