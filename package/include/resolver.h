@@ -178,4 +178,3 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
     usize stmt_idx,
     anvl_merge_policy_fn policy,
     void *userdata);
-

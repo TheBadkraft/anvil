@@ -467,27 +467,27 @@ static void test_missing_base_deferred_error(void) {
 
 /* Test data for custom merge tests */
 #define CM_BASE_DERIVED \
-   "#!aml\n" \
+   "#!aml\n"            \
    "Base { x := 10 }\n" \
    "Derived:Base := { y := 20 }\n"
 
 #define CM_NO_INHERIT \
-   "#!aml\n" \
+   "#!aml\n"          \
    "Standalone { a := 1, b := 2 }\n"
 
-#define CM_ARRAY_BASE \
-   "#!aml\n" \
+#define CM_ARRAY_BASE           \
+   "#!aml\n"                    \
    "Base { items := [1, 2] }\n" \
    "Derived:Base := { items := [3, 4] }\n"
 
-#define CM_OBJECT_BASE \
-   "#!aml\n" \
+#define CM_OBJECT_BASE                                            \
+   "#!aml\n"                                                      \
    "Base { config := { host := \"localhost\", port := 8080 } }\n" \
    "Derived:Base := { config := { port := 9000, ssl := true } }\n"
 
-#define CM_THREE_LEVEL \
-   "#!aml\n" \
-   "Alpha { a := 1 }\n" \
+#define CM_THREE_LEVEL          \
+   "#!aml\n"                    \
+   "Alpha { a := 1 }\n"         \
    "Beta:Alpha := { b := 2 }\n" \
    "Gamma:Beta := { c := 3 }\n"
 
@@ -774,7 +774,7 @@ static void test_cache_custom_results(void) {
 
    Assert.isNotNull((void *)second, "Second call should return result");
    Assert.isTrue(second->count == first->count, "Results should have same field count");
-   
+
    /* Note: Custom policy results are NOT cached in current implementation */
    /* Callback is invoked again on each call (callback_count > first_count) */
    Assert.isTrue(callback_count > first_count, "Callback invoked again (no caching for custom policies)");

@@ -536,10 +536,10 @@ const anvl_field_list_t *anvl_node_state_get_own_fields(
    /* Get fields from context field_list */
    usize start = stmt->value_meta->data.object.field_start;
    usize count = stmt->value_meta->data.object.field_count;
-   
+
    result->fields = &state->ctx->field_list.fields[start];
    result->count = count;
-   
+
    return result;
 }
 
@@ -554,7 +554,7 @@ static anvl_field_list_t *merge_fields_custom(
     usize own_count,
     anvl_merge_policy_fn policy,
     void *userdata) {
-   
+
    const char *raw = Source.data(src);
    usize base_count = base_list ? base_list->count : 0;
 
@@ -597,7 +597,7 @@ static anvl_field_list_t *merge_fields_custom(
       }
    } else {
       /* Custom policy: invoke callback for each field pair */
-      
+
       /* First pass: process fields that exist in both base and derived */
       for (usize i = 0; i < base_count; i++) {
          field base_field = base_list->fields[i];
@@ -672,7 +672,7 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
     usize stmt_idx,
     anvl_merge_policy_fn policy,
     void *userdata) {
-   
+
    if (!state || stmt_idx >= state->stmt_count)
       return NULL;
 
@@ -724,7 +724,7 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
    usize base_stmt_idx = id_map_lookup(&state->id_to_idx, raw,
                                        stmt->base_meta->pos,
                                        stmt->base_meta->len);
-   
+
    if (base_stmt_idx == (usize)-1) {
       anvl_error_set(ANVL_ERR_RESOLVER_MISSING_BASE,
                      "base identifier not found at resolve time", 0, 0, __FILE__);
@@ -755,4 +755,3 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
    Allocator.dispose(merged);
    return cached;
 }
-
