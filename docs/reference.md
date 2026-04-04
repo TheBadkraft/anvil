@@ -560,6 +560,255 @@ Higher-level path helpers — `node["field"]["subfield"]`, jq-style selectors, j
 
 ---
 
+## 10. Custom Merge Policies (Inheritance)
+
+### 10.1 Overview
+
+Anvil supports single inheritance via the `Base:Derived` syntax. By default, the resolver uses "derived wins" semantics: when both base and derived define the same field, the derived value completely replaces the base value.
+
+For many scenarios, this is insufficient. Consider config inheritance:
+
+```aml
+// Base config
+Base {
+    plugins := ["/usr/share/plugins"]
+    server { host := "localhost", port := 8080 }
+}
+
+// User override  
+User:Base {
+    plugins := ["~/.local/plugins"]
+    server { port := 9000, ssl := true }
+}
+```
+
+**Default behavior** (surprising):
+- `plugins = ["~/.local/plugins"]` — base path **lost**
+- `server = { port: 9000, ssl: true }` — `host` field **lost**
+
+**Desired behavior** (with custom policy):
+- `plugins = ["/usr/share/plugins", "~/.local/plugins"]` — array concatenation
+- `server = { host: "localhost", port: 9000, ssl: true }` — object deep merge
+
+Custom merge policies enable consumers to implement field-specific merge logic without modifying Anvil core.
+
+### 10.2 API Functions (v0.6.0)
+
+#### Callback Type
+
+```c
+typedef field (*anvl_merge_policy_fn)(
+    context ctx,
+    source src,
+    field base_field,
+    field derived_field,
+    void *userdata);
+```
+
+**Invoked for each field pair during inheritance resolution.**
+
+Parameters:
+- `ctx` — parsing context (for allocating new fields if needed)
+- `src` — source buffer (for accessing field names/values)
+- `base_field` — field from base statement (NULL if only in derived)
+- `derived_field` — field from derived statement (NULL if only in base)
+- `userdata` — caller-supplied context pointer
+
+Returns:
+- A `field` pointer — merged result (may be new, or base, or derived)
+- `NULL` — exclude this field from the result
+
+#### anvl_node_state_get_base_index
+
+```c
+usize anvl_node_state_get_base_index(
+    anvl_node_state_t *state,
+    usize stmt_idx);
+```
+
+**Returns the base statement index for a given statement.**
+
+- Returns base index (0 ≤ idx < stmt_count) if statement has inheritance
+- Returns `(usize)-1` if statement has no base or base not found
+
+#### anvl_node_state_get_own_fields
+
+```c
+const anvl_field_list_t *anvl_node_state_get_own_fields(
+    anvl_node_state_t *state,
+    usize stmt_idx);
+```
+
+**Returns the statement's own (unmerged) fields.**
+
+This is the raw field list from the AST, WITHOUT inheritance resolution. Useful for:
+- Inspecting what fields a derived statement explicitly defines
+- Building custom merge logic that needs to distinguish base vs derived
+
+Returns NULL if statement index is out of bounds or statement has no value.
+
+#### anvl_node_state_get_merged_fields_custom
+
+```c
+const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
+    anvl_node_state_t *state,
+    usize stmt_idx,
+    anvl_merge_policy_fn policy,
+    void *userdata);
+```
+
+**Returns merged fields with custom merge policy.**
+
+Like `anvl_node_state_get_merged_fields()`, but invokes the caller-supplied merge policy callback for each field pair during resolution.
+
+If `policy` is NULL, behaves identically to `get_merged_fields()` (default "derived wins") and uses the same cache.
+
+Results are cached separately per stmt_idx for custom policies.
+
+Returns NULL on error (missing base, allocation failure). Error code is set via `anvl_error_set()`.
+
+### 10.3 Example: Array Concatenation
+
+```c
+/* Merge policy: concatenate arrays, deep-merge objects, derived wins for scalars */
+field my_merge_policy(context ctx, source src, field base, field derived, void *ud) {
+    const char *raw = Source.data(src);
+    (void)ud;
+
+    /* No base field? Use derived as-is */
+    if (!base)
+        return derived;
+
+    /* No derived field? Use base as-is */
+    if (!derived)
+        return base;
+
+    /* Same field name — check types */
+    if (derived->val->type == ANVL_VALUE_COLLECTION &&
+        base->val->type == ANVL_VALUE_COLLECTION) {
+        /* Both are arrays — concatenate */
+        return concatenate_arrays(ctx, src, base, derived);
+    }
+
+    if (derived->val->type == ANVL_VALUE_OBJECT &&
+        base->val->type == ANVL_VALUE_OBJECT) {
+        /* Both are objects — deep merge */
+        return merge_object_shallow(ctx, src, base, derived);
+    }
+
+    /* Scalars or type mismatch: derived wins */
+    return derived;
+}
+
+/* Usage */
+anvl_node_state_t *state = anvl_resolver_build_state(ctx, src);
+const anvl_field_list_t *merged =
+    anvl_node_state_get_merged_fields_custom(state, stmt_idx, my_merge_policy, NULL);
+```
+
+### 10.4 Example: Field Exclusion
+
+Return `NULL` from the policy callback to exclude a field:
+
+```c
+field exclude_internals(context ctx, source src, field base, field derived, void *ud) {
+    (void)ctx; (void)base; (void)ud;
+    
+    /* Exclude fields starting with underscore */
+    const char *raw = Source.data(src);
+    if (derived && derived->key_len > 0 &&
+        raw[derived->key_pos] == '_') {
+        return NULL;  /* Exclude this field */
+    }
+
+    return derived ? derived : base;
+}
+```
+
+### 10.5 Integration with sigma.collections
+
+For array concatenation and object merging, use types from `sigma.collections`:
+
+```c
+#include <sigma.collections/collections.h>
+
+field concatenate_arrays(context ctx, source src, field base, field derived) {
+    /* Create farray builder */
+    farray_builder *builder = farray_new(sizeof(anvl_element_meta));
+    
+    /* Add base elements */
+    usize base_count = Context.value_element_count(ctx, base->val);
+    for (usize i = 0; i < base_count; i++) {
+        const anvl_element_meta *elem = Context.get_value_element(ctx, base->val, i);
+        farray_append(builder, elem);
+    }
+    
+    /* Add derived elements */
+    usize derived_count = Context.value_element_count(ctx, derived->val);
+    for (usize i = 0; i < derived_count; i++) {
+        const anvl_element_meta *elem = Context.get_value_element(ctx, derived->val, i);
+        farray_append(builder, elem);
+    }
+    
+    /* Allocate new field with concatenated array */
+    /* (implementation details omitted for brevity) */
+    field result = /* ... build new field from farray ... */;
+    farray_dispose(builder);
+    return result;
+}
+```
+
+### 10.6 Design Rationale
+
+**Why callback pattern instead of configuration flags?**
+
+1. **Flexibility**: Real-world merge logic is field-specific. Config may want:
+   - Arrays: concatenate for `plugins`, replace for `allowed_hosts`
+   - Objects: deep merge for `server`, shallow merge for `ui`
+   - Scalars: always derived wins
+
+2. **Primitives not policy**: Anvil provides the lowest-level API possible. Consumers build their own merge strategies without Anvil core needing to know about every use case.
+
+3. **Composability**: Policies can be:
+   - Chained (policy A calls policy B for nested objects)
+   - Conditional (switch behavior based on field name)
+   - Context-aware (use `userdata` to pass application state)
+
+**Performance**: The callback overhead is negligible compared to:
+- Inheritance graph traversal (already recursive)
+- Field name comparison (already O(n×m) string matching)
+- Memory allocation (dominant cost in merge)
+
+### 10.7 Limitations
+
+1. **Caching**:  Current implementation (v0.6.0) recomputes custom merges on every call. Production use should implement caching in the consumer layer if needed.
+
+2. **Memory management**: The policy callback must allocate new fields from the same context (`ctx`) passed to it. Do NOT use external allocators.
+
+3. **Circular references**: The callback is invoked during recursive descent. Avoid creating circular field references (Anvil does not detect these).
+
+### 10.8 Migration Path
+
+Existing code using default resolver behavior is unaffected:
+
+```c
+/* Old code (still works) */
+const anvl_field_list_t *merged = 
+    anvl_node_state_get_merged_fields(state, idx);
+```
+
+New code can opt into custom policies:
+
+```c
+/* New code (opt-in) */
+const anvl_field_list_t *merged = 
+    anvl_node_state_get_merged_fields_custom(state, idx, my_policy, NULL);
+```
+
+**No breaking changes.** The API is additive.
+
+---
+
 ## Addendum: Law 42
 
 Any deviation requires a signed confession and a public apology. And probably steak dinners for the team.

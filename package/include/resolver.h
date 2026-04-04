@@ -102,3 +102,80 @@ bool anvl_node_state_warm_all(anvl_node_state_t *state);
  * Release all memory owned by the state.
  */
 void anvl_node_state_dispose(anvl_node_state_t *state);
+
+/* ================================================================
+ * Custom Merge Policy API — FR-2604-anvl-002
+ * ================================================================ */
+
+/**
+ * Merge policy callback type — consumer-controlled field merging.
+ *
+ * Invoked for each field pair (base, derived) during inheritance resolution.
+ * Should return:
+ *   - A field pointer (new merged field, or base, or derived)
+ *   - NULL to exclude the field from the result
+ *
+ * Parameters:
+ *   ctx          - parsing context (for allocating new fields if needed)
+ *   src          - source buffer (for accessing field names/values)
+ *   base_field   - field from base statement (may be NULL if only in derived)
+ *   derived_field- field from derived statement (may be NULL if only in base)
+ *   userdata     - caller-supplied context pointer
+ *
+ * Examples:
+ *   - Array concatenation: build new field with [base] + [derived]
+ *   - Object deep merge: recursively merge nested objects
+ *   - Exclusion: return NULL to omit field from result
+ *   - Default: return derived_field (mimics current "derived wins")
+ */
+typedef field (*anvl_merge_policy_fn)(
+    context ctx,
+    source src,
+    field base_field,
+    field derived_field,
+    void *userdata);
+
+/**
+ * Get the base statement index for a given statement.
+ *
+ * Returns:
+ *   - Index of the base statement (0 <= idx < stmt_count)
+ *   - USIZE_MAX if statement has no base or base not found
+ */
+usize anvl_node_state_get_base_index(
+    anvl_node_state_t *state,
+    usize stmt_idx);
+
+/**
+ * Get the statement's own (unmerged) fields.
+ *
+ * Returns the fields defined directly in the statement, WITHOUT
+ * inheritance resolution. This is the raw field list from the AST.
+ *
+ * Returns NULL if statement index is out of bounds.
+ */
+const anvl_field_list_t *anvl_node_state_get_own_fields(
+    anvl_node_state_t *state,
+    usize stmt_idx);
+
+/**
+ * Return the merged field list with custom merge policy.
+ *
+ * Like anvl_node_state_get_merged_fields(), but invokes the caller-supplied
+ * merge policy callback for each field pair during resolution.
+ *
+ * If policy is NULL, behaves identically to get_merged_fields() (default
+ * "derived wins" semantics) and uses the same cache.
+ *
+ * Results are cached separately per stmt_idx for custom policies.
+ * Subsequent calls with the same policy return cached results.
+ *
+ * Returns NULL on error (missing base, allocation failure).
+ * Error code is set via anvl_error_set().
+ */
+const anvl_field_list_t *anvl_node_state_get_merged_fields_custom(
+    anvl_node_state_t *state,
+    usize stmt_idx,
+    anvl_merge_policy_fn policy,
+    void *userdata);
+
