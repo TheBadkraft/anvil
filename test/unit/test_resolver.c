@@ -49,6 +49,7 @@ static void test_null_policy_preserves_default(void);
 static void test_nested_inheritance_3_levels(void);
 static void test_base_not_found_error(void);
 static void test_cache_custom_results(void);
+static void test_cannot_inherit_from_anonymous(void);
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -466,30 +467,36 @@ static void test_missing_base_deferred_error(void) {
  * ================================================================ */
 
 /* Test data for custom merge tests */
-#define CM_BASE_DERIVED \
-   "#!aml\n"            \
-   "Base { x := 10 }\n" \
+#define CM_BASE_DERIVED    \
+   "#!aml\n"               \
+   "Base := { x := 10 }\n" \
    "Derived:Base := { y := 20 }\n"
 
 #define CM_NO_INHERIT \
    "#!aml\n"          \
    "Standalone { a := 1, b := 2 }\n"
 
-#define CM_ARRAY_BASE           \
-   "#!aml\n"                    \
-   "Base { items := [1, 2] }\n" \
+#define CM_ARRAY_BASE              \
+   "#!aml\n"                       \
+   "Base := { items := [1, 2] }\n" \
    "Derived:Base := { items := [3, 4] }\n"
 
-#define CM_OBJECT_BASE                                            \
-   "#!aml\n"                                                      \
-   "Base { config := { host := \"localhost\", port := 8080 } }\n" \
+#define CM_OBJECT_BASE                                               \
+   "#!aml\n"                                                         \
+   "Base := { config := { host := \"localhost\", port := 8080 } }\n" \
    "Derived:Base := { config := { port := 9000, ssl := true } }\n"
 
 #define CM_THREE_LEVEL          \
    "#!aml\n"                    \
-   "Alpha { a := 1 }\n"         \
+   "Alpha := { a := 1 }\n"      \
    "Beta:Alpha := { b := 2 }\n" \
    "Gamma:Beta := { c := 3 }\n"
+
+/* Negative test: anonymous base should be rejected */
+#define CM_ANON_INHERIT_ERROR \
+   "#!aml\n"                  \
+   "Base { x := 10 }\n"       \
+   "Derived:Base := { y := 20 }\n"
 
 /* ================================================================
  * CM01 — Get base index with inheritance
@@ -785,6 +792,28 @@ static void test_cache_custom_results(void) {
 }
 
 /* ================================================================
+ * CM11 — Cannot inherit from anonymous object
+ * ================================================================ */
+static void test_cannot_inherit_from_anonymous(void) {
+   context ctx = build_context(CM_ANON_INHERIT_ERROR);
+   Assert.isNotNull(ctx, "Context should parse");
+
+   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
+   Assert.isNotNull(state, "State should build (inheritance detected)");
+
+   /* Attempt to get base index should fail with error */
+   usize base_idx = anvl_node_state_get_base_index(state, 1);
+   Assert.isTrue(base_idx == (usize)-1, "Should return -1 for anonymous base");
+   Assert.isTrue(anvl_error_is_set(), "Error should be set");
+   Assert.isTrue(Anvil.error_get()->code == ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
+                 "Error code should be CANNOT_INHERIT_FROM_ANONYMOUS");
+
+   anvl_node_state_dispose(state);
+   Context.dispose(ctx);
+   teardown();
+}
+
+/* ================================================================
  * Registration
  * ================================================================ */
 static void _register(void) {
@@ -812,6 +841,7 @@ static void _register(void) {
    testcase("CM08: Nested inheritance (3 levels)", test_nested_inheritance_3_levels);
    testcase("CM09: Base not found error", test_base_not_found_error);
    testcase("CM10: Repeated calls with custom policy", test_cache_custom_results);
+   testcase("CM11: Cannot inherit from anonymous", test_cannot_inherit_from_anonymous);
 }
 __attribute__((constructor)) static void register_test_resolver(void) {
    Tests.enqueue(_register);
