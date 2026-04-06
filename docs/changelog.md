@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Value-level collection traversal API** (`include/context.h`, `src/core/context.c`) — five new functions enabling traversal of nested collections inside field values (FR-2604-anvl-001):
+  - `Context.value_element_count(ctx, val)` — count elements in array/tuple values
+  - `Context.get_value_element(ctx, val, index)` — access array/tuple elements by index
+  - `Context.value_field_count(ctx, val)` — count fields in object values
+  - `Context.get_value_field(ctx, val, index)` — access object fields by index
+  - `Context.get_value_field_by_name(ctx, val, name, len)` — access object fields by name (linear scan)
+- **Tests: VT01–VT15** (`test/unit/test_context.c`) — 15 new test cases covering value-level element/field access, NULL guards, out-of-range handling, and nested object traversal
 - **Custom merge policy API** (`include/resolver.h`, `src/resolver/resolver.c`) — four new functions enabling consumer-controlled inheritance merge strategies (FR-2604-anvl-002):
   - `anvl_node_state_get_base_index(state, stmt_idx)` — resolve base statement index
   - `anvl_node_state_get_own_fields(state, stmt_idx)` — access unmerged fields from derived statement
@@ -25,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (docs)
 
-- **reference.md § 10** — Custom Merge Policies chapter with API documentation, rationale, usage examples (array concatenation, field exclusion, sigma.collections integration), and migration path
+- **reference.md § 9.5** — Value-Level Collection Traversal chapter with API documentation and usage examples for traversing nested arrays/objects inside field values (FR-2604-anvl-001)
+- **reference.md § 10** — Custom Merge Policies chapter with API documentation, rationale, usage examples (array concatenation, field exclusion, sigma.collections integration), and migration path (FR-2604-anvl-002)
 
 ---
 
