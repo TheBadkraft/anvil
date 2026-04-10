@@ -1,0 +1,153 @@
+#!anvl
+// Bug Report: Anonymous objects with attributes require explicit := operator
+// ID: BR-2604-anvil-002
+// Owner: anvil
+// Filed: 2026-04-09
+
+BR-2604-anvil-002 @[
+    type="bug-report",
+    owner="anvil",
+    priority="medium",
+    severity="minor",
+    status="open",
+    filed="2026-04-09"
+] := {
+
+    metadata {
+        title := "Anonymous objects with attributes should not require := operator"
+        project := "anvil"
+        component := "ANVL parser"
+        affects := "ANVL syntax parsing, font atlas files, configuration objects"
+        discovered_by := "lattice.net integration (FR-2604-lattice-005)"
+        reporter := "badkraft"
+    }
+
+    problem := `
+Anonymous objects with attribute blocks currently require an explicit := operator,
+but this appears inconsistent with ANVL's design philosophy. Named objects with
+attributes use := naturally, but anonymous attribute-annotated objects should be
+valid without it since the attribute block already signals the object definition.
+
+Current behavior forces this syntax:
+    font_atlas @[typeface="Inter Regular", mode=Msdf] := { ... }
+
+Expected behavior should allow:
+    font_atlas @[typeface="Inter Regular", mode=Msdf] { ... }
+
+The := feels redundant when attributes are present, as the @[...] already
+indicates an object is being defined.
+`
+
+    symptoms := {
+        parse_error := "Expected ':=' after identifier"
+        location := "ANVL parser, attribute-annotated anonymous objects"
+        workaround := "Add explicit := operator after attribute block"
+        functional_impact := "Parser rejects valid-looking ANVL files, forces verbose syntax"
+        clarity_impact := "Syntax feels inconsistent compared to other object forms"
+    }
+
+    example_failing_syntax := `
+// This FAILS to parse:
+font_atlas @[typeface="Inter Regular", mode=Msdf] {
+    atlasWidth := 2048
+    atlasHeight := 2048
+    emSize := 64.0
+}
+
+// Parser error: "Expected ':=' after identifier"
+`
+
+    example_working_workaround := `
+// This WORKS with explicit :=
+font_atlas @[typeface="Inter Regular", mode=Msdf] := {
+    atlasWidth := 2048
+    atlasHeight := 2048
+    emSize := 64.0
+}
+`
+
+    context := {
+        use_case := "lattice.net font atlas descriptor files (.font)"
+        file_location := "lattice.net/assets/fonts/Inter-Regular.font"
+        integration := "FR-2604-lattice-005 (MSDF rendering pipeline)"
+        workaround_applied := "2026-04-09 (commit f68b463)"
+        related_code := "lattice.net/src/Lattice.Fonts/FontAtlasDescriptor.cs"
+    }
+
+    design_questions := {
+        q1 := "Is := operator mandatory for all anonymous objects, even with attributes?"
+        q2 := "Should attribute blocks @[...] implicitly signal object definition?"
+        q3 := "Is this a parser bug or intentional design decision?"
+        q4 := "Do other attribute-annotated forms require := operator?"
+    }
+
+    proposed_resolution := {
+        option_a := {
+            approach := "Make := optional for anonymous objects with attributes"
+            rationale := "Attribute block @[...] clearly signals object definition"
+            impact := "More intuitive syntax, less verbose"
+            risk := "May break existing ANVL files expecting := (backward compat)"
+        }
+
+        option_b := {
+            approach := "Keep := mandatory, document it clearly"
+            rationale := "Maintains consistent syntax rules for all anonymous objects"
+            impact := "No parser changes needed, just documentation"
+            risk := "Syntax remains verbose, feels redundant"
+        }
+
+        option_c := {
+            approach := "Allow both forms (with and without :=)"
+            rationale := "Maximum flexibility, backward compatible"
+            impact := "Parser needs to handle both cases"
+            risk := "Slight parser complexity increase"
+        }
+    }
+
+    test_cases {
+        tc1 := {
+            name := "Anonymous object with attributes (no :=)"
+            input := "obj @[attr=value] { field := 1 }"
+            expect := "Parses successfully" 
+            current := "Parse error: Expected ':=' after identifier"
+        }
+
+        tc2 := {
+            name := "Anonymous object with attributes (with :=)"
+            input := "obj @[attr=value] := { field := 1 }"
+            expect := "Parses successfully"
+            current := "Parses successfully (workaround)"
+        }
+
+        tc3 := {
+            name := "Named object with attributes"
+            input := "name @[attr=value] := { field := 1 }"
+            expect := "Parses successfully"
+            current := "Parses successfully (expected)"
+        }
+
+        tc4 := {
+            name := "Font atlas descriptor (real-world case)"
+            input := `font_atlas @[typeface="Inter", mode=Msdf] { 
+                atlasWidth := 1024
+                emSize := 64.0
+            }`
+            expect := "Parses successfully"
+            current := "Parse error: Expected ':=' after identifier"
+        }
+    }
+
+    notes := `
+This issue was discovered during MSDF font rendering implementation in lattice.net.
+The font atlas descriptor file format uses ANVL with attribute-annotated objects.
+Initial implementation failed until := was added after the attribute block.
+
+Question for Anvil team: Is this parser behavior intentional or an oversight?
+If intentional, we'll document it. If oversight, consider making := optional
+for attribute-annotated anonymous objects.
+
+Tentatively scheduling for current sprint pending Anvil team response.
+`
+
+    resolution := null
+}
