@@ -164,6 +164,14 @@ struct anvl_import_decl {
    usize alias_len; // byte length of the alias identifier (0 if none)
 };
 
+/* ------------------------------------------------------------------ */
+/* Using Declaration (stored in context->using_list during parse)     */
+/* ------------------------------------------------------------------ */
+struct anvl_using_decl {
+   usize name_pos; // byte offset of the module identifier in source
+   usize name_len; // byte length of the module identifier
+};
+
 struct anvl_value_meta {
    anvl_value_type type; // scalar, object, array, tuple, blob, varref, interp_string
    usize pos;            // position in source

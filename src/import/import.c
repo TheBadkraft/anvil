@@ -49,7 +49,7 @@ static bool load_stack_push(load_stack_t *s, char *canonical) {
       memset(nb, 0, sizeof(char *) * newcap);
       if (s->paths) {
          memcpy(nb, s->paths, sizeof(char *) * s->count);
-         Allocator.free(s->paths);
+         Allocator.dispose(s->paths);
       }
       s->paths = nb;
       s->capacity = newcap;
@@ -73,7 +73,7 @@ static bool load_stack_contains(const load_stack_t *s, const char *canonical) {
 
 static void load_stack_free(load_stack_t *s) {
    if (s->paths)
-      Allocator.free(s->paths);
+      Allocator.dispose(s->paths);
    s->paths = NULL;
    s->count = s->capacity = 0;
 }
@@ -95,9 +95,9 @@ static bool str_map_insert(str_map_t *m, char *key, usize val) {
       usize *nv = Allocator.alloc(sizeof(usize) * newcap);
       if (!nk || !nv) {
          if (nk)
-            Allocator.free(nk);
+            Allocator.dispose(nk);
          if (nv)
-            Allocator.free(nv);
+            Allocator.dispose(nv);
          return false;
       }
       memset(nk, 0, sizeof(char *) * newcap);
@@ -105,8 +105,8 @@ static bool str_map_insert(str_map_t *m, char *key, usize val) {
       if (m->keys) {
          memcpy(nk, m->keys, sizeof(char *) * m->count);
          memcpy(nv, m->vals, sizeof(usize) * m->count);
-         Allocator.free(m->keys);
-         Allocator.free(m->vals);
+         Allocator.dispose(m->keys);
+         Allocator.dispose(m->vals);
       }
       m->keys = nk;
       m->vals = nv;
@@ -129,9 +129,9 @@ static usize str_map_find(const str_map_t *m, const char *key) {
 
 static void str_map_free(str_map_t *m) {
    if (m->keys)
-      Allocator.free(m->keys);
+      Allocator.dispose(m->keys);
    if (m->vals)
-      Allocator.free(m->vals);
+      Allocator.dispose(m->vals);
    m->keys = NULL;
    m->vals = NULL;
    m->count = m->capacity = 0;
@@ -152,7 +152,7 @@ static bool graph_ensure_cap(anvl_import_graph_t *g, usize need) {
    memset(nb, 0, sizeof(anvl_import_entry_t) * newcap);
    if (g->entries) {
       memcpy(nb, g->entries, sizeof(anvl_import_entry_t) * g->count);
-      Allocator.free(g->entries);
+      Allocator.dispose(g->entries);
    }
    g->entries = nb;
    g->capacity = newcap;
@@ -255,7 +255,7 @@ static bool process_decl(build_ctx_t *bc, context ctx,
    }
 
    bool ok = load_import(bc, raw_path, raw_path_len, alias);
-   Allocator.free(alias);
+   Allocator.dispose(alias);
    return ok;
 }
 
@@ -285,7 +285,7 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    /* Diamond dedup: same canonical already loaded → register alias only */
    usize existing = str_map_find(&bc->canonical_map, canonical);
    if (existing != (usize)-1) {
-      Allocator.free(canonical);
+      Allocator.dispose(canonical);
       /* If alias is already registered for this same entry, pure diamond — done */
       usize alias_existing = str_map_find(&bc->alias_map, alias);
       if (alias_existing == existing)
@@ -315,7 +315,7 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
          return false;
       }
       if (!str_map_insert(&bc->alias_map, alias_copy, existing)) {
-         Allocator.free(alias_copy);
+         Allocator.dispose(alias_copy);
          anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                         anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                         0, 0, __FILE__);
@@ -329,7 +329,7 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
       anvl_error_set(ANVL_ERR_IMPORT_DUPLICATE_ALIAS,
                      anvl_error_code_message(ANVL_ERR_IMPORT_DUPLICATE_ALIAS),
                      0, 0, __FILE__);
-      Allocator.free(canonical);
+      Allocator.dispose(canonical);
       return false;
    }
 
@@ -338,7 +338,7 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
       anvl_error_set(ANVL_ERR_IMPORT_CYCLIC,
                      anvl_error_code_message(ANVL_ERR_IMPORT_CYCLIC),
                      0, 0, __FILE__);
-      Allocator.free(canonical);
+      Allocator.dispose(canonical);
       return false;
    }
 
@@ -349,7 +349,7 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
       anvl_error_set(ANVL_ERR_IMPORT_FILE_NOT_FOUND,
                      anvl_error_code_message(ANVL_ERR_IMPORT_FILE_NOT_FOUND),
                      0, 0, __FILE__);
-      Allocator.free(canonical);
+      Allocator.dispose(canonical);
       return false;
    }
 
@@ -359,15 +359,15 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    context child_ctx = builder->build(builder);
    builder->dispose(builder);
    if (!child_ctx) {
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       /* Error already set by builder */
       return false;
    }
    if (!Context.parse(child_ctx)) {
       Context.dispose(child_ctx);
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       /* Error already set by parser */
       return false;
    }
@@ -376,8 +376,8 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    usize entry_idx = bc->graph->count;
    if (!graph_ensure_cap(bc->graph, entry_idx + 1)) {
       Context.dispose(child_ctx);
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -388,8 +388,8 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    string_builder sb3 = StringBuilder.new(64);
    if (!sb3) {
       Context.dispose(child_ctx);
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -400,8 +400,8 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    StringBuilder.dispose(sb3);
    if (!alias_owned) {
       Context.dispose(child_ctx);
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -411,10 +411,10 @@ static bool load_import(build_ctx_t *bc, const char *path, usize path_len,
    /* Register in maps (non-owning pointers to entry strings) */
    if (!str_map_insert(&bc->alias_map, alias_owned, entry_idx) ||
        !str_map_insert(&bc->canonical_map, canonical, entry_idx)) {
-      Allocator.free(alias_owned);
+      Allocator.dispose(alias_owned);
       Context.dispose(child_ctx);
-      Allocator.free((void *)src_bytes);
-      Allocator.free(canonical);
+      Allocator.dispose((void *)src_bytes);
+      Allocator.dispose(canonical);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -484,7 +484,7 @@ static anvl_import_graph_t *import_graph_build(context ctx,
    if (owner_path) {
       string_builder sb = StringBuilder.new(64);
       if (!sb) {
-         Allocator.free(graph);
+         Allocator.dispose(graph);
          anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                         anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                         0, 0, __FILE__);
@@ -495,8 +495,8 @@ static anvl_import_graph_t *import_graph_build(context ctx,
       StringBuilder.dispose(sb);
       if (!root_canon || !load_stack_push(&bc.stack, root_canon)) {
          if (root_canon)
-            Allocator.free(root_canon);
-         Allocator.free(graph);
+            Allocator.dispose(root_canon);
+         Allocator.dispose(graph);
          anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                         anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                         0, 0, __FILE__);
@@ -512,7 +512,7 @@ static anvl_import_graph_t *import_graph_build(context ctx,
          }
       }
       load_stack_pop(&bc.stack);
-      Allocator.free(root_canon);
+      Allocator.dispose(root_canon);
       if (!ok) {
          load_stack_free(&bc.stack);
          str_map_free(&bc.alias_map);
@@ -547,16 +547,16 @@ static void import_graph_dispose(anvl_import_graph_t *graph) {
    for (usize i = 0; i < graph->count; i++) {
       anvl_import_entry_t *e = &graph->entries[i];
       if (e->canonical)
-         Allocator.free(e->canonical);
+         Allocator.dispose(e->canonical);
       if (e->alias)
-         Allocator.free(e->alias);
+         Allocator.dispose(e->alias);
       if (e->ctx)
          Context.dispose(e->ctx);
       /* e->src is owned by e->ctx — already freed above */
    }
    if (graph->entries)
-      Allocator.free(graph->entries);
-   Allocator.free(graph);
+      Allocator.dispose(graph->entries);
+   Allocator.dispose(graph);
 }
 
 /* ------------------------------------------------------------------ */

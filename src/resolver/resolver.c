@@ -431,7 +431,14 @@ const anvl_field_list_t *anvl_node_state_get_merged_fields(
       return NULL;
    }
 
-   /* Recurse to get base merged fields */
+   /* Validate: cannot inherit from an anonymous block */
+   statement base_stmt_check = Context.get_statement(state->ctx, base_stmt_idx);
+   if (base_stmt_check &&
+       (anvl_stmt_type)base_stmt_check->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT) {
+      anvl_error_set(ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
+                     "cannot inherit from anonymous object", 0, 0, __FILE__);
+      return NULL;
+   }
    const anvl_field_list_t *base_list =
        anvl_node_state_get_merged_fields(state, base_stmt_idx);
    if (!base_list && anvl_error_is_set())
@@ -545,8 +552,8 @@ const anvl_field_list_t *anvl_node_state_get_own_fields(
    if (stmt->value_meta->type != ANVL_VALUE_OBJECT)
       return NULL;
 
-   /* Allocate temporary field_list to return (caller should not free fields) */
-   anvl_field_list_t *result = Allocator.alloc(sizeof(*result));
+   /* Allocate from the parse arena — freed with Context.dispose(), no leak */
+   anvl_field_list_t *result = state->ctx->arena->alloc(state->ctx->arena, sizeof(*result));
    if (!result)
       return NULL;
 

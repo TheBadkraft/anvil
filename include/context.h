@@ -143,6 +143,13 @@ struct anvl_context_t {
       usize count;                    // number of declarations
       usize capacity;                 // allocated capacity
    } import_list;
+   // Using declarations (populated during parse; before vars/statements)
+   // First using escalates dialect AML → ASL.
+   struct {
+      struct anvl_using_decl *decls; // array of using declarations
+      usize count;                   // number of declarations
+      usize capacity;                // allocated capacity
+   } using_list;
    // Lazy-built statement name → index map (FNV-1a, sigma.collections Map).
    // NULL until the first get_statement_by_name call. Freed by context_dispose.
    void *stmt_name_index;

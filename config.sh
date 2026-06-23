@@ -33,11 +33,11 @@ TEST_DIR=test
 TST_BUILD_DIR="$BUILD_DIR/test"
 LIB_NAME="anvil"
 
-# Runtime dependencies (cbuild resolves these as /usr/local/packages/<name>.o)
-REQUIRES=("sigma.core" "sigma.memory" "sigma.collections")
+# Runtime dependencies — sigma.core/memory/text are built into src/core/
+REQUIRES=()
 
-# Test dependencies (rtest resolves these — adds sigma.test on top of REQUIRES)
-TST_REQUIRES=("sigma.core" "sigma.memory" "sigma.collections" "sigma.test")
+# Test dependencies — TestBit replaces sigma.test
+TST_REQUIRES=()
 
 # ---------------------------------------------------------------------------
 # Package: anvil (mandatory core)
@@ -47,7 +47,20 @@ TST_REQUIRES=("sigma.core" "sigma.memory" "sigma.collections" "sigma.test")
 shopt -s nullglob
 _CORE_SRCS=("$SRC_DIR/core"/*.c)
 _UTIL_SRCS=("$SRC_DIR/utilities"/*.c)
-ANVIL_SOURCES=("${_CORE_SRCS[@]}" "${_UTIL_SRCS[@]}")
+# Non-parser files excluded from standalone build:
+#   module.c  — sigma framework registration (deleted)
+#   types.c   — diagnostic helpers (anvl_value_type_name etc); re-include when wiring serializer/resolver
+#   operators.c — canonical operator table; re-include when wiring serializer/writer
+#   symbols.c   — canonical symbol table; re-include when wiring serializer/writer
+_EXCLUDE=("types.c" "operators.c" "symbols.c")
+_FILTERED=()
+for _s in "${_CORE_SRCS[@]}"; do
+    _base=$(basename "$_s")
+    _skip=false
+    for _x in "${_EXCLUDE[@]}"; do [[ "$_base" == "$_x" ]] && _skip=true && break; done
+    [[ "$_skip" == false ]] && _FILTERED+=("$_s")
+done
+ANVIL_SOURCES=("${_FILTERED[@]}" "${_UTIL_SRCS[@]}")
 unset _CORE_SRCS _UTIL_SRCS
 
 # Flatten object paths into BUILD_DIR (avoids mirroring subdirs)

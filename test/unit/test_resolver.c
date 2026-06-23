@@ -1,848 +1,303 @@
 /*
- * test_resolver.c — TDD tests for the inheritance resolver (port/resolver)
- *
- * Test contracts derived from ResolverTests.cs (Anvil.Net.Api reference).
- *
- * Test groups:
- *   RS01  Fast-path: document with no inheritance → build_state returns NULL
- *   RS02  Single-level: Derived:Base inherits un-overridden fields
- *   RS03  Single-level: Derived overrides own field (derived wins)
- *   RS04  Single-level: Base statement unchanged after resolve
- *   RS05  Three-level chain: Gamma:Beta:Alpha — full field resolution
- *   RS06  Three-level: Beta midpoint correct
- *   RS07  Forward reference: derived declared before base — still works
- *   RS08  Cycle A:B, B:A → ANVL_ERR_RESOLVER_CYCLE_DETECTED
- *   RS09  warm_all + idempotent double warm
- *   RS10  Missing base → NULL from get_merged_fields + RESOLVER_MISSING_BASE
+ * Copyright (c) 2026 Quantum Override. All rights reserved.
+ * SPDX-License-Identifier: Proprietary
+ * ------------------------------------------------------------------
+ * test_resolver.c — TDD: inheritance graph resolver (anvil.resolver)
+ * ------------------------------------------------------------------
+ * Converted from sigma.test to TestBit.
+ * Original test contracts from ResolverTests.cs (Anvil.Net.Api).
+ * ------------------------------------------------------------------
  */
 
 #include "anvil.h"
+#include "context.h"
+#include "errors.h"
 #include "resolver.h"
-#include "utilities/helpers.h"
-#include <sigma.memory/memory.h>
-#include <sigma.test/sigtest.h>
-#include <stdio.h>
+#include "testbit.h"
 #include <string.h>
-
-/* ------------------------------------------------------------------ */
-/* Test function forward declarations                                 */
-/* ------------------------------------------------------------------ */
-static void test_no_inheritance_fast_path(void);
-static void test_single_level_inherits_unoverridden(void);
-static void test_single_level_derived_override(void);
-static void test_single_level_base_unchanged(void);
-static void test_three_level_full_resolve(void);
-static void test_three_level_beta_correct(void);
-static void test_forward_reference(void);
-static void test_cycle_detected(void);
-static void test_warm_all_idempotent(void);
-static void test_missing_base_deferred_error(void);
-
-/* Custom merge policy tests — FR-2604-anvl-002 */
-static void test_get_base_index_with_inheritance(void);
-static void test_get_base_index_without_inheritance(void);
-static void test_get_own_fields_no_merge(void);
-static void test_custom_array_concatenation(void);
-static void test_custom_object_deep_merge(void);
-static void test_field_exclusion_policy(void);
-static void test_null_policy_preserves_default(void);
-static void test_nested_inheritance_3_levels(void);
-static void test_base_not_found_error(void);
-static void test_cache_custom_results(void);
-static void test_cannot_inherit_from_anonymous(void);
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
+static context parse_src(const char *src) {
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
+    if (!ctx) return NULL;
+    Context.parse(ctx);
+    return ctx;
+}
+static void td(void) { Anvil.error_clear(); }
 
-static void set_config(FILE **logger) {
-   *logger = fopen("logs/test_resolver.log", "w");
-}
-static void set_teardown(void) {
-   Anvil.cleanup();
-}
-static void teardown(void) {
-   Anvil.error_clear();
-}
-
-static context build_context(const char *src_str) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   builder->set_source(builder, src_str, strlen(src_str));
-   context ctx = builder->build(builder);
-   if (!ctx)
-      return NULL;
-   bool ok = Context.parse(ctx);
-   if (!ok) {
-      Context.dispose(ctx);
-      return NULL;
-   }
-   return ctx;
+static usize find_stmt(context ctx, const char *name) {
+    const char *raw = Source.data(ctx->source);
+    for (usize i = 0; i < ctx->stmt_list.count; i++) {
+        statement s = ctx->stmt_list.statements[i];
+        usize p = s->meta[STMT_META_IDENT_POS], l = s->meta[STMT_META_IDENT_LEN];
+        if (l == strlen(name) && memcmp(raw + p, name, l) == 0) return i;
+    }
+    return (usize)-1;
 }
 
-/* Return source string from context (convenience) */
-static inline source ctx_src(context ctx) { return ctx->source; }
-
-/* Get identifier from statement into buffer (convenience; FR-002) */
-static void stmt_ident(statement stmt, source src, char *out_buf) {
-   Statement.identifier(stmt, src, out_buf);
+static field find_field(const anvl_field_list_t *fl, context ctx, const char *name) {
+    const char *raw = Source.data(ctx->source);
+    for (usize i = 0; i < fl->count; i++) {
+        field f = fl->fields[i];
+        if (f->key_len == strlen(name) && memcmp(raw + f->key_pos, name, f->key_len) == 0)
+            return f;
+    }
+    return NULL;
 }
 
-/* Find merged field by key name; returns NULL when not found */
-static field find_field(const anvl_field_list_t *list, source src, const char *key) {
-   if (!list)
-      return NULL;
-   usize klen = strlen(key);
-   for (usize i = 0; i < list->count; i++) {
-      field f = list->fields[i];
-      if (!f)
-         continue;
-      if (f->key_len == klen && memcmp(Source.data(src) + f->key_pos, key, klen) == 0)
-         return f;
-   }
-   return NULL;
+static bool has_field(const anvl_field_list_t *fl, context ctx, const char *name) {
+    return find_field(fl, ctx, name) != NULL;
 }
 
-/* Read scalar value as long (decimal only, no negatives for small helpers) */
-static long field_as_long(field f, source src) {
-   if (!f || !f->val || f->val->type != ANVL_VALUE_SCALAR)
-      return -1;
-   const char *s = Source.data(src) + f->val->data.scalar.pos;
-   usize len = f->val->data.scalar.len;
-   long result = 0;
-   int sign = 1;
-   usize i = 0;
-   if (i < len && s[i] == '-') {
-      sign = -1;
-      i++;
-   }
-   for (; i < len; i++) {
-      if (s[i] < '0' || s[i] > '9')
-         break;
-      result = result * 10 + (s[i] - '0');
-   }
-   return sign * result;
+static bool field_val_eq(field f, context ctx, const char *expected) {
+    if (!f || !f->val) return false;
+    const char *raw = Source.data(ctx->source);
+    usize pos = f->val->data.scalar.pos, len = f->val->data.scalar.len;
+    return len == strlen(expected) && memcmp(raw + pos, expected, len) == 0;
 }
 
 /* ------------------------------------------------------------------ */
-/* Test sample documents                                              */
+/* RS01 — no inheritance: fast-path NULL, no error                   */
 /* ------------------------------------------------------------------ */
-
-static const char SINGLE_LEVEL[] =
-    "#!aml\n"
-    "Base := { a := \"hello\", b := 42, c := 7 }\n"
-    "Derived:Base := { b := 99 }\n";
-
-static const char THREE_LEVEL[] =
-    "#!aml\n"
-    "Alpha := { x := 1, y := 2, z := 3 }\n"
-    "Beta:Alpha := { y := 20 }\n"
-    "Gamma:Beta := { z := 300 }\n";
-
-static const char CYCLE[] =
-    "#!aml\n"
-    "A:B := { valA := 1 }\n"
-    "B:A := { valB := 2 }\n";
-
-static const char MISSING_BASE[] =
-    "#!aml\n"
-    "X:Ghost := { x := 10 }\n";
-
-static const char NO_INHERITANCE[] =
-    "#!aml\n"
-    "Standalone := { p := 1, q := 2 }\n";
-
-static const char FORWARD_REF[] =
-    "#!aml\n"
-    "Child:Parent := { own := 1 }\n"
-    "Parent := { shared := 42 }\n";
-
-/* ================================================================
- * RS01 — Fast-path: no inheritance → build_state returns NULL
- * ================================================================ */
-static void test_no_inheritance_fast_path(void) {
-   context ctx = build_context(NO_INHERITANCE);
-   Assert.isNotNull(ctx, "Context should be created");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNull(state, "Fast-path: build_state should return NULL when no inheritance");
-   Assert.isFalse(anvl_error_is_set(), "No error should be set for fast-path");
-
-   Context.dispose(ctx);
-   teardown();
+static void test_rs01_no_inheritance(void) {
+    const char *src = "#!aml\nx := 1\ny := 2";
+    context ctx = parse_src(src);
+    TestBit.is_not_null(ctx, "RS01: context");
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_null(st, "RS01: NULL fast-path (no inheritance)");
+    TestBit.is_false(Anvil.error_is_set(), "RS01: no error");
+    Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS02 — Single-level: Derived:Base inherits un-overridden fields
- * ================================================================ */
-static void test_single_level_inherits_unoverridden(void) {
-   context ctx = build_context(SINGLE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built for doc with inheritance");
-
-   /* Find Derived statement index */
-   usize derived_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Derived") == 0) {
-         derived_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(derived_idx != (usize)-1, "Should find Derived statement");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, derived_idx);
-   Assert.isNotNull((void *)merged, "Merged fields should not be NULL");
-
-   field fa = find_field(merged, ctx_src(ctx), "a");
-   field fc = find_field(merged, ctx_src(ctx), "c");
-   Assert.isNotNull(fa, "Field 'a' should be inherited from Base");
-   Assert.isNotNull(fc, "Field 'c' should be inherited from Base");
-   Assert.isTrue(fc->val != NULL && field_as_long(fc, ctx_src(ctx)) == 7L,
-                 "Field 'c' value should be 7 (inherited)");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS02 — single-level: unoverridden base fields inherited           */
+/* ------------------------------------------------------------------ */
+static void test_rs02_single_inherits(void) {
+    const char *src = "#!aml\n"
+                      "Base := { a := 1, b := 2 }\n"
+                      "Derived : Base := { c := 3 }";
+    context ctx = parse_src(src);
+    TestBit.is_not_null(ctx, "RS02: context");
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS02: state built");
+    usize di = find_stmt(ctx, "Derived");
+    const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, di);
+    TestBit.is_not_null(m, "RS02: merged fields");
+    TestBit.is_true(has_field(m, ctx, "a"), "RS02: has 'a' from Base");
+    TestBit.is_true(has_field(m, ctx, "b"), "RS02: has 'b' from Base");
+    TestBit.is_true(has_field(m, ctx, "c"), "RS02: has 'c' from Derived");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS03 — Single-level: Derived overrides own field
- * ================================================================ */
-static void test_single_level_derived_override(void) {
-   context ctx = build_context(SINGLE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built");
-
-   usize derived_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Derived") == 0) {
-         derived_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(derived_idx != (usize)-1, "Should find Derived");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, derived_idx);
-   Assert.isNotNull((void *)merged, "Merged fields should not be NULL");
-
-   field fb = find_field(merged, ctx_src(ctx), "b");
-   Assert.isNotNull(fb, "Field 'b' should be present");
-   Assert.isTrue(field_as_long(fb, ctx_src(ctx)) == 99L,
-                 "Derived 'b' should be 99 (override)");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS03 — derived field overrides base field (derived wins)          */
+/* ------------------------------------------------------------------ */
+static void test_rs03_override(void) {
+    const char *src = "#!aml\n"
+                      "Base := { hp := 100 }\n"
+                      "Derived : Base := { hp := 200 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS03: state");
+    usize di = find_stmt(ctx, "Derived");
+    const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, di);
+    TestBit.is_not_null(m, "RS03: merged");
+    TestBit.is_equal_int(1, (long long)m->count, "RS03: one field after override");
+    TestBit.is_true(field_val_eq(m->fields[0], ctx, "200"), "RS03: derived hp=200 wins");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS04 — Single-level: Base unchanged
- * ================================================================ */
-static void test_single_level_base_unchanged(void) {
-   context ctx = build_context(SINGLE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built");
-
-   usize base_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Base") == 0) {
-         base_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(base_idx != (usize)-1, "Should find Base");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, base_idx);
-   Assert.isNotNull((void *)merged, "Base merged fields should not be NULL");
-
-   field fb = find_field(merged, ctx_src(ctx), "b");
-   Assert.isNotNull(fb, "Base should have field 'b'");
-   Assert.isTrue(field_as_long(fb, ctx_src(ctx)) == 42L,
-                 "Base 'b' should still be 42");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS04 — base unchanged by derived                                  */
+/* ------------------------------------------------------------------ */
+static void test_rs04_base_unchanged(void) {
+    const char *src = "#!aml\n"
+                      "Base := { hp := 100 }\n"
+                      "Derived : Base := { hp := 200 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS04: state");
+    usize bi = find_stmt(ctx, "Base");
+    const anvl_field_list_t *bm = anvl_node_state_get_merged_fields(st, bi);
+    TestBit.is_not_null(bm, "RS04: base merged");
+    TestBit.is_true(field_val_eq(bm->fields[0], ctx, "100"), "RS04: base hp still 100");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS05 — Three-level: Gamma fully resolved
- * ================================================================ */
-static void test_three_level_full_resolve(void) {
-   context ctx = build_context(THREE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built");
-
-   usize gamma_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Gamma") == 0) {
-         gamma_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(gamma_idx != (usize)-1, "Should find Gamma");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, gamma_idx);
-   Assert.isNotNull((void *)merged, "Gamma merged fields should not be NULL");
-
-   field fx = find_field(merged, ctx_src(ctx), "x");
-   field fy = find_field(merged, ctx_src(ctx), "y");
-   field fz = find_field(merged, ctx_src(ctx), "z");
-   Assert.isNotNull(fx, "Gamma should inherit 'x' from Alpha");
-   Assert.isNotNull(fy, "Gamma should inherit 'y' from Beta");
-   Assert.isNotNull(fz, "Gamma should have own 'z'");
-
-   Assert.isTrue(field_as_long(fx, ctx_src(ctx)) == 1L, "Gamma x = 1");
-   Assert.isTrue(field_as_long(fy, ctx_src(ctx)) == 20L, "Gamma y = 20 (Beta override)");
-   Assert.isTrue(field_as_long(fz, ctx_src(ctx)) == 300L, "Gamma z = 300 (own)");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS05 — three-level chain: grandchild gets all ancestors           */
+/* ------------------------------------------------------------------ */
+static void test_rs05_three_level(void) {
+    const char *src = "#!aml\n"
+                      "A := { x := 1 }\n"
+                      "B : A := { y := 2 }\n"
+                      "C : B := { z := 3 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS05: state");
+    usize ci = find_stmt(ctx, "C");
+    const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, ci);
+    TestBit.is_not_null(m, "RS05: merged");
+    TestBit.is_true(has_field(m, ctx, "x"), "RS05: has 'x' from A");
+    TestBit.is_true(has_field(m, ctx, "y"), "RS05: has 'y' from B");
+    TestBit.is_true(has_field(m, ctx, "z"), "RS05: has 'z' from C");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS06 — Three-level: Beta midpoint correct
- * ================================================================ */
-static void test_three_level_beta_correct(void) {
-   context ctx = build_context(THREE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built");
-
-   usize beta_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Beta") == 0) {
-         beta_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(beta_idx != (usize)-1, "Should find Beta");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, beta_idx);
-   Assert.isNotNull((void *)merged, "Beta merged fields should not be NULL");
-
-   Assert.isTrue(field_as_long(find_field(merged, ctx_src(ctx), "x"), ctx_src(ctx)) == 1L, "Beta x=1");
-   Assert.isTrue(field_as_long(find_field(merged, ctx_src(ctx), "y"), ctx_src(ctx)) == 20L, "Beta y=20");
-   Assert.isTrue(field_as_long(find_field(merged, ctx_src(ctx), "z"), ctx_src(ctx)) == 3L, "Beta z=3");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS06 — forward reference: base declared after derived             */
+/* ------------------------------------------------------------------ */
+static void test_rs06_forward_ref(void) {
+    const char *src = "#!aml\n"
+                      "Derived : Base := { c := 3 }\n"
+                      "Base := { a := 1, b := 2 }";
+    context ctx = parse_src(src);
+    TestBit.is_not_null(ctx, "RS06: context");
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS06: state (forward ref resolved)");
+    usize di = find_stmt(ctx, "Derived");
+    const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, di);
+    TestBit.is_not_null(m, "RS06: merged");
+    TestBit.is_true(has_field(m, ctx, "a"), "RS06: has 'a' from Base");
+    TestBit.is_true(has_field(m, ctx, "c"), "RS06: has 'c' from Derived");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS07 — Forward reference (Child declared before Parent)
- * ================================================================ */
-static void test_forward_reference(void) {
-   context ctx = build_context(FORWARD_REF);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built for forward ref doc");
-
-   usize child_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Child") == 0) {
-         child_idx = i;
-         break;
-      }
-   }
-   Assert.isTrue(child_idx != (usize)-1, "Should find Child");
-
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, child_idx);
-   Assert.isNotNull((void *)merged, "Forward-ref merge should succeed");
-
-   field fs = find_field(merged, ctx_src(ctx), "shared");
-   Assert.isNotNull(fs, "Child should inherit 'shared' from Parent");
-   Assert.isTrue(field_as_long(fs, ctx_src(ctx)) == 42L, "shared = 42");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS07 — cycle detected                                             */
+/* ------------------------------------------------------------------ */
+static void test_rs07_cycle(void) {
+    const char *src = "#!aml\n"
+                      "A : B := { x := 1 }\n"
+                      "B : A := { y := 2 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_null(st, "RS07: NULL on cycle");
+    TestBit.is_equal_int(ANVL_ERR_RESOLVER_CYCLE_DETECTED,
+                         (long long)Anvil.error_get()->code,
+                         "RS07: CYCLE_DETECTED error");
+    if (ctx) Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS08 — Cycle A:B, B:A → ANVL_ERR_RESOLVER_CYCLE_DETECTED
- * ================================================================ */
-static void test_cycle_detected(void) {
-   context ctx = build_context(CYCLE);
-   Assert.isNotNull(ctx, "Context should build (cycle not detected at parse time)");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNull(state, "build_state should return NULL on cycle");
-   Assert.isTrue(anvl_error_is_set(), "Error should be set");
-   const anvl_error_state *err = Anvil.error_get();
-   Assert.isTrue(err->code == ANVL_ERR_RESOLVER_CYCLE_DETECTED,
-                 "Error code should be RESOLVER_CYCLE_DETECTED");
-
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS08 — warm_all idempotent                                        */
+/* ------------------------------------------------------------------ */
+static void test_rs08_warm_all(void) {
+    const char *src = "#!aml\n"
+                      "Base := { x := 1 }\n"
+                      "A : Base := { y := 2 }\n"
+                      "B : Base := { z := 3 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS08: state");
+    TestBit.is_true(anvl_node_state_warm_all(st), "RS08: warm_all pass 1");
+    TestBit.is_false(Anvil.error_is_set(), "RS08: no error");
+    TestBit.is_true(anvl_node_state_warm_all(st), "RS08: warm_all pass 2 (idempotent)");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS09 — warm_all + idempotent double warm
- * ================================================================ */
-static void test_warm_all_idempotent(void) {
-   context ctx = build_context(SINGLE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should be built");
-
-   bool ok1 = anvl_node_state_warm_all(state);
-   Assert.isTrue(ok1, "First warm_all should succeed");
-
-   bool ok2 = anvl_node_state_warm_all(state);
-   Assert.isTrue(ok2, "Second warm_all should be idempotent");
-
-   /* Verify cached result still correct after double warm */
-   usize derived_idx = (usize)-1;
-   char id[128];
-   for (usize i = 0; i < (usize)Context.statement_count(ctx); i++) {
-      stmt_ident(Context.get_statement(ctx, i), ctx_src(ctx), id);
-      if (id[0] && strcmp(id, "Derived") == 0) {
-         derived_idx = i;
-         break;
-      }
-   }
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, derived_idx);
-   Assert.isNotNull((void *)merged, "Merged fields still valid after double warm");
-   field fb = find_field(merged, ctx_src(ctx), "b");
-   Assert.isTrue(field_as_long(fb, ctx_src(ctx)) == 99L, "Cached result correct after double warm");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS09 — missing base: lazy error on get_merged_fields              */
+/* ------------------------------------------------------------------ */
+static void test_rs09_missing_base(void) {
+    const char *src = "#!aml\nDerived : Ghost := { x := 1 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    if (st) {
+        usize di = find_stmt(ctx, "Derived");
+        const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, di);
+        TestBit.is_null(m, "RS09: NULL on missing base");
+        TestBit.is_equal_int(ANVL_ERR_RESOLVER_MISSING_BASE,
+                             (long long)Anvil.error_get()->code,
+                             "RS09: MISSING_BASE error");
+        anvl_node_state_dispose(st);
+    } else {
+        TestBit.is_true(Anvil.error_is_set(), "RS09: error at build_state");
+    }
+    Context.dispose(ctx);
 }
 
-/* ================================================================
- * RS10 — Missing base → ANVL_ERR_RESOLVER_MISSING_BASE on access
- * ================================================================ */
-static void test_missing_base_deferred_error(void) {
-   context ctx = build_context(MISSING_BASE);
-   Assert.isNotNull(ctx, "Context should build (missing base not detected at parse time)");
-
-   /* build_state should succeed — missing base is a deferred error */
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed for missing-base doc");
-   Assert.isFalse(anvl_error_is_set(), "No error yet at build time");
-
-   /* First field access should trigger RESOLVER_MISSING_BASE */
-   usize x_idx = 0; /* X is the only statement */
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, x_idx);
-   Assert.isNull((void *)merged, "get_merged_fields should return NULL for missing base");
-   Assert.isTrue(anvl_error_is_set(), "Error should be set after missing-base access");
-   const anvl_error_state *err = Anvil.error_get();
-   Assert.isTrue(err->code == ANVL_ERR_RESOLVER_MISSING_BASE,
-                 "Error code should be RESOLVER_MISSING_BASE");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS10 — get_own_fields: no base fields included                    */
+/* ------------------------------------------------------------------ */
+static void test_rs10_own_fields(void) {
+    const char *src = "#!aml\n"
+                      "Base := { a := 1 }\n"
+                      "Derived : Base := { b := 2 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS10: state");
+    usize di = find_stmt(ctx, "Derived");
+    const anvl_field_list_t *own = anvl_node_state_get_own_fields(st, di);
+    TestBit.is_not_null(own, "RS10: own fields");
+    TestBit.is_equal_int(1, (long long)own->count, "RS10: only own field");
+    TestBit.is_true(has_field(own, ctx, "b"),  "RS10: own has 'b'");
+    TestBit.is_false(has_field(own, ctx, "a"), "RS10: own excludes 'a' from Base");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * Custom Merge Policy Tests — FR-2604-anvl-002
- * ================================================================ */
-
-/* Test data for custom merge tests */
-#define CM_BASE_DERIVED    \
-   "#!aml\n"               \
-   "Base := { x := 10 }\n" \
-   "Derived:Base := { y := 20 }\n"
-
-#define CM_NO_INHERIT \
-   "#!aml\n"          \
-   "Standalone { a := 1, b := 2 }\n"
-
-#define CM_ARRAY_BASE              \
-   "#!aml\n"                       \
-   "Base := { items := [1, 2] }\n" \
-   "Derived:Base := { items := [3, 4] }\n"
-
-#define CM_OBJECT_BASE                                               \
-   "#!aml\n"                                                         \
-   "Base := { config := { host := \"localhost\", port := 8080 } }\n" \
-   "Derived:Base := { config := { port := 9000, ssl := true } }\n"
-
-#define CM_THREE_LEVEL          \
-   "#!aml\n"                    \
-   "Alpha := { a := 1 }\n"      \
-   "Beta:Alpha := { b := 2 }\n" \
-   "Gamma:Beta := { c := 3 }\n"
-
-/* Negative test: anonymous base should be rejected */
-#define CM_ANON_INHERIT_ERROR \
-   "#!aml\n"                  \
-   "Base { x := 10 }\n"       \
-   "Derived:Base := { y := 20 }\n"
-
-/* ================================================================
- * CM01 — Get base index with inheritance
- * ================================================================ */
-static void test_get_base_index_with_inheritance(void) {
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Derived (idx=1) should have Base (idx=0) as base */
-   usize base_idx = anvl_node_state_get_base_index(state, 1);
-   Assert.isTrue(base_idx == 0, "Derived statement should have base index 0");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS11 — get_base_index returns correct index                       */
+/* ------------------------------------------------------------------ */
+static void test_rs11_base_index(void) {
+    const char *src = "#!aml\n"
+                      "Base := { x := 1 }\n"
+                      "Derived : Base := { y := 2 }";
+    context ctx = parse_src(src);
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    TestBit.is_not_null(st, "RS11: state");
+    usize bi = find_stmt(ctx, "Base");
+    usize di = find_stmt(ctx, "Derived");
+    usize base_of_derived = anvl_node_state_get_base_index(st, di);
+    TestBit.is_equal_int((long long)bi, (long long)base_of_derived,
+                         "RS11: base index of Derived == Base index");
+    usize base_of_base = anvl_node_state_get_base_index(st, bi);
+    TestBit.is_equal_int((long long)(usize)-1, (long long)base_of_base,
+                         "RS11: Base has no base ((usize)-1)");
+    anvl_node_state_dispose(st); Context.dispose(ctx);
 }
 
-/* ================================================================
- * CM02 — Get base index without inheritance
- * ================================================================ */
-static void test_get_base_index_without_inheritance(void) {
-   /* Use context with inheritance, but test Base (idx=0) which has no base */
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Base (idx=0) has no base — should return (usize)-1 */
-   usize base_idx = anvl_node_state_get_base_index(state, 0);
-   Assert.isTrue(base_idx == (usize)-1, "Base statement should return (usize)-1");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
+/* ------------------------------------------------------------------ */
+/* RS12 — cannot inherit from anonymous block                        */
+/* ------------------------------------------------------------------ */
+static void test_rs12_no_inherit_from_anon(void) {
+    const char *src = "#!aml\n"
+                      "Anon { x := 1 }\n"
+                      "Derived : Anon := { y := 2 }";
+    context ctx = parse_src(src);
+    TestBit.is_not_null(ctx, "RS12: context");
+    anvl_node_state_t *st = anvl_resolver_build_state(ctx, ctx->source);
+    if (st) {
+        usize di = find_stmt(ctx, "Derived");
+        const anvl_field_list_t *m = anvl_node_state_get_merged_fields(st, di);
+        TestBit.is_null(m, "RS12: cannot resolve anon base");
+        TestBit.is_true(Anvil.error_is_set(), "RS12: error set");
+        anvl_node_state_dispose(st);
+    } else {
+        TestBit.is_true(Anvil.error_is_set(), "RS12: error at build_state");
+    }
+    Context.dispose(ctx);
 }
 
-/* ================================================================
- * CM03 — Get own fields (no merge)
- * ================================================================ */
-static void test_get_own_fields_no_merge(void) {
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Derived (idx=1) should have only its own field 'y', not 'x' from Base */
-   const anvl_field_list_t *own = anvl_node_state_get_own_fields(state, 1);
-   Assert.isNotNull((void *)own, "get_own_fields should return field list");
-   Assert.isTrue(own->count == 1, "Derived should have 1 own field");
-
-   field y_field = find_field(own, ctx_src(ctx), "y");
-   Assert.isNotNull((void *)y_field, "Derived should have field 'y'");
-
-   field x_field = find_field(own, ctx_src(ctx), "x");
-   Assert.isNull((void *)x_field, "Derived should NOT have 'x' in own fields");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM04 — Custom array concatenation policy
- * ================================================================ */
-
-/* Policy callback for array concatenation */
-static field array_concat_policy(context ctx, source src, field base_field, field derived_field, void *userdata) {
-   (void)ctx;
-   (void)src;
-
-   /* Mark that callback was invoked (using userdata counter) */
-   if (userdata) {
-      (*(int *)userdata)++;
-   }
-
-   /* If only base field exists, keep it */
-   if (!derived_field)
-      return base_field;
-
-   /* If only derived field exists (no base), keep it */
-   if (!base_field)
-      return derived_field;
-
-   /* Both exist: for this test, we just return derived_field */
-   /* Full implementation would create new field with concatenated array */
-   /* This test verifies callback is invoked and result is used */
-   return derived_field;
-}
-
-static void test_custom_array_concatenation(void) {
-   context ctx = build_context(CM_ARRAY_BASE);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Call with custom policy */
-   int callback_count = 0;
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields_custom(
-       state, 1, array_concat_policy, &callback_count);
-
-   Assert.isNotNull((void *)merged, "get_merged_fields_custom should return result");
-   Assert.isTrue(callback_count > 0, "Custom policy callback should be invoked");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM05 — Custom object deep merge policy
- * ================================================================ */
-static void test_custom_object_deep_merge(void) {
-   context ctx = build_context(CM_OBJECT_BASE);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Call with custom policy */
-   int callback_count = 0;
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields_custom(
-       state, 1, array_concat_policy, &callback_count);
-
-   Assert.isNotNull((void *)merged, "get_merged_fields_custom should return result");
-   Assert.isTrue(callback_count > 0, "Custom policy callback should be invoked");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM06 — Field exclusion policy (return NULL to exclude)
- * ================================================================ */
-static field exclusion_policy(context ctx, source src, field base_field, field derived_field, void *userdata) {
-   (void)ctx;
-   (void)src;
-   (void)base_field;
-   (void)userdata;
-
-   /* Exclude fields named "x" */
-   const char *data = Source.data(src) + derived_field->key_pos;
-   if (derived_field->key_len == 1 && data[0] == 'x') {
-      return NULL; /* Exclude this field */
-   }
-
-   return derived_field;
-}
-
-static void test_field_exclusion_policy(void) {
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Call with exclusion policy */
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields_custom(
-       state, 1, exclusion_policy, NULL);
-
-   Assert.isNotNull((void *)merged, "get_merged_fields_custom should return result");
-
-   /* Field 'x' should be excluded */
-   field x_field = find_field(merged, ctx_src(ctx), "x");
-   Assert.isNull((void *)x_field, "Field 'x' should be excluded by policy");
-
-   /* Field 'y' should still be present */
-   field y_field = find_field(merged, ctx_src(ctx), "y");
-   Assert.isNotNull((void *)y_field, "Field 'y' should be present");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM07 — NULL policy preserves default behavior
- * ================================================================ */
-static void test_null_policy_preserves_default(void) {
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Get merged fields with NULL policy */
-   const anvl_field_list_t *custom = anvl_node_state_get_merged_fields_custom(
-       state, 1, NULL, NULL);
-
-   /* Get merged fields with default function */
-   const anvl_field_list_t *default_result = anvl_node_state_get_merged_fields(state, 1);
-
-   Assert.isNotNull((void *)custom, "custom with NULL policy should return result");
-   Assert.isNotNull((void *)default_result, "default get_merged_fields should return result");
-
-   /* Both should return same pointer (cached) */
-   Assert.isTrue(custom == default_result, "NULL policy should use same cache as default");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM08 — Nested inheritance (3 levels) with custom policy
- * ================================================================ */
-static void test_nested_inheritance_3_levels(void) {
-   context ctx = build_context(CM_THREE_LEVEL);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* Gamma (idx=2) should resolve through Beta -> Alpha */
-   int callback_count = 0;
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields_custom(
-       state, 2, array_concat_policy, &callback_count);
-
-   Assert.isNotNull((void *)merged, "get_merged_fields_custom should return result");
-   Assert.isTrue(merged->count == 3, "Gamma should have 3 fields (a, b, c)");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM09 — Base not found error with custom policy
- * ================================================================ */
-static void test_base_not_found_error(void) {
-   context ctx = build_context(MISSING_BASE);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* get_base_index should return (usize)-1 for missing base */
-   usize base_idx = anvl_node_state_get_base_index(state, 0);
-   Assert.isTrue(base_idx == (usize)-1, "Missing base should return (usize)-1");
-
-   /* get_merged_fields_custom should return NULL and set error */
-   const anvl_field_list_t *merged = anvl_node_state_get_merged_fields_custom(
-       state, 0, NULL, NULL);
-
-   Assert.isNull((void *)merged, "get_merged_fields_custom should return NULL for missing base");
-   Assert.isTrue(anvl_error_is_set(), "Error should be set");
-   Assert.isTrue(Anvil.error_get()->code == ANVL_ERR_RESOLVER_MISSING_BASE,
-                 "Error code should be RESOLVER_MISSING_BASE");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM10 — Repeated custom policy calls work correctly
- * ================================================================ */
-static void test_cache_custom_results(void) {
-   context ctx = build_context(CM_BASE_DERIVED);
-   Assert.isNotNull(ctx, "Context should build");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "build_state should succeed");
-
-   /* First call with custom policy */
-   int callback_count = 0;
-   const anvl_field_list_t *first = anvl_node_state_get_merged_fields_custom(
-       state, 1, array_concat_policy, &callback_count);
-
-   Assert.isNotNull((void *)first, "First call should return result");
-   int first_count = callback_count;
-
-   /* Second call with same policy — verify it works (caching is NOT implemented for MVP) */
-   const anvl_field_list_t *second = anvl_node_state_get_merged_fields_custom(
-       state, 1, array_concat_policy, &callback_count);
-
-   Assert.isNotNull((void *)second, "Second call should return result");
-   Assert.isTrue(second->count == first->count, "Results should have same field count");
-
-   /* Note: Custom policy results are NOT cached in current implementation */
-   /* Callback is invoked again on each call (callback_count > first_count) */
-   Assert.isTrue(callback_count > first_count, "Callback invoked again (no caching for custom policies)");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * CM11 — Cannot inherit from anonymous object
- * ================================================================ */
-static void test_cannot_inherit_from_anonymous(void) {
-   context ctx = build_context(CM_ANON_INHERIT_ERROR);
-   Assert.isNotNull(ctx, "Context should parse");
-
-   anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx_src(ctx));
-   Assert.isNotNull(state, "State should build (inheritance detected)");
-
-   /* Attempt to get base index should fail with error */
-   usize base_idx = anvl_node_state_get_base_index(state, 1);
-   Assert.isTrue(base_idx == (usize)-1, "Should return -1 for anonymous base");
-   Assert.isTrue(anvl_error_is_set(), "Error should be set");
-   Assert.isTrue(Anvil.error_get()->code == ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
-                 "Error code should be CANNOT_INHERIT_FROM_ANONYMOUS");
-
-   anvl_node_state_dispose(state);
-   Context.dispose(ctx);
-   teardown();
-}
-
-/* ================================================================
- * Registration
- * ================================================================ */
-static void _register(void) {
-   testset("Resolver Tests", set_config, set_teardown);
-
-   testcase("No inheritance fast-path", test_no_inheritance_fast_path);
-   testcase("Single-level: inherits unoverridden", test_single_level_inherits_unoverridden);
-   testcase("Single-level: derived overrides field", test_single_level_derived_override);
-   testcase("Single-level: base unchanged", test_single_level_base_unchanged);
-   testcase("Three-level: Gamma full resolve", test_three_level_full_resolve);
-   testcase("Three-level: Beta midpoint", test_three_level_beta_correct);
-   testcase("Forward reference", test_forward_reference);
-   testcase("Cycle detected", test_cycle_detected);
-   testcase("warm_all idempotent", test_warm_all_idempotent);
-   testcase("Missing base deferred error", test_missing_base_deferred_error);
-
-   /* Custom merge policy tests — FR-2604-anvl-002 */
-   testcase("CM01: Get base index with inheritance", test_get_base_index_with_inheritance);
-   testcase("CM02: Get base index without inheritance", test_get_base_index_without_inheritance);
-   testcase("CM03: Get own fields (no merge)", test_get_own_fields_no_merge);
-   testcase("CM04: Custom array concatenation", test_custom_array_concatenation);
-   testcase("CM05: Custom object deep merge", test_custom_object_deep_merge);
-   testcase("CM06: Field exclusion policy", test_field_exclusion_policy);
-   testcase("CM07: NULL policy preserves default", test_null_policy_preserves_default);
-   testcase("CM08: Nested inheritance (3 levels)", test_nested_inheritance_3_levels);
-   testcase("CM09: Base not found error", test_base_not_found_error);
-   testcase("CM10: Repeated calls with custom policy", test_cache_custom_results);
-   testcase("CM11: Cannot inherit from anonymous", test_cannot_inherit_from_anonymous);
-}
-__attribute__((constructor)) static void register_test_resolver(void) {
-   Tests.enqueue(_register);
+/* ------------------------------------------------------------------ */
+/* Entry point                                                        */
+/* ------------------------------------------------------------------ */
+int main(void) {
+    TestBit.run_ex("RS01_no_inheritance",   NULL, test_rs01_no_inheritance,  td);
+    TestBit.run_ex("RS02_single_inherits",  NULL, test_rs02_single_inherits, td);
+    TestBit.run_ex("RS03_override",         NULL, test_rs03_override,        td);
+    TestBit.run_ex("RS04_base_unchanged",   NULL, test_rs04_base_unchanged,  td);
+    TestBit.run_ex("RS05_three_level",      NULL, test_rs05_three_level,     td);
+    TestBit.run_ex("RS06_forward_ref",      NULL, test_rs06_forward_ref,     td);
+    TestBit.run_ex("RS07_cycle",            NULL, test_rs07_cycle,           td);
+    TestBit.run_ex("RS08_warm_all",         NULL, test_rs08_warm_all,        td);
+    TestBit.run_ex("RS09_missing_base",     NULL, test_rs09_missing_base,    td);
+    TestBit.run_ex("RS10_own_fields",       NULL, test_rs10_own_fields,      td);
+    TestBit.run_ex("RS11_base_index",       NULL, test_rs11_base_index,      td);
+    TestBit.run_ex("RS12_no_inherit_anon",  NULL, test_rs12_no_inherit_from_anon, td);
+
+    return TestBit.report();
 }

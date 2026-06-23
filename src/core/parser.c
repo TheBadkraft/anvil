@@ -51,6 +51,7 @@ static bool parse_anon_object(parser_ctx *p, statement stmt);
 static value parse_varref(parser_ctx *p);
 static value parse_interp_string(parser_ctx *p);
 static bool parse_import_decl(parser_ctx *p);
+static bool parse_using_decl(parser_ctx *p);
 
 bool anvl_parse(context ctx) {
    if (!ctx || !ctx->source) {
@@ -94,6 +95,26 @@ static bool parse_source(parser_ctx *p) {
          return false;
       }
       if (!parse_import_decl(p))
+         return false;
+      si_skip_whitespace_and_comments(p->src);
+   }
+
+   // using declarations — must precede module attributes, vars, and statements
+   // using escalates dialect AML → ASL; not allowed in AMP
+   while (si_match_length(p->src, "using", 5) == 5 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 5))) {
+      if (Source.dialect(p->src) == ANVL_DIALECT_AMP) {
+         parser_error(ANVL_ERR_USING_IN_AMP, p->src);
+         return false;
+      }
+      if (p->ctx->vars_list.parsed || p->ctx->stmt_list.count > 0) {
+         parser_error(ANVL_ERR_USING_AFTER_STATEMENTS, p->src);
+         return false;
+      }
+      // Escalate AML → ASL on first using
+      if (Source.dialect(p->src) != ANVL_DIALECT_ASL)
+         p->src->dialect = ANVL_DIALECT_ASL;
+      if (!parse_using_decl(p))
          return false;
       si_skip_whitespace_and_comments(p->src);
    }
@@ -162,6 +183,13 @@ static bool parse_source(parser_ctx *p) {
       if (si_match_length(p->src, "import", 6) == 6 &&
           !Source.is_identifier_part(si_peek_offset(p->src, 6))) {
          parser_error(ANVL_ERR_IMPORT_NOT_FIRST, p->src);
+         return false;
+      }
+
+      // using after statements is illegal
+      if (si_match_length(p->src, "using", 5) == 5 &&
+          !Source.is_identifier_part(si_peek_offset(p->src, 5))) {
+         parser_error(ANVL_ERR_USING_AFTER_STATEMENTS, p->src);
          return false;
       }
 
@@ -348,6 +376,10 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       value_meta->data.object.field_count = val->data.object.field_count;
    } else if (val->type == ANVL_VALUE_VARREF) {
       // Override pos/len to identifier span (not including the '$' sigil)
+      value_meta->pos = val->data.scalar.pos;
+      value_meta->len = val->data.scalar.len;
+   } else if (val->type == ANVL_VALUE_SCALAR) {
+      // Override pos/len to inner content span (quotes excluded by parse_scalar_value)
       value_meta->pos = val->data.scalar.pos;
       value_meta->len = val->data.scalar.len;
    } else if (val->type == ANVL_VALUE_INTERP_STRING) {
@@ -733,8 +765,13 @@ static value parse_array(parser_ctx *p) {
       }
 
       elem_temp[element_count].type = elem->type;
-      elem_temp[element_count].pos = elem_start;
-      elem_temp[element_count].len = elem_end - elem_start;
+      if (elem->type == ANVL_VALUE_SCALAR || elem->type == ANVL_VALUE_VARREF) {
+         elem_temp[element_count].pos = elem->data.scalar.pos;
+         elem_temp[element_count].len = elem->data.scalar.len;
+      } else {
+         elem_temp[element_count].pos = elem_start;
+         elem_temp[element_count].len = elem_end - elem_start;
+      }
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -815,8 +852,13 @@ static value parse_tuple(parser_ctx *p) {
       }
 
       elem_temp[element_count].type = elem->type;
-      elem_temp[element_count].pos = elem_start;
-      elem_temp[element_count].len = elem_end - elem_start;
+      if (elem->type == ANVL_VALUE_SCALAR || elem->type == ANVL_VALUE_VARREF) {
+         elem_temp[element_count].pos = elem->data.scalar.pos;
+         elem_temp[element_count].len = elem->data.scalar.len;
+      } else {
+         elem_temp[element_count].pos = elem_start;
+         elem_temp[element_count].len = elem_end - elem_start;
+      }
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -859,12 +901,14 @@ static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_val
    }
 
    if (si_match_length(s, "\"", 1) == 1) {
-      si_consume(s, 1); // opening quote
+      si_consume(s, 1); // opening quote — excluded from span
+      *start = si_position(s); // content starts here (after opening quote)
       bool closed = false;
       while (!si_is_eof(s)) {
          char c = si_peek(s);
          if (c == '"') {
-            si_consume(s, 1);
+            *len = si_position(s) - *start; // content length (before closing quote)
+            si_consume(s, 1);               // closing quote — excluded from span
             closed = true;
             break;
          } else if (c == '\\') {
@@ -879,6 +923,7 @@ static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_val
          parser_error(ANVL_ERR_PARSER_UNTERMINATED_STRING, s);
          return false;
       }
+      return true; // *len already set above
    } else {
       while (!si_is_eof(s)) {
          char c = si_peek(s);
@@ -998,13 +1043,34 @@ static bool lookahead_is_anon_object(parser_ctx *p) {
    usize la = 0;
    if (si_is_eof_offset(s, la) || !Source.is_identifier_start(si_peek_offset(s, la)))
       return false;
+   // Skip identifier
    while (!si_is_eof_offset(s, la) && Source.is_identifier_part(si_peek_offset(s, la)))
       la++;
+   // Skip whitespace
    while (!si_is_eof_offset(s, la)) {
       char c = si_peek_offset(s, la);
-      if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
-         break;
+      if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
       la++;
+   }
+   // Optionally skip @[...] attribute blocks (bracket-depth scan, no consuming)
+   while (!si_is_eof_offset(s, la) &&
+          si_peek_offset(s, la) == '@' &&
+          !si_is_eof_offset(s, la + 1) &&
+          si_peek_offset(s, la + 1) == '[') {
+      la += 2; // '@['
+      int depth = 1;
+      while (!si_is_eof_offset(s, la) && depth > 0) {
+         char c = si_peek_offset(s, la);
+         if (c == '[') depth++;
+         else if (c == ']') depth--;
+         la++;
+      }
+      // Skip whitespace after closing ']'
+      while (!si_is_eof_offset(s, la)) {
+         char c = si_peek_offset(s, la);
+         if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+         la++;
+      }
    }
    return !si_is_eof_offset(s, la) && si_peek_offset(s, la) == '{';
 }
@@ -1052,6 +1118,31 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
 
    si_skip_whitespace_and_comments(s);
 
+   // Optional @[...] attribute blocks (decoration is optional)
+   usize attrib_start = p->ctx->attr_list.count;
+   while (si_match_length(s, "@[", 2) == 2) {
+      if (!parse_attribute_block(p, NULL, NULL))
+         return false;
+      si_skip_whitespace_and_comments(s);
+   }
+   usize attrib_count = p->ctx->attr_list.count - attrib_start;
+   struct anvl_attr_meta *attr_meta = NULL;
+   if (attrib_count > 0) {
+      attr_meta = ci_new_attr_meta_array(p->ctx, attrib_count);
+      if (!attr_meta) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return false;
+      }
+      for (usize i = 0; i < attrib_count; i++) {
+         attribute attr = ci_get_attribute(p->ctx, attrib_start + i);
+         if (!attr) { parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s); return false; }
+         attr_meta[i].pos = attr->key_pos;
+         attr_meta[i].len = attr->key_len;
+         attr_meta[i].value_pos = attr->value_pos;
+         attr_meta[i].value_len = attr->value_len;
+      }
+   }
+
    // Record start position (at '{')
    usize value_start_pos = si_position(s);
 
@@ -1083,13 +1174,13 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    stmt->meta[STMT_META_IDENT_POS] = ident_pos;
    stmt->meta[STMT_META_IDENT_LEN] = ident_len;
    stmt->meta[STMT_META_BASE_IDX] = 0;
-   stmt->meta[STMT_META_ATTR_IDX] = 0;
+   stmt->meta[STMT_META_ATTR_IDX] = attrib_count;
    stmt->meta[STMT_META_RESERVED_6] = 0;
    stmt->meta[STMT_META_VALUE_IDX] = 1;
    stmt->meta[STMT_META_RESERVED_8] = 0;
 
    stmt->base_meta = NULL;
-   stmt->attr_meta = NULL;
+   stmt->attr_meta = attr_meta;
    stmt->value_meta = value_meta;
 
    si_skip_whitespace_and_comments(s);
@@ -1271,6 +1362,37 @@ static bool parse_import_decl(parser_ctx *p) {
                                   .path_len = path_len,
                                   .alias_pos = alias_pos,
                                   .alias_len = alias_len,
+                              });
+   return true;
+}
+
+/* ========================================================================
+ * parse_using_decl() - Parse:  using <identifier>
+ *
+ * Consumes "using" (already peeked by caller), reads the module identifier,
+ * and stores it in ctx->using_list.
+ * Dialect escalation (AML → ASL) is handled by the caller.
+ * ======================================================================== */
+static bool parse_using_decl(parser_ctx *p) {
+   source s = p->src;
+   si_consume(s, 5); // consume "using"
+   si_skip_whitespace_and_comments(s);
+
+   if (!Source.is_identifier_start(si_peek(s))) {
+      parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
+      return false;
+   }
+
+   usize name_pos = si_position(s);
+   usize name_len = 0;
+   while (!si_is_eof(s) && Source.is_identifier_part(si_peek(s))) {
+      si_consume(s, 1);
+      name_len++;
+   }
+
+   ci_add_using_decl(p->ctx, (struct anvl_using_decl){
+                                  .name_pos = name_pos,
+                                  .name_len = name_len,
                               });
    return true;
 }

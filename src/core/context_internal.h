@@ -125,6 +125,27 @@ static inline void ci_add_import_decl(context ctx, struct anvl_import_decl d) {
    ctx->import_list.decls[ctx->import_list.count++] = d;
 }
 
+static inline void ci_ensure_using_capacity(context ctx, usize need) {
+   if (ctx->using_list.capacity >= need)
+      return;
+   usize newcap = ctx->using_list.capacity ? ctx->using_list.capacity * 2 : 4;
+   while (newcap < need) newcap *= 2;
+   struct anvl_using_decl *newbuf =
+       ctx->arena->alloc(ctx->arena, sizeof(struct anvl_using_decl) * newcap);
+   if (!newbuf) return;
+   if (ctx->using_list.decls)
+      memcpy(newbuf, ctx->using_list.decls,
+             sizeof(struct anvl_using_decl) * ctx->using_list.count);
+   ctx->using_list.decls = newbuf;
+   ctx->using_list.capacity = newcap;
+}
+
+static inline void ci_add_using_decl(context ctx, struct anvl_using_decl d) {
+   ci_ensure_using_capacity(ctx, ctx->using_list.count + 1);
+   if (!ctx->using_list.decls) return;
+   ctx->using_list.decls[ctx->using_list.count++] = d;
+}
+
 // Constructors — allocated from the context resource scope via ctx->arena->alloc(ctx->arena, size).
 static inline statement ci_new_statement(context ctx, anvl_stmt_type type) {
    statement s = ctx->arena->alloc(ctx->arena, sizeof(*s));
