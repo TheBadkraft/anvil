@@ -1,5 +1,5 @@
 # Anvil — C Users Guide
-**v0.5.5-alpha — E3 query path primitives, O(1) field-by-name lookup**
+**v0.5.0-alpha — standalone build, parser parity, resolver, schema**
 
 ---
 
@@ -15,8 +15,8 @@ parse-time allocations live in a per-context bump arena. Do not `free()` any han
 returned by the library; call `Context.dispose(ctx)` to release everything at once.
 
 ```c
-#include <anvil/anvil.h>
-#include <anvil/context.h>
+#include "anvil.h"
+#include "context.h"
 ```
 
 ---
@@ -86,11 +86,12 @@ valid for the lifetime of the owning `context`.
 
 ### Statement types
 
-| `anvl_stmt_type` | Meaning |
+| `anvl_stmt_type`    | Meaning |
 |---|---|
-| `ANVL_STMT_ASSIGNMENT` | `key := value` |
-| `ANVL_STMT_VARS` | `vars { … }` block |
-| `ANVL_STMT_IMPORT` | `import "path"` declaration |
+| `ANVL_STMT_ASSN`    | `key := value` (standard assignment) |
+| `ANVL_ANON_OBJECT`  | `key { … }` (anonymous block, no `:=`) |
+| `ANVL_STMT_FUNC`    | Function statement (AnvilScript, Phase II) |
+| `ANVL_STMT_MSSG`    | Message statement (AMP, future) |
 
 ### Statement interface members
 
@@ -131,9 +132,9 @@ field Context.get_field_by_name(context self, statement stmt,
 Returns the field whose key matches `name` (byte-exact, `len` bytes, case-sensitive, no
 NUL required). Returns `NULL` if not found.
 
-> **Performance**: O(1) after the first call. A FNV-1a hash map is built lazily on the
-> first `get_field_by_name` call for a given statement and cached in `value_meta->name_index`
-> for the lifetime of the context. `Context.dispose` releases all cached maps.
+> **Performance note**: O(n) linear scan. The sigma.collections hash map is not yet
+> linked in the standalone build. A future update will restore O(1) lookup when
+> `sigma.collections` is available.
 
 ### Collection Element Traversal
 
@@ -272,26 +273,30 @@ for (usize i = 0; i < count; i++) {
 
 ## Scalar Access
 
-Scalar values are always zero-copy spans into the source buffer:
+Scalar values are always zero-copy spans into the source buffer.
+**Since v0.5.0 the parser strips surrounding quotes** — `pos/len` points directly
+at the content, not the `"` delimiters:
 
 ```c
 // Statement-level scalar
 statement s   = Context.get_statement(ctx, 0);
-usize     pos = s->value_meta->data.scalar.pos;  // byte offset in source
-usize     len = s->value_meta->data.scalar.len;  // byte length
+usize     pos = s->value_meta->data.scalar.pos;  // byte offset in source (after opening quote)
+usize     len = s->value_meta->data.scalar.len;  // byte length (excludes both quotes)
 const char *raw = Source.data(ctx->source);
+
+// For  name := "Alice"  → raw[pos..pos+len] is "Alice" (5 bytes, no quotes)
 
 // Copy to NUL-terminated string (caller owns)
 char *val = strndup(raw + pos, len);
 
 // Or parse in-place without allocation
-long port = strtol(raw + pos, NULL, 10);
-double f  = strtod(raw + pos, NULL);
-bool  b   = (len == 4 && memcmp(raw + pos, "true", 4) == 0);
+long   port = strtol(raw + pos, NULL, 10);
+double f    = strtod(raw + pos, NULL);
+bool   b    = (len == 4 && memcmp(raw + pos, "true", 4) == 0);
 ```
 
-String values retain their surrounding `"` delimiters in the source span if quoted.
-Strip them by adjusting `pos + 1` / `len - 2` when you need bare text.
+Unquoted scalars (bare words, numbers, booleans) are unchanged — `pos/len` spans
+the token directly, as before.
 
 ---
 
@@ -418,8 +423,8 @@ Context.dispose(ctx);
 ```c
 // Source: config := { server := { host := localhost, port := 8080 }, timeout := 30 }
 
-#include <anvil/anvil.h>
-#include <anvil/context.h>
+#include "anvil.h"
+#include "context.h"
 #include <stdio.h>
 
 static void walk_fields(context ctx, usize field_start, usize field_count,
@@ -540,59 +545,227 @@ static bool load_config(const char *path, server_config *out) {
 
 ---
 
-## Named Field Lookup (O(1))
+## Using Declarations
 
-For point-in-time lookups on object statements, skip the index loop entirely:
+`using` imports an AnvilScript module into the document and escalates the dialect from
+AML → ASL. It must appear before `vars` and all statements.
 
 ```c
-statement hero = Context.get_statement(ctx, 0);
+// Source: #!aml\nusing sys_math\nx := 1
+context ctx = /* parse … */;
 
-field name_f   = Context.get_field_by_name(ctx, hero, "name",   4);
-field health_f = Context.get_field_by_name(ctx, hero, "health", 6);
-field weapon_f = Context.get_field_by_name(ctx, hero, "weapon", 6);
+// How many usings were declared?
+usize n = ctx->using_list.count;
+for (usize i = 0; i < n; i++) {
+    struct anvl_using_decl *u = &ctx->using_list.decls[i];
+    const char *raw = Source.data(ctx->source);
+    printf("using: %.*s\n", (int)u->name_len, raw + u->name_pos);
+}
 
-if (name_f)
-    printf("name: %.*s\n", (int)name_f->val->data.scalar.len,
-                             raw + name_f->val->data.scalar.pos);
+// Dialect is now ASL after a using
+// Source.dialect(ctx->source) == ANVL_DIALECT_ASL
 ```
 
-The first call to `get_field_by_name` on a statement builds a FNV-1a hash map and caches
-it in `value_meta->name_index`. All subsequent calls (including `get_field` by index)
-benefit and the map is released automatically by `Context.dispose`.
+`using` in `#!amp` produces error `ANVL_ERR_USING_IN_AMP` (4306).
+`using` after vars/statements produces error `ANVL_ERR_USING_AFTER_STATEMENTS` (4307).
 
 ---
 
-## Linking
+## Anonymous Blocks
 
-### Dynamic (`.so`)
+An anonymous block is a top-level read-only object declared without `:=`.
+Optional `@[attrs]` may appear between the identifier and `{`:
 
-```makefile
-CFLAGS  += -I/usr/local/include/anvil
-LDFLAGS += -L/usr/local/lib -lanvil
+```anvl
+// Plain anonymous block
+defaults { hp := 100, speed := 5 }
+
+// Decorated anonymous block
+defaults @[tier=1, immutable] { hp := 100, speed := 5 }
 ```
 
-### Static / relocatable object (`.o`)
+```c
+statement stmt = Context.get_statement(ctx, 0);
+// stmt->meta[STMT_META_TYPE] == ANVL_ANON_OBJECT
+
+// Attributes (if any)
+usize attr_count = stmt->meta[STMT_META_ATTR_IDX];
+if (attr_count > 0 && stmt->attr_meta) {
+    const char *raw = Source.data(ctx->source);
+    for (usize i = 0; i < attr_count; i++) {
+        printf("@%.*s\n", (int)stmt->attr_meta[i].len,
+                           raw + stmt->attr_meta[i].pos);
+    }
+}
+```
+
+Inheritance from an anonymous block is rejected at resolve time
+(`ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS`).
+
+---
+
+## Resolver API (`anvil.resolver.o`)
+
+The resolver handles single-inheritance — `derived : base := { … }` — using
+Kahn's topological sort for cycle detection and lazy per-statement merge cache.
+
+```c
+#include "resolver.h"
+
+// Build resolver state from a parsed context
+anvl_node_state_t *state = anvl_resolver_build_state(ctx, ctx->source);
+if (!state) {
+    if (Anvil.error_is_set()) {
+        // ANVL_ERR_RESOLVER_CYCLE_DETECTED or ANVL_ERR_MEMORY_ALLOCATION_FAILED
+        fprintf(stderr, "resolver: %s\n", Anvil.error_get()->message);
+    }
+    // NULL with no error = fast-path (no inheritance in this document)
+    return;
+}
+
+// Get merged fields for a statement (lazy, cached)
+// stmtIdx = index in ctx->stmt_list
+const anvl_field_list_t *merged = anvl_node_state_get_merged_fields(state, stmtIdx);
+if (!merged) {
+    // ANVL_ERR_RESOLVER_MISSING_BASE or ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS
+    return;
+}
+
+const char *raw = Source.data(ctx->source);
+for (usize i = 0; i < merged->count; i++) {
+    field f = merged->fields[i];
+    printf("  %.*s\n", (int)f->key_len, raw + f->key_pos);
+}
+
+// Get own (unmerged) fields only
+const anvl_field_list_t *own = anvl_node_state_get_own_fields(state, stmtIdx);
+
+// Get base statement index
+usize baseIdx = anvl_node_state_get_base_index(state, stmtIdx);
+// Returns (usize)-1 if no base
+
+// Pre-warm all merges (optional)
+anvl_node_state_warm_all(state);
+
+// Always dispose when done
+anvl_node_state_dispose(state);
+```
+
+**Custom merge policy** — control how fields are merged per field pair:
+
+```c
+field my_policy(context ctx, source src,
+                field base_field, field derived_field, void *userdata) {
+    // Return derived_field to override base (default behaviour)
+    // Return base_field to keep base
+    // Return NULL to exclude the field entirely
+    return derived_field ? derived_field : base_field;
+}
+
+const anvl_field_list_t *merged =
+    anvl_node_state_get_merged_fields_custom(state, stmtIdx, my_policy, NULL);
+```
+
+---
+
+## Schema API (`anvil.schema.o`)
+
+Schema documents use `@[schema]` as a module-level attribute to declare types.
+The schema module resolves type rules and validates data documents against them.
+
+```c
+#include "schema.h"
+
+// 1. Parse the schema document (.asch or any .anvl with @[schema])
+context schema_ctx = /* parse "vehicle.asch" … */;
+
+// 2. Resolve type rules from the schema
+anvl_schema_ruleset_t *rules = Schema.resolve(schema_ctx);
+if (!rules) {
+    // ANVL_ERR_SCHEMA_ATTR_MISSING (4601) — missing @[schema]
+    // ANVL_ERR_SCHEMA_BASE_UNKNOWN (4603) — unrecognised base in schema
+    return;
+}
+
+// 3. Look up a type by name
+anvl_schema_type_t *t = Schema.get_type(rules, "VehicleRecord");
+if (t) {
+    printf("kind: %d  fields: %d\n", t->kind, t->field_count);
+    // ANVL_SCHEMA_OBJECT=0, ANVL_SCHEMA_ENUM=1, ANVL_SCHEMA_FLAGS=2
+    for (int i = 0; i < t->field_count; i++)
+        printf("  field: %s\n", t->fields[i].name);
+}
+
+// 4. Validate a data document against the ruleset
+context data_ctx = /* parse data document … */;
+anvl_schema_result_t *result = Schema.validate(rules, data_ctx, "vehicle.anvl");
+if (!result->is_valid) {
+    for (int i = 0; i < result->error_count; i++)
+        fprintf(stderr, "[%d] %s\n", result->errors[i].code,
+                                     result->errors[i].message);
+}
+
+// 5. Free (always, even on is_valid=true)
+Schema.result_free(result);
+Schema.ruleset_free(rules);
+```
+
+**Schema type kinds:**
+
+| Kind | Declaration | Description |
+|---|---|---|
+| `ANVL_SCHEMA_OBJECT` | `Type := { field value }` | Structured type with named fields |
+| `ANVL_SCHEMA_ENUM` | `Type : enum := (a, b, c)` | Closed set of scalar values |
+| `ANVL_SCHEMA_FLAGS` | `Type : flags := (r, w, x)` | Composable flag set |
+
+**Validation error codes:**
+
+| Code | Constant | Meaning |
+|---|---|---|
+| 4601 | `ANVL_ERR_SCHEMA_ATTR_MISSING` | Document lacks `@[schema]` |
+| 4603 | `ANVL_ERR_SCHEMA_BASE_UNKNOWN` | Schema base not `enum`/`flags` |
+| 4604 | `ANVL_ERR_SCHEMA_VALIDATION_REQUIRED` | Required field absent in data |
+| 4605 | `ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH` | Field type does not match declared type |
+
+---
+
+---
+
+## Building (Standalone — Zero External Dependencies)
+
+As of v0.5.0 anvil embeds all sigma dependencies. No `-l` flags needed.
 
 ```sh
-ld -r myapp.o /usr/local/packages/anvil.o -o myapp_bundle.o
-# or link directly:
-gcc main.o /usr/local/packages/anvil.o -o myapp
+# Core parser only
+gcc -std=c2x -I./include \
+    src/core/anvil_impl.c src/core/context.c src/core/errors.c \
+    src/core/memory.c src/core/parser.c src/core/strings.c \
+    src/utilities/utils.c \
+    main.c -o myapp
+
+# With resolver and vars (default lib)
+gcc -std=c2x -I./include \
+    src/core/anvil_impl.c src/core/context.c src/core/errors.c \
+    src/core/memory.c src/core/parser.c src/core/strings.c \
+    src/utilities/utils.c \
+    src/resolver/resolver.c src/vars/vars.c \
+    main.c -o myapp
+
+# With schema (add on top of default lib)
+gcc -std=c2x -I./include ... src/schema/schema.c main.c -o myapp
 ```
 
-`anvil.o` is a fat relocatable object that bundles `sigma.memory`, `sigma.core.module`,
-`sigma.core.text`, and `sigma.collections` — no additional `-l` flags needed for those
-dependencies.
+All includes resolve from `./include` — no installed packages required.
 
 ---
 
 ## Thread Safety
 
 - **`context`** handles are **not thread-safe**. Each thread must own its own `context`.
-- **`CtxBuilder`** is not thread-safe. Use `Context.get_builder()` (which returns a
-  pointer to the global) — or maintain a per-thread builder.
+- **`CtxBuilder`** is not thread-safe. Use `Context.get_builder()` once per sequence
+  or maintain a per-thread builder.
 - **`Anvil.error_get()`** is thread-local — safe to read from any thread without locking.
-- **Module registration** (`sigma.core` module system) is handled at program startup via
-  `__attribute__((constructor))` in `anvil_impl.c` — no explicit init call needed.
+- No global init call is required — the standalone build has no module registration.
 
 ---
 
@@ -612,7 +785,7 @@ dependencies.
 | `dispose` | `(ctx)` | Release context and all arena memory |
 | `field_count` | `(ctx, stmt) → usize` | Fields in an object statement |
 | `get_field` | `(ctx, stmt, i) → field` | Field by index |
-| `get_field_by_name` | `(ctx, stmt, name, len) → field` | Field by key — O(1) cached |
+| `get_field_by_name` | `(ctx, stmt, name, len) → field` | Field by key — linear scan |
 | `element_count` | `(ctx, stmt) → usize` | Elements in an array/tuple statement |
 | `get_element` | `(ctx, stmt, i) → anvl_element_meta *` | Element by index |
 
