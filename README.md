@@ -1,7 +1,7 @@
 # Anvil — The Final Data Language  
-**ANVL · Version 0.4.5-alpha · March 13, 2026**  
+**ANVL · Version 0.5.0-alpha · June 23, 2026**  
 
-**Private Repository · Internal Reference Implementation**
+**Private Repository · Reference Implementation in Pure C**
 
 ```text
           █████╗ ███╗   ██╗██╗   ██╗██╗██╗     
@@ -23,8 +23,8 @@ Anvil is not just another language.
 Anvil is a paradigm shift in data structure, object modelling, and messaging.  
 
  · Zero-copy · Typeless · Human-first · Fast is an understatement ·  
- · Multi-dialect (AML, AMP, ASL-**TBD**) · Immutable AST-**TBD** ·  
- · Perfect round-tripping · Resolver-**complete** · AMP arrays/tuples-**complete** ·  
+ · Multi-dialect (AML, AMP, ASL-**Phase II**) · Standalone build — zero external deps ·  
+ · Perfect round-tripping · Resolver-**complete** · Schema-**complete** · AMP arrays/tuples-**complete** ·  
  · UDP-friendly · **Parser holds zero payload data — zero attack surface** ·  
   
 ### Built to replace every legacy data and configuration language in existence.
@@ -81,33 +81,72 @@ AMP is equally at home on TCP, UDP, WebSocket, serial, or a message queue. The p
 ## Repository Structure
 
 ```
-anvil/                     ← this repo (private)
-├── src/                  ← pure C reference implementation (Anvil)
-│   ├── include/anvil.h
-│   ├── core/
-├── bindings/
-│   ├── Anvil.J/           ← Java 21+ binding (current production)
-│   ├── Anvil.CS/          ← C# / .NET 8 binding
-│   ├── Anvil.CPP/         ← Modern C++20/23 binding
-│   ├── Anvil.PY/          ← Python 3.12+ binding
-│   └── Anvil.R/           ← Rust binding
-├── spec/                  ← formal grammar, examples, golden files
-├── tools/                 ← AnvilBuild (future), minifier, validator
-├── Makefile
-└── README.md              ← you are here
+anvil/
+├── include/
+│   ├── anvil.h              ← public API entry point
+│   ├── context.h            ← Context, Source, CtxBuilder interfaces
+│   ├── types.h              ← statement, value, field, attribute structs
+│   ├── errors.h             ← error codes and error state
+│   ├── resolver.h           ← inheritance resolver API
+│   ├── schema.h             ← schema validation API
+│   ├── vars.h               ← vars resolution API
+│   ├── import.h             ← multi-file import API
+│   ├── serializer.h         ← round-trip writer API
+│   ├── sigma.core/          ← embedded: types, allocator, strings interfaces
+│   └── sigma.memory/        ← embedded: bump arena + Allocator vtable
+├── src/
+│   ├── core/                ← parser, context, errors, memory, strings, utils
+│   ├── resolver/            ← anvil.resolver.o — inheritance graph
+│   ├── schema/              ← anvil.schema.o   — type validation
+│   ├── vars/                ← anvil.vars.o     — var resolution
+│   ├── import/              ← anvil.import.o   — multi-file imports
+│   ├── serializer/          ← anvil.serializer.o — round-trip writer
+│   └── asl/                 ← anvil.asl.o      — AnvilScript (Phase II)
+├── test/
+│   └── unit/                ← TestBit-based unit tests (57 tests, 0 leaks)
+├── docs/                    ← language spec, AMP guide, schema authoring
+├── config.sh                ← bash build configuration
+└── README.md
 ```
+
+## Module Architecture
+
+Anvil is designed as a single C backend with pluggable layers. All bindings
+(Node.js, Python, .NET, etc.) link against the same C modules.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Default lib (always shipped together)               │
+│  anvil.o + anvil.resolver.o + anvil.vars.o           │
+│  + anvil.import.o                                    │
+├─────────────────────────────────────────────────────┤
+│  Optional modules (linked when needed)               │
+│  anvil.schema.o    — schema validation               │
+│  anvil.serializer.o — round-trip writer              │
+├─────────────────────────────────────────────────────┤
+│  Phase II                                            │
+│  anvil.asl.o — AnvilScript parser + evaluator        │
+├─────────────────────────────────────────────────────┤
+│  Language bindings (per-paradigm wrappers)           │
+│  Anvil.JS (Node) · Anvil.PY · Anvil.Net · Anvil.J   │
+└─────────────────────────────────────────────────────┘
+```
+
+**Dependency rule:** `anvil.schema` → `anvil.resolver` → `anvil.o`. Nothing flows upward. The parser knows nothing about schema, scripting, or bindings.
 
 ## Core Principles (Non-Negotiable)
 
 | Principle                         | Status |
 |-----------------------------------|---------|
 | Attitude ... because it's earned | Locked |
-| Zero-copy parsing, spans into original buffer | Locked |
-| Immutable AST, round-trip identical writer | **TBD** (v0.2.0 — Writer pending) |
-| Resolver 100 % pluggable (`$var`, `$func()`, inheritance, interpolation) | **Partial** (inheritance ✅; vars + imports TBD v0.3.0) |
-| No macros except literal constants | Locked |
-| No CMake. GNU Makefile until AnvilBuild exists | Locked |
-| C23 default, C11 fallback only when forced | Locked |
+| Zero-copy parsing, spans into original buffer | ✅ Locked |
+| Lexerless, forward-only, disciplined forward discovery | ✅ Locked |
+| Parser holds zero payload data — zero attack surface | ✅ Locked |
+| No external dependencies — fully standalone C build | ✅ As of v0.5.0 |
+| No macros except literal constants | ✅ Locked |
+| No CMake. Bash build scripts until AnvilBuild exists | ✅ Locked |
+| C23 default, C11 fallback only when forced | ✅ Locked |
+| All bindings share the same C backend | ✅ Architecture locked |
 
 ## Dialects
 
@@ -117,21 +156,70 @@ One language. One parser. Three dialects — activated by shebang on the first l
 |---------|---------|--------|--------|
 | **AML** | `#!aml` | Declarative data modeling — replaces JSON, YAML, TOML | ✅ Complete |
 | **AMP** | `#!amp` | Cipher-agnostic structured messaging — UDP-friendly, zero parser attack surface | ✅ Complete |
-| **ASL** | `#!asl` | Lightweight imperative scripting — embedded behavior automation | ⚠️ Planned (v0.4.0) |
+| **ASL** | `#!asl` | Lightweight imperative scripting — embedded behavior automation | ⚠️ Phase II |
+
+## Current State (v0.5.0-alpha)
+
+### Parser (anvil.o)
+- AML: statements, objects, arrays, tuples, blobs, attributes, inheritance, anonymous blocks
+- AMP: scalar arrays/tuples, blob encoding, all object/attribute/import restrictions enforced
+- Vars block: `vars { key := value }` — stored in `ctx->vars_list`
+- Imports: `import "path"` and `import "path" as alias` — stored in `ctx->import_list`
+- Using declarations: `using <module>` — escalates AML → ASL; stored in `ctx->using_list`
+- VarRef: `$identifier` — zero-copy identifier span
+- Interpolated strings: `$"…{ident}…"` — segment list (literal + ref spans)
+- Anonymous blocks: `identifier { }` and `identifier @[attrs] { }` — optional decoration
+- Quote stripping: scalar `pos/len` points inside the quotes (consumers see raw content)
+- Error codes: full 4xxx range with line/column reporting
+
+### Resolver (anvil.resolver.o)
+- Kahn's topological sort — cycle detection with ANVL_ERR_RESOLVER_CYCLE_DETECTED
+- Lazy merged-field access with per-statement cache
+- Forward references: base may be declared after derived
+- Custom merge policy API: `anvl_merge_policy_fn` callback for array concat, deep merge, etc.
+- Rejects inheritance from anonymous blocks
+- `warm_all()` for eager pre-computation
+
+### Schema (anvil.schema.o)
+- Resolves `.asch` documents: Object, Enum, Flags type declarations
+- `@[schema]` module attribute triggers schema context (detected by schema module, not parser)
+- Multi-error validation: collects all errors before returning
+- Error codes: 4601–4606 (missing attr, unknown base, required field, type mismatch, etc.)
+
+### Vars (anvil.vars.o)
+- `Vars.build()` — resolves VarRef chains, detects circular references
+- `Vars.resolve()` — key lookup by name
+- `Vars.materialise_interp()` — expands `$"…{ref}…"` to a heap string
+
+### Import (anvil.import.o)
+- Multi-file import graph with transitive resolution
+- Cross-source statement lookup, VarRef resolution, inheritance
+- Cycle detection in import graph
+
+### Serializer (anvil.serializer.o)
+- Round-trip writer: context → ANVL text
+- Pretty and minified output
+- AMP dialect enforcement
+
+### Testing
+- TestBit: zero-dependency C test runner (`extern const testbit_i TestBit`)
+- 7 test suites, 57 tests, 239 assertions — all pass
+- Zero valgrind errors, zero leaks across all suites
 
 AMP is the only messaging protocol whose parser holds no payload data at any point during parsing — not a performance optimization, a security property. See [docs/amp.md](docs/amp.md) for the full specification, security customization guide, and UDP fragmentation pattern.
 
-## Bindings Status (Official Only)
+## Bindings Status
 
-| Binding   | Language     | Status            | Repository       |
-|-----------|--------------|-------------------|------------------|
-| Anvil.J   | Java 21+     | **TBD** (Planned Q1 2026) | —          |
-| Anvil.CS  | C# / .NET 8  | **TBD** (Planned Q1 2026) | —          |
-| Anvil.CPP | C++20/23     | **TBD** (Planned Q2 2026) | —          |
-| Anvil.PY  | Python 3.12+ | **TBD** (Planned Q2 2026) | —          |
-| Anvil.R   | Rust 1.75+   | **TBD** (Planned Q3 2026) | —          |
+| Binding     | Language      | Status                    |
+|-------------|---------------|---------------------------|
+| Anvil.JS    | Node.js       | **Next** — in planning    |
+| Anvil.Net   | C# / .NET 9   | Separate repo (v1.7.0)    |
+| Anvil.PY    | Python 3.12+  | Planned                   |
+| Anvil.J     | Java 21+      | Planned                   |
+| Anvil.CPP   | C++20/23      | Planned                   |
+| Anvil.R     | Rust          | Planned                   |
 
-No official bindings exist yet. The Java implementation referenced in prior work was a proof of concept.
+All bindings wrap the same C backend. The binding's job is idiomatic exposure — not reimplementation.
 
 ## Performance Metrics
 
@@ -176,15 +264,16 @@ All parse times are single cold-parse wall-clock. Throughput is file size / pars
 
 ## Roadmap
 
-| Milestone              | Target   | Content                                      | Status |
-|------------------------|----------|----------------------------------------------|--------|
-| Anvil 0.1.0-alpha      | Dec 2025 | Pure C parser (AML, AMP), zero memory leaks  | ✅ Released |
-| Anvil 0.1.1-alpha      | Mar 2026 | AMP scalar arrays/tuples, all error codes    | ✅ Released |
-| Anvil 0.2.0-alpha      | Mar 2026 | Inheritance Resolver ✅, Writer (pending)     | ⚠️ In progress |
-| Anvil 0.3.0-alpha      | Q2 2026  | VarRef resolution, Import graph              | ❌ Planned |
-| Anvil 0.4.0-alpha      | Q2 2026  | ASL parser + evaluator core                  | ❌ Planned |
-| Anvil 1.0              | Q3 2026  | Full AML/AMP/ASL, schema validation, bindings | ❌ Planned |
-| AnvilBuild 1.0         | Q4 2026  | Build system written in ASL using `.anvil`   | ❌ Planned |
+| Milestone              | Target     | Content                                                | Status |
+|------------------------|------------|--------------------------------------------------------|--------|
+| Anvil 0.1.0-alpha      | Dec 2025   | Pure C parser (AML, AMP), zero memory leaks            | ✅ Released |
+| Anvil 0.2.x-alpha      | Mar 2026   | Inheritance resolver, writer, import graph             | ✅ Released |
+| Anvil 0.5.0-alpha      | Jun 2026   | Standalone build, parser parity, schema, TestBit       | ✅ Released |
+| Anvil.JS binding       | Q3 2026    | Node.js binding — first language wrapper               | 🔜 Next |
+| Anvil 0.6.0-alpha      | Q3 2026    | FlyWire formal schema pipeline, vars full resolution   | ❌ Planned |
+| Anvil 0.7.0-alpha      | Q3 2026    | ASL parser + evaluator (Phase II)                      | ❌ Planned |
+| AnvilBuild 1.0         | TBD        | Build system written in ASL using `.anvl` config       | ❌ Planned |
+| Anvil 1.0              | TBD        | Full AML/AMP/ASL, all official bindings                | ❌ Planned |
 
 ---
 
