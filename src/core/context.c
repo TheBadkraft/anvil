@@ -1020,7 +1020,7 @@ static bool source_is_identifier_start(char c) {
    return source_is_alpha(c);
 }
 static bool source_is_identifier_part(char c) {
-   return source_is_alpha(c) || source_is_digit(c) || c == '.';
+   return source_is_alpha(c) || source_is_digit(c) || c == '.' || c == '-';
 }
 
 static usize source_consume(source self, usize count) {

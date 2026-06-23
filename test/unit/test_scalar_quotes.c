@@ -245,15 +245,50 @@ static void test_qs06_array_elements(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* QS07 — hyphen in identifier: my-field, kebab-case-key            */
+/* ------------------------------------------------------------------ */
+static void test_qs07_hyphen_in_identifier(void) {
+    /* my-field := 1 */
+    {
+        const char *src = "#!aml\nmy-field := 1";
+        CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+        context ctx = CtxBuilder.build(&CtxBuilder);
+        Context.parse(ctx);
+        TestBit.is_false(Anvil.error_is_set(), "QS07: my-field parses without error");
+        TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
+                             "QS07: one statement");
+        const char *raw = Source.data(ctx->source);
+        statement s = Context.get_statement(ctx, 0);
+        TestBit.is_true(s->meta[STMT_META_IDENT_LEN] == 8 &&
+                        memcmp(raw + s->meta[STMT_META_IDENT_POS], "my-field", 8) == 0,
+                        "QS07: identifier is 'my-field'");
+        Context.dispose(ctx);
+    }
+    /* kebab-case-key := x */
+    {
+        const char *src = "#!aml\nkebab-case-key := x";
+        CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+        context ctx = CtxBuilder.build(&CtxBuilder);
+        Context.parse(ctx);
+        TestBit.is_false(Anvil.error_is_set(), "QS07: kebab-case-key parses");
+        TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
+                             "QS07: one statement");
+        Context.dispose(ctx);
+    }
+    Anvil.error_clear();
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                       */
 /* ------------------------------------------------------------------ */
 int main(void) {
-    TestBit.run_ex("QS01_quoted_string",    NULL, test_qs01_quoted_string, teardown_state);
-    TestBit.run_ex("QS02_unquoted_scalar",  NULL, test_qs02_unquoted_scalar, teardown_state);
-    TestBit.run_ex("QS03_empty_string",     NULL, test_qs03_empty_string, teardown_state);
-    TestBit.run_ex("QS04_attribute_value",  NULL, test_qs04_attribute_value, teardown_state);
-    TestBit.run_ex("QS05_blob_unchanged",   NULL, test_qs05_blob_unchanged, teardown_state);
-    TestBit.run_ex("QS06_array_elements",   NULL, test_qs06_array_elements, teardown_state);
+    TestBit.run_ex("QS01_quoted_string",      NULL, test_qs01_quoted_string,      teardown_state);
+    TestBit.run_ex("QS02_unquoted_scalar",    NULL, test_qs02_unquoted_scalar,    teardown_state);
+    TestBit.run_ex("QS03_empty_string",       NULL, test_qs03_empty_string,       teardown_state);
+    TestBit.run_ex("QS04_attribute_value",    NULL, test_qs04_attribute_value,    teardown_state);
+    TestBit.run_ex("QS05_blob_unchanged",     NULL, test_qs05_blob_unchanged,     teardown_state);
+    TestBit.run_ex("QS06_array_elements",     NULL, test_qs06_array_elements,     teardown_state);
+    TestBit.run_ex("QS07_hyphen_identifier",  NULL, test_qs07_hyphen_in_identifier, teardown_state);
 
     return TestBit.report();
 }
