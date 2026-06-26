@@ -279,6 +279,83 @@ static void test_qs07_hyphen_in_identifier(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* QS08 — bare '#' as value must be rejected                         */
+/* ------------------------------------------------------------------ */
+/*
+ * source: `hash := #`
+ * '#' alone is neither a hex color nor a selector.
+ * Expected: parse fails, error is set.
+ */
+static void test_qs08_bare_hash_rejected(void) {
+    const char *src = "hash := #";
+    anvl_ctx_builder_i *builder = Context.get_builder();
+    builder->set_dialect(builder, ANVL_DIALECT_AML);
+    builder->set_source(builder, src, strlen(src));
+    context ctx = builder->build(builder);
+
+    TestBit.is_not_null(ctx, "QS08: builder produced context");
+
+    bool ok = Context.parse(ctx);
+    TestBit.is_false(ok, "QS08: parse must fail on bare '#'");
+    TestBit.is_true(Anvil.error_is_set(), "QS08: error must be set");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* QS09 — '#FFFFFF' is a valid scalar (hex color), must not reject   */
+/* ------------------------------------------------------------------ */
+/*
+ * source: `color := #FFFFFF`
+ * '#' followed by 6 hex digits — valid hex color scalar.
+ * Expected: parse succeeds, value_meta spans "FFFFFF" or "#FFFFFF"
+ * depending on whether the parser strips the '#' sigil.
+ * We only assert parse success and non-empty span here.
+ */
+static void test_qs09_hex_color_accepted(void) {
+    const char *src = "color := #FFFFFF";
+    context ctx = parse(src);
+
+    TestBit.is_not_null(ctx, "QS09: context created for hex color");
+    TestBit.is_false(Anvil.error_is_set(), "QS09: no error on valid hex color");
+
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_not_null(stmt, "QS09: statement exists");
+
+    struct anvl_value_meta *vm = stmt->value_meta;
+    TestBit.is_not_null(vm, "QS09: value_meta exists");
+    TestBit.is_true(vm->len > 0, "QS09: value span is non-empty");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* QS10 — '#identifier' is a valid scalar (selector), must not reject */
+/* ------------------------------------------------------------------ */
+/*
+ * source: `target := #submit-btn`
+ * '#' followed by an identifier — valid selector scalar.
+ * Distinct from hex color: identifier chars, not hex digits.
+ * Expected: parse succeeds, value span is non-empty.
+ */
+static void test_qs10_selector_accepted(void) {
+    const char *src = "target := #submit-btn";
+    context ctx = parse(src);
+
+    TestBit.is_not_null(ctx, "QS10: context created for selector");
+    TestBit.is_false(Anvil.error_is_set(), "QS10: no error on valid selector");
+
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_not_null(stmt, "QS10: statement exists");
+
+    struct anvl_value_meta *vm = stmt->value_meta;
+    TestBit.is_not_null(vm, "QS10: value_meta exists");
+    TestBit.is_true(vm->len > 0, "QS10: value span is non-empty");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                       */
 /* ------------------------------------------------------------------ */
 int main(void) {
@@ -289,6 +366,9 @@ int main(void) {
     TestBit.run_ex("QS05_blob_unchanged",     NULL, test_qs05_blob_unchanged,     teardown_state);
     TestBit.run_ex("QS06_array_elements",     NULL, test_qs06_array_elements,     teardown_state);
     TestBit.run_ex("QS07_hyphen_identifier",  NULL, test_qs07_hyphen_in_identifier, teardown_state);
-
+    TestBit.run_ex("QS08_bare_hash_rejected", NULL, test_qs08_bare_hash_rejected, teardown_state);
+    TestBit.run_ex("QS09_hex_color_accepted", NULL, test_qs09_hex_color_accepted, teardown_state);
+    TestBit.run_ex("QS10_selector_accepted", NULL, test_qs10_selector_accepted, teardown_state);
+    
     return TestBit.report();
 }
