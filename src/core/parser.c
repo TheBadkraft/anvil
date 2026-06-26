@@ -927,7 +927,7 @@ static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_val
    } else {
       /* Reject bare '#' — not a hex color or selector in this position.
        * Valid '#' forms are handled upstream by the token/value dispatcher. */
-      if (first == '#' && !isalnum((unsigned char)si_peek_offset(s, 1))) {
+      if (first == '#' && !Source.is_identifier_part(si_peek_offset(s, 1))) {
          parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
          return false;
       }
