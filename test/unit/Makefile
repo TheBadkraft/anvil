@@ -28,7 +28,7 @@ SCHEMA_LIB    = $(DEFAULT_LIB) $(SCHEMA_SRCS)
 
 BIN = bin
 
-.PHONY: all clean valgrind test_scalar_quotes
+.PHONY: all clean valgrind test_scalar_quotes test_amp_collections
 
 all: $(BIN)/test_scalar_quotes $(BIN)/test_amp_collections $(BIN)/test_interp_string $(BIN)/test_using $(BIN)/test_anon_block_attrs $(BIN)/test_resolver $(BIN)/test_schema
 
@@ -42,6 +42,9 @@ test_scalar_quotes: $(BIN)/test_scalar_quotes
 $(BIN)/test_amp_collections: test_amp_collections.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
+
+test_amp_collections: $(BIN)/test_amp_collections
+	@$(BIN)/test_amp_collections
 
 $(BIN)/test_interp_string: test_interp_string.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)

@@ -17,6 +17,9 @@
  *   AM05 — #!amp nested tuple rejected (error 4401)
  *   AM06 — #!amp object in array rejected (unexpected token)
  *   AM07 — AML arrays are unaffected (regression guard)
+ *   AM08 — empty array [] is rejected
+ *   AM09 — empty tuple () is rejected
+ *   AM10 — empty object {} is rejected (#!aml)
  * ------------------------------------------------------------------
  */
 
@@ -168,6 +171,51 @@ static void test_am07_aml_nested_array_ok(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* AM08 — empty array [] is rejected                                  */
+/* ------------------------------------------------------------------ */
+static void test_am08_empty_array_rejected(void) {
+    const char *src = "#!aml\nbad := []";
+    context ctx = parse_ok(src);
+
+    TestBit.is_true(Anvil.error_is_set(), "AM08: error is set for empty array");
+    TestBit.is_equal_int(ANVL_ERR_PARSER_EMPTY_ARRAY_NOT_ALLOWED,
+                         (long long)Anvil.error_get()->code,
+                         "AM08: error is EMPTY_ARRAY_NOT_ALLOWED");
+
+    if (ctx) Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* AM09 — empty tuple () is rejected                                  */
+/* ------------------------------------------------------------------ */
+static void test_am09_empty_tuple_rejected(void) {
+    const char *src = "#!aml\nbad := ()";
+    context ctx = parse_ok(src);
+
+    TestBit.is_true(Anvil.error_is_set(), "AM09: error is set for empty tuple");
+    TestBit.is_equal_int(ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED,
+                         (long long)Anvil.error_get()->code,
+                         "AM09: error is EMPTY_TUPLE_NOT_ALLOWED");
+
+    if (ctx) Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* AM10 — empty object {} is rejected                                 */
+/* ------------------------------------------------------------------ */
+static void test_am10_empty_object_rejected(void) {
+    const char *src = "#!aml\nbad := {}";
+    context ctx = parse_ok(src);
+
+    TestBit.is_true(Anvil.error_is_set(), "AM10: error is set for empty object");
+    TestBit.is_equal_int(ANVL_ERR_PARSER_EMPTY_OBJECT_NOT_ALLOWED,
+                         (long long)Anvil.error_get()->code,
+                         "AM10: error is EMPTY_OBJECT_NOT_ALLOWED");
+
+    if (ctx) Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                        */
 /* ------------------------------------------------------------------ */
 int main(void) {
@@ -178,6 +226,9 @@ int main(void) {
     TestBit.run_ex("AM05_amp_nested_tuple_rejected",NULL, test_am05_amp_nested_tuple_rejected, td);
     TestBit.run_ex("AM06_amp_object_rejected",      NULL, test_am06_amp_object_rejected,       td);
     TestBit.run_ex("AM07_aml_nested_array_ok",      NULL, test_am07_aml_nested_array_ok,       td);
+    TestBit.run_ex("AM08_empty_array_rejected",     NULL, test_am08_empty_array_rejected,      td);
+    TestBit.run_ex("AM09_empty_tuple_rejected",     NULL, test_am09_empty_tuple_rejected,      td);
+    TestBit.run_ex("AM10_empty_object_rejected",    NULL, test_am10_empty_object_rejected,     td);
 
     return TestBit.report();
 }

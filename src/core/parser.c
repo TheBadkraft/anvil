@@ -804,6 +804,11 @@ static value parse_tuple(parser_ctx *p) {
 
    si_consume(s, 1); // consume '('
    si_skip_whitespace_and_comments(s);
+   // invalidate the empty tuple case
+   if (si_peek(s) == ')') {
+      parser_error(ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED, s);
+      return NULL;
+   }
 
    value v = ci_new_value(p->ctx, ANVL_VALUE_TUPLE);
    if (!v) {
