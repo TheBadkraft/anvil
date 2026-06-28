@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [v0.5.3-alpha] — pre-release (2026-06-28)
 
 ### Added
 
@@ -24,11 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `anvl_merge_policy_fn` — callback type for custom field merge logic
   - `anvl_node_state_get_merged_fields_custom(state, stmt_idx, policy, userdata)` — merge with policy callback
 - **Tests: CM01–CM10** (`test/unit/test_resolver.c`) — 10 new test cases covering base index lookup, own fields access, array concatenation, object deep merge, field exclusion, NULL policy preservation, nested inheritance, error handling, and caching
+- **`Anvil.get_version()`** (`include/anvil.h`, `src/core/anvil.c`) — runtime version query on the `Anvil` vtable; returns `major.minor.patch+build-tag` string with build number injected at compile time via `ANVL_BUILD`
+- **Version macros** (`include/constants.h`) — consolidated to `ANVL_VERSION_MAJOR`, `ANVL_VERSION_MINOR`, `ANVL_VERSION_PATCH`, `ANVL_VERSION_TAG`, `ANVL_VERSION_STR`; removed duplicate definitions from `include/anvil.h` and `include/types.h`
+- **`lib/Makefile`** — new; builds `lib/debug/` and `lib/release/` static and shared libraries; `ANVL_BUILD` injected via `git rev-list --count HEAD`
+- **Tests: AM08–AM12** (`test/unit/test_amp_collections.c`) — empty array, empty tuple, empty object, single-element tuple rejection; two-element tuple acceptance
+- **`test_version`** (`test/unit/test_version.c`) — standalone version output binary; appended to each test target run
 
 ### Fixed
 
 - **Allocator API** (`src/resolver/resolver.c`) — updated all `Allocator.free()` calls to `Allocator.dispose()` to match current sigma.memory API (resolver module hadn't been updated since allocator API migration)
 - **BR-2604-anvil-001:** Parser now rejects inheritance from anonymous objects. Anonymous object syntax (`Base { x := 10 }`) is incompatible with inheritance — statements that use inheritance (`:Base`) must use explicit assignment syntax (`Base := { x := 10 }` or `Derived:Base := { y := 20 }`). Added `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` error code (4052) and validation in `anvl_node_state_get_base_index()`. This enforces semantic consistency: anonymous objects are truly immutable and cannot be inherited from.
+- **Parser: bare `#` rejection** — `parse_scalar_value` now rejects `#` not followed by an alphanumeric character with `ANVL_ERR_PARSER_UNEXPECTED_TOKEN`; valid forms `#RRGGBB` and `#identifier` unaffected
+- **Parser: empty tuple `()` rejected** — `parse_tuple` now emits `ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED` on empty tuple, consistent with existing empty array and empty object behavior
+- **Parser: single-element tuple rejected** — `parse_tuple` now emits `ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS` when `element_count < 2`
+
+### Changed
+
+- **`src/core/anvil_impl.c` renamed to `src/core/anvil.c`**
+- **`lib/` build scope** — `asl` and `serializer` removed from library build sources
+- **`test/unit/Makefile`** — `ANVL_BUILD` injected; `test_release` target added; `test_version` wired as prerequisite and appended to all test targets
 
 ### Added (docs)
 
