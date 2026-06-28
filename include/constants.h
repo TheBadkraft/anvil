@@ -28,11 +28,11 @@
 /* Versioning                                                         */
 /* Update this by script for each release                             */
 /* ------------------------------------------------------------------ */
-#define ANVIL_API_VERSION_MAJOR 0
-#define ANVIL_API_VERSION_MINOR 1
-#define ANVIL_API_VERSION_PATCH 0
-#define ANVIL_BUILD 0               // how to update auto-magically?
-#define ANVIL_BUILD_CANDIDATE "dev" // dev, alpha, beta, rc, stable
+#define ANVL_VERSION_MAJOR 0
+#define ANVL_VERSION_MINOR 5
+#define ANVL_VERSION_PATCH 1
+#define ANVL_VERSION_TAG   "alpha"
+#define ANVL_VERSION_STR   "0.5.1-alpha"
 
 /* ------------------------------------------------------------------ */
 /* Dialect: AML vs ASL vs AMP vs Aurora                               */

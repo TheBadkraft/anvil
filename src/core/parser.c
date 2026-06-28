@@ -880,7 +880,12 @@ static value parse_tuple(parser_ctx *p) {
          return NULL;
       }
    }
-
+   // minimum 2 values in tuple
+   if (element_count < 2) {
+      parser_error(ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS, s);
+      return NULL;
+   }
+   // expected closing parenthesis
    if (si_match_length(s, ")", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE, s);
       return NULL;

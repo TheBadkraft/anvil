@@ -20,9 +20,6 @@
  */
 #pragma once
 
-/* Version identifier */
-#define ANVIL_VERSION "v0.4.5-alpha"
-
 #include "constants.h"
 #include "context.h"
 #include "errors.h"
@@ -56,5 +53,7 @@ typedef struct anvl_i {
    bool (*error_is_set)(void);
    const anvl_error_state *(*error_get)(void);
    void (*error_clear)(void);
+   // Version
+   const char *(*get_version)(void);
 } anvl_i;
 extern const anvl_i Anvil;

@@ -216,6 +216,40 @@ static void test_am10_empty_object_rejected(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* AM11 — single element tuple (1,) is rejected                       */
+/* ------------------------------------------------------------------ */
+static void test_am11_single_element_tuple_rejected(void) {
+    const char *src = "#!aml\nbad := (42,)";
+    context ctx = parse_ok(src);
+
+    TestBit.is_true(Anvil.error_is_set(), "AM11: error is set for single element tuple");
+    TestBit.is_equal_int(ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS,
+                         (long long)Anvil.error_get()->code,
+                         "AM11: error is TUPLE_TOO_FEW_ELEMENTS");
+
+    if (ctx) Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* AM12 — two element tuple is valid (regression guard)               */
+/* ------------------------------------------------------------------ */
+static void test_am12_two_element_tuple_ok(void) {
+    const char *src = "#!aml\npt := (10, 20)";
+    context ctx = parse_ok(src);
+
+    TestBit.is_not_null(ctx, "AM12: context created");
+    TestBit.is_false(Anvil.error_is_set(), "AM12: no error for two element tuple");
+
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value_meta->type,
+                         "AM12: value is TUPLE");
+    TestBit.is_equal_int(2, (long long)stmt->value_meta->data.collection.element_count,
+                         "AM12: two elements");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                        */
 /* ------------------------------------------------------------------ */
 int main(void) {
@@ -229,6 +263,8 @@ int main(void) {
     TestBit.run_ex("AM08_empty_array_rejected",     NULL, test_am08_empty_array_rejected,      td);
     TestBit.run_ex("AM09_empty_tuple_rejected",     NULL, test_am09_empty_tuple_rejected,      td);
     TestBit.run_ex("AM10_empty_object_rejected",    NULL, test_am10_empty_object_rejected,     td);
+    TestBit.run_ex("AM11_single_element_tuple_rejected", NULL, test_am11_single_element_tuple_rejected, td);
+    TestBit.run_ex("AM12_two_element_tuple_ok",     NULL, test_am12_two_element_tuple_ok,      td);
 
     return TestBit.report();
 }
