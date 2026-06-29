@@ -262,6 +262,14 @@ typedef struct anvl_context_i {
    usize (*value_field_count)(context self, value val);
    field (*get_value_field)(context self, value val, usize index);
    field (*get_value_field_by_name)(context self, value val, const char *name, usize len);
+   // Statement-level attribute access
+   usize (*stmt_attr_count)(context self, statement stmt);
+   struct anvl_attr_meta *(*get_stmt_attr)(context self, statement stmt, usize index);
+   struct anvl_attr_meta *(*get_stmt_attr_by_name)(context self, statement stmt, const char *name, usize len);
+   // Field-level attribute access
+   usize (*field_attr_count)(context self, field f);
+   attribute (*get_field_attr)(context self, field f, usize index);
+   attribute (*get_field_attr_by_name)(context self, field f, const char *name, usize len);
 } anvl_context_i;
 extern const anvl_context_i Context;
 

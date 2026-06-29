@@ -730,6 +730,54 @@ static field context_get_value_field_by_name(context self, value val, const char
    }
    return NULL;
 }
+static usize context_stmt_attr_count(context self, statement stmt) {
+   if (!self || !stmt) return 0;
+   return stmt->meta[STMT_META_ATTR_IDX];
+}
+
+static struct anvl_attr_meta *context_get_stmt_attr(context self, statement stmt, usize index) {
+   if (!self || !stmt || !stmt->attr_meta) return NULL;
+   if (index >= stmt->meta[STMT_META_ATTR_IDX]) return NULL;
+   return &stmt->attr_meta[index];
+}
+
+static struct anvl_attr_meta *context_get_stmt_attr_by_name(context self, statement stmt,
+                                                              const char *name, usize len) {
+   if (!self || !stmt || !stmt->attr_meta || !name || len == 0) return NULL;
+   const char *raw = Source.data(self->source);
+   usize count = stmt->meta[STMT_META_ATTR_IDX];
+   for (usize i = 0; i < count; i++) {
+      struct anvl_attr_meta *a = &stmt->attr_meta[i];
+      if (a->len == len && memcmp(raw + a->pos, name, len) == 0)
+         return a;
+   }
+   return NULL;
+}
+
+static usize context_field_attr_count(context self, field f) {
+   (void)self;
+   if (!f) return 0;
+   return f->attrib_count;
+}
+
+static attribute context_get_field_attr(context self, field f, usize index) {
+   if (!self || !f) return NULL;
+   if (index >= f->attrib_count) return NULL;
+   return self->attr_list.attributes[f->attrib_start + index];
+}
+
+static attribute context_get_field_attr_by_name(context self, field f,
+                                                  const char *name, usize len) {
+   if (!self || !f || !name || len == 0) return NULL;
+   const char *raw = Source.data(self->source);
+   for (usize i = 0; i < f->attrib_count; i++) {
+      attribute a = self->attr_list.attributes[f->attrib_start + i];
+      if (!a) continue;
+      if (a->key_len == len && memcmp(raw + a->key_pos, name, len) == 0)
+         return a;
+   }
+   return NULL;
+}
 
 const struct anvl_context_i Context = {
     .get_builder = context_get_builder,
@@ -759,6 +807,12 @@ const struct anvl_context_i Context = {
     .get_value_field = context_get_value_field,
     .get_value_field_by_name = context_get_value_field_by_name,
     .get_statement_by_name = context_get_statement_by_name,
+    .stmt_attr_count         = context_stmt_attr_count,
+    .get_stmt_attr           = context_get_stmt_attr,
+    .get_stmt_attr_by_name   = context_get_stmt_attr_by_name,
+    .field_attr_count        = context_field_attr_count,
+    .get_field_attr          = context_get_field_attr,
+    .get_field_attr_by_name  = context_get_field_attr_by_name,
 };
 
 const struct anvl_statement_i Statement = {
@@ -768,11 +822,9 @@ const struct anvl_statement_i Statement = {
     .value_type = statement_value_type,
     .length = statement_length,
 };
-
 static void builder_set_dialect(struct anvl_ctx_builder_i *self, anvl_dialect dialect) {
    self->dialect = dialect;
 }
-
 static void builder_set_source(struct anvl_ctx_builder_i *self, const char *data, usize len) {
    // dispose existing source if any
    if (self->source) {
@@ -781,7 +833,6 @@ static void builder_set_source(struct anvl_ctx_builder_i *self, const char *data
    // create new source
    self->source = Source.create(data, len);
 }
-
 static context builder_build(struct anvl_ctx_builder_i *self) {
    context ctx = Allocator.alloc(sizeof(struct anvl_context_t));
    if (ctx)
@@ -823,7 +874,6 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
 
    return ctx;
 }
-
 static void builder_dispose(struct anvl_ctx_builder_i *self) {
    if (self->source) {
       Source.dispose(self->source);
@@ -840,7 +890,6 @@ static void statement_identifier(statement self, source src, char *out_identifie
    }
    Source.substring(src, self->meta[STMT_META_IDENT_POS], self->meta[STMT_META_IDENT_LEN], out_identifier);
 }
-
 static const char *statement_base(statement self, source src) {
    if (!self || !src)
       return NULL;
@@ -859,13 +908,11 @@ static const char *statement_base(statement self, source src) {
    // For now, base_meta is accessed directly from statement via stmt->base_meta
    return NULL;
 }
-
 static anvl_stmt_type statement_type(statement self) {
    if (!self)
       return 0;
    return (anvl_stmt_type)self->meta[STMT_META_TYPE];
 }
-
 static anvl_value_type statement_value_type(statement self) {
    if (!self)
       return ANVL_VALUE_SCALAR;
@@ -873,7 +920,6 @@ static anvl_value_type statement_value_type(statement self) {
    // For now, return scalar as default
    return ANVL_VALUE_SCALAR;
 }
-
 static usize statement_length(statement self) {
    if (!self)
       return 0;
@@ -952,7 +998,6 @@ static source source_create(const char *data, usize len) {
 
    return src;
 }
-
 static void source_dispose(source self) {
    if (!self)
       return;
@@ -961,13 +1006,11 @@ static void source_dispose(source self) {
    }
    Allocator.dispose(self);
 }
-
 static anvl_dialect source_get_dialect(source self) {
    if (!self)
       return ANVL_DIALECT_ASL;
    return self->dialect;
 }
-
 static usize source_position(source self) {
    return self->pos;
 }
@@ -977,14 +1020,12 @@ static usize source_line(source self) {
 static usize source_column(source self) {
    return self->col;
 }
-
 static bool source_is_eof(source self) {
    return self->pos >= (usize)(self->buffer.end - self->buffer.bucket);
 }
 static bool source_is_eof_offset(source self, usize offset) {
    return self->pos + offset >= (usize)(self->buffer.end - self->buffer.bucket);
 }
-
 static char source_peek_offset(source self, usize offset) {
    usize idx = self->pos + offset;
    usize len = (usize)(self->buffer.end - self->buffer.bucket);
@@ -993,7 +1034,6 @@ static char source_peek_offset(source self, usize offset) {
 static char source_peek(source self) {
    return source_peek_offset(self, 0);
 }
-
 static usize source_scan_match(source self, const char *s, usize slen) {
    if (!s || slen == 0)
       return 0;
@@ -1006,7 +1046,6 @@ static usize source_scan_match(source self, const char *s, usize slen) {
 static usize source_match_operator(source self, const char *op, usize oplen) {
    return source_scan_match(self, op, oplen);
 }
-
 static bool source_is_alpha(char c) {
    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
