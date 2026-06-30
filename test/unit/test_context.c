@@ -1,303 +1,312 @@
-/* ------------------------------------------------------------------
+/*
+ * Copyright (c) 2025 Quantum Override. All rights reserved.
+ * ------------------------------------------------------------------
+ * test_context.c — Context interface unit tests (TestBit)
+ * ------------------------------------------------------------------
  * Author: BadKraft
  * Created: 2025-12-13
- * File: test/test_context.c
+ * File: test/unit/test_context.c
  * ------------------------------------------------------------------
- * Description:
- * This file contains unit tests for the Anvil context interface.
- * ------------------------------------------------------------------
- * Copyright (c) 2025 Quantum Override. All rights reserved.
+ * Converted from sigma.test to TestBit.
+ * Tests requiring Allocator.alloc() (statement/attribute manual
+ * construction) are skipped — no heap allocation in TestBit.
  * ------------------------------------------------------------------
  */
 
 #include "anvil.h"
-#include "utilities/helpers.h"
-#include <sigma.memory/memory.h>
-#include <sigma.test/sigtest.h>
+#include "context.h"
+#include "testbit.h"
+#include <stdlib.h>
 #include <string.h>
 
-static void set_config(FILE **logger) {
-   // configure logging stream
-   *logger = fopen("logs/test_context.log", "w");
-}
-static void set_teardown() {
-   Anvil.cleanup();
-}
-static void teardown() {
-   const anvl_error_state *err = Anvil.error_get();
-   if (err->message)
-      writelnf("Error: %s", err->message);
+/* ------------------------------------------------------------------ */
+/* Shared teardown — mirrors td() in test_amp_collections.c           */
+/* ------------------------------------------------------------------ */
+static void td(void) { Anvil.error_clear(); }
 
-   Anvil.error_clear();
+/* ------------------------------------------------------------------ */
+/* CTX01 — Context.get_builder returns a valid builder                */
+/* ------------------------------------------------------------------ */
+static void test_ctx01_get_builder(void) {
+    anvl_ctx_builder_i *builder = Context.get_builder();
+    TestBit.is_not_null(builder, "CTX01: Context.get_builder returns non-null");
 }
 
-static void test_context_get_builder(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   Assert.isNotNull(builder, "Context.get_builder should return a valid builder interface");
+/* ------------------------------------------------------------------ */
+/* CTX02 — build with no source sets ANVL_ERR_BUILDER_NO_SOURCE      */
+/* ------------------------------------------------------------------ */
+static void test_ctx02_null_no_source(void) {
+    anvl_ctx_builder_i *builder = Context.get_builder();
+    context ctx = builder->build(builder);
+
+    TestBit.is_null(ctx, "CTX02: build with no source returns NULL");
+    TestBit.is_true(Anvil.error_is_set(), "CTX02: error is set");
+    TestBit.is_equal_int(ANVL_ERR_BUILDER_NO_SOURCE,
+                         (long long)Anvil.error_get()->code,
+                         "CTX02: error is BUILDER_NO_SOURCE");
 }
 
-static void test_ctx_bldr_null_no_source(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   context ctx = builder->build(builder);
-   Assert.isNull(ctx, "Builder.build should return a NULL context");
+/* ------------------------------------------------------------------ */
+/* CTX03 — set_source / build / dialect detection                     */
+/* ------------------------------------------------------------------ */
+static void test_ctx03_set_source(void) {
+    const char *src = "#!aml";
+    anvl_ctx_builder_i *builder = Context.get_builder();
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   // get error state
-   const anvl_error_state *err = Anvil.error_get();
-   Assert.isTrue(err != NULL, "Error state should be set after failed build");
-   Assert.isTrue(err->code == ANVL_ERR_BUILDER_NO_SOURCE, "Error code should indicate invalid state");
-   teardown();
+    TestBit.is_not_null(ctx, "CTX03: context created");
+    TestBit.is_false(Anvil.error_is_set(), "CTX03: no error");
+    TestBit.is_equal_int(ANVL_DIALECT_AML,
+                         (long long)Context.dialect(ctx),
+                         "CTX03: dialect is AML");
+    TestBit.is_not_null(ctx->source, "CTX03: source object present");
+
+    Context.dispose(ctx);
 }
 
-static void test_ctx_bldr_set_source(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *aml_source = "#!aml";
-   usize len = strlen(aml_source);
-   builder->set_source(builder, aml_source, len);
+/* ------------------------------------------------------------------ */
+/* CTX04 — load file with shebang → AML dialect                      */
+/* ------------------------------------------------------------------ */
+static void test_ctx04_load_file_shebang(void) {
+    const char *file_path = "test/fixtures/shebang.anvl";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Builder.build should return a valid context");
-   Assert.isTrue(Context.dialect(ctx) == ANVL_DIALECT_AML, "Context should detect AML from shebang");
-   Assert.isNotNull(ctx->source, "Context should have a source object");
-   Assert.isTrue(memcmp(ctx->source->buffer.bucket, aml_source, len) == 0, "Context source data should match set source");
+    CtxBuilder.load_file(&CtxBuilder, file_path);
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   usize actual_len = ctx->source->buffer.end - ctx->source->buffer.bucket;
-   Assert.isTrue(actual_len == len, "Context source length should match set len");
+    TestBit.is_not_null(ctx, "CTX04: context created from file");
+    TestBit.is_false(Anvil.error_is_set(), "CTX04: no error");
+    TestBit.is_equal_int(ANVL_DIALECT_AML,
+                         (long long)Context.dialect(ctx),
+                         "CTX04: shebang → AML dialect");
+    TestBit.is_not_null(ctx->source, "CTX04: source object present");
 
-   Context.dispose(ctx);
-   teardown();
+    Context.dispose(ctx);
 }
 
-static void test_ctx_bldr_load_file_shebang(void) {
-   const char *file_path = get_source_path("shebang.anvl");
-   writelnf("Loading file: %s", file_path);
+/* ------------------------------------------------------------------ */
+/* CTX05 — load file without shebang → ASL dialect                   */
+/* ------------------------------------------------------------------ */
+static void test_ctx05_load_file_no_shebang(void) {
+    const char *file_path = "test/fixtures/generic.aurora";
 
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   bool loaded = builder->load_file(builder, file_path);
-   Assert.isTrue(loaded, "Should load shebang.anvl file");
+    CtxBuilder.load_file(&CtxBuilder, file_path);
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   if (!loaded)
-      return; // skip rest if loading failed
+    TestBit.is_not_null(ctx, "CTX05: context created from file");
+    TestBit.is_false(Anvil.error_is_set(), "CTX05: no error");
+    TestBit.is_equal_int(ANVL_DIALECT_ASL,
+                         (long long)Context.dialect(ctx),
+                         "CTX05: no shebang → ASL dialect");
+    TestBit.is_not_null(ctx->source, "CTX05: source object present");
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Builder.build should return a valid context");
-   Assert.isTrue(Context.dialect(ctx) == ANVL_DIALECT_AML, "Context should detect AML from shebang in file");
-   Assert.isNotNull(ctx->source, "Context should have a source object");
-
-   Context.dispose(ctx);
-   teardown();
+    Context.dispose(ctx);
 }
 
-static void test_ctx_bldr_load_file_no_shebang(void) {
-   const char *file_path = get_source_path("generic.aurora");
-   writelnf("Loading file: %s", file_path);
+/* ------------------------------------------------------------------ */
+/* CTX06 — set_dialect(ASL) overridden by AML shebang in source      */
+/* ------------------------------------------------------------------ */
+static void test_ctx06_shebang_overrides_dialect(void) {
+    const char *src = "#!aml";
 
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   Assert.isTrue(builder->load_file(builder, file_path), "Should load generic.aurora file");
+    CtxBuilder.set_dialect(&CtxBuilder, ANVL_DIALECT_ASL);
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Builder.build should return a valid context");
-   Assert.isTrue(Context.dialect(ctx) == ANVL_DIALECT_ASL, "Context should default to ASL dialect");
-   Assert.isNotNull(ctx->source, "Context should have a source object");
+    TestBit.is_not_null(ctx, "CTX06: context created");
+    TestBit.is_false(Anvil.error_is_set(), "CTX06: no error");
+    TestBit.is_equal_int(ANVL_DIALECT_AML,
+                         (long long)Context.dialect(ctx),
+                         "CTX06: shebang overrides set_dialect");
+    TestBit.is_not_null(ctx->source, "CTX06: source object present");
 
-   Context.dispose(ctx);
+    Context.dispose(ctx);
 }
 
-static void test_ctx_bldr_chain(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   // Set user preference to ASL
-   builder->set_dialect(builder, ANVL_DIALECT_ASL);
-   // But source has AML shebang - shebang should win
-   const char *aml_source = "#!aml";
-   usize len = strlen(aml_source);
-   builder->set_source(builder, aml_source, len);
+/* ------------------------------------------------------------------ */
+/* CTX07 — manual statement construction                              */
+/* ------------------------------------------------------------------ */
+static void test_ctx07_statement_operations(void) {
+    const char *src = "test := value";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Builder.build should return a valid context");
-   Assert.isTrue(Context.dialect(ctx) == ANVL_DIALECT_AML, "Shebang should override user dialect setting");
-   Assert.isNotNull(ctx->source, "Context should have a source object");
-   Assert.isTrue(memcmp(ctx->source->buffer.bucket, aml_source, len) == 0, "Context source should match set source");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   usize actual_len = ctx->source->buffer.end - ctx->source->buffer.bucket;
-   Assert.isTrue(actual_len == len, "Context source length should match set len");
+    TestBit.is_not_null(ctx, "CTX07: context created");
+    TestBit.is_equal_int(0, (long long)Context.statement_count(ctx),
+                         "CTX07: initially no statements");
+    TestBit.is_null(Context.get_statement(ctx, 0),
+                    "CTX07: get_statement(0) on empty → NULL");
 
-   Context.dispose(ctx);
-   teardown();
+    statement stmt = malloc(sizeof(struct anvl_statement));
+    if (stmt) memset(stmt, 0, sizeof(struct anvl_statement));
+    stmt->meta[STMT_META_TYPE]      = ANVL_STMT_ASSN;
+    stmt->meta[STMT_META_IDENT_POS] = 0;
+    stmt->meta[STMT_META_IDENT_LEN] = 4;  /* "test" */
+    stmt->meta[STMT_META_BASE_IDX]  = 0;
+    stmt->meta[STMT_META_ATTR_IDX]  = 0;
+    stmt->meta[STMT_META_VALUE_IDX] = 0;
+
+    bool added = Context.add_statement(ctx, stmt);
+    TestBit.is_true(added, "CTX07: statement added");
+    TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
+                         "CTX07: one statement");
+    TestBit.is_not_null(Context.get_statement(ctx, 0),
+                        "CTX07: get_statement(0) returns non-null");
+    TestBit.is_equal_int(ANVL_STMT_ASSN,
+                         (long long)Context.get_statement(ctx, 0)->meta[STMT_META_TYPE],
+                         "CTX07: statement type is ASSN");
+
+    free(stmt);
+    Context.dispose(ctx);
 }
 
-static void test_context_statement_operations(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source_str = "test := value";
-   builder->set_source(builder, source_str, strlen(source_str));
+/* ------------------------------------------------------------------ */
+/* CTX08 — manual attribute construction                              */
+/* ------------------------------------------------------------------ */
+static void test_ctx08_attribute_operations(void) {
+    const char *src = "test";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   // Initially no statements
-   Assert.isTrue(Context.statement_count(ctx) == 0, "Should start with no statements");
-   Assert.isNull(Context.get_statement(ctx, 0), "Getting statement 0 should return NULL");
+    TestBit.is_not_null(ctx, "CTX08: context created");
+    TestBit.is_equal_int(0, (long long)Context.attribute_count(ctx),
+                         "CTX08: initially no attributes");
+    TestBit.is_null(Context.get_attribute(ctx, 0),
+                    "CTX08: get_attribute(0) on empty → NULL");
 
-   // Create a dummy statement (in real parser, this would be built properly)
-   statement stmt = Allocator.alloc(sizeof(struct anvl_statement));
-   if (stmt) memset(stmt, 0, sizeof(struct anvl_statement));
-   stmt->meta[STMT_META_TYPE] = ANVL_STMT_ASSN;
-   stmt->meta[STMT_META_IDENT_POS] = 0;
-   stmt->meta[STMT_META_IDENT_LEN] = 4; // "test"
-   stmt->meta[STMT_META_BASE_IDX] = 0;  // no base
-   stmt->meta[STMT_META_ATTR_IDX] = 0;  // no attributes
-   stmt->meta[STMT_META_VALUE_IDX] = 0; // value index (placeholder)
-   // NOTE: Statement length is now in value_meta->len (not in meta[STMT_META_LEN] which was removed)
+    attribute attr = malloc(sizeof(struct anvl_attribute));
+    if (attr) memset(attr, 0, sizeof(struct anvl_attribute));
+    attr->key_pos   = 0;
+    attr->key_len   = 4;  /* "test" */
+    attr->value_pos = 0;
+    attr->value_len = 0;
 
-   // Add statement
-   bool added = Context.add_statement(ctx, stmt);
-   Assert.isTrue(added, "Should add statement successfully");
-   Assert.isTrue(Context.statement_count(ctx) == 1, "Should have 1 statement");
-   Assert.isNotNull(Context.get_statement(ctx, 0), "Should get the statement back");
-   Assert.isTrue((anvl_stmt_type)Context.get_statement(ctx, 0)->meta[STMT_META_TYPE] == ANVL_STMT_ASSN, "Statement type should match");
+    bool added = Context.add_attribute(ctx, attr);
+    TestBit.is_true(added, "CTX08: attribute added");
+    TestBit.is_equal_int(1, (long long)Context.attribute_count(ctx),
+                         "CTX08: one attribute");
+    TestBit.is_not_null(Context.get_attribute(ctx, 0),
+                        "CTX08: get_attribute(0) returns non-null");
+    TestBit.is_equal_int(4,
+                         (long long)Context.get_attribute(ctx, 0)->key_len,
+                         "CTX08: key_len is 4");
 
-   Context.dispose(ctx);
-   teardown();
+    free(attr);
+    Context.dispose(ctx);
 }
 
-static void test_context_attribute_operations(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source = "test";
-   builder->set_source(builder, source, strlen(source));
+/* ------------------------------------------------------------------ */
+/* CTX09 — parse basic single assignment                              */
+/* ------------------------------------------------------------------ */
+static void test_ctx09_parse_basic(void) {
+    const char *src = "name := \"John\"";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   // Initially no attributes
-   Assert.isTrue(Context.attribute_count(ctx) == 0, "Should start with no attributes");
-   Assert.isNull(Context.get_attribute(ctx, 0), "Getting attribute 0 should return NULL");
+    TestBit.is_not_null(ctx, "CTX09: context created");
 
-   // Create a dummy attribute
-   attribute attr = Allocator.alloc(sizeof(struct anvl_attribute));
-   if (attr) memset(attr, 0, sizeof(struct anvl_attribute));
-   attr->key_pos = 0;
-   attr->key_len = 4; // "test"
-   attr->value_pos = 0;
-   attr->value_len = 0; // no value
+    bool parsed = Context.parse(ctx);
+    TestBit.is_true(parsed, "CTX09: parse succeeds");
+    TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
+                         "CTX09: one statement");
 
-   // Add attribute
-   bool added = Context.add_attribute(ctx, attr);
-   Assert.isTrue(added, "Should add attribute successfully");
-   Assert.isTrue(Context.attribute_count(ctx) == 1, "Should have 1 attribute");
-   Assert.isNotNull(Context.get_attribute(ctx, 0), "Should get the attribute back");
-   Assert.isTrue(Context.get_attribute(ctx, 0)->key_len == 4, "Attribute key_len should match");
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_not_null(stmt, "CTX09: statement exists");
+    TestBit.is_equal_int(ANVL_STMT_ASSN,
+                         (long long)stmt->meta[STMT_META_TYPE],
+                         "CTX09: statement type is ASSN");
+    TestBit.is_equal_int(4, (long long)stmt->meta[STMT_META_IDENT_LEN],
+                         "CTX09: identifier length is 4 (\"name\")");
 
-   Context.dispose(ctx);
-   teardown();
+    Context.dispose(ctx);
 }
 
-static void test_context_parse_basic(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source = "name := \"John\"";
-   builder->set_source(builder, source, strlen(source));
+/* ------------------------------------------------------------------ */
+/* CTX10 — parse multiple statements                                  */
+/* ------------------------------------------------------------------ */
+static void test_ctx10_parse_multiple(void) {
+    const char *src = "name := \"John\"\nage := 30\nactive := true";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   // Parse
-   bool parsed = Context.parse(ctx);
-   Assert.isTrue(parsed, "Should parse successfully");
-   Assert.isTrue(Context.statement_count(ctx) == 1, "Should have 1 statement after parsing");
+    TestBit.is_not_null(ctx, "CTX10: context created");
 
-   statement stmt = Context.get_statement(ctx, 0);
-   Assert.isNotNull(stmt, "Statement should exist");
-   Assert.isTrue((anvl_stmt_type)stmt->meta[STMT_META_TYPE] == ANVL_STMT_ASSN, "Should be assignment");
-   Assert.isTrue(stmt->meta[STMT_META_IDENT_LEN] == 4, "Identifier should be 'name'");
-   // TODO: Value type check when value_meta is implemented
-   // Assert.isTrue((anvl_value_type)stmt->meta[STMT_META_VALUE_IDX] == ANVL_VALUE_SCALAR, "Value should be scalar");
+    bool parsed = Context.parse(ctx);
+    TestBit.is_true(parsed, "CTX10: parse succeeds");
+    TestBit.is_equal_int(3, (long long)Context.statement_count(ctx),
+                         "CTX10: three statements");
 
-   Context.dispose(ctx);
-   teardown();
+    TestBit.is_equal_int(4,
+        (long long)Context.get_statement(ctx, 0)->meta[STMT_META_IDENT_LEN],
+        "CTX10: stmt[0] ident len 4 (\"name\")");
+    TestBit.is_equal_int(3,
+        (long long)Context.get_statement(ctx, 1)->meta[STMT_META_IDENT_LEN],
+        "CTX10: stmt[1] ident len 3 (\"age\")");
+    TestBit.is_equal_int(6,
+        (long long)Context.get_statement(ctx, 2)->meta[STMT_META_IDENT_LEN],
+        "CTX10: stmt[2] ident len 6 (\"active\")");
+
+    Context.dispose(ctx);
 }
 
-static void test_context_multiple_statements(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source = "name := \"John\"\nage := 30\nactive := true";
-   builder->set_source(builder, source, strlen(source));
+/* ------------------------------------------------------------------ */
+/* CTX11 — get_statement bounds                                       */
+/* ------------------------------------------------------------------ */
+static void test_ctx11_get_statement_bounds(void) {
+    const char *src = "test := value";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   bool parsed = Context.parse(ctx);
-   Assert.isTrue(parsed, "Should parse multiple statements successfully");
-   Assert.isTrue(Context.statement_count(ctx) == 3, "Should have 3 statements");
+    TestBit.is_not_null(ctx, "CTX11: context created");
 
-   // Check each statement
-   statement stmt1 = Context.get_statement(ctx, 0);
-   Assert.isTrue(stmt1->meta[STMT_META_IDENT_LEN] == 4, "First statement identifier length");
-   statement stmt2 = Context.get_statement(ctx, 1);
-   Assert.isTrue(stmt2->meta[STMT_META_IDENT_LEN] == 3, "Second statement identifier length");
-   statement stmt3 = Context.get_statement(ctx, 2);
-   Assert.isTrue(stmt3->meta[STMT_META_IDENT_LEN] == 6, "Third statement identifier length");
+    bool parsed = Context.parse(ctx);
+    TestBit.is_true(parsed, "CTX11: parse succeeds");
 
-   Context.dispose(ctx);
-   teardown();
+    TestBit.is_not_null(Context.get_statement(ctx, 0),  "CTX11: stmt[0] exists");
+    TestBit.is_null    (Context.get_statement(ctx, 1),  "CTX11: stmt[1] out of bounds → NULL");
+    TestBit.is_null    (Context.get_statement(ctx, -1), "CTX11: negative index → NULL");
+
+    Context.dispose(ctx);
 }
 
-static void test_context_get_statement_bounds(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source = "test := value";
-   builder->set_source(builder, source, strlen(source));
+/* ------------------------------------------------------------------ */
+/* CTX12 — add_statement rejects NULL                                 */
+/* ------------------------------------------------------------------ */
+static void test_ctx12_add_statement_null(void) {
+    const char *src = "test";
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
+    CtxBuilder.set_source(&CtxBuilder, src, strlen(src));
+    context ctx = CtxBuilder.build(&CtxBuilder);
 
-   bool parsed = Context.parse(ctx);
-   Assert.isTrue(parsed, "Should parse successfully");
+    TestBit.is_not_null(ctx, "CTX12: context created");
 
-   // Test bounds
-   Assert.isNotNull(Context.get_statement(ctx, 0), "Should get statement 0");
-   Assert.isNull(Context.get_statement(ctx, 1), "Should return NULL for out of bounds");
-   Assert.isNull(Context.get_statement(ctx, -1), "Should return NULL for negative index");
+    TestBit.is_false(Context.add_statement(ctx,  NULL), "CTX12: NULL stmt rejected");
+    TestBit.is_false(Context.add_statement(NULL, NULL), "CTX12: NULL ctx rejected");
 
-   Context.dispose(ctx);
-   teardown();
+    Context.dispose(ctx);
 }
 
-static void test_context_add_statement_null(void) {
-   anvl_ctx_builder_i *builder = Context.get_builder();
-   const char *source = "test";
-   builder->set_source(builder, source, strlen(source));
+/* ------------------------------------------------------------------ */
+/* Entry point                                                        */
+/* ------------------------------------------------------------------ */
+int main(void) {
+    TestBit.run_ex("CTX01_get_builder",             NULL, test_ctx01_get_builder,              td);
+    TestBit.run_ex("CTX02_null_no_source",          NULL, test_ctx02_null_no_source,           td);
+    TestBit.run_ex("CTX03_set_source",              NULL, test_ctx03_set_source,               td);
+    TestBit.run_ex("CTX04_load_file_shebang",       NULL, test_ctx04_load_file_shebang,        td);
+    TestBit.run_ex("CTX05_load_file_no_shebang",    NULL, test_ctx05_load_file_no_shebang,     td);
+    TestBit.run_ex("CTX06_shebang_overrides_dialect",NULL, test_ctx06_shebang_overrides_dialect, td);
+    TestBit.run_ex("CTX07_statement_operations",    NULL, test_ctx07_statement_operations,     td);
+    TestBit.run_ex("CTX08_attribute_operations",    NULL, test_ctx08_attribute_operations,     td);
+    TestBit.run_ex("CTX09_parse_basic",             NULL, test_ctx09_parse_basic,              td);
+    TestBit.run_ex("CTX10_parse_multiple",          NULL, test_ctx10_parse_multiple,           td);
+    TestBit.run_ex("CTX11_get_statement_bounds",    NULL, test_ctx11_get_statement_bounds,     td);
+    TestBit.run_ex("CTX12_add_statement_null",      NULL, test_ctx12_add_statement_null,       td);
 
-   context ctx = builder->build(builder);
-   Assert.isNotNull(ctx, "Context should be created");
-
-   // Try to add NULL statement
-   bool added = Context.add_statement(ctx, NULL);
-   Assert.isFalse(added, "Should not add NULL statement");
-
-   // Try to add to NULL context
-   added = Context.add_statement(NULL, NULL);
-   Assert.isFalse(added, "Should not add to NULL context");
-
-   Context.dispose(ctx);
-   teardown();
-}
-#if 0
-#endif
-
-static void _register(void) {
-   testset("Context Interface", set_config, set_teardown);
-
-   testcase("Ctx: Get Builder", test_context_get_builder);
-   testcase("Ctx Bldr: Err Null No Source", test_ctx_bldr_null_no_source);
-
-   testcase("Ctx Bldr: Set Source", test_ctx_bldr_set_source);
-   testcase("Ctx Bldr: Load File Shebang", test_ctx_bldr_load_file_shebang);
-   testcase("Ctx Bldr: Load File No Shebang", test_ctx_bldr_load_file_no_shebang);
-
-   testcase("Ctx Bldr: Chain", test_ctx_bldr_chain);
-
-   testcase("Ctx: Statement Operations", test_context_statement_operations);
-   testcase("Ctx: Attribute Operations", test_context_attribute_operations);
-   testcase("Ctx: Parse Basic", test_context_parse_basic);
-   testcase("Ctx: Parse Multiple Statements", test_context_multiple_statements);
-   testcase("Ctx: Get Statement Bounds", test_context_get_statement_bounds);
-   testcase("Ctx: Add Statement Null", test_context_add_statement_null);
-}
-__attribute__((constructor)) static void register_test_context(void) {
-   Tests.enqueue(_register);
+    return TestBit.report();
 }

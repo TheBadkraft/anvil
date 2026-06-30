@@ -34,7 +34,7 @@ BIN = bin
 
 .PHONY: all clean valgrind test_scalar_quotes test_amp_collections test_release test_version
 
-all: $(BIN)/test_version $(BIN)/test_scalar_quotes $(BIN)/test_amp_collections $(BIN)/test_interp_string $(BIN)/test_using $(BIN)/test_anon_block_attrs $(BIN)/test_resolver $(BIN)/test_schema
+all: $(BIN)/test_version $(BIN)/test_scalar_quotes $(BIN)/test_amp_collections $(BIN)/test_context $(BIN)/test_interp_string $(BIN)/test_using $(BIN)/test_anon_block_attrs $(BIN)/test_resolver $(BIN)/test_schema
 
 $(BIN)/test_version: test_version.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
@@ -42,6 +42,14 @@ $(BIN)/test_version: test_version.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 
 test_version: $(BIN)/test_version
 	@$(BIN)/test_version
+
+$(BIN)/test_context: test_context.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+test_context: $(BIN)/test_version $(BIN)/test_context
+	@$(BIN)/test_version
+	@$(BIN)/test_context
 
 $(BIN)/test_scalar_quotes: test_scalar_quotes.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
