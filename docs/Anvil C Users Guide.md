@@ -1,5 +1,5 @@
 # Anvil — C Users Guide
-**v0.5.0-alpha — standalone build, parser parity, resolver, schema**
+**v0.5.4-alpha — standalone build, parser parity, vars, resolver, schema**
 
 ---
 
@@ -25,7 +25,7 @@ returned by the library; call `Context.dispose(ctx)` to release everything at on
 
 ```c
 // 1. Get a builder
-anvl_ctx_builder_i *b = Context.get_builder();
+ctx_builder b = Context.get_builder();
 
 // 2. Supply a source — choose one:
 b->set_source(b, src, len);           // parse from in-memory string (bytes + length)
@@ -76,7 +76,8 @@ usize n = Context.statement_count(ctx);
 for (usize i = 0; i < n; i++) {
     statement stmt  = Context.get_statement(ctx, i);
     anvl_stmt_type t = Statement.type(stmt);
-    const char    *id = Statement.identifier(stmt, ctx->source);
+    char id[256] = {0};
+    Statement.identifier(stmt, ctx->source, id);
     printf("stmt[%zu]: %s  type=%d\n", i, id, t);
 }
 ```
@@ -90,18 +91,20 @@ valid for the lifetime of the owning `context`.
 |---|---|
 | `ANVL_STMT_ASSN`    | `key := value` (standard assignment) |
 | `ANVL_ANON_OBJECT`  | `key { … }` (anonymous block, no `:=`) |
-| `ANVL_STMT_FUNC`    | Function statement (AnvilScript, Phase II) |
+| `ANVL_STMT_FUNC`    | Function statement (AnvilScript) |
 | `ANVL_STMT_MSSG`    | Message statement (AMP, future) |
 
 ### Statement interface members
 
 | Call | Returns | Purpose |
 |---|---|---|
-| `Statement.identifier(stmt, src)` | `const char *` | NUL-terminated identifier; pointer into source |
+| `Statement.identifier(stmt, src, out_buf)` | `void` | Writes NUL-terminated identifier into caller buffer |
 | `Statement.base(stmt, src)` | `const char *` | Inheritance base identifier; `NULL` if none |
 | `Statement.type(stmt)` | `anvl_stmt_type` | Statement category |
 | `Statement.value_type(stmt)` | `anvl_value_type` | Type of the statement's value |
 | `Statement.length(stmt)` | `usize` | Source span length |
+
+`Statement.identifier` requires a caller-owned output buffer.
 
 ---
 
@@ -310,11 +313,11 @@ usize       slen = Source.length(ctx->source);   // total source byte length
 anvl_dialect d   = Source.dialect(ctx->source);  // detected dialect
 ```
 
-Substrings (allocates, caller owns):
+Substrings (caller-supplied buffer):
 ```c
-char *sub = Source.substring(ctx->source, pos, len);
+char sub[128];
+Source.substring(ctx->source, pos, len, sub);
 // ... use sub ...
-free(sub);
 ```
 
 ---
@@ -390,7 +393,7 @@ arrays/tuples, and blobs — objects are forbidden.
 // version := 2
 // ids     := [101, 204, 387]
 
-anvl_ctx_builder_i *b = Context.get_builder();
+ctx_builder b = Context.get_builder();
 b->set_source(b, amp_src, amp_len);
 context ctx = b->build(b);
 Context.parse(ctx);
@@ -448,7 +451,7 @@ static void walk_fields(context ctx, usize field_start, usize field_count,
 }
 
 int main(void) {
-    anvl_ctx_builder_i *b = Context.get_builder();
+    ctx_builder b = Context.get_builder();
     const char *src = "config := { server := { host := localhost, port := 8080 }, timeout := 30 }";
     b->set_source(b, src, strlen(src));
     context ctx = b->build(b);
@@ -462,7 +465,9 @@ int main(void) {
     usize n = Context.statement_count(ctx);
     for (usize i = 0; i < n; i++) {
         statement stmt = Context.get_statement(ctx, i);
-        printf("%s :=\n", Statement.identifier(stmt, ctx->source));
+        char ident[256] = {0};
+        Statement.identifier(stmt, ctx->source, ident);
+        printf("%s :=\n", ident);
         walk_fields(ctx, stmt->value_meta->data.object.field_start,
                          stmt->value_meta->data.object.field_count, raw, 1);
     }
@@ -503,7 +508,7 @@ typedef struct {
 } server_config;
 
 static bool load_config(const char *path, server_config *out) {
-    anvl_ctx_builder_i *b = Context.get_builder();
+    ctx_builder b = Context.get_builder();
     if (!b->load_file(b, path)) return false;
     context ctx = b->build(b);
     if (!Context.parse(ctx)) { Context.dispose(ctx); return false; }
@@ -512,7 +517,8 @@ static bool load_config(const char *path, server_config *out) {
     usize n = Context.statement_count(ctx);
     for (usize i = 0; i < n; i++) {
         statement s = Context.get_statement(ctx, i);
-        const char *key = Statement.identifier(s, ctx->source);
+        char key[128] = {0};
+        Statement.identifier(s, ctx->source, key);
 
         if (strcmp(key, "host") == 0) {
             usize p = s->value_meta->data.scalar.pos;
@@ -668,6 +674,53 @@ const anvl_field_list_t *merged =
 
 ---
 
+## Vars API (`anvil.vars.o`)
+
+`Vars` is an explicit post-parse layer for var-ref resolution and interpolation
+materialization. Parser output remains unresolved until you call this API.
+
+```c
+#include "vars.h"
+
+anvl_vars_state_t *vs = Vars.build(ctx);
+if (!vs) {
+    // ANVL_ERR_VARS_CIRCULAR_REF or allocation failure
+    fprintf(stderr, "vars: %s\n", Anvil.error_get()->message);
+    return;
+}
+
+// Resolve a flat key
+usize rpos, rlen;
+anvl_value_type rtype;
+if (Vars.resolve(vs, "atlas", 5, &rpos, &rlen, &rtype)) {
+    const char *raw = Source.data(ctx->source);
+    printf("atlas = %.*s\n", (int)rlen, raw + rpos);
+}
+
+// Resolve a dotted path (single-level supported today)
+if (Vars.resolve_path(vs, ctx, "changelog.version", 17, &rpos, &rlen, &rtype)) {
+    const char *raw = Source.data(ctx->source);
+    printf("changelog.version = %.*s\n", (int)rlen, raw + rpos);
+}
+
+// Materialize interpolated string from statement value_meta
+statement s = Context.get_statement(ctx, 0);
+char *expanded = Vars.materialise_interp(vs, ctx, s->value_meta);
+if (expanded) {
+    printf("interp = %s\n", expanded);
+    Allocator.dispose(expanded);
+}
+
+Vars.dispose(vs);
+```
+
+Notes:
+- `Vars.resolve` and `Vars.resolve_path` set `ANVL_ERR_VARS_KEY_NOT_FOUND` for missing references.
+- `Vars.resolve_path` currently supports one dot segment (`a.b`); deeper traversal (`a.b.c`) is still WIP.
+- `Vars.materialise_interp` expects `ANVL_VALUE_INTERP_STRING` metadata and returns heap memory owned by caller.
+
+---
+
 ## Schema API (`anvil.schema.o`)
 
 Schema documents use `@[schema]` as a module-level attribute to declare types.
@@ -738,14 +791,14 @@ As of v0.5.0 anvil embeds all sigma dependencies. No `-l` flags needed.
 ```sh
 # Core parser only
 gcc -std=c2x -I./include \
-    src/core/anvil_impl.c src/core/context.c src/core/errors.c \
+    src/core/anvil.c src/core/context.c src/core/errors.c \
     src/core/memory.c src/core/parser.c src/core/strings.c \
     src/utilities/utils.c \
     main.c -o myapp
 
 # With resolver and vars (default lib)
 gcc -std=c2x -I./include \
-    src/core/anvil_impl.c src/core/context.c src/core/errors.c \
+    src/core/anvil.c src/core/context.c src/core/errors.c \
     src/core/memory.c src/core/parser.c src/core/strings.c \
     src/utilities/utils.c \
     src/resolver/resolver.c src/vars/vars.c \
@@ -775,7 +828,7 @@ All includes resolve from `./include` — no installed packages required.
 
 | Slot | Signature | Purpose |
 |---|---|---|
-| `get_builder` | `() → anvl_ctx_builder_i *` | Obtain the builder |
+| `get_builder` | `() → ctx_builder` | Obtain the builder |
 | `dialect` | `(ctx) → anvl_dialect` | Source dialect |
 | `statement_count` | `(ctx) → usize` | Number of top-level statements |
 | `get_statement` | `(ctx, i) → statement` | Statement by index |
@@ -788,12 +841,23 @@ All includes resolve from `./include` — no installed packages required.
 | `get_field_by_name` | `(ctx, stmt, name, len) → field` | Field by key — linear scan |
 | `element_count` | `(ctx, stmt) → usize` | Elements in an array/tuple statement |
 | `get_element` | `(ctx, stmt, i) → anvl_element_meta *` | Element by index |
+| `value_element_count` | `(ctx, val) → usize` | Elements in nested array/tuple field values |
+| `get_value_element` | `(ctx, val, i) → anvl_element_meta *` | Nested element by index |
+| `value_field_count` | `(ctx, val) → usize` | Fields in nested object field values |
+| `get_value_field` | `(ctx, val, i) → field` | Nested field by index |
+| `get_value_field_by_name` | `(ctx, val, name, len) → field` | Nested field by key |
+| `stmt_attr_count` | `(ctx, stmt) → usize` | Statement attribute count |
+| `get_stmt_attr` | `(ctx, stmt, i) → anvl_attr_meta *` | Statement attribute by index |
+| `get_stmt_attr_by_name` | `(ctx, stmt, name, len) → anvl_attr_meta *` | Statement attribute by key |
+| `field_attr_count` | `(ctx, field) → usize` | Field attribute count |
+| `get_field_attr` | `(ctx, field, i) → attribute` | Field attribute by index |
+| `get_field_attr_by_name` | `(ctx, field, name, len) → attribute` | Field attribute by key |
 
 ### `Statement` vtable
 
 | Slot | Signature | Purpose |
 |---|---|---|
-| `identifier` | `(stmt, src) → const char *` | Identifier string (NUL-terminated) |
+| `identifier` | `(stmt, src, out_buf) → void` | Writes identifier string to caller buffer |
 | `base` | `(stmt, src) → const char *` | Base/parent identifier; `NULL` if none |
 | `type` | `(stmt) → anvl_stmt_type` | Statement category |
 | `value_type` | `(stmt) → anvl_value_type` | Value type |
@@ -806,7 +870,7 @@ All includes resolve from `./include` — no installed packages required.
 | `data` | `(src) → const char *` | Pointer to raw source bytes |
 | `length` | `(src) → usize` | Total source byte length |
 | `dialect` | `(src) → anvl_dialect` | Detected dialect |
-| `substring` | `(src, pos, len) → char *` | Heap-allocated substring (caller frees) |
+| `substring` | `(src, pos, len, out_buf) → void` | Copy span into caller buffer |
 
 ### `anvl_value_type` enum
 
