@@ -76,6 +76,7 @@ static const char *error_messages[] = {
     [ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY] = "Duplicate attribute identifier",
     [ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE] = "Attributes are not allowed on scalar, array, or tuple types",
     [ANVL_ERR_ANON_BLOCK_REDECLARATION] = "Anonymous block name conflicts with an existing declaration",
+    [ANVL_ERR_PARSER_UNTERMINATED_COMMENT] = "Unterminated block comment",
 
     [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "Cycle detected in inheritance chain",
     [ANVL_ERR_RESOLVER_MISSING_BASE] = "Base identifier not found in document",
@@ -86,6 +87,7 @@ static const char *error_messages[] = {
     [ANVL_ERR_VARS_DUPLICATE_KEY] = "Duplicate key in vars block",
     [ANVL_ERR_VARS_CIRCULAR_REF] = "Circular reference detected in vars block",
     [ANVL_ERR_VARS_KEY_NOT_FOUND] = "vars key not found",
+   [ANVL_ERR_VARS_UNTERMINATED_INTERP] = "Unterminated interpolated string: missing closing quote or '}'",
     [ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF] = "Unterminated braced VarRef: '${' missing closing '}'",
 
     [ANVL_ERR_IMPORT_NOT_FIRST] = "import declarations must precede statements",
@@ -181,6 +183,7 @@ static const char *error_names[] = {
     [ANVL_ERR_VARS_DUPLICATE_KEY] = "ANVL_ERR_VARS_DUPLICATE_KEY",
     [ANVL_ERR_VARS_CIRCULAR_REF] = "ANVL_ERR_VARS_CIRCULAR_REF",
     [ANVL_ERR_VARS_KEY_NOT_FOUND] = "ANVL_ERR_VARS_KEY_NOT_FOUND",
+   [ANVL_ERR_VARS_UNTERMINATED_INTERP] = "ANVL_ERR_VARS_UNTERMINATED_INTERP",
     [ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF] = "ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF",
 
     [ANVL_ERR_IMPORT_NOT_FIRST] = "ANVL_ERR_IMPORT_NOT_FIRST",

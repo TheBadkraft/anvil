@@ -48,7 +48,7 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
    state->entries = Allocator.alloc(sizeof(struct anvl_vars_resolved) * n);
    if (!state->entries) {
-      /* state stays in bump allocator — will be freed with controller */
+      Allocator.dispose(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -79,7 +79,8 @@ static anvl_vars_state_t *vars_build(context ctx) {
     */
    uint8_t *done = Allocator.alloc(n);
    if (!done) {
-      /* state and entries stay in bump allocator — will be freed with controller */
+      Allocator.dispose(state->entries);
+      Allocator.dispose(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -90,7 +91,9 @@ static anvl_vars_state_t *vars_build(context ctx) {
    /* Stack to track current DFS path (maximum chain = n entries) */
    usize *path = Allocator.alloc(sizeof(usize) * (n + 1));
    if (!path) {
-      /* done, state, and entries stay in bump allocator — will be freed with controller */
+      Allocator.dispose(done);
+      Allocator.dispose(state->entries);
+      Allocator.dispose(state);
       anvl_error_set(ANVL_ERR_MEMORY_ALLOCATION_FAILED,
                      anvl_error_code_message(ANVL_ERR_MEMORY_ALLOCATION_FAILED),
                      0, 0, __FILE__);
@@ -124,7 +127,10 @@ static anvl_vars_state_t *vars_build(context ctx) {
 
          if (done[cur] == 1) {
             /* cur is already on the current path → cycle detected */
-            /* path, done, state, and entries stay in bump allocator — will be freed with controller */
+            Allocator.dispose(path);
+            Allocator.dispose(done);
+            Allocator.dispose(state->entries);
+            Allocator.dispose(state);
             anvl_error_set(ANVL_ERR_VARS_CIRCULAR_REF,
                            anvl_error_code_message(ANVL_ERR_VARS_CIRCULAR_REF),
                            0, 0, __FILE__);
@@ -176,7 +182,8 @@ static anvl_vars_state_t *vars_build(context ctx) {
       }
    }
 
-   /* path and done stay in bump allocator — no free needed */
+   Allocator.dispose(path);
+   Allocator.dispose(done);
    return state;
 }
 
@@ -323,8 +330,11 @@ static bool vars_resolve_path(anvl_vars_state_t *state, context ctx,
 /* vars_dispose                                                       */
 /* ------------------------------------------------------------------ */
 static void vars_dispose(anvl_vars_state_t *state) {
-   /* Bump allocator — state and entries stay in allocator, freed with controller */
-   (void)state;
+   if (!state)
+      return;
+
+   Allocator.dispose(state->entries);
+   Allocator.dispose(state);
 }
 
 /* ------------------------------------------------------------------ */

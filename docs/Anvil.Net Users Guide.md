@@ -183,6 +183,10 @@ block := {
 A dot-prefixed identifier in any value position resolves transparently to the `vars` entry
 with that name. No special call is needed — the runtime resolves it on first access:
 
+> Syntax note: this section documents the Anvil.Net surface syntax (`.identifier`).
+> Core C/parser-facing docs may also show parser-level `$...` forms (for raw var-ref and
+> interpolation tokenization). Treat those as backend/parser representation details.
+
 ```csharp
 AnvilNode root = Anvil.Load("blocks.aml")!;
 

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.4-alpha] — pre-release (2026-07-01)
+
+### Added
+
+- **Test coverage: vars parser edge-cases** (`test/unit/test_vars.c`) — added V21–V23 TestBit checks for braced dotted VarRef parsing, unbraced dotted VarRef parsing, and dedicated unterminated braced VarRef parser error.
+- **Test coverage: interpolation error-code assertions** (`test/unit/test_interp_string.c`) — IS07 and IS08 now assert exact parser error codes (`ANVL_ERR_VARS_UNTERMINATED_INTERP`, `ANVL_ERR_VARS_INVALID_VARREF`) instead of only checking generic error presence.
+- **Make ergonomics (active suite targets)** (`test/unit/Makefile`) — added explicit convenience targets for `test_interp_string`, `test_using`, `test_anon_block_attrs`, and `test_schema` and wired `test_vars` into active aggregate/release/valgrind flows.
+
+### Fixed
+
+- **Valgrind blocker: `all` target recipe bug** (`test/unit/Makefile`) — `all` now correctly lists binaries as prerequisites instead of attempting to execute path strings as shell commands.
+- **Vars state leak under valgrind** (`src/vars/vars.c`) — `Vars.build()` now disposes temporary allocations (`done`, `path`) and frees owned state on build failure; `Vars.dispose()` now releases `state->entries` and `state`. `test_vars` valgrind run is now clean.
+- **Error table completeness** (`src/core/errors.c`) — wired `ANVL_ERR_VARS_UNTERMINATED_INTERP` into both error message and error name lookup tables.
+
+### Changed
+
+- **Docs consistency refresh** (`README.md`, `docs/parser-architecture.md`, `docs/reference.md`, `docs/test-gaps.md`, `docs/Anvil.Net Users Guide.md`) — aligned ASL status/roadmap wording with current implementation, replaced stale Sigma.Test references with TestBit framing for active suites, refreshed vars suite count in test-gaps, and clarified binding-specific var-ref syntax context.
+
+---
+
 ## [v0.5.3-alpha] — pre-release (2026-06-28)
 
 ### Added

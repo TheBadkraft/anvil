@@ -23,7 +23,7 @@ Anvil is not just another language.
 Anvil is a paradigm shift in data structure, object modelling, and messaging.  
 
  · Zero-copy · Typeless · Human-first · Fast is an understatement ·  
- · Multi-dialect (AML, AMP, ASL-**Phase II**) · Standalone build — zero external deps ·  
+ · Multi-dialect (AML, AMP, ASL-**implemented (alpha)**) · Standalone build — zero external deps ·  
  · Perfect round-tripping · Resolver-**complete** · Schema-**complete** · AMP arrays/tuples-**complete** ·  
  · UDP-friendly · **Parser holds zero payload data — zero attack surface** ·  
   
@@ -101,9 +101,9 @@ anvil/
 │   ├── vars/                ← anvil.vars.o     — var resolution
 │   ├── import/              ← anvil.import.o   — multi-file imports
 │   ├── serializer/          ← anvil.serializer.o — round-trip writer
-│   └── asl/                 ← anvil.asl.o      — AnvilScript (Phase II)
+│   └── asl/                 ← anvil.asl.o      — AnvilScript parser + evaluator
 ├── test/
-│   └── unit/                ← TestBit-based unit tests (57 tests, 0 leaks)
+│   └── unit/                ← TestBit-based unit tests (active quality gate)
 ├── docs/                    ← language spec, AMP guide, schema authoring
 ├── config.sh                ← bash build configuration
 └── README.md
@@ -123,8 +123,6 @@ Anvil is designed as a single C backend with pluggable layers. All bindings
 │  Optional modules (linked when needed)               │
 │  anvil.schema.o    — schema validation               │
 │  anvil.serializer.o — round-trip writer              │
-├─────────────────────────────────────────────────────┤
-│  Phase II                                            │
 │  anvil.asl.o — AnvilScript parser + evaluator        │
 ├─────────────────────────────────────────────────────┤
 │  Language bindings (per-paradigm wrappers)           │
@@ -156,7 +154,7 @@ One language. One parser. Three dialects — activated by shebang on the first l
 |---------|---------|--------|--------|
 | **AML** | `#!aml` | Declarative data modeling — replaces JSON, YAML, TOML | ✅ Complete |
 | **AMP** | `#!amp` | Cipher-agnostic structured messaging — UDP-friendly, zero parser attack surface | ✅ Complete |
-| **ASL** | `#!asl` | Lightweight imperative scripting — embedded behavior automation | ⚠️ Phase II |
+| **ASL** | `#!asl` | Lightweight imperative scripting — embedded behavior automation | ✅ Implemented (alpha) |
 
 ## Current State (v0.5.0-alpha)
 
@@ -203,8 +201,9 @@ One language. One parser. Three dialects — activated by shebang on the first l
 
 ### Testing
 - TestBit: zero-dependency C test runner (`extern const testbit_i TestBit`)
-- 7 test suites, 57 tests, 239 assertions — all pass
-- Zero valgrind errors, zero leaks across all suites
+- Active TestBit suites are wired in `test/unit/Makefile` and used as the supported quality gate
+- Current local runs in this branch are passing for resolver, vars, interpolation, using, schema, and anonymous-block attributes
+- Valgrind target remains clean for active suites
 
 AMP is the only messaging protocol whose parser holds no payload data at any point during parsing — not a performance optimization, a security property. See [docs/amp.md](docs/amp.md) for the full specification, security customization guide, and UDP fragmentation pattern.
 
@@ -268,10 +267,11 @@ All parse times are single cold-parse wall-clock. Throughput is file size / pars
 |------------------------|------------|--------------------------------------------------------|--------|
 | Anvil 0.1.0-alpha      | Dec 2025   | Pure C parser (AML, AMP), zero memory leaks            | ✅ Released |
 | Anvil 0.2.x-alpha      | Mar 2026   | Inheritance resolver, writer, import graph             | ✅ Released |
+| Anvil 0.4.0-alpha      | Mar 2026   | ASL parser + evaluator                                 | ✅ Released |
 | Anvil 0.5.0-alpha      | Jun 2026   | Standalone build, parser parity, schema, TestBit       | ✅ Released |
 | Anvil.JS binding       | Q3 2026    | Node.js binding — first language wrapper               | 🔜 Next |
-| Anvil 0.6.0-alpha      | Q3 2026    | FlyWire formal schema pipeline, vars full resolution   | ❌ Planned |
-| Anvil 0.7.0-alpha      | Q3 2026    | ASL parser + evaluator (Phase II)                      | ❌ Planned |
+| Anvil 0.6.0-alpha      | Q3 2026    | FlyWire formal schema pipeline, vars deep-path resolution | ❌ Planned |
+| Anvil 0.7.0-alpha      | Q4 2026    | ASL hardening + module dispatch expansion              | ❌ Planned |
 | AnvilBuild 1.0         | TBD        | Build system written in ASL using `.anvl` config       | ❌ Planned |
 | Anvil 1.0              | TBD        | Full AML/AMP/ASL, all official bindings                | ❌ Planned |
 

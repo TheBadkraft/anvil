@@ -1,9 +1,9 @@
 # Anvil — Test Gap Analysis
 
 **Audited:** 2026-03-12
-**Updated:** 2026-03-12 (P0 + P1 complete)
-**Scope:** `test/unit/` — all 15 test files
-**Method:** Compare implemented functions (`static void test_*() {`) against registered testcases (`testcase(...)`) in each file
+**Updated:** 2026-07-01 (active-suite refresh)
+**Scope:** Historical gap ledger for parser-era suites; active quality gate is TestBit targets in `test/unit/Makefile`
+**Method:** Compare implemented functions against registered tests in each suite
 
 ---
 
@@ -22,7 +22,7 @@
 | `test_resolver.c` | 10 | 10 | 0 | 0 | ✅ Clean |
 | `test_serializer.c` | 19 | 19 | 0 | 0 | ✅ Clean |
 | `test_source.c` | 22 | 22 | 0 | 0 | ✅ Clean |
-| `test_vars.c` | 20 | 20 | 0 | 0 | ✅ Clean |
+| `test_vars.c` | 23 | 23 | 0 | 0 | ✅ Clean |
 | `test_parser.c` | 80 | 68 | ~22 stubs (P3) | 0 | ⚠️ Stubs remain |
 | `test_schema.c` | 20 | 20 | 0 | 0 | ✅ Clean |
 | `test_statements.c` | 20 | 20 | 0 | 0 | ✅ Clean |

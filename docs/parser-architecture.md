@@ -852,14 +852,14 @@ User checks: const anvl_error_state *err = Anvil.error_get();
 
 ### Test Infrastructure
 
-**Test Framework:** Sigma Test (`sigtest/sigtest.h`)
+**Test Framework:** TestBit (`testbit/testbit.h`)
 
 **Test Harness:**
 ```c
-__attribute__((constructor)) static void register_test_parser(void) {
-    testset("Parser Tests", set_config, set_teardown);
-    testcase("Simple Assignment", test_parse_simple_assignment);
-    // ... 50 more testcases ...
+int main(void) {
+    TestBit.run_ex("Simple Assignment", NULL, test_parse_simple_assignment, td);
+    // ... additional test registrations ...
+    return TestBit.status;
 }
 ```
 
@@ -877,12 +877,12 @@ static context parse_source_with_err(const char *source, ..., const anvl_error_s
 
 **Assertions Used:**
 ```c
-Assert.isTrue(condition, message)
-Assert.isFalse(condition, message)
-Assert.isNull(ptr, message)
-Assert.isNotNull(ptr, message)
-Assert.areEqual(expected, actual, type, message)
-Assert.skip(message)  // For unimplemented tests
+TestBit.is_true(condition, message)
+TestBit.is_false(condition, message)
+TestBit.is_null(ptr, message)
+TestBit.is_not_null(ptr, message)
+TestBit.is_equal_int(expected, actual, message)
+TestBit.skip(message)  // For intentionally skipped tests
 ```
 
 ---

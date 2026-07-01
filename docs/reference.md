@@ -1,5 +1,5 @@
 # THE ANVIL C REFERENCE DOCUMENT  
-**Version 1.0 – December 2025 – This document is the single source of truth. Everything else is legacy.**
+**Version 1.0 – December 2025 – Historical design reference plus implemented API notes.**
 
 ## 1. What Anvil Is (and Is Not)
 
@@ -13,7 +13,7 @@
 | Dual dialect: AML (declarative, data-first) + ASL (imperative, scripting-first)    | Interpreter for AML            |
 | Zero-boilerplate, human-first syntax                                                 | Typed language                 |
 | Zero-copy parsing, immutable AST, round-tripping                                    | Mutable AST by default         |
-| Resolver is 100 % pluggable – consumer owns `$var`, `$func()`, inheritance, interpolation | Magic resolution               |
+| Resolver and Vars APIs are pluggable — consumer controls policy and materialization strategy | Hidden, implicit runtime magic |
 | Default file extension `.anvl` (shebang overrides)                                 | Tied to any file extension     |
 | Designed to become the build configuration language of the future (AnvilBuild)     | Just a library                 |
 

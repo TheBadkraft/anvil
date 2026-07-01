@@ -16,13 +16,27 @@
  */
 
 #include "anvil.h"
-#include "utilities/helpers.h"
 #include "vars.h"
 #include <sigma.memory/memory.h>
-#include <sigma.test/sigtest.h>
+#include "testbit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Bridge legacy Assert.* calls to TestBit assertions. */
+static struct {
+   void (*isTrue)(bool value, const char *message);
+   void (*isFalse)(bool value, const char *message);
+   void (*isNotNull)(const void *value, const char *message);
+   void (*isNull)(const void *value, const char *message);
+} Assert;
+
+static void init_assert_bridge(void) {
+   Assert.isTrue = TestBit.is_true;
+   Assert.isFalse = TestBit.is_false;
+   Assert.isNotNull = TestBit.is_not_null;
+   Assert.isNull = TestBit.is_null;
+}
 
 /* ------------------------------------------------------------------ */
 /* Forward declarations                                               */
@@ -47,16 +61,13 @@ static void test_v17_multi_ref_interpolation(void);
 static void test_v18_literal_only_interpolation(void);
 static void test_v19_escaped_braces_materialise(void);
 static void test_v20_missing_ref_in_interpolation(void);
+static void test_v21_braced_dotted_varref_parses(void);
+static void test_v22_unbraced_dotted_varref_parses(void);
+static void test_v23_unterminated_braced_varref_error(void);
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
-static void set_config(FILE **logger) {
-   *logger = fopen("logs/test_vars.log", "w");
-}
-static void set_teardown(void) {
-   Anvil.cleanup();
-}
 static void teardown(void) {
    Anvil.error_clear();
 }
@@ -73,6 +84,28 @@ static context build_context(const char *src_str) {
       return NULL;
    }
    return ctx;
+}
+
+static bool parse_fails(const char *src_str, anvl_error_code *out_code) {
+   anvl_ctx_builder_i *builder = Context.get_builder();
+   builder->set_source(builder, src_str, strlen(src_str));
+   context ctx = builder->build(builder);
+   if (!ctx)
+      return false;
+
+   bool ok = Context.parse(ctx);
+   if (ok) {
+      Context.dispose(ctx);
+      return false;
+   }
+
+   if (out_code) {
+      const anvl_error_state *err = Anvil.error_get();
+      *out_code = err ? err->code : ANVL_ERR_NONE;
+   }
+
+   Context.dispose(ctx);
+   return true;
 }
 
 /* Resolve a top-level VarRef statement's value to a source string.
@@ -609,32 +642,119 @@ static void test_v20_missing_ref_in_interpolation(void) {
 }
 
 /* ================================================================
+ * V21 — Braced dotted varref parses and stores full path
+ * ================================================================ */
+static void test_v21_braced_dotted_varref_parses(void) {
+   const char *src =
+       "#!aml\n"
+       "changelog { version := 1.0.0 }\n"
+       "display := ${changelog.version}\n";
+
+   context ctx = build_context(src);
+   Assert.isNotNull(ctx, "context parses with braced dotted varref");
+   Assert.isTrue(Context.statement_count(ctx) == 2, "2 statements parsed");
+
+   statement display = Context.get_statement(ctx, 1);
+   Assert.isNotNull(display, "display statement exists");
+   Assert.isTrue(display && display->value_meta &&
+                     display->value_meta->type == ANVL_VALUE_VARREF,
+                 "display value is VARREF");
+
+   if (display && display->value_meta) {
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len,
+                       path);
+      Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
+                    "stored varref path is changelog.version");
+      free(path);
+   }
+
+   Context.dispose(ctx);
+   teardown();
+}
+
+/* ================================================================
+ * V22 — Unbraced dotted varref parses and stores full path
+ * ================================================================ */
+static void test_v22_unbraced_dotted_varref_parses(void) {
+   const char *src =
+       "#!aml\n"
+       "changelog { version := 1.0.0 }\n"
+       "display := $changelog.version\n";
+
+   context ctx = build_context(src);
+   Assert.isNotNull(ctx, "context parses with unbraced dotted varref");
+   Assert.isTrue(Context.statement_count(ctx) == 2, "2 statements parsed");
+
+   statement display = Context.get_statement(ctx, 1);
+   Assert.isNotNull(display, "display statement exists");
+   Assert.isTrue(display && display->value_meta &&
+                     display->value_meta->type == ANVL_VALUE_VARREF,
+                 "display value is VARREF");
+
+   if (display && display->value_meta) {
+      char *path = malloc(display->value_meta->len + 1);
+      Source.substring(ctx->source,
+                       display->value_meta->pos,
+                       display->value_meta->len,
+                       path);
+      Assert.isTrue(path && strcmp(path, "changelog.version") == 0,
+                    "stored varref path is changelog.version");
+      free(path);
+   }
+
+   Context.dispose(ctx);
+   teardown();
+}
+
+/* ================================================================
+ * V23 — Unterminated braced varref returns dedicated error
+ * ================================================================ */
+static void test_v23_unterminated_braced_varref_error(void) {
+   const char *src =
+       "#!aml\n"
+       "display := ${changelog.version\n";
+
+   anvl_error_code code = ANVL_ERR_NONE;
+   bool failed = parse_fails(src, &code);
+
+   Assert.isTrue(failed, "parse fails for unterminated braced varref");
+   Assert.isTrue(code == ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF,
+                 "error is ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF");
+
+   teardown();
+}
+
+/* ================================================================
  * Registration
  * ================================================================ */
-static void _register(void) {
-   testset("Vars Tests", set_config, set_teardown);
+int main(void) {
+   init_assert_bridge();
 
-   testcase("V01: Empty vars block parses ok", test_v01_empty_vars_block_parses_ok);
-   testcase("V02: Single entry stored", test_v02_single_entry_stored);
-   testcase("V03: Multiple entries stored", test_v03_multiple_entries_stored);
-   testcase("V04: vars after statement is error", test_v04_vars_after_statement_is_error);
-   testcase("V05: Second vars block is error", test_v05_second_vars_block_is_error);
-   testcase("V06: Duplicate key is error", test_v06_duplicate_key_is_error);
-   testcase("V07: vars as identifier is error", test_v07_vars_as_statement_identifier_is_error);
-   testcase("V08: Scalar VarRef resolves", test_v08_scalar_varref_resolves);
-   testcase("V09: VarRef in object field resolves", test_v09_varref_in_object_field_resolves);
-   testcase("V10: VarRef to object forwards", test_v10_varref_to_object_forwards);
-   testcase("V11: VarRef to array forwards", test_v11_varref_to_array_forwards);
-   testcase("V12: VarRef in derived object resolves", test_v12_varref_in_derived_object_resolves);
-   testcase("V13: VarRef chain resolves to scalar", test_v13_varref_chain_resolves_to_scalar);
-   testcase("V14: Missing VarRef error at resolve", test_v14_missing_varref_error_at_resolve);
-   testcase("V15: Circular VarRef error at build", test_v15_circular_varref_error_at_build);
-   testcase("V16: Single-ref interpolation", test_v16_single_ref_interpolation);
-   testcase("V17: Multi-ref interpolation", test_v17_multi_ref_interpolation);
-   testcase("V18: Literal-only interpolation", test_v18_literal_only_interpolation);
-   testcase("V19: Escaped braces materialise", test_v19_escaped_braces_materialise);
-   testcase("V20: Missing ref in interpolation", test_v20_missing_ref_in_interpolation);
-}
-__attribute__((constructor)) static void register_test_vars(void) {
-   Tests.enqueue(_register);
+   TestBit.run_ex("V01_empty_vars_block_parses_ok",      NULL, test_v01_empty_vars_block_parses_ok,      NULL);
+   TestBit.run_ex("V02_single_entry_stored",             NULL, test_v02_single_entry_stored,             NULL);
+   TestBit.run_ex("V03_multiple_entries_stored",         NULL, test_v03_multiple_entries_stored,         NULL);
+   TestBit.run_ex("V04_vars_after_statement_is_error",   NULL, test_v04_vars_after_statement_is_error,   NULL);
+   TestBit.run_ex("V05_second_vars_block_is_error",      NULL, test_v05_second_vars_block_is_error,      NULL);
+   TestBit.run_ex("V06_duplicate_key_is_error",          NULL, test_v06_duplicate_key_is_error,          NULL);
+   TestBit.run_ex("V07_vars_as_identifier_is_error",     NULL, test_v07_vars_as_statement_identifier_is_error, NULL);
+   TestBit.run_ex("V08_scalar_varref_resolves",          NULL, test_v08_scalar_varref_resolves,          NULL);
+   TestBit.run_ex("V09_varref_in_object_field_resolves", NULL, test_v09_varref_in_object_field_resolves, NULL);
+   TestBit.run_ex("V10_varref_to_object_forwards",       NULL, test_v10_varref_to_object_forwards,       NULL);
+   TestBit.run_ex("V11_varref_to_array_forwards",        NULL, test_v11_varref_to_array_forwards,        NULL);
+   TestBit.run_ex("V12_varref_in_derived_object_resolves", NULL, test_v12_varref_in_derived_object_resolves, NULL);
+   TestBit.run_ex("V13_varref_chain_resolves_to_scalar", NULL, test_v13_varref_chain_resolves_to_scalar, NULL);
+   TestBit.run_ex("V14_missing_varref_error_at_resolve", NULL, test_v14_missing_varref_error_at_resolve, NULL);
+   TestBit.run_ex("V15_circular_varref_error_at_build",  NULL, test_v15_circular_varref_error_at_build,  NULL);
+   TestBit.run_ex("V16_single_ref_interpolation",        NULL, test_v16_single_ref_interpolation,        NULL);
+   TestBit.run_ex("V17_multi_ref_interpolation",         NULL, test_v17_multi_ref_interpolation,         NULL);
+   TestBit.run_ex("V18_literal_only_interpolation",      NULL, test_v18_literal_only_interpolation,      NULL);
+   TestBit.run_ex("V19_escaped_braces_materialise",      NULL, test_v19_escaped_braces_materialise,      NULL);
+   TestBit.run_ex("V20_missing_ref_in_interpolation",    NULL, test_v20_missing_ref_in_interpolation,    NULL);
+   TestBit.run_ex("V21_braced_dotted_varref_parses",     NULL, test_v21_braced_dotted_varref_parses,     NULL);
+   TestBit.run_ex("V22_unbraced_dotted_varref_parses",   NULL, test_v22_unbraced_dotted_varref_parses,   NULL);
+   TestBit.run_ex("V23_unterminated_braced_varref_error", NULL, test_v23_unterminated_braced_varref_error, NULL);
+   return TestBit.report();
 }

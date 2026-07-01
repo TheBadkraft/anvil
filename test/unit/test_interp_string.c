@@ -207,6 +207,9 @@ static void test_is07_unterminated(void) {
     context ctx = parse_src(src);
 
     TestBit.is_true(Anvil.error_is_set(), "IS07: error is set");
+    TestBit.is_equal_int(ANVL_ERR_VARS_UNTERMINATED_INTERP,
+                         (long long)Anvil.error_get()->code,
+                         "IS07: error is UNTERMINATED_INTERP");
 
     if (ctx) Context.dispose(ctx);
 }
@@ -219,6 +222,9 @@ static void test_is08_invalid_hole(void) {
     context ctx = parse_src(src);
 
     TestBit.is_true(Anvil.error_is_set(), "IS08: error is set for invalid hole");
+    TestBit.is_equal_int(ANVL_ERR_VARS_INVALID_VARREF,
+                         (long long)Anvil.error_get()->code,
+                         "IS08: error is INVALID_VARREF");
 
     if (ctx) Context.dispose(ctx);
 }
