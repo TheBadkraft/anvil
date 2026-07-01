@@ -158,14 +158,15 @@ struct anvl_context_t {
 /* ------------------------------------------------------------------ */
 /* Context Builder Interface                                          */
 /* ------------------------------------------------------------------ */
+typedef struct anvl_ctx_builder_i *ctx_builder;
 typedef struct anvl_ctx_builder_i {
    anvl_dialect dialect;
    source source;
-   void (*set_dialect)(struct anvl_ctx_builder_i *self, anvl_dialect dialect);
-   void (*set_source)(struct anvl_ctx_builder_i *self, const char *source, usize len);
-   bool (*load_file)(struct anvl_ctx_builder_i *self, const char *filepath);
-   context (*build)(struct anvl_ctx_builder_i *self);
-   void (*dispose)(struct anvl_ctx_builder_i *self);
+   void (*set_dialect)(ctx_builder self, anvl_dialect dialect);
+   void (*set_source)(ctx_builder self, const char *source, usize len);
+   bool (*load_file)(ctx_builder self, const char *filepath);
+   context (*build)(ctx_builder self);
+   void (*dispose)(ctx_builder self);
 } anvl_ctx_builder_i;
 extern anvl_ctx_builder_i CtxBuilder;
 
@@ -226,7 +227,7 @@ struct anvl_attr_builder_t {
 /* Context Interface                                                  */
 /* ------------------------------------------------------------------ */
 typedef struct anvl_context_i {
-   struct anvl_ctx_builder_i *(*get_builder)(void);
+   ctx_builder (*get_builder)(void);
    anvl_dialect (*dialect)(context self);
    usize (*statement_count)(context self);
    statement (*get_statement)(context self, usize index);

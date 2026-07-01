@@ -3,6 +3,24 @@
 
 ---
 
+## Preface
+
+> Anvil is a structured information language designed around the idea that data should have shape before it has meaning.
+>
+> Most data formats are either too loose — JSON and YAML treat everything as stringly-typed bags of values with no inherent semantic contract — or too rigid, requiring schema compilation, code generation, or external tooling just to read a document. Anvil occupies a different position: it enforces structure at the syntax level without prescribing what that structure means to the consumer.
+>
+> At its core, Anvil is a declaration language. Every construct is a named assertion — a statement that something exists, has a type, carries attributes, and relates to other things. The parser doesn't interpret; it organizes. The meaning flows from the consumer's domain, not from the format itself. This makes Anvil unusually composable — the same document can serve as a configuration file, a schema definition, a UI binding, a data transport payload, or a communication protocol frame, depending solely on who reads it and what they expect.
+>
+> The type system is structural rather than nominal. Scalars, arrays, tuples, objects, blobs, variable references, and interpolated strings cover the full range of value representation without requiring type annotations. The distinction between a tuple and an array isn't academic — it encodes a contract about cardinality and positional meaning that a generic list cannot express. Attributes on statements and fields carry metadata without polluting the value space.
+>
+> The zero-copy, bump-arena parser model reflects a deeper principle: Anvil treats the source document as immutable truth. Nothing is transformed at parse time. Spans into the original buffer are the data. This makes Anvil appropriate for constrained environments — embedded systems, network edge nodes, mobile devices — where allocation cost and memory pressure are real constraints, not theoretical concerns.
+>
+> The dialect system — AML, ASL, AMP — means a single parser handles documents ranging from full-featured configuration to wire-protocol payloads, with the document itself declaring its own interpretation rules via the shebang. The format is self-describing at the structural level without requiring an external registry.
+>
+> What Anvil is, fundamentally, is a precision instrument for expressing relationships between named things — lightweight enough to live on the wire, rich enough to model complex domains, and honest enough to reject ambiguity at the point of authorship rather than silently passing it to the consumer.
+
+---
+
 ## Overview
 
 The Anvil C library (`libanvil` / `anvil.o`) exposes a vtable-based interface. Every

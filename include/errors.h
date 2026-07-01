@@ -76,38 +76,39 @@ typedef enum {
    ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY = 4013,
    ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE = 4014,
    ANVL_ERR_ANON_BLOCK_REDECLARATION = 4015,
+   ANVL_ERR_PARSER_UNTERMINATED_COMMENT = 4016,
 
    // Resolver Errors (405x)
    ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050,
    ANVL_ERR_RESOLVER_MISSING_BASE = 4051,
    ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS = 4052,
 
-   // Vars Errors (410x)
+   // Vars Errors (41xx)
    ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101,
    ANVL_ERR_VARS_NOT_FIRST = 4102,
    ANVL_ERR_VARS_DUPLICATE_KEY = 4103,
    ANVL_ERR_VARS_CIRCULAR_REF = 4104,
    ANVL_ERR_VARS_KEY_NOT_FOUND = 4105,
 
-   // Import Errors (420x)
+   // Import Errors (42xx)
    ANVL_ERR_IMPORT_NOT_FIRST = 4201,
    ANVL_ERR_IMPORT_AMP_FORBIDDEN = 4202,
    ANVL_ERR_IMPORT_DUPLICATE_ALIAS = 4203,
    ANVL_ERR_IMPORT_FILE_NOT_FOUND = 4204,
    ANVL_ERR_IMPORT_CYCLIC = 4206,
 
-   // Using Errors (430x)
+   // Using Errors (43xx)
    ANVL_ERR_USING_MODULE_NOT_FOUND = 4305,
    ANVL_ERR_USING_IN_AMP = 4306,
    ANVL_ERR_USING_AFTER_STATEMENTS = 4307,
 
-   // AMP Dialect Errors (440x)
+   // AMP Dialect Errors (44xx)
    ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401,
 
-   // Serializer Errors (450x)
+   // Serializer Errors (45xx)
    ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED = 4501,
 
-   // Schema Errors (460x)
+   // Schema Errors (46xx)
    ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,             // document lacks the required @[schema] module attribute
    ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602,          // schema field references an undefined type name
    ANVL_ERR_SCHEMA_BASE_UNKNOWN = 4603,             // schema statement base is not 'enum', 'flags', or a known type
@@ -115,7 +116,7 @@ typedef enum {
    ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH = 4605, // data field value type does not match schema field type
    ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD = 4606, // data field not declared in schema type (strict mode)
 
-   // Lexer/Scanner Errors (500x)
+   // Lexer/Scanner Errors (50xx)
    ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,
    ANVL_ERR_PARSER_UNTERMINATED_STRING = 5002,
    ANVL_ERR_PARSER_UNTERMINATED_BLOB = 5003,
@@ -129,21 +130,21 @@ typedef enum {
    ANVL_ERR_VARS_UNTERMINATED_INTERP = 5011,        // $"…{ref" missing closing '}'
    ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF = 5012, // '${' missing closing '}'
 
-   // ASL Errors (510x)
+   // ASL Errors (51xx)
    ANVL_ERR_ASL_PARSE_ERROR = 5101,           // ASL script parse failure
    ANVL_ERR_ASL_RUNTIME_ERROR = 5102,         // ASL runtime failure
    ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED = 5103,   // call depth limit exceeded
    ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP = 5104,    // break outside loop
    ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
 
-   // I/O Errors (600x)
+   // I/O Errors (60xx)
    ANVL_ERR_IO_FILE_NOT_FOUND = 6001,
    ANVL_ERR_IO_READ_FAILED = 6002,
 
-   // Memory Errors (700x)
+   // Memory Errors (70xx)
    ANVL_ERR_MEMORY_ALLOCATION_FAILED = 7001,
 
-   // Generic Errors (900x)
+   // Generic Errors (90xx)
    ANVL_ERR_INVALID_OPERATION = 9001,
    ANVL_ERR_INVALID_ARGUMENT = 9002,
 } anvl_error_code;

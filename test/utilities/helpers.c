@@ -24,7 +24,7 @@ const char *get_anvl_path(const char *name) {
 
 const char *get_source_path(const char *name) {
    static char path_buffer[512] = {0};
-   snprintf(path_buffer, sizeof(path_buffer), "test/samples/%s", name);
+   snprintf(path_buffer, sizeof(path_buffer), "../samples/%s", name);
    return path_buffer;
 }
 
