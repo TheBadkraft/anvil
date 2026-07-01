@@ -3,8 +3,8 @@
 
 ---
 
-## Preface
-
+> **Preface**
+>
 > Anvil is a structured information language designed around the idea that data should have shape before it has meaning.
 >
 > Most data formats are either too loose — JSON and YAML treat everything as stringly-typed bags of values with no inherent semantic contract — or too rigid, requiring schema compilation, code generation, or external tooling just to read a document. Anvil occupies a different position: it enforces structure at the syntax level without prescribing what that structure means to the consumer.
