@@ -782,6 +782,50 @@ Schema.ruleset_free(rules);
 
 ---
 
+### FlyWire Pipeline (Current C Support)
+
+For FlyWire, the current C schema stack already supports the core validation flow:
+
+1. Parse and resolve one `.asch` schema into a reusable `anvl_schema_ruleset_t`.
+2. Parse each data document (`.aml` / `.anvl`) and validate against that ruleset.
+3. Collect per-file errors from `anvl_schema_result_t` and surface them in your pipeline output.
+
+```c
+static bool validate_one(anvl_schema_ruleset_t *rules, const char *file_path) {
+    ctx_builder b = Context.get_builder();
+    if (!b->load_file(b, file_path))
+        return false;
+
+    context data_ctx = b->build(b);
+    if (!data_ctx || !Context.parse(data_ctx)) {
+        Context.dispose(data_ctx);
+        return false;
+    }
+
+    anvl_schema_result_t *r = Schema.validate(rules, data_ctx, file_path);
+    bool ok = (r && r->is_valid);
+
+    if (r && !r->is_valid) {
+        for (int i = 0; i < r->error_count; i++) {
+            fprintf(stderr, "%s: [%d] %s\n",
+                    file_path,
+                    r->errors[i].code,
+                    r->errors[i].message);
+        }
+    }
+
+    Schema.result_free(r);
+    Context.dispose(data_ctx);
+    return ok;
+}
+```
+
+Current boundary notes:
+- Schema core support is shipped and tested.
+- The roadmap FlyWire milestone is about formalized pipeline tooling/workflow layers, not missing base schema primitives.
+
+---
+
 ---
 
 ## Building (Standalone — Zero External Dependencies)

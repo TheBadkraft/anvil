@@ -183,6 +183,8 @@ One language. One parser. Three dialects — activated by shebang on the first l
 - `@[schema]` module attribute triggers schema context (detected by schema module, not parser)
 - Multi-error validation: collects all errors before returning
 - Error codes: 4601–4606 (missing attr, unknown base, required field, type mismatch, etc.)
+- FlyWire-ready core is available now: `Schema.resolve`, `Schema.get_type`, and `Schema.validate` are shipped and tested in active C suites
+- Roadmap item `0.6.0-alpha` refers to formal FlyWire pipeline tooling (packaging/workflow/deep integration), not first-time schema availability
 
 ### Vars (anvil.vars.o)
 - `Vars.build()` — resolves VarRef chains, detects circular references
