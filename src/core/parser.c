@@ -65,7 +65,8 @@ bool anvl_parse(context ctx) {
        .src = ctx->source,
    };
 
-   return parse_source(&p);
+   bool result = parse_source(&p);
+   return result;
 }
 
 static void parser_error(anvl_error_code code, source s) {
@@ -85,6 +86,7 @@ static void dispose_statement(statement stmt) {
 
 static bool parse_source(parser_ctx *p) {
    si_skip_whitespace_and_comments(p->src);
+   if (Anvil.error_is_set()) return false;
 
    // import declarations — must precede module attributes, vars, and all statements
    // import is not allowed in AMP dialect
@@ -97,6 +99,7 @@ static bool parse_source(parser_ctx *p) {
       if (!parse_import_decl(p))
          return false;
       si_skip_whitespace_and_comments(p->src);
+      if (Anvil.error_is_set()) return false;
    }
 
    // using declarations — must precede module attributes, vars, and statements
@@ -117,6 +120,7 @@ static bool parse_source(parser_ctx *p) {
       if (!parse_using_decl(p))
          return false;
       si_skip_whitespace_and_comments(p->src);
+      if (Anvil.error_is_set()) return false;
    }
 
    // Module attributes (prefix only)
@@ -131,6 +135,7 @@ static bool parse_source(parser_ctx *p) {
       if (!parse_attribute_block(p, NULL, NULL))
          return false;
       si_skip_whitespace_and_comments(p->src);
+      if (Anvil.error_is_set()) return false;
    }
 
    // vars block must come before all statements (optional; at most one)
@@ -149,6 +154,7 @@ static bool parse_source(parser_ctx *p) {
          if (!parse_vars_block(p))
             return false;
          si_skip_whitespace_and_comments(p->src);
+         if (Anvil.error_is_set()) return false;
       }
    }
 
@@ -207,9 +213,11 @@ static bool parse_source(parser_ctx *p) {
 
       ci_add_statement(p->ctx, stmt);
       si_skip_whitespace_and_comments(p->src);
+      if (Anvil.error_is_set()) return false;
    }
 
    si_skip_whitespace_and_comments(p->src);
+   if (Anvil.error_is_set()) return false;
    if (si_match_length(p->src, "@[", 2) == 2) {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_MODULE_ATTRIBUTES, p->src);
       return false;
@@ -222,6 +230,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    source s = p->src;
 
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Parse identifier (field name)
    usize ident_pos = 0, ident_len = 0;
@@ -246,6 +255,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    }
 
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Parse optional inheritance base FIRST (before attributes)
    // Check for ':' that is NOT part of ':=' (assignment operator)
@@ -259,6 +269,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       }
       si_consume(s, 1);
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
       if (!read_identifier(p, &base_pos, &base_len))
          return false;
       // Allocate base_meta and store inheritance information
@@ -270,6 +282,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       base_meta->pos = base_pos;
       base_meta->len = base_len;
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
    }
 
    // Parse optional attributes (only valid on complex types, validated after parsing value)
@@ -284,6 +297,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
       if (!parse_attribute_block(p, NULL, NULL))
          return false;
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
    }
    usize attrib_count = p->ctx->attr_list.count - attrib_start;
    if (attrib_count > 0) {
@@ -319,6 +333,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    }
    si_consume(s, 2);
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Track value position and parse value
    usize value_start_pos = si_position(s);
@@ -410,6 +425,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    // The arena owns val; no individual free needed.
 
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
+
    if (si_match_length(s, ",", 1) == 1) {
       si_consume(s, 1);
    }
@@ -600,7 +617,8 @@ static value parse_object(parser_ctx *p) {
 
    si_consume(s, 1); // consume '{'
    si_skip_whitespace_and_comments(s);
-
+   if (Anvil.error_is_set()) return NULL;
+   
    if (si_peek(s) == '}') {
       parser_error(ANVL_ERR_PARSER_EMPTY_OBJECT_NOT_ALLOWED, s);
       return NULL;
@@ -632,6 +650,7 @@ static value parse_object(parser_ctx *p) {
       }
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return NULL;
 
       usize attrib_start = p->ctx->attr_list.count;
       while (si_match_length(s, "@[", 2) == 2) {
@@ -640,6 +659,7 @@ static value parse_object(parser_ctx *p) {
             return NULL;
          }
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return NULL;
       }
       usize attrib_count = p->ctx->attr_list.count - attrib_start;
 
@@ -650,6 +670,7 @@ static value parse_object(parser_ctx *p) {
       }
       si_consume(s, 2);
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return NULL;
 
       value field_val = parse_value(p);
       if (!field_val) {
@@ -677,9 +698,12 @@ static value parse_object(parser_ctx *p) {
       field_count++;
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return NULL;
+
       if (si_match_length(s, ",", 1) == 1) {
          si_consume(s, 1);
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return NULL;
       } else if (si_match_length(s, "}", 1) == 1) {
          break;
       }
@@ -712,6 +736,7 @@ static value parse_array(parser_ctx *p) {
 
    si_consume(s, 1); // consume '['
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return NULL;
 
    if (si_peek(s) == ']') {
       parser_error(ANVL_ERR_PARSER_EMPTY_ARRAY_NOT_ALLOWED, s);
@@ -775,9 +800,12 @@ static value parse_array(parser_ctx *p) {
       element_count++;
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return NULL;
+
       if (si_match_length(s, ",", 1) == 1) {
          si_consume(s, 1);
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return NULL;
       } else if (si_match_length(s, "]", 1) == 1) {
          break;
       } else {
@@ -804,6 +832,8 @@ static value parse_tuple(parser_ctx *p) {
 
    si_consume(s, 1); // consume '('
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return NULL;
+
    // invalidate the empty tuple case
    if (si_peek(s) == ')') {
       parser_error(ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED, s);
@@ -867,9 +897,12 @@ static value parse_tuple(parser_ctx *p) {
       element_count++;
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return NULL;
+
       if (si_match_length(s, ",", 1) == 1) {
          si_consume(s, 1);
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return NULL;
       } else if (si_peek(s) == ')') {
          break;
       } else {
@@ -957,6 +990,7 @@ static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_co
    source s = p->src;
    si_consume(s, 2); // consume "@["
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    if (si_match_length(s, "]", 1) == 1) {
       parser_error(ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK, s);
@@ -979,9 +1013,13 @@ static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_co
 
       usize value_pos = 0, value_len = 0;
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
       if (si_match_length(s, "=", 1) == 1) {
          si_consume(s, 1);
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return false;
+
          value_pos = si_position(s);
          anvl_value_type vt;
          if (!parse_scalar_value(p, &value_pos, &value_len, &vt))
@@ -1004,6 +1042,8 @@ static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_co
       ci_add_attribute(p->ctx, attr);
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
       if (si_match_length(s, "]", 1) == 1) {
          si_consume(s, 1);
          break;
@@ -1014,6 +1054,7 @@ static bool parse_attribute_block(parser_ctx *p, usize *out_start, usize *out_co
       }
       si_consume(s, 1);
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
    }
 
    if (out_start)
@@ -1133,6 +1174,7 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    }
 
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Optional @[...] attribute blocks (decoration is optional)
    usize attrib_start = p->ctx->attr_list.count;
@@ -1140,6 +1182,7 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
       if (!parse_attribute_block(p, NULL, NULL))
          return false;
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
    }
    usize attrib_count = p->ctx->attr_list.count - attrib_start;
    struct anvl_attr_meta *attr_meta = NULL;
@@ -1200,6 +1243,8 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    stmt->value_meta = value_meta;
 
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
+
    if (si_match_length(s, ",", 1) == 1)
       si_consume(s, 1);
 
@@ -1224,6 +1269,7 @@ static bool parse_vars_block(parser_ctx *p) {
 
    si_consume(s, 4); // consume "vars"
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    if (si_match_length(s, "{", 1) != 1) {
       parser_error(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, s);
@@ -1241,6 +1287,7 @@ static bool parse_vars_block(parser_ctx *p) {
          return false;
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
 
       // Check for duplicate key
       const char *src_data = si_data(s);
@@ -1260,6 +1307,7 @@ static bool parse_vars_block(parser_ctx *p) {
       }
       si_consume(s, 2);
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
 
       // Parse value
       usize value_start = si_position(s);
@@ -1295,9 +1343,12 @@ static bool parse_vars_block(parser_ctx *p) {
       // val lives in the arena; no individual free needed.
 
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
       if (si_match_length(s, ",", 1) == 1) {
          si_consume(s, 1);
          si_skip_whitespace_and_comments(s);
+         if (Anvil.error_is_set()) return false;
       }
    }
 
@@ -1323,6 +1374,7 @@ static bool parse_import_decl(parser_ctx *p) {
    source s = p->src;
    si_consume(s, 6); // consume "import"
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Expect opening '"'
    if (si_peek(s) != '"') {
@@ -1354,6 +1406,7 @@ static bool parse_import_decl(parser_ctx *p) {
    }
    si_consume(s, 1); // closing '"'
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    // Optional:  as <alias>
    usize alias_pos = 0;
@@ -1362,6 +1415,8 @@ static bool parse_import_decl(parser_ctx *p) {
        !Source.is_identifier_part(si_peek_offset(s, 2))) {
       si_consume(s, 2); // consume "as"
       si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
       if (!Source.is_identifier_start(si_peek(s))) {
          parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);
          return false;
@@ -1393,6 +1448,7 @@ static bool parse_using_decl(parser_ctx *p) {
    source s = p->src;
    si_consume(s, 5); // consume "using"
    si_skip_whitespace_and_comments(s);
+   if (Anvil.error_is_set()) return false;
 
    if (!Source.is_identifier_start(si_peek(s))) {
       parser_error(ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, s);

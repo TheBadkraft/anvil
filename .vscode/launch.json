@@ -5,10 +5,10 @@
             "name": "Debug active test (make: build active test)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/test/${fileBasenameNoExtension}",
+            "program": "${workspaceFolder}/test/unit/bin/${fileBasenameNoExtension}",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/test/unit",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -20,30 +20,7 @@
                 }
             ],
             "miDebuggerPath": "/usr/bin/gdb",
-            "preLaunchTask": "gcc: link active test"
-        },
-        {
-            "name": "Debug CLI",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/anvil",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "preLaunchTask": "Build CLI"
-        },
-        {
-            "name": "Debug test_parser",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/test_parser",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb"
+            "preLaunchTask": "link active test"
         }
     ]
 }

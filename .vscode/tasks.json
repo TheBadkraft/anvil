@@ -10,157 +10,34 @@
     ],
     "tasks": [
         {
-            "label": "cpkg: anvil",
+            "label": "link active test",
             "type": "shell",
-            "command": "cpkg anvil && sudo cp package/anvil.o /usr/local/packages/anvil.o",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "cbuild: lib",
-            "type": "shell",
-            "command": "cbuild",
+            "command": "gcc",
             "args": [
-                "lib"
+                "-Wall", "-Wextra", "-g", "-std=c2x",
+                "-I../../include",
+                "-I../../../testbit/include",
+                "-D_POSIX_C_SOURCE=200809L",
+                "-DANVL_BUILD=0",
+                "${fileBasename}",
+                "../../src/core/anvil.c",
+                "../../src/core/context.c",
+                "../../src/core/errors.c",
+                "../../src/core/memory.c",
+                "../../src/core/parser.c",
+                "../../src/core/strings.c",
+                "../../src/utilities/utils.c",
+                "../../../testbit/src/testbit.c",
+                "-o", "bin/${fileBasenameNoExtension}"
             ],
+            "options": {
+                "cwd": "${workspaceFolder}/test/unit"
+            },
+            "problemMatcher": "$msCompile",
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": "$gcc"
-        },
-        {
-            "label": "cbuild: compile",
-            "type": "shell",
-            "command": "cbuild",
-            "args": [
-                "compile"
-            ],
-            "group": "build",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": "$gcc"
-        },
-        {
-            "label": "cbuild: clean",
-            "type": "shell",
-            "command": "cbuild",
-            "args": [
-                "clean"
-            ],
-            "presentation": {
-                "reveal": "silent",
-                "panel": "shared"
             }
-        },
-        {
-            "label": "cbuild: clean_all",
-            "type": "shell",
-            "command": "cbuild",
-            "args": [
-                "clean_all"
-            ],
-            "presentation": {
-                "reveal": "silent",
-                "panel": "shared"
-            }
-        },
-        {
-            "label": "rtest: prompt",
-            "type": "shell",
-            "command": "./rtest",
-            "args": [
-                "${input:testPath}"
-            ],
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "dependsOn": [
-                "cbuild: lib"
-            ]
-        },
-        {
-            "label": "rtest: unit",
-            "type": "shell",
-            "command": "./rtest",
-            "args": [
-                "unit"
-            ],
-            "group": "test",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "dependsOn": [
-                "cbuild: lib"
-            ]
-        },
-        {
-            "label": "rtest: performance",
-            "type": "shell",
-            "command": "./rtest",
-            "args": [
-                "performance"
-            ],
-            "group": "test",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "dependsOn": [
-                "cbuild: lib"
-            ]
-        },
-        {
-            "label": "rtest: active test",
-            "type": "shell",
-            "command": "bash",
-            "args": [
-                "-c",
-                "name=$(basename '${fileBasenameNoExtension}' | sed 's/^test_//'); subdir=$(dirname '${relativeFile}' | sed 's|^test/||;s|/.*||'); ./rtest ${subdir}/${name}"
-            ],
-            "group": "test",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "dependsOn": [
-                "cbuild: lib"
-            ]
-        },
-        {
-            "label": "rtest: active test (valgrind)",
-            "type": "shell",
-            "command": "bash",
-            "args": [
-                "-c",
-                "name=$(basename '${fileBasenameNoExtension}' | sed 's/^test_//'); subdir=$(dirname '${relativeFile}' | sed 's|^test/||;s|/.*||'); ./rtest ${subdir}/${name} --valgrind"
-            ],
-            "group": "test",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "dependsOn": [
-                "cbuild: lib"
-            ]
         }
     ]
 }

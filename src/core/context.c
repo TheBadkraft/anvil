@@ -76,7 +76,7 @@ void value_builder_element(value_builder self, value val);
 void value_builder_end_array(value_builder self);
 void value_builder_scalar(value_builder self, usize pos, usize len, anvl_value_type type);
 
-static bool builder_load_file(struct anvl_ctx_builder_i *self, const char *filepath) {
+static bool builder_load_file(ctx_builder self, const char *filepath) {
    // Load file content
    const char *data;
    usize len;
@@ -101,8 +101,8 @@ static bool builder_load_file(struct anvl_ctx_builder_i *self, const char *filep
    return true;
 }
 
-static anvl_ctx_builder_i *context_get_builder(void) {
-   return (anvl_ctx_builder_i *)&CtxBuilder; // return the global builder interface
+ctx_builder context_get_builder(void) {
+   return (ctx_builder)&CtxBuilder; // return the global builder interface
 }
 
 static anvl_dialect context_dialect(context self) {
@@ -822,10 +822,10 @@ const struct anvl_statement_i Statement = {
     .value_type = statement_value_type,
     .length = statement_length,
 };
-static void builder_set_dialect(struct anvl_ctx_builder_i *self, anvl_dialect dialect) {
+static void builder_set_dialect(ctx_builder self, anvl_dialect dialect) {
    self->dialect = dialect;
 }
-static void builder_set_source(struct anvl_ctx_builder_i *self, const char *data, usize len) {
+static void builder_set_source(ctx_builder self, const char *data, usize len) {
    // dispose existing source if any
    if (self->source) {
       Source.dispose(self->source);
@@ -833,7 +833,7 @@ static void builder_set_source(struct anvl_ctx_builder_i *self, const char *data
    // create new source
    self->source = Source.create(data, len);
 }
-static context builder_build(struct anvl_ctx_builder_i *self) {
+static context builder_build(ctx_builder self) {
    context ctx = Allocator.alloc(sizeof(struct anvl_context_t));
    if (ctx)
       memset(ctx, 0, sizeof(struct anvl_context_t));
@@ -874,7 +874,7 @@ static context builder_build(struct anvl_ctx_builder_i *self) {
 
    return ctx;
 }
-static void builder_dispose(struct anvl_ctx_builder_i *self) {
+static void builder_dispose(ctx_builder self) {
    if (self->source) {
       Source.dispose(self->source);
    }
@@ -982,10 +982,16 @@ static source source_create(const char *data, usize len) {
    src->col = 1;
 
    if (data && len > 0) {
-      source_consume(src, source_skip_whitespace_and_comments(src));
+      usize skipped = source_skip_whitespace_and_comments(src);
+      if (!anvl_error_is_set()) {
+         source_consume(src, skipped);
+      }
       if (source_is_shebang(src)) {
          src->dialect = source_parse_dialect(src, src->dialect);
-         source_consume(src, source_skip_whitespace_and_comments(src));
+         skipped = source_skip_whitespace_and_comments(src);
+         if (!anvl_error_is_set()) {
+            source_consume(src, skipped);
+         }
          if (source_is_shebang(src)) {
             anvl_error_set(ANVL_ERR_PARSER_MULTIPLE_SHEBANG, "Multiple shebangs not allowed", src->line, src->col, NULL);
             free(src->buffer.bucket);
@@ -993,7 +999,10 @@ static source source_create(const char *data, usize len) {
             return NULL;
          }
       }
-      source_consume(src, source_skip_whitespace_and_comments(src));
+      skipped = source_skip_whitespace_and_comments(src);
+      if (!anvl_error_is_set()) {
+         source_consume(src, skipped);
+      }
    }
 
    return src;
@@ -1141,6 +1150,12 @@ static usize source_scan_block_comment(source self, usize offset) {
          pos++;
          c = source_peek_offset(self, pos);
       }
+      if (c == '\0') {
+         anvl_error_code code = ANVL_ERR_PARSER_UNTERMINATED_COMMENT;
+         anvl_error_set(code, anvl_error_code_message(code), source_line(self), source_column(self), __FILE__);
+         
+         return pos;
+      }
       if (c != '\0') {
          pos += 2;
       }
@@ -1158,6 +1173,9 @@ static usize source_skip_whitespace_and_comments(source self) {
       pos = source_scan_whitespace(self, pos);
       pos = source_scan_line_comment(self, pos);
       pos = source_scan_block_comment(self, pos);
+      // check if error state is set
+      if (Anvil.error_is_set()) { return pos; }
+
       changed = (pos != old_pos);
    }
 
@@ -1174,7 +1192,10 @@ static bool source_is_shebang(source self) {
 }
 
 static anvl_dialect source_parse_dialect(source self, anvl_dialect current) {
-   source_consume(self, source_skip_whitespace_and_comments(self));
+   usize skipped = source_skip_whitespace_and_comments(self);
+   if (!anvl_error_is_set()) {
+      source_consume(self, skipped);
+   }
    if (source_is_shebang(self)) {
       source_consume(self, 2);
 
