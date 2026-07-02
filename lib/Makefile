@@ -42,13 +42,16 @@ DEBUG_LIB_SO  := debug/libanvil.so
 RELEASE_LIB_A := release/libanvil.a
 RELEASE_LIB_SO:= release/libanvil.so
 
-.PHONY: all debug release clean
+.PHONY: all debug release bindings clean
 
-all: debug
+all: debug bindings
 
 debug: $(DEBUG_LIB_A) $(DEBUG_LIB_SO)
 
 release: $(RELEASE_LIB_A) $(RELEASE_LIB_SO)
+
+bindings:
+	$(MAKE) -C ../bindings generate
 
 $(DEBUG_LIB_A): $(DEBUG_OBJS)
 	$(AR) $(ARFLAGS) $@ $^

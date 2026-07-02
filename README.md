@@ -3,14 +3,7 @@
 
 **Private Repository · Reference Implementation in Pure C**
 
-```text
-          █████╗ ███╗   ██╗██╗   ██╗██╗██╗     
-         ██╔══██╗████╗  ██║██║   ██║██║██║     
-         ███████║██╔██╗ ██║██║   ██║██║██║     
-         ██╔══██║██║╚██╗██║╚██╗ ██╔╝██║██║     
-         ██║  ██║██║ ╚████║ ╚████╔╝ ██║███████╗
-         ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚══════╝
-```
+![ANVL Wordmark](docs/images/anvl_wordmark.png)
 
 **A**ttributed **N**ode **V**ariadic **L**anguage
 
@@ -104,10 +97,21 @@ anvil/
 │   └── asl/                 ← anvil.asl.o      — AnvilScript parser + evaluator
 ├── test/
 │   └── unit/                ← TestBit-based unit tests (active quality gate)
+├── bindings/
+│   ├── node/                ← official Node/N-API binding workspace
+│   ├── python/              ← official Python binding workspace
+│   ├── dotnet/              ← official .NET binding workspace
+│   ├── scripts/             ← shared binding maintenance/handoff scripts
+│   └── Makefile             ← bindings generation/signoff orchestration
 ├── docs/                    ← language spec, AMP guide, schema authoring
 ├── config.sh                ← bash build configuration
 └── README.md
 ```
+
+Bindings maintenance policy and sign-off checklist:
+
+- `docs/maintainers/bindings-maintenance.md`
+- `docs/maintainers/bindings-signoff-checklist.md`
 
 ## Module Architecture
 

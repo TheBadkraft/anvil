@@ -1,0 +1,58 @@
+{
+  "generated_at_utc": "2026-07-02T01:25:09.175525+00:00",
+  "repo_root": "/root/projects/anvil",
+  "git_rev": "7a2b32841ec3c3cd03a2791af33c8bd118ea4687",
+  "version": {
+    "major": "0",
+    "minor": "5",
+    "patch": "4",
+    "tag": "alpha",
+    "str": "0.5.4-alpha"
+  },
+  "files": {
+    "include/anvil.h": {
+      "exists": true,
+      "sha256": "d814886c83c92bd594baebec91bf7582b1d54d70c7ca13ae384477f293922859"
+    },
+    "include/context.h": {
+      "exists": true,
+      "sha256": "379c524377e6e61321f4d207f14fb7d31e8449380ab1915ad538a302edfbc60b"
+    },
+    "include/resolver.h": {
+      "exists": true,
+      "sha256": "4310cb19d0beae7253090d2e36f4bee83b30445ba4d32e296bacf4492203bd86"
+    },
+    "include/schema.h": {
+      "exists": true,
+      "sha256": "ac931c9b482169be1f1546e89b0469522ece310df890e262508cf34207d7119a"
+    },
+    "include/vars.h": {
+      "exists": true,
+      "sha256": "264d1ab0df5b4f3a3e02a56e497b5d112bf70f9a71db1fba2da9a731629bb7eb"
+    },
+    "include/constants.h": {
+      "exists": true,
+      "sha256": "6e4c0ef8a56fb378262e2033beeed3f973669d4f2132d8f459e229df22e8e51e"
+    },
+    "docs/bindings-api-reference.md": {
+      "exists": true,
+      "sha256": "c9bb6726af61b735596e717f120bb4bad494ab8c667d16cdc8cfc2769159bafb"
+    },
+    "docs/Anvil C Users Guide.md": {
+      "exists": true,
+      "sha256": "577021eef66025e7f7e905cc06bf645b85420e81cc5b40eef560635979345e36"
+    },
+    "docs/changelog.md": {
+      "exists": true,
+      "sha256": "d396dc1d8c5aed9929e3bacaccee92bc3a4b61902360e6cc022241cfbd5e925e"
+    },
+    "README.md": {
+      "exists": true,
+      "sha256": "54a0405182a23f32ba22e3ba4fb90ef088d3a630c12ff1ca77414def54f47d57"
+    }
+  },
+  "notes": [
+    "Use docs/maintainers/bindings-signoff-checklist.md before release.",
+    "If build/version changes, update docs/Anvil C Users Guide.md and docs/changelog.md."
+  ]
+}

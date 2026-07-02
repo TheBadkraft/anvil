@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test coverage: vars parser edge-cases** (`test/unit/test_vars.c`) — added V21–V23 TestBit checks for braced dotted VarRef parsing, unbraced dotted VarRef parsing, and dedicated unterminated braced VarRef parser error.
 - **Test coverage: interpolation error-code assertions** (`test/unit/test_interp_string.c`) — IS07 and IS08 now assert exact parser error codes (`ANVL_ERR_VARS_UNTERMINATED_INTERP`, `ANVL_ERR_VARS_INVALID_VARREF`) instead of only checking generic error presence.
 - **Make ergonomics (active suite targets)** (`test/unit/Makefile`) — added explicit convenience targets for `test_interp_string`, `test_using`, `test_anon_block_attrs`, and `test_schema` and wired `test_vars` into active aggregate/release/valgrind flows.
+- **Official bindings workspace scaffold** (`bindings/`) — added `bindings/Makefile` orchestration, official workspace layout (`node`, `python`, `dotnet`), and shared handoff script (`bindings/scripts/handoff_manifest.py`) that emits `bindings/.handoff/binding-handoff.json`.
+- **Pinned maintainership docs** (`docs/maintainers/`) — added `bindings-maintenance.md` and `bindings-signoff-checklist.md` for maintainers, contributors, and binding teams.
 
 ### Fixed
 
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Docs consistency refresh** (`README.md`, `docs/parser-architecture.md`, `docs/reference.md`, `docs/test-gaps.md`, `docs/Anvil.Net Users Guide.md`) — aligned ASL status/roadmap wording with current implementation, replaced stale Sigma.Test references with TestBit framing for active suites, refreshed vars suite count in test-gaps, and clarified binding-specific var-ref syntax context.
+- **Build orchestration split by concern** (`lib/Makefile`, `bindings/Makefile`) — core library build now triggers official bindings generation via a dedicated bindings Makefile instead of growing a monolithic root build script.
 
 ---
 

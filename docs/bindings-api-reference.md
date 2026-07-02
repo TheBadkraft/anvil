@@ -1,5 +1,11 @@
 # Anvil — Public API Bindings Reference
-**v0.5.0-alpha · For binding authors and N-API implementors**
+**v0.5.4-alpha · For binding authors and N-API implementors**
+
+> Pinned maintenance note:
+> Official bindings live under `bindings/*/` in this repository.
+> Maintenance policy: `docs/maintainers/bindings-maintenance.md`
+> Sign-off checklist: `docs/maintainers/bindings-signoff-checklist.md`
+> Handoff manifest: `make -C bindings contract` → `bindings/.handoff/binding-handoff.json`
 
 This document defines the complete public API surface exposed by the Anvil C library,
 the N-API contract between the C layer and JavaScript, and JavaScript usage examples.
@@ -33,6 +39,7 @@ typedef struct anvl_i {
     bool  (*error_is_set)(void);
     const anvl_error_state *(*error_get)(void);
     void  (*error_clear)(void);
+    const char *(*get_version)(void);
 } anvl_i;
 ```
 
@@ -45,6 +52,7 @@ typedef struct anvl_i {
 | `error_is_set()` | True if a parse error occurred |
 | `error_get()` | Returns current error state (code, message, line, column) |
 | `error_clear()` | Reset error state |
+| `get_version()` | Return runtime version string (`major.minor.patch+build-tag`) |
 
 ### 1.2 `Context` — Document context
 
@@ -53,7 +61,7 @@ typedef struct anvl_i {
 extern const anvl_context_i Context;
 
 typedef struct anvl_context_i {
-    anvl_ctx_builder_i *(*get_builder)(void);
+    ctx_builder          (*get_builder)(void);
     anvl_dialect        (*dialect)         (context self);
     usize               (*statement_count) (context self);
     statement           (*get_statement)   (context self, usize index);
@@ -106,7 +114,7 @@ typedef struct anvl_statement_i {
 ```c
 typedef enum {
     ANVL_STMT_ASSN,    // key := value
-    ANVL_STMT_FUNC,    // function (AnvilScript, Phase II)
+    ANVL_STMT_FUNC,    // function (AnvilScript)
     ANVL_STMT_MSSG,    // message (AMP, future)
     ANVL_ANON_OBJECT   // key { … } — read-only anonymous block
 } anvl_stmt_type;
@@ -181,7 +189,7 @@ struct anvl_element_meta {
 ```c
 typedef enum {
     ANVL_DIALECT_AML,    // #!aml — declarative data
-    ANVL_DIALECT_ASL,    // #!asl — scripting (Phase II)
+    ANVL_DIALECT_ASL,    // #!asl — scripting (implemented alpha)
     ANVL_DIALECT_AMP,    // #!amp — messaging
     ANVL_DIALECT_AURORA  // generic
 } anvl_dialect;
@@ -342,7 +350,7 @@ NAPI_MODULE_INIT() {
     "target_name": "n-anvl-binder",
     "sources": [
       "src/binder.c",
-      "../anvil/src/core/anvil_impl.c",
+    "../anvil/src/core/anvil.c",
       "../anvil/src/core/context.c",
       "../anvil/src/core/errors.c",
       "../anvil/src/core/memory.c",
@@ -355,7 +363,7 @@ NAPI_MODULE_INIT() {
     "include_dirs": [
       "../anvil/include"
     ],
-    "cflags": ["-std=c11", "-Wall", "-Wextra"]
+        "cflags": ["-std=c2x", "-Wall", "-Wextra"]
   }]
 }
 ```

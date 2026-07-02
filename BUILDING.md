@@ -1,155 +1,102 @@
-# Bash Build System (BBS) v0.2.0 — Anvil
+# Building Anvil (Current Repo Workflow)
 
-A Makefile-free build system using `cbuild` (in PATH) and a local `config.sh`. Sources and test structure mirror the Sigma ecosystem conventions.
+This document reflects the build flow that exists in this repository today.
 
-## Overview
+## Build Surfaces
 
-| Script | Source | Purpose |
-|--------|--------|---------|
-| `cbuild` | `/usr/local/scripts/cbuild` (in PATH) | Build library, clean, install |
-| `ctest` | `/usr/local/scripts/ctest` (in PATH) | Run a single flat test (legacy) |
-| `rtest` | `./rtest` (local) | Run nested tests by subdirectory |
-| `config.sh` | `./config.sh` (local) | All build variables and custom functions |
+- Core libraries: `lib/Makefile`
+- Unit tests: `test/unit/Makefile`
+- Official bindings orchestration: `bindings/Makefile`
 
----
+## Prerequisites
+
+- `gcc`
+- `make`
+- `python3` (for bindings handoff manifest generation)
+- `valgrind` (optional, for memory checks)
 
 ## Quick Start
 
 ```bash
-# Build shared library → bin/lib/libanvil.so
-cbuild lib
+# 1) Build core debug libraries (.a and .so)
+make -C lib
 
-# Compile only (no link)
-cbuild compile
+# 2) Build core release libraries (.a and .so)
+make -C lib release
 
-# Clean object files
-cbuild clean
+# 3) Run selected active unit suites
+make -C test/unit test_resolver test_vars test_interp_string test_using test_schema test_anon_block_attrs
 
-# Run all unit tests
-./rtest unit
+# 4) Run unit valgrind gate
+make -C test/unit valgrind
 
-# Run a single test
-./rtest unit/parser
-
-# Run a test with valgrind
-./rtest unit/parser --valgrind
+# 5) Generate official bindings + contract manifest
+make -C bindings generate
 ```
 
----
+## Core Library Build
 
-## Configuration (`config.sh`)
+`lib/Makefile` outputs:
 
-All build variables are in `config.sh`. Key settings:
+- `lib/debug/libanvil.a`
+- `lib/debug/libanvil.so`
+- `lib/release/libanvil.a`
+- `lib/release/libanvil.so`
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CC` | `gcc` | Compiler |
-| `STD` | `c2x` | C standard |
-| `CFLAGS` | `-Wall -Wextra -g -fPIC ...` | Library compile flags |
-| `TST_CFLAGS` | `$CFLAGS -DTSTDBG -I./test` | Test compile flags |
-| `LDFLAGS` | `-shared` | Library link flags |
-| `REQUIRES` | `sigma.memory sigma.text` | Library packages (resolved from `/usr/local/packages/`) |
-| `TST_REQUIRES` | `sigma.memory sigma.text sigma.test` | Test packages |
-| `LIB_NAME` | `anvil` | Output: `bin/lib/libanvil.so` |
-
-### Source Layout Note
-
-Anvil sources span two subdirectories (`src/core/*.c`, `src/utilities/*.c`). `config.sh` defines a custom `anvil_build_lib()` function that handles this — `cbuild`'s default single-directory glob is bypassed via `BUILD_TARGETS`.
-
----
-
-## Test Structure
-
-Tests follow sigma.memory's nested layout:
-
-```
-test/
-  unit/          ← Core functionality tests (fast, isolated)
-  integration/   ← Cross-component tests
-  performance/   ← Benchmarks
-  stress/        ← Long-running / high-load tests
-  validation/    ← Correctness / spec-compliance tests
-  utilities/     ← Shared helpers (helpers.c, diagnostic.c, prototype.c)
-  samples/       ← .anvl / .aml sample files
-```
-
-Test files follow the `test_<name>.c` convention in their subdirectory.
-
----
-
-## Running Tests (`rtest`)
+Commands:
 
 ```bash
-# Run one test (subdir/name — omit "test_" prefix)
-./rtest unit/parser
-
-# Run all tests in a subdirectory
-./rtest unit
-
-# Run with valgrind
-./rtest unit/parser --valgrind
-./rtest unit --valgrind
-
-# Show help
-./rtest --help
+make -C lib           # debug + bindings generation
+make -C lib release   # release libs
+make -C lib clean
 ```
 
-`rtest` compiles library objects, test helper objects, and the test binary on demand (incremental — only recompiles stale files). All linking is done against `/usr/local/packages/*.o` entries in `TST_REQUIRES`.
+Note: `make -C lib` triggers `make -C bindings generate` so official bindings
+and handoff metadata stay in sync with core changes.
 
----
+## Unit Test Build and Run
 
-## Memory Checking
+`test/unit/Makefile` is the active local quality gate.
 
-### Valgrind
+Common commands:
 
 ```bash
-# Enable in config.sh (already true by default)
-VALGRIND_ENABLED=true
-
-./rtest unit/parser --valgrind
-./rtest unit --valgrind
+make -C test/unit test_resolver
+make -C test/unit test_vars
+make -C test/unit test_schema
+make -C test/unit valgrind
+make -C test/unit clean
 ```
 
-### AddressSanitizer (ASAN)
+## Official Bindings
+
+Bindings are maintained under `bindings/*/`:
+
+- `bindings/node/`
+- `bindings/python/`
+- `bindings/dotnet/`
+
+Orchestration:
 
 ```bash
-# Enable in config.sh
-ASAN_ENABLED=true
-
-cbuild clean_all
-cbuild lib
-./rtest unit/parser
+make -C bindings generate
+make -C bindings contract
+make -C bindings signoff
 ```
 
-ASAN requires recompilation; valgrind works on existing binaries.
+Contract output:
 
----
+- `bindings/.handoff/binding-handoff.json`
 
-## Build Targets (`cbuild <target>`)
+Related docs:
 
-| Target | Action |
-|--------|--------|
-| `all` / `lib` | Build `bin/lib/libanvil.so` |
-| `compile` | Compile object files only (no link) |
-| `clean` | Remove `.o` files from `build/` |
-| `clean_all` | Remove all build artifacts |
-| `install` | Build and install to system (`/usr/lib/`, `/usr/include/`) |
-| `root` | Show project info (verifies `config.sh` in use) |
+- `docs/maintainers/bindings-maintenance.md`
+- `docs/maintainers/bindings-signoff-checklist.md`
+- `docs/bindings-api-reference.md`
 
----
+## Legacy/External Tooling Note
 
-## Package Dependencies
-
-Packages are pre-built fat object files resolved from `/usr/local/packages/<name>.o`.
-
-| Package | File | Used by |
-|---------|------|---------|
-| `sigma.memory` | `/usr/local/packages/sigma.memory.o` | lib + tests |
-| `sigma.text` | `/usr/local/packages/sigma.text.o` | lib + tests |
-| `sigma.test` | `/usr/local/packages/sigma.test.o` | tests only |
-
----
-
-## VS Code Tasks
-
-Tasks are defined in `.vscode/tasks.json` and map to `cbuild` / `rtest` commands. Use **Terminal → Run Task** or the keyboard shortcut.
+Some historical docs mention `cbuild` / `ctest` scripts from external locations.
+Those are not required for the repository-local flow documented here.
+If your environment still uses those wrappers, treat them as optional overlays
+on top of the Makefile-based workflow above.
