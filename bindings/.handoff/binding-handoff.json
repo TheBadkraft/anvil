@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-07-02T01:25:09.175525+00:00",
+  "generated_at_utc": "2026-07-03T00:35:59.198628+00:00",
   "repo_root": "/root/projects/anvil",
-  "git_rev": "7a2b32841ec3c3cd03a2791af33c8bd118ea4687",
+  "git_rev": "05c7ae1e1883139cb056df93d4e9c28789c52a04",
   "version": {
     "major": "0",
     "minor": "5",
-    "patch": "4",
+    "patch": "5",
     "tag": "alpha",
-    "str": "0.5.4-alpha"
+    "str": "0.5.5-alpha"
   },
   "files": {
     "include/anvil.h": {
@@ -16,7 +16,7 @@
     },
     "include/context.h": {
       "exists": true,
-      "sha256": "379c524377e6e61321f4d207f14fb7d31e8449380ab1915ad538a302edfbc60b"
+      "sha256": "a03410159695391dc88a1d4f38ece78ba7234107b9792931f57af466ff791969"
     },
     "include/resolver.h": {
       "exists": true,

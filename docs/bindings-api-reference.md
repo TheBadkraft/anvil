@@ -1,5 +1,5 @@
 # Anvil — Public API Bindings Reference
-**v0.5.4-alpha · For binding authors and N-API implementors**
+**v0.5.5-alpha · For binding authors and N-API implementors**
 
 > Pinned maintenance note:
 > Official bindings live under `bindings/*/` in this repository.
@@ -78,6 +78,14 @@ typedef struct anvl_context_i {
     field               (*get_field_by_name)(context self, statement stmt, const char *name, usize len);
     usize               (*element_count)   (context self, statement stmt);
     struct anvl_element_meta *(*get_element)(context self, statement stmt, usize index);
+    value               (*get_element_value)(context self, statement stmt, usize index);
+    // Value-level collection traversal (nested arrays/tuples/objects)
+    usize               (*value_element_count)(context self, value val);
+    struct anvl_element_meta *(*get_value_element)(context self, value val, usize index);
+    value               (*get_value_element_value)(context self, value val, usize index);
+    usize               (*value_field_count)(context self, value val);
+    field               (*get_value_field)(context self, value val, usize index);
+    field               (*get_value_field_by_name)(context self, value val, const char *name, usize len);
 } anvl_context_i;
 ```
 
@@ -181,6 +189,7 @@ struct anvl_element_meta {
     anvl_value_type type;
     usize pos;   // quote-stripped for SCALAR elements
     usize len;
+    value child; // nested value handle (NULL for scalar fast-path elements)
 };
 ```
 
@@ -266,6 +275,9 @@ binder.load(filePath: string): AnvilTree | null
 
 // Last error from parse/load
 binder.lastError(): { message: string, line: number, column: number, path: string | null } | null
+
+// Runtime version string
+binder.getVersion(): string
 ```
 
 ### 4.2 `AnvilTree` — the plain JS object returned by the binder
@@ -331,13 +343,15 @@ static napi_value napi_parse(napi_env env, napi_callback_info info) {
 }
 
 NAPI_MODULE_INIT() {
-    napi_value parse_fn, load_fn, last_error_fn;
+    napi_value parse_fn, load_fn, last_error_fn, ver_fn;
     napi_create_function(env, "parse", NAPI_AUTO_LENGTH, napi_parse, NULL, &parse_fn);
     napi_create_function(env, "load",  NAPI_AUTO_LENGTH, napi_load,  NULL, &load_fn);
     napi_create_function(env, "lastError", NAPI_AUTO_LENGTH, napi_last_error, NULL, &last_error_fn);
+    napi_create_function(env, "getVersion", NAPI_AUTO_LENGTH, napi_get_version, NULL, &ver_fn);
     napi_set_named_property(env, exports, "parse",     parse_fn);
     napi_set_named_property(env, exports, "load",      load_fn);
     napi_set_named_property(env, exports, "lastError", last_error_fn);
+    napi_set_named_property(env, exports, "getVersion", ver_fn);
     return exports;
 }
 ```
