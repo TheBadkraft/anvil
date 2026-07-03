@@ -152,14 +152,6 @@ static void test_sf11_deep_nesting(void) {
     Context.dispose(ctx);
 }
 
-/* ================================================================== */
-/* SF12: Real-world data stress test — skipped (no network)          */
-/* ================================================================== */
-
-static void test_sf12_real_world_data(void) {
-    TestBit.skip("SF12: real-world data fetch requires network — not available in TestBit");
-}
-
 /* ------------------------------------------------------------------ */
 /* Entry point                                                        */
 /* ------------------------------------------------------------------ */
@@ -175,7 +167,6 @@ int main(void) {
     TestBit.run_ex("SF09_vars",             NULL, test_sf09_vars_sample,       td);
     TestBit.run_ex("SF10_schema_asch",      NULL, test_sf10_schema_asch,       td);
     TestBit.run_ex("SF11_deep_nesting",     NULL, test_sf11_deep_nesting,      td);
-    TestBit.run_ex("SF12_real_world_data",  NULL, test_sf12_real_world_data,   td);
 
     return TestBit.report();
 }
