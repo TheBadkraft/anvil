@@ -558,53 +558,19 @@ static value parse_blob(parser_ctx *p) {
    }
    si_consume(s, 1); /* consume closing backtick */
 
-   /* Create blob value based on dialect */
-   if (dialect == ANVL_DIALECT_AMP) {
-      /* AMP: Scalar blob with encoded tag length in length field */
-      value blob = ci_new_value(p->ctx, ANVL_VALUE_BLOB);
-      if (!blob) {
-         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-         return NULL;
-      }
-      blob->data.scalar.pos = content_pos;
-      blob->data.scalar.len = blob_encode_length(tag_len, content_len);
-      return blob;
-   } else {
-      /* Array-based (AML, ASL, AURORA): Collection with tag and content as separate elements */
-      value blob_collection = ci_new_value(p->ctx, ANVL_VALUE_ARRAY);
-      if (!blob_collection) {
-         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-         return NULL;
-      }
+   (void)dialect;
 
-      /* Allocate for up to 2 elements (tag + content) */
-      struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * 2);
-      if (elem_temp)
-         memset(elem_temp, 0, sizeof(struct anvl_element_meta) * 2);
-      if (!elem_temp) {
-         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
-         return NULL;
-      }
-
-      usize element_count = 0;
-
-      /* Element [0]: Tag metadata (if tag present) — pos/len are 0 (not needed by serializer) */
-      if (tag_len > 0) {
-         elem_temp[0].type = ANVL_VALUE_BLOB;
-         element_count = 1;
-      }
-
-      /* Element [0 or 1]: Content — pos/len are 0 (serializer uses value_meta->pos/len) */
-      elem_temp[element_count].type = ANVL_VALUE_BLOB;
-      element_count++;
-
-      /* Set up collection metadata */
-      blob_collection->data.collection.element_start = 0;
-      blob_collection->data.collection.element_count = element_count;
-      blob_collection->data.collection._elem_types_temp = elem_temp;
-
-      return blob_collection;
+   /* Canonical blob representation across dialects:
+    * scalar.pos = content start, scalar.len = encoded(tag_len, content_len).
+    */
+   value blob = ci_new_value(p->ctx, ANVL_VALUE_BLOB);
+   if (!blob) {
+      parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+      return NULL;
    }
+   blob->data.scalar.pos = content_pos;
+   blob->data.scalar.len = blob_encode_length(tag_len, content_len);
+   return blob;
 }
 
 static value parse_object(parser_ctx *p) {

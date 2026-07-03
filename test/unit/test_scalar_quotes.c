@@ -181,9 +181,8 @@ static void test_qs04_attribute_value(void) {
  */
 static void test_qs05_blob_unchanged(void) {
     /* Blobs use backticks, not quotes — quote stripping must not affect them.
-     * By design, AML blob element_meta has pos=0,len=0; content span lives in
-     * value_meta->pos/len covering the full blob expression (@md`raw`).
-     * We verify: value_meta->pos points to '@', not a '"' character. */
+     * Blob values are canonical ANVL_VALUE_BLOB; value_meta->pos/len cover
+     * the full blob expression (@md`raw`). */
     const char *src = "data := @md`raw`";
     context ctx = parse(src);
 
@@ -193,8 +192,8 @@ static void test_qs05_blob_unchanged(void) {
     struct anvl_value_meta *vm = stmt->value_meta;
 
     TestBit.is_not_null(vm, "QS05: value_meta exists");
-    TestBit.is_true(vm->type == ANVL_VALUE_ARRAY || vm->type == ANVL_VALUE_BLOB,
-                    "QS05: blob stored as ARRAY or BLOB");
+    TestBit.is_equal_int(ANVL_VALUE_BLOB, (long long)vm->type,
+                         "QS05: blob stored as BLOB");
 
     /* value_meta covers the whole blob expression — first char must be '@' */
     const char *data = Source.data(ctx->source);

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Binding traversal gap for non-scalar collection elements** (`src/core/parser.c`, `src/core/context.c`) — bindings can now obtain nested element value handles directly from context APIs instead of being limited to type + source span metadata.
+- **Blob value canonicalization across dialects** (`src/core/parser.c`) — blob literals now parse as `ANVL_VALUE_BLOB` consistently (including AML/ASL) instead of legacy array-based blob metadata. This keeps blob semantics stable for bindings and removes scalar-empty placeholder behavior when traversing nested values.
 
 ### Changed
 

@@ -329,6 +329,8 @@ static void test_pc11_blobs(void) {
 
     statement stmt = Context.get_statement(ctx, 0);
     TestBit.is_not_null(stmt->value_meta, "PC11: stmt[0] has value_meta");
+    TestBit.is_equal_int(ANVL_VALUE_BLOB, (long long)stmt->value_meta->type,
+                         "PC11: stmt[0] value type is BLOB");
     usize len = stmt->value_meta->len;
     char *value_text = malloc(len + 1);
     Source.substring(ctx->source, stmt->value_meta->pos, len, value_text);
@@ -338,9 +340,13 @@ static void test_pc11_blobs(void) {
 
     stmt = Context.get_statement(ctx, 1);
     TestBit.is_not_null(stmt->value_meta, "PC11: stmt[1] has value_meta");
+    TestBit.is_equal_int(ANVL_VALUE_BLOB, (long long)stmt->value_meta->type,
+                         "PC11: stmt[1] value type is BLOB");
 
     stmt = Context.get_statement(ctx, 2);
     TestBit.is_not_null(stmt->value_meta, "PC11: stmt[2] has value_meta");
+    TestBit.is_equal_int(ANVL_VALUE_BLOB, (long long)stmt->value_meta->type,
+                         "PC11: stmt[2] value type is BLOB");
 
     Context.dispose(ctx);
 }
