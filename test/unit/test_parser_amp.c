@@ -4,50 +4,18 @@
  */
 
 #include "anvil.h"
+#include "../utilities/helpers.h"
 #include "testbit.h"
 #include <string.h>
 
 static void td(void) { Anvil.error_clear(); }
-
-/* ------------------------------------------------------------------ */
-/* Local helpers                                                      */
-/* ------------------------------------------------------------------ */
-static context parse_source(const char *source, anvl_dialect dialect) {
-    ctx_builder builder = Context.get_builder();
-    builder->set_dialect(builder, dialect);
-    builder->set_source(builder, source, strlen(source));
-
-    context ctx = builder->build(builder);
-    TestBit.is_not_null(ctx, "context created from source");
-
-    bool result = Context.parse(ctx);
-    TestBit.is_true(result, "source parsing succeeds");
-
-    return ctx;
-}
-
-static context parse_source_with_err(const char *source, anvl_dialect dialect,
-                                     const anvl_error_state **err_state) {
-    ctx_builder builder = Context.get_builder();
-    builder->set_dialect(builder, dialect);
-    builder->set_source(builder, source, strlen(source));
-
-    context ctx = builder->build(builder);
-    TestBit.is_not_null(ctx, "context created from source");
-
-    bool result = Context.parse(ctx);
-    TestBit.is_false(result, "parser should fail for invalid AMP source");
-    *err_state = Anvil.error_get();
-
-    return ctx;
-}
 
 /* ================================================================== */
 /* AM01 — scalar integer array parses successfully in AMP             */
 /* ================================================================== */
 static void test_am01_scalar_array(void) {
     const char *source = "#!amp\nids := [101, 204, 387]";
-    context ctx = parse_source(source, ANVL_DIALECT_AMP);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AMP);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "AM01: one statement");
@@ -65,7 +33,7 @@ static void test_am01_scalar_array(void) {
 /* ================================================================== */
 static void test_am04_scalar_tuple(void) {
     const char *source = "#!amp\ncoords := (128, 64, -37)";
-    context ctx = parse_source(source, ANVL_DIALECT_AMP);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AMP);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "AM04: one statement");

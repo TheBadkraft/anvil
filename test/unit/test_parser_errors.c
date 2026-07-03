@@ -7,30 +7,12 @@
  */
 
 #include "anvil.h"
+#include "../utilities/helpers.h"
 #include "testbit.h"
 #include <stdio.h>
 #include <string.h>
 
 static void td(void) { Anvil.error_clear(); }
-
-/* ------------------------------------------------------------------ */
-/* Local helper — parse source expected to fail, capture error state  */
-/* ------------------------------------------------------------------ */
-static context parse_source_with_err(const char *source, anvl_dialect dialect,
-                                     const anvl_error_state **err_state) {
-    anvl_ctx_builder_i *builder = Context.get_builder();
-    builder->set_dialect(builder, dialect);
-    builder->set_source(builder, source, strlen(source));
-
-    context ctx = builder->build(builder);
-    TestBit.is_not_null(ctx, "context created from source");
-
-    bool result = Context.parse(ctx);
-    TestBit.is_false(result, "parser should fail for invalid source");
-    *err_state = Anvil.error_get();
-
-    return ctx;
-}
 
 /* ================================================================== */
 /* PE01–PE02: Missing structural tokens                               */

@@ -30,9 +30,9 @@
 /* ------------------------------------------------------------------ */
 #define ANVL_VERSION_MAJOR 0
 #define ANVL_VERSION_MINOR 5
-#define ANVL_VERSION_PATCH 5
+#define ANVL_VERSION_PATCH 6
 #define ANVL_VERSION_TAG   "alpha"
-#define ANVL_VERSION_STR   "0.5.5-alpha"
+#define ANVL_VERSION_STR   "0.5.6-alpha"
 
 /* ------------------------------------------------------------------ */
 /* Dialect: AML vs ASL vs AMP vs Aurora                               */

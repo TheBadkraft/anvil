@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.6-alpha] — pre-release (2026-07-03)
+
+### Fixed
+
+- **Anonymous-block inheritance parse path** (`src/core/parser.c`) — parser now accepts anonymous object block inheritance syntax with optional attributes (`Ident : Base { ... }` and `Ident : Base @[...] { ... }`) and preserves base metadata on `ANVL_ANON_OBJECT` statements.
+
+### Changed
+
+- **Parser structures coverage expanded** (`test/unit/test_parser_structures.c`) — added inheritance-focused anonymous-block structural tests (PS14, PS15) in the primary structures suite.
+- **Test fixture layout cleanup** (`test/fixtures/`, `test/unit/*`, `test/benchmarks/*`, `test/utilities/helpers.*`) — migrated sample assets from `test/samples/` to `test/fixtures/` and updated test helpers/consumers to use the consolidated fixtures path.
+- **No public API surface changes** — this release is parser behavior and test-infrastructure focused.
+
+---
+
 ## [v0.5.5-alpha] — pre-release (2026-07-03)
 
 ### Added

@@ -6,7 +6,7 @@
  * ------------------------------------------------------------------
  * Mirrors .NET ScriptEngineBenchmarks.cs (SE01–SE08).
  * Function bodies correspond to the named functions in
- * test/samples/scripts.asl (arith, fib, sumLoop, classify, collatz).
+ * test/fixtures/scripts.asl (arith, fib, sumLoop, classify, collatz).
  *
  * AB01  Cold_Parse      — Asl.parse() only (build AST); no exec.
  *                         Measures the cold AST construction cost.

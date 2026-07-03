@@ -69,7 +69,7 @@ static void test_ctx03_set_source(void) {
 /* CTX04 — load file with shebang → AML dialect                      */
 /* ------------------------------------------------------------------ */
 static void test_ctx04_load_file_shebang(void) {
-    const char *file_path = "../samples/shebang.anvl";
+    const char *file_path = "../fixtures/shebang.anvl";
 
     ctx_builder builder = Context.get_builder();
     builder->load_file(builder, file_path);
@@ -89,7 +89,7 @@ static void test_ctx04_load_file_shebang(void) {
 /* CTX05 — load file without shebang → ASL dialect                   */
 /* ------------------------------------------------------------------ */
 static void test_ctx05_load_file_no_shebang(void) {
-    const char *file_path = "../samples/generic.aurora";
+    const char *file_path = "../fixtures/generic.aurora";
 
     ctx_builder builder = Context.get_builder();
     builder->load_file(builder, file_path);

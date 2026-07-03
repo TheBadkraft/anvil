@@ -86,7 +86,7 @@ test_context: $(BIN)/test_version $(BIN)/test_context
 	@$(BIN)/test_context
 	@$(BIN)/test_version
 
-$(BIN)/test_parser_core: test_parser_core.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+$(BIN)/test_parser_core: test_parser_core.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -94,7 +94,7 @@ test_parser_core: $(BIN)/test_version $(BIN)/test_parser_core
 	@$(BIN)/test_parser_core
 	@$(BIN)/test_version
 
-$(BIN)/test_parser_structures: test_parser_structures.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+$(BIN)/test_parser_structures: test_parser_structures.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -102,7 +102,7 @@ test_parser_structures: $(BIN)/test_version $(BIN)/test_parser_structures
 	@$(BIN)/test_parser_structures
 	@$(BIN)/test_version
 
-$(BIN)/test_parser_errors: test_parser_errors.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+$(BIN)/test_parser_errors: test_parser_errors.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -110,7 +110,7 @@ test_parser_errors: $(BIN)/test_version $(BIN)/test_parser_errors
 	@$(BIN)/test_parser_errors
 	@$(BIN)/test_version
 
-$(BIN)/test_parser_amp: test_parser_amp.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+$(BIN)/test_parser_amp: test_parser_amp.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -184,11 +184,11 @@ test_release: $(LIB_RELEASE)
 	$(CC) $(CFLAGS) test_vars.c             $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_vars
 	$(CC) $(CFLAGS) test_schema.c           $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_schema
 	$(CC) $(CFLAGS) test_context.c          $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_context
-	$(CC) $(CFLAGS) test_parser_core.c      $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_core
-	$(CC) $(CFLAGS) test_parser_structures.c $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_structures
-	$(CC) $(CFLAGS) test_parser_errors.c    $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_errors
-	$(CC) $(CFLAGS) test_parser_amp.c       $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_amp
-	$(CC) $(CFLAGS) test_parser_samples.c   $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_samples
+	$(CC) $(CFLAGS) test_parser_core.c      $(TESTBIT_SRC) $(TEST_HELPER) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_core
+	$(CC) $(CFLAGS) test_parser_structures.c $(TESTBIT_SRC) $(TEST_HELPER) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_structures
+	$(CC) $(CFLAGS) test_parser_errors.c    $(TESTBIT_SRC) $(TEST_HELPER) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_errors
+	$(CC) $(CFLAGS) test_parser_amp.c       $(TESTBIT_SRC) $(TEST_HELPER) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_amp
+	$(CC) $(CFLAGS) test_parser_samples.c   $(TESTBIT_SRC) $(TEST_HELPER) $(LIB_RELEASE) -o $(BIN)/rel_test_parser_samples
 	$(CC) $(CFLAGS) test_version.c          $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_version
 	@echo "-- release QC --"
 	@$(BIN)/rel_test_scalar_quotes

@@ -5,7 +5,7 @@
  * performance.c — Parser throughput sweep (all sample files)
  * ------------------------------------------------------------------
  * Runs a single-pass throughput measurement over every sample file
- * in test/samples/ and prints a summary table.  Each file is one
+ * in test/fixtures/ and prints a summary table.  Each file is one
  * testcase; the bench asserts parse success and positive throughput.
  *
  * This file is the rtest-compatible successor to the original
@@ -37,23 +37,23 @@ typedef struct {
 } sample_entry_t;
 
 static const sample_entry_t _samples[] = {
-    {"test/samples/assignments.anvl", "assignments.anvl"},
-    {"test/samples/objects.anvl", "objects.anvl"},
-    {"test/samples/inherits.anvl", "inherits.anvl"},
-    {"test/samples/numbers.anvl", "numbers.anvl"},
-    {"test/samples/attributes.anvl", "attributes.anvl"},
-    {"test/samples/arrays.anvl", "arrays.anvl"},
-    {"test/samples/tuples.anvl", "tuples.anvl"},
-    {"test/samples/modpack.anvl", "modpack.anvl"},
-    {"test/samples/large_dataset.anvl", "large_dataset.anvl"},
-    {"test/samples/complex_nested.anvl", "complex_nested.anvl"},
-    {"test/samples/repetitive_data.anvl", "repetitive_data.anvl"},
-    {"test/samples/deep_nesting.anvl", "deep_nesting.anvl"},
-    {"test/samples/blob_heavy_json.anvl", "blob_heavy_json.anvl"},
-    {"test/samples/blob_heavy_xml.anvl", "blob_heavy_xml.anvl"},
-    {"test/samples/blob_heavy_csv.anvl", "blob_heavy_csv.anvl"},
-    {"test/samples/blob_heavy_mixed.anvl", "blob_heavy_mixed.anvl"},
-    {"test/samples/amp_envelope.anvl", "amp_envelope.anvl"},
+    {"test/fixtures/assignments.anvl", "assignments.anvl"},
+    {"test/fixtures/objects.anvl", "objects.anvl"},
+    {"test/fixtures/inherits.anvl", "inherits.anvl"},
+    {"test/fixtures/numbers.anvl", "numbers.anvl"},
+    {"test/fixtures/attributes.anvl", "attributes.anvl"},
+    {"test/fixtures/arrays.anvl", "arrays.anvl"},
+    {"test/fixtures/tuples.anvl", "tuples.anvl"},
+    {"test/fixtures/modpack.anvl", "modpack.anvl"},
+    {"test/fixtures/large_dataset.anvl", "large_dataset.anvl"},
+    {"test/fixtures/complex_nested.anvl", "complex_nested.anvl"},
+    {"test/fixtures/repetitive_data.anvl", "repetitive_data.anvl"},
+    {"test/fixtures/deep_nesting.anvl", "deep_nesting.anvl"},
+    {"test/fixtures/blob_heavy_json.anvl", "blob_heavy_json.anvl"},
+    {"test/fixtures/blob_heavy_xml.anvl", "blob_heavy_xml.anvl"},
+    {"test/fixtures/blob_heavy_csv.anvl", "blob_heavy_csv.anvl"},
+    {"test/fixtures/blob_heavy_mixed.anvl", "blob_heavy_mixed.anvl"},
+    {"test/fixtures/amp_envelope.anvl", "amp_envelope.anvl"},
 };
 #define SAMPLE_COUNT ((int)(sizeof(_samples) / sizeof(_samples[0])))
 

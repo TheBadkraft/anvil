@@ -5,7 +5,7 @@
  * bench_parse.c — Parser throughput benchmarks
  * ------------------------------------------------------------------
  * Mirrors .NET ParseBenchmarks.cs (PB01–PB04) and extends with
- * real-world fixture sizes present in test/samples/.
+ * real-world fixture sizes present in test/fixtures/.
  *
  * PB01  Parse_Small    — assignments.anvl  (~17 lines, scalars+blobs)
  * PB02  Parse_Medium   — objects.anvl      (~20 lines, nested objects)
@@ -48,13 +48,13 @@ static size_t _sz_basic, _sz_largeaml;
 static void set_config(FILE **logger) {
    *logger = fopen("logs/bench_parse.log", "w");
 
-   load_source("test/samples/assignments.anvl", &_src_small, &_sz_small);
-   load_source("test/samples/objects.anvl", &_src_medium, &_sz_medium);
-   load_source("test/samples/modpack.anvl", &_src_large, &_sz_large);
-   load_source("test/samples/blob_heavy_mixed.anvl", &_src_blob, &_sz_blob);
-   load_source("test/samples/deep_nesting.anvl", &_src_deep, &_sz_deep);
-   load_source("test/samples/basic.aml", &_src_basic, &_sz_basic);
-   load_source("test/samples/large.aml", &_src_largeaml, &_sz_largeaml);
+   load_source("test/fixtures/assignments.anvl", &_src_small, &_sz_small);
+   load_source("test/fixtures/objects.anvl", &_src_medium, &_sz_medium);
+   load_source("test/fixtures/modpack.anvl", &_src_large, &_sz_large);
+   load_source("test/fixtures/blob_heavy_mixed.anvl", &_src_blob, &_sz_blob);
+   load_source("test/fixtures/deep_nesting.anvl", &_src_deep, &_sz_deep);
+   load_source("test/fixtures/basic.aml", &_src_basic, &_sz_basic);
+   load_source("test/fixtures/large.aml", &_src_largeaml, &_sz_largeaml);
 
    printf("\n  %-42s  %9s  %9s  %9s  %7s  %12s\n",
           "Benchmark", "min", "mean", "max", "σ", "throughput");

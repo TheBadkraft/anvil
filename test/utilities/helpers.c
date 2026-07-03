@@ -10,6 +10,8 @@
  * ------------------------------------------------------------------
  */
 #include "../../include/utils.h"
+#include "../../include/anvil.h"
+#include "../../testbit/include/testbit.h"
 #include <sigma.core/types.h>
 #include <sigma.memory/memory.h>
 #include <stdio.h>
@@ -18,14 +20,88 @@
 
 const char *get_anvl_path(const char *name) {
    static char path_buffer[512] = {0};
-   snprintf(path_buffer, sizeof(path_buffer), "test/samples/%s.anvl", name);
+   snprintf(path_buffer, sizeof(path_buffer), "test/fixtures/%s.anvl", name);
    return path_buffer;
 }
 
 const char *get_source_path(const char *name) {
    static char path_buffer[512] = {0};
-   snprintf(path_buffer, sizeof(path_buffer), "../samples/%s", name);
+   snprintf(path_buffer, sizeof(path_buffer), "../fixtures/%s", name);
    return path_buffer;
+}
+
+context parse_source_ok(const char *source, anvl_dialect dialect) {
+   ctx_builder builder = Context.get_builder();
+   builder->set_dialect(builder, dialect);
+   builder->set_source(builder, source, strlen(source));
+
+   context ctx = builder->build(builder);
+   TestBit.is_not_null(ctx, "context created from source");
+
+   bool result = Context.parse(ctx);
+   if (!result) {
+      const anvl_error_state *err = Anvil.error_get();
+      fprintf(stderr, "[DEBUG]: Failed to parse source: %s\n", source);
+      if (err && err->message)
+         fprintf(stderr, "[DEBUG]: Parse error: %s\n", err->message);
+   }
+   TestBit.is_true(result, "source parsing succeeds");
+
+   return ctx;
+}
+
+context parse_source_with_err(const char *source, anvl_dialect dialect,
+                              const anvl_error_state **err_state) {
+   ctx_builder builder = Context.get_builder();
+   builder->set_dialect(builder, dialect);
+   builder->set_source(builder, source, strlen(source));
+
+   context ctx = builder->build(builder);
+   TestBit.is_not_null(ctx, "context created from source");
+
+   bool result = Context.parse(ctx);
+   TestBit.is_false(result, "parser should fail for invalid source");
+   *err_state = Anvil.error_get();
+
+   return ctx;
+}
+
+context parse_fixture_file_ok(const char *filename, anvl_dialect exp_dialect,
+                              usize exp_pos, usize exp_line, usize exp_col) {
+   const char *filepath = get_source_path(filename);
+
+   ctx_builder builder = Context.get_builder();
+   bool loaded = builder->load_file(builder, filepath);
+   if (!loaded)
+      fprintf(stderr, "[DEBUG]: Failed to load file: %s\n", filepath);
+   TestBit.is_true(loaded, "fixture file loaded successfully");
+
+   context ctx = builder->build(builder);
+   TestBit.is_not_null(ctx, "context created for fixture file");
+
+   TestBit.is_equal_int((long long)exp_dialect, (long long)Context.dialect(ctx),
+                        "dialect matches expected");
+   TestBit.is_equal_int((long long)exp_pos, (long long)ctx->source->pos,
+                        "source positioned past preamble");
+   TestBit.is_equal_int((long long)exp_line, (long long)ctx->source->line,
+                        "source at correct line");
+   TestBit.is_equal_int((long long)exp_col, (long long)ctx->source->col,
+                        "source at correct column");
+
+   bool result = Context.parse(ctx);
+   if (!result) {
+      const anvl_error_state *err = Anvil.error_get();
+      TestBit.is_true(Anvil.error_is_set(), "error set on unexpected parse failure");
+      fprintf(stderr, "[DEBUG]: Unexpected parse failure for %s: %s at line %ld, col %ld\n",
+              filename,
+              (err && err->message) ? err->message : "<none>",
+              (long)(err ? err->line : 0),
+              (long)(err ? err->column : 0));
+      Anvil.error_clear();
+   }
+   TestBit.is_true(result, "fixture file parsing succeeds");
+
+   return ctx;
 }
 
 char *generate_large_nested_structure(void) {
@@ -58,31 +134,28 @@ char *generate_large_nested_structure(void) {
 
 char *generate_deep_nested_structure(void) {
    char *buffer = malloc(5000); // 5KB buffer (reduced)
+   if (!buffer)
+      return NULL;
+
    strcpy(buffer, "deep := ");
 
-   // Generate 8 levels of nesting (reduced from 15)
+   // Generate 8 valid nesting levels using only object/array forms.
    for (int i = 0; i < 8; i++) {
-      if (i % 3 == 0) {
-         strcat(buffer, "{level := ");
-      } else if (i % 3 == 1) {
+      if (i % 2 == 0)
+         sprintf(buffer + strlen(buffer), "{ level%d := ", i);
+      else
          strcat(buffer, "[");
-      } else {
-         strcat(buffer, "(");
-      }
    }
 
-   // Add some content at the deepest level
+   // Deepest payload
    strcat(buffer, "42");
 
-   // Close all nesting levels
+   // Close all nesting levels in reverse order.
    for (int i = 7; i >= 0; i--) {
-      if (i % 3 == 0) {
-         strcat(buffer, "}");
-      } else if (i % 3 == 1) {
+      if (i % 2 == 0)
+         strcat(buffer, " }");
+      else
          strcat(buffer, "]");
-      } else {
-         strcat(buffer, ")");
-      }
    }
 
    strcat(buffer, "\n");

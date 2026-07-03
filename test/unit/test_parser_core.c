@@ -4,34 +4,13 @@
  */
 
 #include "anvil.h"
+#include "../utilities/helpers.h"
 #include "testbit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static void td(void) { Anvil.error_clear(); }
-
-/* ------------------------------------------------------------------ */
-/* Local helper — parse a source string, asserting success            */
-/* ------------------------------------------------------------------ */
-static context parse_source(const char *source, anvl_dialect dialect) {
-    ctx_builder builder = Context.get_builder();
-    builder->set_dialect(builder, dialect);
-    builder->set_source(builder, source, strlen(source));
-
-    context ctx = builder->build(builder);
-    TestBit.is_not_null(ctx, "context created from source");
-
-    bool result = Context.parse(ctx);
-    if (!result) {
-        fprintf(stderr, "[DEBUG]: Failed to parse source: %s\n", source);
-        const anvl_error_state *err = Anvil.error_get();
-        if (err->message) fprintf(stderr, "Error: %s\n", err->message);
-    }
-    TestBit.is_true(result, "source parsing succeeds");
-
-    return ctx;
-}
 
 /* ------------------------------------------------------------------ */
 /* PC01 — empty source fails to build                                 */
@@ -54,7 +33,7 @@ static void test_pc01_empty_source(void) {
 /* ------------------------------------------------------------------ */
 static void test_pc02_simple_assignment(void) {
     const char *source = "name := \"John\"";
-    context ctx = parse_source(source, ANVL_DIALECT_AML);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AML);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "PC02: one statement");
@@ -75,7 +54,7 @@ static void test_pc03_multiple_statements(void) {
         "name := \"John\"\n"
         "age := 30\n"
         "active := true\n";
-    context ctx = parse_source(source, ANVL_DIALECT_AML);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AML);
 
     TestBit.is_equal_int(3, (long long)Context.statement_count(ctx),
                          "PC03: three statements");
@@ -103,7 +82,7 @@ static void test_pc03_multiple_statements(void) {
 /* ------------------------------------------------------------------ */
 static void test_pc04_array(void) {
     const char *source = "numbers := [1, 2, 3]";
-    context ctx = parse_source(source, ANVL_DIALECT_AML);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AML);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "PC04: one statement");
@@ -121,7 +100,7 @@ static void test_pc04_array(void) {
 /* ------------------------------------------------------------------ */
 static void test_pc05_object(void) {
     const char *source = "person := { name := \"John\", age := 30 }";
-    context ctx = parse_source(source, ANVL_DIALECT_AML);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AML);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "PC05: one statement");
@@ -139,7 +118,7 @@ static void test_pc05_object(void) {
 /* ------------------------------------------------------------------ */
 static void test_pc06_tuple(void) {
     const char *source = "point := (10, 20)";
-    context ctx = parse_source(source, ANVL_DIALECT_AML);
+    context ctx = parse_source_ok(source, ANVL_DIALECT_AML);
 
     TestBit.is_equal_int(1, (long long)Context.statement_count(ctx),
                          "PC06: one statement");

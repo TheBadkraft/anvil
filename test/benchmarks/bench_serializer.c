@@ -49,12 +49,12 @@ static void set_config(FILE **logger) {
    *logger = fopen("logs/bench_serializer.log", "w");
 
    const char *src_small = NULL;
-   load_source("test/samples/objects.anvl", &src_small, &_sz_medium);
+   load_source("test/fixtures/objects.anvl", &src_small, &_sz_medium);
    _src_medium = src_small; /* keep for SB05 round-trip */
 
    const char *src_large = NULL;
    size_t sz_large;
-   load_source("test/samples/modpack.anvl", &src_large, &sz_large);
+   load_source("test/fixtures/modpack.anvl", &src_large, &sz_large);
 
    _ctx_small = _build_ctx(src_small, _sz_medium);
    _ctx_large = _build_ctx(src_large, sz_large);

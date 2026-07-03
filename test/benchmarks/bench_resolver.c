@@ -21,7 +21,7 @@
  *                            GoldOreDeep, DiamondOreDeep) reading the
  *                            same inherited field on a pre-warmed state.
  *
- * All benchmarks use test/samples/merge.aml — the same file as
+ * All benchmarks use test/fixtures/merge.aml — the same file as
  * .NET MergeBenchmarks for apples-to-apples comparison.
  *
  * Cold benchmarks: each iteration rebuilds the resolver state from
@@ -87,7 +87,7 @@ static inline context _build_ctx(const char *src, size_t sz) {
 static void set_config(FILE **logger) {
    *logger = fopen("logs/bench_resolver.log", "w");
 
-   load_source("test/samples/merge.aml", &_merge_src, &_merge_sz);
+   load_source("test/fixtures/merge.aml", &_merge_src, &_merge_sz);
    _ctx_merge = _build_ctx(_merge_src, _merge_sz);
 
    /* Build warm state and prime all derived nodes for cache-hit benchmarks */

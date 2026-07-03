@@ -1078,6 +1078,31 @@ static bool lookahead_is_anon_object(parser_ctx *p) {
       if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
       la++;
    }
+
+   // Optional inheritance prefix: ':' <identifier>
+   if (!si_is_eof_offset(s, la) &&
+       si_peek_offset(s, la) == ':' &&
+       (si_is_eof_offset(s, la + 1) || si_peek_offset(s, la + 1) != '=')) {
+      la++; // ':'
+      while (!si_is_eof_offset(s, la)) {
+         char c = si_peek_offset(s, la);
+         if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+         la++;
+      }
+
+      if (si_is_eof_offset(s, la) || !Source.is_identifier_start(si_peek_offset(s, la)))
+         return false;
+
+      while (!si_is_eof_offset(s, la) && Source.is_identifier_part(si_peek_offset(s, la)))
+         la++;
+
+      while (!si_is_eof_offset(s, la)) {
+         char c = si_peek_offset(s, la);
+         if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+         la++;
+      }
+   }
+
    // Optionally skip @[...] attribute blocks (bracket-depth scan, no consuming)
    while (!si_is_eof_offset(s, la) &&
           si_peek_offset(s, la) == '@' &&
@@ -1145,6 +1170,30 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    si_skip_whitespace_and_comments(s);
    if (Anvil.error_is_set()) return false;
 
+   // Optional inheritance base: ':' <identifier>
+   struct anvl_base_meta *base_meta = NULL;
+   usize base_pos = 0, base_len = 0;
+   if (si_match_length(s, ":", 1) == 1 && si_peek_offset(s, 1) != '=') {
+      si_consume(s, 1);
+      si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+
+      if (!read_identifier(p, &base_pos, &base_len))
+         return false;
+
+      base_meta = ci_new_base_meta(p->ctx);
+      if (!base_meta) {
+         parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
+         return false;
+      }
+
+      base_meta->pos = base_pos;
+      base_meta->len = base_len;
+
+      si_skip_whitespace_and_comments(s);
+      if (Anvil.error_is_set()) return false;
+   }
+
    // Optional @[...] attribute blocks (decoration is optional)
    usize attrib_start = p->ctx->attr_list.count;
    while (si_match_length(s, "@[", 2) == 2) {
@@ -1201,13 +1250,13 @@ static bool parse_anon_object(parser_ctx *p, statement stmt) {
    stmt->meta[STMT_META_RESERVED_1] = 0;
    stmt->meta[STMT_META_IDENT_POS] = ident_pos;
    stmt->meta[STMT_META_IDENT_LEN] = ident_len;
-   stmt->meta[STMT_META_BASE_IDX] = 0;
+   stmt->meta[STMT_META_BASE_IDX] = base_meta ? 1 : 0;
    stmt->meta[STMT_META_ATTR_IDX] = attrib_count;
    stmt->meta[STMT_META_RESERVED_6] = 0;
    stmt->meta[STMT_META_VALUE_IDX] = 1;
    stmt->meta[STMT_META_RESERVED_8] = 0;
 
-   stmt->base_meta = NULL;
+   stmt->base_meta = base_meta;
    stmt->attr_meta = attr_meta;
    stmt->value_meta = value_meta;
 

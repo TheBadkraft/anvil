@@ -1621,7 +1621,7 @@ static void _register(void) {
    // Inheritance smoke test
    testcase("Inheritance placeholder", test_parse_inheritance_placeholder);
 
-   // Sample file tests (test/samples/*.anvl and *.aurora)
+   // Sample file tests (test/fixtures/*.anvl and *.aurora)
    testcase("Sample arrays.anvl", test_parse_arrays_sample);
    testcase("Sample assignments.anvl", test_parse_assignments_sample);
    testcase("Sample attributes.anvl", test_parse_attributes_sample);
@@ -1654,7 +1654,7 @@ __attribute__((constructor)) static void register_test_parser(void) {
    Tests.enqueue(_register);
 }
 
-// Test sample files from test/samples/
+// Test sample files from test/fixtures/
 static context parse_file(const char *filename, anvl_dialect exp_dialect, usize exp_pos, usize exp_line, usize exp_col) {
    const char *filepath = get_source_path(filename);
 
