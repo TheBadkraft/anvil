@@ -69,3 +69,6 @@ vgcore.*
 *.txt
 debug_parser.c
 diagnose_tests.c
+
+# Generated binding handoff artifact
+bindings/.handoff/binding-handoff.json
