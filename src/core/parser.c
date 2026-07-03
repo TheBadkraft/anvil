@@ -380,6 +380,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
                elem_meta[i].type = elem_temp[i].type;
                elem_meta[i].pos = elem_temp[i].pos;
                elem_meta[i].len = elem_temp[i].len;
+               elem_meta[i].child = elem_temp[i].child;
             }
             val->data.collection._elem_types_temp = NULL;
          }
@@ -797,6 +798,7 @@ static value parse_array(parser_ctx *p) {
          elem_temp[element_count].pos = elem_start;
          elem_temp[element_count].len = elem_end - elem_start;
       }
+      elem_temp[element_count].child = elem;
       element_count++;
 
       si_skip_whitespace_and_comments(s);
@@ -894,6 +896,7 @@ static value parse_tuple(parser_ctx *p) {
          elem_temp[element_count].pos = elem_start;
          elem_temp[element_count].len = elem_end - elem_start;
       }
+      elem_temp[element_count].child = elem;
       element_count++;
 
       si_skip_whitespace_and_comments(s);

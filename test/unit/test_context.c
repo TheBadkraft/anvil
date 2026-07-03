@@ -301,6 +301,75 @@ static void test_ctx12_add_statement_null(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* CTX13 — array object element exposes child value handle            */
+/* ------------------------------------------------------------------ */
+static void test_ctx13_array_object_element_value(void) {
+    const char *src = "Weapons := [{ name := Sword damage := 15 }, { name := Axe damage := 20 }]";
+
+    ctx_builder builder = Context.get_builder();
+    builder->set_source(builder, src, strlen(src));
+    context ctx = builder->build(builder);
+    TestBit.is_not_null(ctx, "CTX13: context created");
+
+    bool parsed = Context.parse(ctx);
+    TestBit.is_true(parsed, "CTX13: parse succeeds");
+
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_not_null(stmt, "CTX13: statement exists");
+
+    struct anvl_element_meta *em0 = Context.get_element(ctx, stmt, 0);
+    TestBit.is_not_null(em0, "CTX13: first element metadata exists");
+    TestBit.is_equal_int(ANVL_VALUE_OBJECT, (long long)em0->type,
+                         "CTX13: first element type is OBJECT");
+
+    value v0 = Context.get_element_value(ctx, stmt, 0);
+    TestBit.is_not_null(v0, "CTX13: first element child value exists");
+    TestBit.is_equal_int(ANVL_VALUE_OBJECT, (long long)v0->type,
+                         "CTX13: child value type is OBJECT");
+    TestBit.is_equal_int(2, (long long)Context.value_field_count(ctx, v0),
+                         "CTX13: object element has two fields");
+
+    field name_f = Context.get_value_field_by_name(ctx, v0, "name", 4);
+    field dmg_f = Context.get_value_field_by_name(ctx, v0, "damage", 6);
+    TestBit.is_not_null(name_f, "CTX13: object element has 'name' field");
+    TestBit.is_not_null(dmg_f, "CTX13: object element has 'damage' field");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
+/* CTX14 — nested array element exposes child collection handle       */
+/* ------------------------------------------------------------------ */
+static void test_ctx14_nested_array_element_value(void) {
+    const char *src = "grid := [[1, 2], [3, 4]]";
+
+    ctx_builder builder = Context.get_builder();
+    builder->set_source(builder, src, strlen(src));
+    context ctx = builder->build(builder);
+    TestBit.is_not_null(ctx, "CTX14: context created");
+
+    bool parsed = Context.parse(ctx);
+    TestBit.is_true(parsed, "CTX14: parse succeeds");
+
+    statement stmt = Context.get_statement(ctx, 0);
+    TestBit.is_not_null(stmt, "CTX14: statement exists");
+
+    struct anvl_element_meta *em0 = Context.get_element(ctx, stmt, 0);
+    TestBit.is_not_null(em0, "CTX14: first element metadata exists");
+    TestBit.is_equal_int(ANVL_VALUE_ARRAY, (long long)em0->type,
+                         "CTX14: first element type is ARRAY");
+
+    value v0 = Context.get_element_value(ctx, stmt, 0);
+    TestBit.is_not_null(v0, "CTX14: first nested collection value exists");
+    TestBit.is_equal_int(ANVL_VALUE_ARRAY, (long long)v0->type,
+                         "CTX14: nested collection value type is ARRAY");
+    TestBit.is_equal_int(2, (long long)Context.value_element_count(ctx, v0),
+                         "CTX14: nested collection has two scalar elements");
+
+    Context.dispose(ctx);
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                        */
 /* ------------------------------------------------------------------ */
 int main(void) {
@@ -316,6 +385,8 @@ int main(void) {
     TestBit.run_ex("CTX10_parse_multiple",          NULL, test_ctx10_parse_multiple,           td);
     TestBit.run_ex("CTX11_get_statement_bounds",    NULL, test_ctx11_get_statement_bounds,     td);
     TestBit.run_ex("CTX12_add_statement_null",      NULL, test_ctx12_add_statement_null,       td);
+    TestBit.run_ex("CTX13_array_object_element_value", NULL, test_ctx13_array_object_element_value, td);
+    TestBit.run_ex("CTX14_nested_array_element_value", NULL, test_ctx14_nested_array_element_value, td);
 
     return TestBit.report();
 }

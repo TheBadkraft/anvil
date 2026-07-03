@@ -663,6 +663,13 @@ static struct anvl_element_meta *context_get_element(context self, statement stm
    return &stmt->value_meta->data.collection.elements[index];
 }
 
+static value context_get_element_value(context self, statement stmt, usize index) {
+   struct anvl_element_meta *em = context_get_element(self, stmt, index);
+   if (!em)
+      return NULL;
+   return em->child;
+}
+
 /* ================================================================
  * Value-level collection traversal (E3 extension)
  * Primitives for traversing arrays/tuples/objects nested in field values
@@ -688,6 +695,13 @@ static struct anvl_element_meta *context_get_value_element(context self, value v
    if (!elements)
       return NULL;
    return &elements[index];
+}
+
+static value context_get_value_element_value(context self, value val, usize index) {
+   struct anvl_element_meta *em = context_get_value_element(self, val, index);
+   if (!em)
+      return NULL;
+   return em->child;
 }
 
 static usize context_value_field_count(context self, value val) {
@@ -801,8 +815,10 @@ const struct anvl_context_i Context = {
     .get_field_by_name = context_get_field_by_name,
     .element_count = context_element_count,
     .get_element = context_get_element,
+   .get_element_value = context_get_element_value,
     .value_element_count = context_value_element_count,
     .get_value_element = context_get_value_element,
+   .get_value_element_value = context_get_value_element_value,
     .value_field_count = context_value_field_count,
     .get_value_field = context_get_value_field,
     .get_value_field_by_name = context_get_value_field_by_name,

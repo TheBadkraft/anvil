@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.5.5-alpha] — pre-release (2026-07-03)
+
+### Added
+
+- **Collection element child-value access API** (`include/context.h`, `src/core/context.c`) — added two context accessors so bindings can traverse non-scalar array/tuple elements without reparsing source spans:
+  - `Context.get_element_value(ctx, stmt, index)`
+  - `Context.get_value_element_value(ctx, val, index)`
+- **Element metadata child handle** (`include/types.h`, `src/core/parser.c`) — `anvl_element_meta` now carries a `child` value handle for element-level traversal of nested object/array/tuple elements.
+- **Tests: CTX13–CTX14** (`test/unit/test_context.c`) — coverage for object elements and nested collection elements retrieved via the new element child-value accessors.
+
+### Fixed
+
+- **Binding traversal gap for non-scalar collection elements** (`src/core/parser.c`, `src/core/context.c`) — bindings can now obtain nested element value handles directly from context APIs instead of being limited to type + source span metadata.
+
+### Changed
+
+- **Version bump** (`include/constants.h`) — updated to `0.5.5-alpha`.
+
+---
+
 ## [v0.5.4-alpha] — pre-release (2026-07-01)
 
 ### Added

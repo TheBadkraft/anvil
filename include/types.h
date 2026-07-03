@@ -122,6 +122,7 @@ struct anvl_element_meta {
    anvl_value_type type; // type of this element
    usize pos;            // position in source
    usize len;            // length in source
+   value child;          // nested value handle (NULL for scalar fast-path elements)
 };
 
 /* ------------------------------------------------------------------ */
