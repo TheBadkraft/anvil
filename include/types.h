@@ -23,6 +23,7 @@
 #include <sigma.core/types.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* ------------------------------------------------------------------ */
 /* Statement Types                                                   */
@@ -283,17 +284,21 @@ struct anvl_value {
 
 /* Extract tag length from encoded length field (upper 8 bits) */
 static inline uint8_t blob_tag_length(usize encoded_length) {
-   return (uint8_t)((encoded_length >> 56) & 0xFF);
+   uint64_t packed = (uint64_t)encoded_length;
+   return (uint8_t)((packed >> 56) & UINT64_C(0xFF));
 }
 
 /* Extract content length from encoded length field (lower 56 bits) */
 static inline usize blob_content_length(usize encoded_length) {
-   return encoded_length & 0x00FFFFFFFFFFFFFF;
+   uint64_t packed = (uint64_t)encoded_length;
+   return (usize)(packed & UINT64_C(0x00FFFFFFFFFFFFFF));
 }
 
 /* Encode tag length and content length into a single usize */
 static inline usize blob_encode_length(uint8_t tag_length, usize content_length) {
-   return ((usize)tag_length << 56) | (content_length & 0x00FFFFFFFFFFFFFF);
+   uint64_t packed = ((uint64_t)tag_length << 56) |
+                     ((uint64_t)content_length & UINT64_C(0x00FFFFFFFFFFFFFF));
+   return (usize)packed;
 }
 
 /* ------------------------------------------------------------------ */

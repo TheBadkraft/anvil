@@ -12,12 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Anonymous-block inheritance parse path** (`src/core/parser.c`) — parser now accepts anonymous object block inheritance syntax with optional attributes (`Ident : Base { ... }` and `Ident : Base @[...] { ... }`) and preserves base metadata on `ANVL_ANON_OBJECT` statements.
+- **WASM32 shift-width warnings in blob length helpers** (`include/types.h`) — blob tag/content length packing now uses explicit `uint64_t` encode/decode so wasm32 targets avoid invalid `usize` 56-bit shifts.
 
 ### Changed
 
 - **Parser structures coverage expanded** (`test/unit/test_parser_structures.c`) — added inheritance-focused anonymous-block structural tests (PS14, PS15) in the primary structures suite.
 - **Test fixture layout cleanup** (`test/fixtures/`, `test/unit/*`, `test/benchmarks/*`, `test/utilities/helpers.*`) — migrated sample assets from `test/samples/` to `test/fixtures/` and updated test helpers/consumers to use the consolidated fixtures path.
-- **No public API surface changes** — this release is parser behavior and test-infrastructure focused.
+- **Core build matrix expanded** (`lib/Makefile`, `BUILDING.md`) — added `wasm` output target (`lib/wasm/libanvil.a`), updated `clean` to remove wasm artifacts, and changed `make -C lib all` to build debug + release + wasm + bindings.
+- **WebAssembly integration docs** (`docs/wasm.md`, `README.md`, `BUILDING.md`) — clarified that `lib/wasm/libanvil.a` is an Emscripten static archive and final browser package ownership lives in binding/app repos (for example `anvil.js`).
+- **No public C API surface changes** — this release is parser behavior, build orchestration, and documentation focused.
 
 ---
 

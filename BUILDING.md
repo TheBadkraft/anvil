@@ -11,6 +11,7 @@ This document reflects the build flow that exists in this repository today.
 ## Prerequisites
 
 - `gcc`
+- `emcc` (Emscripten, for `make -C lib wasm` and `make -C lib all`)
 - `make`
 - `python3` (for bindings handoff manifest generation)
 - `valgrind` (optional, for memory checks)
@@ -21,16 +22,19 @@ This document reflects the build flow that exists in this repository today.
 # 1) Build core debug libraries (.a and .so)
 make -C lib
 
-# 2) Build core release libraries (.a and .so)
+# 2) Build all core library variants (debug + release + wasm) and bindings handoff
+make -C lib all
+
+# 3) Build only core release libraries (.a and .so)
 make -C lib release
 
-# 3) Run selected active unit suites
+# 4) Run selected active unit suites
 make -C test/unit test_resolver test_vars test_interp_string test_using test_schema test_anon_block_attrs
 
-# 4) Run unit valgrind gate
+# 5) Run unit valgrind gate
 make -C test/unit valgrind
 
-# 5) Generate official bindings + contract manifest
+# 6) Generate official bindings + contract manifest
 make -C bindings generate
 ```
 
@@ -42,14 +46,21 @@ make -C bindings generate
 - `lib/debug/libanvil.so`
 - `lib/release/libanvil.a`
 - `lib/release/libanvil.so`
+- `lib/wasm/libanvil.a`
 
 Commands:
 
 ```bash
 make -C lib           # debug + bindings generation
+make -C lib all       # debug + release + wasm + bindings generation
 make -C lib release   # release libs
+make -C lib wasm      # WebAssembly static archive (requires emcc)
 make -C lib clean
 ```
+
+Note: `lib/wasm/libanvil.a` is an Emscripten static archive for wasm toolchains.
+It is not the final browser-distributable module by itself; bindings/tools perform
+the final link step into `.wasm` + JS loader artifacts.
 
 Note: `make -C lib` triggers `make -C bindings generate` so official bindings
 and handoff metadata stay in sync with core changes.

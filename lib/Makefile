@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------
 
 CC      := gcc
+EMCC    ?= emcc
 STD     := c2x
 AR      := ar
 ARFLAGS := rcs
@@ -33,22 +34,27 @@ COMMON    := -std=$(STD) -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM) $(I
 
 DEBUG_FLAGS   := -Wall -Wextra -g -O0
 RELEASE_FLAGS := -Wall -Wextra -O2 -DNDEBUG
+WASM_FLAGS    := -Wall -Wextra -O2
 
 DEBUG_OBJS   := $(patsubst $(ANVIL)/%.c, debug/%.o,   $(SRCS))
 RELEASE_OBJS := $(patsubst $(ANVIL)/%.c, release/%.o, $(SRCS))
+WASM_OBJS    := $(patsubst $(ANVIL)/%.c, wasm/%.o,    $(SRCS))
 
 DEBUG_LIB_A   := debug/libanvil.a
 DEBUG_LIB_SO  := debug/libanvil.so
 RELEASE_LIB_A := release/libanvil.a
 RELEASE_LIB_SO:= release/libanvil.so
+WASM_LIB_A    := wasm/libanvil.a
 
-.PHONY: all debug release bindings clean
+.PHONY: all debug release wasm bindings clean
 
-all: debug bindings
+all: debug release wasm bindings
 
 debug: $(DEBUG_LIB_A) $(DEBUG_LIB_SO)
 
 release: $(RELEASE_LIB_A) $(RELEASE_LIB_SO)
+
+wasm: $(WASM_LIB_A)
 
 bindings:
 	$(MAKE) -C ../bindings generate
@@ -65,6 +71,9 @@ $(RELEASE_LIB_A): $(RELEASE_OBJS)
 $(RELEASE_LIB_SO): $(RELEASE_OBJS)
 	$(CC) -shared -o $@ $^
 
+$(WASM_LIB_A): $(WASM_OBJS)
+	$(AR) $(ARFLAGS) $@ $^
+
 debug/%.o: $(ANVIL)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(COMMON) $(DEBUG_FLAGS) -fPIC -c $< -o $@
@@ -73,5 +82,9 @@ release/%.o: $(ANVIL)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(COMMON) $(RELEASE_FLAGS) -fPIC -c $< -o $@
 
+wasm/%.o: $(ANVIL)/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(COMMON) $(WASM_FLAGS) -c $< -o $@
+
 clean:
-	rm -rf debug release
+	rm -rf debug release wasm

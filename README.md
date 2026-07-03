@@ -136,6 +136,15 @@ Anvil is designed as a single C backend with pluggable layers. All bindings
 
 **Dependency rule:** `anvil.schema` → `anvil.resolver` → `anvil.o`. Nothing flows upward. The parser knows nothing about schema, scripting, or bindings.
 
+## WebAssembly Status
+
+- Core WebAssembly compilation is now available via `make -C lib wasm` (or `make -C lib all`).
+- The generated artifact `lib/wasm/libanvil.a` is an Emscripten static archive (toolchain input), not a browser-ready runtime bundle by itself.
+- Browser-distributable outputs (`.wasm` + JS loader/glue) are produced by the owning binding/application repository during its final link/package step.
+- For `anvil.js`, web build ownership lives in that repository's build pipeline while this repository remains the canonical C core producer.
+
+See `BUILDING.md` and `docs/wasm.md` for details.
+
 ## Core Principles (Non-Negotiable)
 
 | Principle                         | Status |
