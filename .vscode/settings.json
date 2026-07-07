@@ -1,0 +1,16 @@
+{
+    "editor.formatOnSave": true,
+    "[c]": {
+        "editor.defaultFormatter": "xaver.clang-format",
+        "editor.tabSize": 3,
+        "editor.formatOnSave": true,
+        "editor.detectIndentation": false
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.tabSize": 3,
+        "editor.formatOnSave": true,
+        "editor.detectIndentation": false
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}
