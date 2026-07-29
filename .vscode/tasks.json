@@ -12,27 +12,12 @@
         {
             "label": "link active test",
             "type": "shell",
-            "command": "gcc",
+            "command": "make",
             "args": [
-                "-Wall", "-Wextra", "-g", "-std=c2x",
-                "-I../../include",
-                "-I../../../testbit/include",
-                "-D_POSIX_C_SOURCE=200809L",
-                "-DANVL_BUILD=0",
-                "${fileBasename}",
-                "../../src/core/anvil.c",
-                "../../src/core/context.c",
-                "../../src/core/errors.c",
-                "../../src/core/parser.c",
-                "../../src/utilities/utils.c",
-                "../../src/utilities/memory.c",
-                "../../src/utilities/strings.c",
-                "../utilities/helpers.c",
-                "../../../testbit/src/testbit.c",
-                "-o", "bin/${fileBasenameNoExtension}"
+                "build_${fileBasenameNoExtension}"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/test/unit"
+                "cwd": "${fileDirname}"
             },
             "problemMatcher": "$msCompile",
             "group": {

@@ -1,0 +1,13 @@
+#!aml
+
+// flag
+server @[active] := localhost;
+
+// key-value
+endpoint @[env=production] := localhost;
+
+// mixed attribution
+server @[env=production, active] := {
+    host := localhost;
+    port := 8080;
+};

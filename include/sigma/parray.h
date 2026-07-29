@@ -1,0 +1,125 @@
+/*
+ * Sigma Collections
+ * Copyright (c) 2026 David Boarman (BadKraft) and contributors
+ * QuantumOverride [Q|]
+ * ----------------------------------------------------------------------- *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * ----------------------------------------------------------------------- *
+ * File: parray.h
+ * Description: Header file for Sigma Collections pointer-array definitions and interfaces
+ *
+ * Array: One of the two core collection structures used to abstract and unify all
+ *        collection types within Sigma Collections. The pointer-array (parray) stores pointers
+ *        to objects, enabling dynamic collections of heterogeneous or large objects
+ *        through pointer indirection. Essential for polymorphism, large objects, or
+ *        when reference semantics are required.
+ *
+ * Pointer-Array: A collection that stores pointers to objects, providing flexibility
+ *                for heterogeneous collections and large objects. Ideal for storing
+ *                objects of varying types, large structures, or when you need reference
+ *                semantics rather than value semantics. The pointer indirection allows
+ *                for polymorphism and avoids expensive copying of large objects.
+ */
+#pragma once
+
+#include <sigma/allocator.h>
+#include <sigma/types.h>
+#include <sigma/collection.h>
+
+// forward declaration of the array structure
+struct sc_pointer_array;
+typedef struct sc_pointer_array *parray;
+
+// forward declaration for slotarray
+struct sc_slotarray;
+typedef struct sc_slotarray *slotarray;
+
+/* Public interface for array operations                        */
+/* ============================================================ */
+typedef struct sc_parray_i {
+    /**
+     * @brief Initialize a new array with the specified initial capacity.
+     * @param capacity Initial array capacity
+     */
+    parray (*new)(usize);
+    /**
+     * @brief Initialize an array with the specified capacity.
+     * @param arr The array to initialize
+     * @param capacity Initial array capacity
+     */
+    void (*init)(parray *, usize);
+    /**
+     * @brief Dispose of the array and free associated resources.
+     * @param arr The array to dispose of
+     */
+    void (*dispose)(parray);
+    /**
+     * @brief Get the current capacity of the array.
+     * @param arr The array to query
+     * @return Current capacity of the array
+     */
+    int (*capacity)(parray);
+    /**
+     * @brief Clear the contents of the array.
+     * @param arr The array to clear
+     */
+    void (*clear)(parray);
+    /**
+     * @brief Set the value at the specified index in the array.
+     * @param arr The array to modify
+     * @param index Index at which to set the value
+     * @param value Value to set
+     * @return 0 on OK; otherwise non-zero
+     */
+    int (*set)(parray, usize, addr);
+    /**
+     * @brief Get the value at the specified index in the array.
+     * @param arr The array to query
+     * @param index Index from which to get the value
+     * @param out_value Pointer to store the retrieved value
+     * @return 0 on OK; otherwise non-zero
+     */
+    int (*get)(parray, usize, addr *);
+    /**
+     * @brief Remove the element at the specified index, setting it to empty without shifting.
+     * @param arr The array to modify
+     * @param index Index of the element to remove
+     * @return 0 on OK; otherwise non-zero
+     */
+    int (*remove)(parray, usize);
+    /**
+     * @brief Create a non-owning collection view of the array.
+     * @param arr The array to view
+     * @return A collection view, or NULL on failure
+     */
+    collection (*as_collection)(parray);
+    /**
+     * @brief Create an owning collection copy of the array.
+     * @param arr The array to copy
+     * @return A collection copy, or NULL on failure
+     */
+    collection (*to_collection)(parray);
+    /**
+     * @brief Create a slotarray view of the parray.
+     * @param arr The parray to view
+     * @return A slotarray view, or NULL on failure
+     */
+    slotarray (*as_slotarray)(parray);
+} sc_parray_i;
+extern const sc_parray_i PArray;

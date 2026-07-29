@@ -1,0 +1,9 @@
+#!aml
+
+/* ************************************ *
+ * Array variants:                      *
+ * - bare literal elements              *
+ * - mixed scalar elements              *
+ * - nested elements                    *
+ * ************************************ */
+tags := [alpha, beta];

@@ -1,0 +1,150 @@
+/*
+ * Copyright (c) 2025 Quantum Override. All rights reserved.
+ * SPDX-License-Identifier: Proprietary
+ * ----------------------------------------------------------------------- *
+ * test_list.c - Infrastructure tests: List vtable
+ * ----------------------------------------------------------------------- *
+ * Author: BadKraft
+ * File: test/infra/test_list.c
+ */
+#include "sigma/list.h"
+#include "testbit.h"
+
+static void td(void) {}
+
+/* ----------------------------------------------------------------- */
+/* IL01 — List.new creates a valid list                               */
+/* ----------------------------------------------------------------- */
+static void test_il01_list_new(void) {
+  list lst = List.new(4, sizeof(void *));
+  TestBit.is_not_null(lst, "IL01: List.new returns non-null");
+  TestBit.is_equal_int(0, (long long)List.size(lst), "IL01: initial size is 0");
+  TestBit.is_true(List.capacity(lst) >= 4, "IL01: capacity at least 4");
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL02 — List.append and size                                        */
+/* ----------------------------------------------------------------- */
+static void test_il02_list_append(void) {
+  list lst = List.new(4, sizeof(void *));
+
+  int a = 1, b = 2, c = 3;
+  List.append(lst, &a);
+  List.append(lst, &b);
+  List.append(lst, &c);
+
+  TestBit.is_equal_int(3, (long long)List.size(lst),
+                       "IL02: size is 3 after 3 appends");
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL03 — List.get retrieves correct element                          */
+/* ----------------------------------------------------------------- */
+static void test_il03_list_get(void) {
+  list lst = List.new(4, sizeof(void *));
+
+  int a = 10, b = 20, c = 30;
+  List.append(lst, &a);
+  List.append(lst, &b);
+  List.append(lst, &c);
+
+  void *out = NULL;
+  int r = List.get(lst, 1, &out);
+  TestBit.is_equal_int(0, (long long)r, "IL03: get at index 1 returns OK");
+  TestBit.is_not_null(out, "IL03: out value is non-null");
+  TestBit.is_equal_int(20, (long long)*(int *)out,
+                       "IL03: value at index 1 is 20");
+
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL04 — List.get out of bounds returns ERR                          */
+/* ----------------------------------------------------------------- */
+static void test_il04_list_get_oob(void) {
+  list lst = List.new(4, sizeof(void *));
+
+  int a = 1;
+  List.append(lst, &a);
+
+  void *out = NULL;
+  int r = List.get(lst, 5, &out);
+  TestBit.is_equal_int(-1, (long long)r, "IL04: get out of bounds returns ERR");
+
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL05 — List.remove_at shifts elements correctly                    */
+/* ----------------------------------------------------------------- */
+static void test_il05_list_remove(void) {
+  list lst = List.new(4, sizeof(void *));
+
+  int a = 1, b = 2, c = 3;
+  List.append(lst, &a);
+  List.append(lst, &b);
+  List.append(lst, &c);
+
+  List.remove(lst, 1);
+  TestBit.is_equal_int(2, (long long)List.size(lst),
+                       "IL05: size is 2 after remove");
+
+  void *out = NULL;
+  List.get(lst, 1, &out);
+  TestBit.is_equal_int(3, (long long)*(int *)out,
+                       "IL05: index 1 is now 3 after remove");
+
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL06 — List.clear resets size to zero                              */
+/* ----------------------------------------------------------------- */
+static void test_il06_list_clear(void) {
+  list lst = List.new(4, sizeof(void *));
+
+  int a = 1, b = 2;
+  List.append(lst, &a);
+  List.append(lst, &b);
+  List.clear(lst);
+
+  TestBit.is_equal_int(0, (long long)List.size(lst),
+                       "IL06: size is 0 after clear");
+  List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL07 — List grows beyond initial capacity                          */
+/* ----------------------------------------------------------------- */
+static void test_il07_list_grow(void) {
+  list lst = List.new(2, sizeof(void *));
+
+  int vals[8];
+  for (int i = 0; i < 8; i++) {
+    vals[i] = i * 10;
+    List.append(lst, &vals[i]);
+  }
+
+  TestBit.is_equal_int(8, (long long)List.size(lst),
+                       "IL07: size is 8 after growing");
+
+  void *out = NULL;
+  List.get(lst, 7, &out);
+  TestBit.is_equal_int(70, (long long)*(int *)out, "IL07: last element is 70");
+
+  List.dispose(lst);
+}
+
+int main(void) {
+  TestBit.run_ex("IL01_list_new", NULL, test_il01_list_new, td);
+  TestBit.run_ex("IL02_list_append", NULL, test_il02_list_append, td);
+  TestBit.run_ex("IL03_list_get", NULL, test_il03_list_get, td);
+  TestBit.run_ex("IL04_list_get_oob", NULL, test_il04_list_get_oob, td);
+  TestBit.run_ex("IL05_list_remove", NULL, test_il05_list_remove, td);
+  TestBit.run_ex("IL06_list_clear", NULL, test_il06_list_clear, td);
+  TestBit.run_ex("IL07_list_grow", NULL, test_il07_list_grow, td);
+
+  return TestBit.report();
+}

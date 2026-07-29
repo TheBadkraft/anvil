@@ -1,0 +1,5 @@
+#!aml
+
+import 'f10_vars_block.anvl'
+
+endpoint := $host;

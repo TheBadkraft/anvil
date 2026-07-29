@@ -1,0 +1,7 @@
+#!aml
+
+@[doc-level]
+@[isMixed=true]
+@[hasVar_Refs]
+@[hasDot.Notation, hasColon:Separator]
+name := David;
