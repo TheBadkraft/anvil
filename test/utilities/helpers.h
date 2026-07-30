@@ -10,12 +10,7 @@
 #pragma once
 
 
-#include "source.h"
-#include "internal/parser.h"
-#include "internal/root.h"
+#include "internal/source.h"
 
 /* Path resolution */
 const char *fixture_path(const char *name);
-
-/* Create doc & parser boilerplate */
-bool create_doc_with_parser(anvl_doc *doc, const char *filepath);

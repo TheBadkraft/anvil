@@ -10,15 +10,14 @@ CFLAGS  = -Wall -Wextra -g -std=$(STD) \
           -D_POSIX_C_SOURCE=200809L \
           -DANVL_BUILD=$(BUILD_NUM)
 
-SIGMA_SRCS = $(ANVL)/src/sigma/files.c \
-             $(ANVL)/src/sigma/strings.c \
+SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
              $(ANVL)/src/sigma/memory.c \
 			 $(ANVL)/src/sigma/arrays.c \
              $(ANVL)/src/sigma/collections.c \
              $(ANVL)/src/sigma/list.c
 
 ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
-			 $(ANVL)/src/core/errors.c
+			 $(ANVL)/src/core/files.c
 
 UTIL_SRCS  = $(ANVL)/src/utilities/utils.c
 

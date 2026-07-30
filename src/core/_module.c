@@ -84,11 +84,11 @@ void mod_dispose(AnvlMod *mod) {
   // clear the caller's pointer to avoid dangling pointer
   *mod = NULL;
 }
-void mod_ctx_set_parser(anvl_ctx ctx, parser p) {
-  if (!ctx || !p)
+void mod_ctx_set_parser(anvl_ctx ctx, parser parser) {
+  if (!ctx || !parser)
     return;
 
-  ctx->parser = p;
+  ctx->parser = parser;
 }
 /* ----------------------------------------------------------------- *
  * anvl_ctx management                                                *

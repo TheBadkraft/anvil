@@ -1,23 +1,22 @@
-/*
- * Copyright (c) 2025 Quantum Override. All rights reserved.
- *
- * This software is proprietary and confidential. Unauthorized copying,
- * distribution, modification, or use of this software, via any medium,
- * is strictly prohibited without express written permission from the
- * copyright holder.
- *
- * SPDX-License-Identifier: Proprietary
+ /* ********************************************************************** *
+ * Copyright (c) 2026 Quantum Override. All rights reserved.               *
+ *                                                                         *
+ * This software is proprietary and confidential. Unauthorized copying,    *
+ * distribution, modification, or use of this software, via any medium,    *
+ * is strictly prohibited without express written permission from the      *
+ * copyright holder.                                                       *
+ *                                                                         *
+ * SPDX-License-Identifier: Proprietary                                    *
  * ----------------------------------------------------------------------- *
- * errors.h - Error handling for Anvil
+ * errors.h - Error handling for Anvil                                     *
  * ----------------------------------------------------------------------- *
- * Author: BadKraft
- * Created: 2025-12-14
- * File: include/errors.h
+ * Author: BadKraft                                                        *
+ * Created: 2026-07-13                                                     *
+ * File: include/errors.h                                                  *
  * ----------------------------------------------------------------------- *
- * Description:
- * Error codes and state management for Anvil parser and operations
- * ----------------------------------------------------------------------- *
- */
+ * Description:                                                            *
+ * Error codes and state management for Anvil parser and operations        *
+ * *********************************************************************** */
 #pragma once
 
 #include "types.h"
@@ -34,6 +33,8 @@ typedef enum {
 
    // Root/Doc Initialization Errors (100x)
    ANVL_ERR_FILE_READ = 1001,
+   ANVL_ERR_FILE_NOT_FOUND = 1002,
+   ANVL_ERR_FILE_INVALID_PATH = 1003,
 
    // Parser Errors (200x-400x)
    // Top Level (200x)
@@ -112,12 +113,15 @@ typedef enum {
    ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED = 4501,
 
    // Schema Errors (46xx)
-   ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,             // document lacks the required @[schema] module attribute
-   ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602,          // schema field references an undefined type name
-   ANVL_ERR_SCHEMA_BASE_UNKNOWN = 4603,             // schema statement base is not 'enum', 'flags', or a known type
-   ANVL_ERR_SCHEMA_VALIDATION_REQUIRED = 4604,      // required field absent in data document
-   ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH = 4605, // data field value type does not match schema field type
-   ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD = 4606, // data field not declared in schema type (strict mode)
+   ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,    // document lacks the required @[schema] module attribute
+   ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602, // schema field references an undefined type name
+   ANVL_ERR_SCHEMA_BASE_UNKNOWN =
+      4603, // schema statement base is not 'enum', 'flags', or a known type
+   ANVL_ERR_SCHEMA_VALIDATION_REQUIRED = 4604, // required field absent in data document
+   ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH =
+      4605, // data field value type does not match schema field type
+   ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD =
+      4606, // data field not declared in schema type (strict mode)
 
    // Lexer/Scanner Errors (50xx)
    ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,
@@ -140,23 +144,19 @@ typedef enum {
    ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP = 5104,    // break outside loop
    ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
 
-   // I/O Errors (60xx)
-   ANVL_ERR_IO_FILE_NOT_FOUND = 6001,
-   ANVL_ERR_IO_READ_FAILED = 6002,
-
    // Memory Errors (70xx)
    ANVL_ERR_MEMORY_ALLOCATION_FAILED = 7001,
 
    // Generic Errors (90xx)
    ANVL_ERR_INVALID_OPERATION = 9001,
    ANVL_ERR_INVALID_ARGUMENT = 9002,
-} anvl_error_code;
+} anvl_err_code;
 
 /* ----------------------------------------------------------------- */
 /* Error State Structure                                             */
 /* ----------------------------------------------------------------- */
 typedef struct anvl_error_state {
-   anvl_error_code code;
+   anvl_err_code code;
    const char *message;
    usize line;
    usize column;
@@ -166,13 +166,13 @@ typedef struct anvl_error_state {
 /* ----------------------------------------------------------------- */
 /* Error State Management                                            */
 /* ----------------------------------------------------------------- */
-void anvl_error_set(list target, anvl_error_code code, usize line, usize column, const char *file);
-void anvl_error_clear(list target);
-bool anvl_error_is_set(list target);
-const anvl_error_state *anvl_error_get(list target, usize index);
+void anvl_error_set(list, anvl_err_code, usize, usize, const char *);
+void anvl_error_clear(list);
+bool anvl_error_is_set(list);
+const anvl_error_state *anvl_error_get(list, usize);
 
 /* ----------------------------------------------------------------- */
 /* Error Code Utilities                                              */
 /* ----------------------------------------------------------------- */
-const char *anvl_error_code_message(anvl_error_code code);
-const char *anvl_error_code_name(anvl_error_code code);
+const char *anvl_error_code_message(anvl_err_code);
+const char *anvl_error_code_name(anvl_err_code);

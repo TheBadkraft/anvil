@@ -20,20 +20,19 @@
 #pragma once
 
 #include "anvil.h"
+#include "std.h"
 #include "internal/module.h"
 // -----------------------------------------------------------------
 #include <sigma/list.h>
 #include <sigma/types.h>
 #include <sigma/memory.h>
 #include <sigma/strings.h>
-#include <stdlib.h>
-#include <string.h>
 
 /* ----------------------------------------------------------------- *
  * Source structure                                                        *
  * ----------------------------------------------------------------- */
 struct anvl_src_t {
-   anvl_doc doc; // pointer to the anvl_doc that owns this source
+   anvl_err_code err_code;
    // farray-compatible buffer structure
    struct {
       void *bucket; // pointer to first element (raw bytes)
@@ -50,26 +49,33 @@ struct anvl_src_t {
  * AnvlDoc->Source Interface - for interrogating source content            *
  * ----------------------------------------------------------------- */
 typedef struct anvl_source_i {
-   bool (*create)(const char *filepath, anvl_doc *out_doc);
-   void (*dispose)(anvl_src src);
-   anvl_dialect (*dialect)(anvl_doc doc);
+   /**
+    * @brief Create a source object from input text.
+    * @param[in] filepath Input source file path.
+    * @param[out] out_src Receives the created source object on success.
+    * @param[out] out_err_code Receives ANVL_ERR_NONE on success, otherwise a failure code.
+    * @return TRUE on success; otherwise FALSE.
+    */
+   bool (*create)(const char *, anvl_source *, anvl_err_code *);
+   void (*dispose)(anvl_source);
+   anvl_dialect (*dialect)(anvl_source);
    // Error handling - per source object
-   bool (*has_errors)(anvl_doc doc);
+   bool (*has_errors)(anvl_source);
 
    // Position & EOF
-   usize (*position)(anvl_doc doc);
-   usize (*line)(anvl_doc doc);
-   usize (*column)(anvl_doc doc);
-   bool (*is_eof)(anvl_doc doc);
-   bool (*is_eof_offset)(anvl_doc doc, usize);
+   usize (*position)(anvl_source);
+   usize (*line)(anvl_source);
+   usize (*column)(anvl_source);
+   bool (*is_eof)(anvl_source);
+   bool (*is_eof_offset)(anvl_source, usize);
 
    // Character peek
-   char (*peek)(anvl_doc doc);
-   char (*peek_offset)(anvl_doc doc, usize);
+   char (*peek)(anvl_source);
+   char (*peek_offset)(anvl_source, usize);
 
    // String matching (returns length if matches, 0 if not)
-   usize (*match_length)(anvl_doc doc, const char *, usize);
-   usize (*match_operator)(anvl_doc doc, const char *, usize);
+   usize (*match_length)(anvl_source, const char *, usize);
+   usize (*match_operator)(anvl_source, const char *, usize);
 
    // Character classification
    bool (*is_alpha)(char);
@@ -79,26 +85,26 @@ typedef struct anvl_source_i {
    bool (*is_identifier_part)(char);
 
    // Consume
-   usize (*consume)(anvl_doc doc, usize);
+   usize (*consume)(anvl_source, usize);
 
    // Data access (for scanning without consuming)
-   const char *(*data)(anvl_doc doc);
-   usize (*length)(anvl_doc doc);
+   const char *(*data)(anvl_source);
+   usize (*length)(anvl_source);
 
    // Substring extraction (caller-supplied buffer; FR-2603-anvil-002)
-   void (*substring)(anvl_doc doc, usize start, usize len, char *out_buf);
+   void (*substring)(anvl_source, usize, usize, char *);
 
    // Whitespace & comments
-   usize (*skip_whitespace_and_comments)(anvl_doc doc);
+   usize (*skip_whitespace_and_comments)(anvl_source);
 
    // Shebang
-   bool (*is_shebang)(anvl_doc doc);
+   bool (*is_shebang)(anvl_source);
 
    // Dialect parsing
-   anvl_dialect (*parse_dialect)(anvl_doc doc, anvl_dialect);
+   anvl_dialect (*parse_dialect)(anvl_source, anvl_dialect);
 
    // Position management
-   void (*set_position)(anvl_doc doc, usize, usize, usize);
-   void (*reset)(anvl_doc doc);
+   void (*set_position)(anvl_source, usize, usize, usize);
+   void (*reset)(anvl_source);
 } anvl_source_i;
 extern const anvl_source_i Source;

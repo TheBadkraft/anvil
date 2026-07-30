@@ -12,11 +12,7 @@ CFLAGS  = -Wall -Wextra -g -std=$(STD) \
 
 ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/errors.c \
-			 $(ANVL)/src/core/parser.c \
-			 $(ANVL)/src/core/source.c \
-			 $(ANVL)/src/core/document.c \
-			 $(ANVL)/src/core/module.c \
-			 $(ANVL)/src/sigma/files.c \
+			 $(ANVL)/src/core/files.c \
 			 $(ANVL)/src/sigma/list.c \
 			 $(ANVL)/src/sigma/arrays.c \
              $(ANVL)/src/sigma/memory.c \

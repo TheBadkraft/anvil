@@ -1,21 +1,21 @@
 /* *********************************************************************** *
- * Copyright (c) 2025 Quantum Override. All rights reserved.            *
- *                                                                      *
- * This software is proprietary and confidential. Unauthorized copying, *
- * distribution, modification, or use of this software, via any medium, *
- * is strictly prohibited without express written permission from the   *
- * copyright holder.                                                    *
- *                                                                      *
- * SPDX-License-Identifier: Proprietary                                 *
+ * Copyright (c) 2025 Quantum Override. All rights reserved.               *
+ *                                                                         *
+ * This software is proprietary and confidential. Unauthorized copying,    *
+ * distribution, modification, or use of this software, via any medium,    *
+ * is strictly prohibited without express written permission from the      *
+ * copyright holder.                                                       *
+ *                                                                         *
+ * SPDX-License-Identifier: Proprietary                                    *
  * ----------------------------------------------------------------------- *
- * std.h - Standard definitions for Anvil                               *
+ * std.h - Standard C includes for Anvil                                   *
  * ----------------------------------------------------------------------- *
- * Author: BadKraft                                                     *
- * Created: 2025-07-24                                                  *
- * File: include/std.h                                                  *
+ * Author: BadKraft                                                        *
+ * Created: 2025-07-24                                                     *
+ * File: include/std.h                                                     *
  * ----------------------------------------------------------------------- *
- * Description:                                                         *
- * This file contains standard definitions for Anvil                    *
+ * Description:                                                            *
+ * This file contains standard C includes for Anvil.                       *
  * *********************************************************************** */
 #pragma once
 
