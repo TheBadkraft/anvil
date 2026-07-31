@@ -1,4 +1,4 @@
- /* ********************************************************************** *
+/* ********************************************************************** *
  * Copyright (c) 2026 Quantum Override. All rights reserved.               *
  *                                                                         *
  * This software is proprietary and confidential. Unauthorized copying,    *
@@ -31,10 +31,10 @@
 typedef enum {
    ANVL_ERR_NONE = 0,
 
-   // Root/Doc Initialization Errors (100x)
-   ANVL_ERR_FILE_READ = 1001,
-   ANVL_ERR_FILE_NOT_FOUND = 1002,
-   ANVL_ERR_FILE_INVALID_PATH = 1003,
+   // File I/O Errors (100x)
+   ANVL_ERR_IO_FILE_READ = 1001,
+   ANVL_ERR_IO_FILE_NOT_FOUND = 1002,
+   ANVL_ERR_IO_INVALID_PATH = 1003,
 
    // Parser Errors (200x-400x)
    // Top Level (200x)
@@ -145,7 +145,7 @@ typedef enum {
    ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
 
    // Memory Errors (70xx)
-   ANVL_ERR_MEMORY_ALLOCATION_FAILED = 7001,
+   ANVL_ERR_MEMORY_ALLOC_FAILED = 7001,
 
    // Generic Errors (90xx)
    ANVL_ERR_INVALID_OPERATION = 9001,
@@ -155,21 +155,21 @@ typedef enum {
 /* ----------------------------------------------------------------- */
 /* Error State Structure                                             */
 /* ----------------------------------------------------------------- */
-typedef struct anvl_error_state {
+typedef struct anvl_err_state_t {
    anvl_err_code code;
    const char *message;
    usize line;
    usize column;
    const char *file;
-} anvl_error_state;
+} anvl_err_state_t;
 
 /* ----------------------------------------------------------------- */
 /* Error State Management                                            */
 /* ----------------------------------------------------------------- */
-void anvl_error_set(list, anvl_err_code, usize, usize, const char *);
+anvl_result anvl_error_set(list, anvl_err_code, usize, usize, const char *, anvl_err_code *);
 void anvl_error_clear(list);
 bool anvl_error_is_set(list);
-const anvl_error_state *anvl_error_get(list, usize);
+anvl_error anvl_error_get(list, usize);
 
 /* ----------------------------------------------------------------- */
 /* Error Code Utilities                                              */

@@ -31,7 +31,7 @@
 /* ----------------------------------------------------------------- *
  * Source structure                                                        *
  * ----------------------------------------------------------------- */
-struct anvl_src_t {
+struct anvl_source_t {
    anvl_err_code err_code;
    // farray-compatible buffer structure
    struct {
@@ -54,9 +54,9 @@ typedef struct anvl_source_i {
     * @param[in] filepath Input source file path.
     * @param[out] out_src Receives the created source object on success.
     * @param[out] out_err_code Receives ANVL_ERR_NONE on success, otherwise a failure code.
-    * @return TRUE on success; otherwise FALSE.
+    * @return Anvl result indicating success or failure.
     */
-   bool (*create)(const char *, anvl_source *, anvl_err_code *);
+   anvl_result (*create)(const char *, anvl_source *, anvl_err_code *);
    void (*dispose)(anvl_source);
    anvl_dialect (*dialect)(anvl_source);
    // Error handling - per source object

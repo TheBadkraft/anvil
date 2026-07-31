@@ -16,18 +16,12 @@
  * *********************************************************************** */
 
 #include "errors.h"
+#include "std.h"
 #include "types.h"
 // -------------------------
 #include <sigma/list.h>
-// -------------------------
-#include <stdlib.h>
-#include <string.h>
 
-/* ----------------------------------------------------------------------- *
- * Error Code Utilities                                                    *
- * ----------------------------------------------------------------------- */
-static anvl_error_state global_error_state = {
-   .code = ANVL_ERR_NONE, .message = NULL, .line = 0, .column = 0, .file = NULL};
+static ssize_t err_state_size = sizeof(struct anvl_err_state_t);
 
 /* ----------------------------------------------------------------------- *
  * Error Code Utilities                                                    *
@@ -36,9 +30,9 @@ static const char *error_messages[] = {
    [ANVL_ERR_NONE] = "No error",
 
    // File Errors (100x)
-   [ANVL_ERR_FILE_READ] = "IO error reading source file",
-   [ANVL_ERR_FILE_NOT_FOUND] = "IO file not found",
-   [ANVL_ERR_FILE_INVALID_PATH] = "IO invalid file path",
+   [ANVL_ERR_IO_FILE_READ] = "IO error reading source file",
+   [ANVL_ERR_IO_FILE_NOT_FOUND] = "IO file not found",
+   [ANVL_ERR_IO_INVALID_PATH] = "IO invalid file path",
 
    // Parser Errors (200x-400x)
    [ANVL_ERR_PARSER_EXPECTED_IDENTIFIER] = "Expected identifier",
@@ -143,19 +137,18 @@ static const char *error_messages[] = {
    [ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP] = "break outside loop",
    [ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP] = "continue outside loop",
 
-   [ANVL_ERR_IO_FILE_NOT_FOUND] = "File not found",
-   [ANVL_ERR_IO_READ_FAILED] = "Failed to read file",
-   [ANVL_ERR_MEMORY_ALLOCATION_FAILED] = "Memory allocation failed",
+   [ANVL_ERR_MEMORY_ALLOC_FAILED] = "Memory allocation failed",
+
    [ANVL_ERR_INVALID_OPERATION] = "Invalid operation",
    [ANVL_ERR_INVALID_ARGUMENT] = "Invalid argument",
 };
 static const char *error_names[] = {
    [ANVL_ERR_NONE] = "ANVL_ERR_NONE",
 
-   [ANVL_ERR_FILE_READ] = "ANVL_ERR_FILE_READ",
-   [ANVL_ERR_FILE_NOT_FOUND] = "ANVL_ERR_FILE_NOT_FOUND",
-   [ANVL_ERR_FILE_INVALID_PATH] = "ANVL_ERR_FILE_INVALID_PATH", 
-   
+   [ANVL_ERR_IO_FILE_READ] = "ANVL_ERR_FILE_READ",
+   [ANVL_ERR_IO_FILE_NOT_FOUND] = "ANVL_ERR_FILE_NOT_FOUND",
+   [ANVL_ERR_IO_INVALID_PATH] = "ANVL_ERR_FILE_INVALID_PATH",
+
    [ANVL_ERR_PARSER_EXPECTED_IDENTIFIER] = "ANVL_ERR_PARSER_EXPECTED_IDENTIFIER",
    [ANVL_ERR_PARSER_EXPECTED_ASSIGN] = "ANVL_ERR_PARSER_EXPECTED_ASSIGN",
    [ANVL_ERR_PARSER_EXPECTED_VALUE] = "ANVL_ERR_PARSER_EXPECTED_VALUE",
@@ -241,10 +234,8 @@ static const char *error_names[] = {
    [ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED] = "ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED",
    [ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP] = "ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP",
    [ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP] = "ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP",
+   [ANVL_ERR_MEMORY_ALLOC_FAILED] = "ANVL_ERR_MEMORY_ALLOC_FAILED",
 
-   [ANVL_ERR_IO_FILE_NOT_FOUND] = "ANVL_ERR_IO_FILE_NOT_FOUND",
-   [ANVL_ERR_IO_READ_FAILED] = "ANVL_ERR_IO_READ_FAILED",
-   [ANVL_ERR_MEMORY_ALLOCATION_FAILED] = "ANVL_ERR_MEMORY_ALLOCATION_FAILED",
    [ANVL_ERR_INVALID_OPERATION] = "ANVL_ERR_INVALID_OPERATION",
    [ANVL_ERR_INVALID_ARGUMENT] = "ANVL_ERR_INVALID_ARGUMENT",
 };
@@ -252,29 +243,24 @@ static const char *error_names[] = {
 /* ----------------------------------------------------------------------- *
  * Error State Management                                                  *
  * ----------------------------------------------------------------------- */
-void anvl_error_set_global(anvl_error_code code, usize line, usize column, const char *file) {
-   global_error_state.code = code;
-   global_error_state.message = anvl_error_code_message(code);
-   global_error_state.line = line;
-   global_error_state.column = column;
-   global_error_state.file = file;
-}
-void anvl_error_set(list target, anvl_error_code code, usize line, usize column, const char *file) {
-   anvl_error_code msg_code = code;
-
-   if (!target) {
-      // If target is NULL, set the global error state
+anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize column,
+                           const char *file, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = code;
+   if (out_err_code) {
+      *out_err_code = ANVL_ERR_NONE;
+   }
+   if (!target || !out_err_code) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
-   list errors = target;
 
-   // Create a new error state and append it to the target's error list
-   anvl_error_state *new_error = (anvl_error_state *)malloc(sizeof(anvl_error_state));
+   anvl_error new_error = Allocator.alloc(err_state_size);
    if (!new_error) {
       // If memory allocation fails, set global error state
-      msg_code = ANVL_ERR_MEMORY_ALLOCATION_FAILED;
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
+   memset(new_error, 0, err_state_size);
 
    new_error->code = code;
    new_error->message = anvl_error_code_message(code);
@@ -282,67 +268,49 @@ void anvl_error_set(list target, anvl_error_code code, usize line, usize column,
    new_error->column = column;
    new_error->file = file;
 
-   List.append(errors, new_error);
-   return;
+   if (List.append(target, new_error) != 0) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+   return ANVL_RES_OK;
 
 error:
-   anvl_error_set_global(msg_code, line, column, file);
-}
-
-void anvl_error_clear_global(void) {
-   global_error_state.code = ANVL_ERR_NONE;
-   global_error_state.message = NULL;
-   global_error_state.line = 0;
-   global_error_state.column = 0;
-   global_error_state.file = NULL;
-}
-void anvl_error_clear(list target) {
-   if (!target) {
-      anvl_error_clear_global();
-      return;
+   if (new_error) {
+      Allocator.dispose(new_error);
    }
-
-   list errors = target;
-   List.clear(errors);
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
 }
 
 bool anvl_error_is_set(list target) {
-   if (!target) {
-      return global_error_state.code != ANVL_ERR_NONE;
-   }
-
-   list errors = target;
-   return List.size(errors) > 0;
+   return List.size(target) > 0;
 }
 
-const anvl_error_state *anvl_error_get(list target, usize index) {
-   if (!target) {
-      return &global_error_state;
-   }
-
-   list errors = target;
-   if (index >= List.size(errors)) {
+anvl_error anvl_error_get(list target, usize index) {
+   if (index >= List.size(target)) {
       return NULL;
    }
 
    // get the error state at the specified index
-   anvl_error_state *error_state = NULL;
-   List.get(errors, index, (object *)&error_state);
+   anvl_error err_state = NULL;
+   List.get(target, index, (object *)&err_state);
 
-   return error_state;
+   return err_state;
 }
 
 /* ----------------------------------------------------------------------- *
  * Error Code Utilities                                                    *
  * ----------------------------------------------------------------------- */
-const char *anvl_error_code_message(anvl_error_code code) {
+const char *anvl_error_code_message(anvl_err_code code) {
    if (code >= sizeof(error_messages) / sizeof(error_messages[0])) {
       return "Unknown error";
    }
    return error_messages[code] ? error_messages[code] : "Unknown error";
 }
 
-const char *anvl_error_code_name(anvl_error_code code) {
+const char *anvl_error_code_name(anvl_err_code code) {
    if (code >= sizeof(error_names) / sizeof(error_names[0])) {
       return "ANVL_ERR_UNKNOWN";
    }

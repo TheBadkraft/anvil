@@ -55,7 +55,7 @@ typedef struct anvl_node_t *anvl_node;
 /* ----------------------------------------------------------------------- *
  * typedefs - Error state                                                  *
  * ----------------------------------------------------------------------- */
-typedef struct anvl_error_state *anvl_error;
+typedef struct anvl_err_state_t *anvl_error;
 
 /* ----------------------------------------------------------------------- *
  * anvl_mod_t *AnvilMod                                                    *

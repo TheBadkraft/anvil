@@ -17,7 +17,7 @@ SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
              $(ANVL)/src/sigma/list.c
 
 ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
-			 $(ANVL)/src/core/files.c
+			 $(ANVL)/src/core/files.c 
 
 UTIL_SRCS  = $(ANVL)/src/utilities/utils.c
 
@@ -28,10 +28,12 @@ VERSION_SRC = ../unit/test_version.c
 TESTBIT_SRC = $(TESTBIT)/src/testbit.c
 
 BIN = bin
+VALGRIND_LOG = $(BIN)/valgrind_test_list.log
 
 .PHONY: all clean
 .PHONY: build_test_version build_test_files build_test_strings build_test_utils build_test_list
 .PHONY: test_version test_files test_strings test_utils
+.PHONY: valgrind_test_list
 
 all: $(BIN)/test_version \
      $(BIN)/test_files \
@@ -77,6 +79,16 @@ $(BIN)/test_list: test_list.c $(ANVIL_SRCS) $(SIGMA_SRCS) $(TESTBIT_SRC)
 test_list: $(BIN)/test_version $(BIN)/test_list
 	@$(BIN)/test_list
 	@$(BIN)/test_version
+
+build_test_list: $(BIN)/test_list
+
+valgrind_test_list: $(BIN)/test_version $(BIN)/test_list
+	@mkdir -p $(BIN)
+	@valgrind --leak-check=full --track-origins=yes \
+		--error-exitcode=42 \
+		--log-file=$(VALGRIND_LOG) \
+		$(BIN)/test_list
+	@echo "Valgrind log: $(VALGRIND_LOG)"
 
 clean:
 	rm -f $(BIN)/*

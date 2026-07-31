@@ -51,7 +51,7 @@ static void test_if02_load_missing_file(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = Files.load("../../test/fixtures/does_not_exist.anvl", &src, &len, &err_code);
    TestBit.is_true(res == ANVL_RES_ERR, "IF02: load returns ANVL_RES_ERR for missing file");
-   TestBit.is_true(err_code == ANVL_ERR_FILE_NOT_FOUND, "IF02: err_code is ANVL_ERR_FILE_NOT_FOUND for missing file");
+   TestBit.is_true(err_code == ANVL_ERR_IO_FILE_NOT_FOUND, "IF02: err_code is ANVL_ERR_IO_FILE_NOT_FOUND for missing file");
    TestBit.is_null((void *)src, "IF02: source buffer remains null");
    TestBit.is_equal_int(0, (long long)len, "IF02: length remains zero");
 }
@@ -65,7 +65,7 @@ static void test_if03_null_path(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = Files.load(NULL, &src, &len, &err_code);
    TestBit.is_true(res == ANVL_RES_ERR, "IF03: load returns ANVL_RES_ERR for null path");
-   TestBit.is_true(err_code == ANVL_ERR_FILE_INVALID_PATH, "IF03: err_code is ANVL_ERR_FILE_INVALID_PATH for null path");
+   TestBit.is_true(err_code == ANVL_ERR_IO_INVALID_PATH, "IF03: err_code is ANVL_ERR_IO_INVALID_PATH for null path");
 }
 
 int main(void) {

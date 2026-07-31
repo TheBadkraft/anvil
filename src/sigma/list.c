@@ -196,6 +196,13 @@ static void list_clear(list lst) {
   }
   collection_clear(lst->coll);
 }
+// create an iterator for the list
+static iterator list_create_iterator(list lst) {
+  if (!lst) {
+    return NULL; // invalid list
+  }
+  return Collections.create_iterator(lst->coll);
+}
 
 //  public interface implementation
 const sc_list_i List = {
@@ -210,4 +217,5 @@ const sc_list_i List = {
     .insert = list_insert_at,
     .prepend = list_prepend,
     .clear = list_clear,
+    .create_iterator = list_create_iterator,
 };

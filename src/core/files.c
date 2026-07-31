@@ -26,13 +26,13 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
    
    if (!path) {
       // invalid path - set 
-      *out_err_code = ANVL_ERR_FILE_INVALID_PATH;
+      *out_err_code = ANVL_ERR_IO_INVALID_PATH;
       goto error;
    }
 
    FILE *f = fopen(path, "rb");
    if (!f) {
-      *out_err_code = ANVL_ERR_FILE_NOT_FOUND;
+      *out_err_code = ANVL_ERR_IO_FILE_NOT_FOUND;
       goto error;
    }
 
@@ -43,14 +43,14 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
    char *filebuff = Allocator.alloc((size_t)len + 1);
    if (!filebuff) {
       fclose(f);
-      *out_err_code = ANVL_ERR_MEMORY_ALLOCATION_FAILED;
+      *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
    if (fread(filebuff, 1, (size_t)len, f) != (size_t)len) {
       free(filebuff);
       fclose(f);
-      *out_err_code = ANVL_ERR_FILE_READ;
+      *out_err_code = ANVL_ERR_IO_FILE_READ;
       goto error;
    }
 

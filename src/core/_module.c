@@ -20,7 +20,8 @@
  #include "types.h"
  #include "utils.h"
  #include "std.h"
-// ----------------------------------------------------------------- #include <sigma/memory.h>
+// ----------------------------------------------------------------- 
+#include <sigma/memory.h>
 
  static ssize_t mod_size = sizeof(struct anvl_mod_t);
 

@@ -40,78 +40,84 @@ typedef struct sc_list *list;
 /* Public interface for list operations                         */
 /* ============================================================ */
 typedef struct sc_list_i {
-    /**
-     * @brief Create a new list with the specified initial capacity and element stride.
-     * @param capacity Initial list capacity
-     * @param stride Size of each element in the list
-     */
-    list (*new)(usize, usize);
-    /**
-     * @brief Dispose of the list and free associated resources.
-     * @param lst The list to dispose of
-     */
-    void (*dispose)(list);
-    /**
-     * @brief Get the current capacity of the list.
-     * @param lst The list to query
-     * @return Current capacity of the list
-     */
-    usize (*capacity)(list);
-    /**
-     * @brief Get the current size (number of elements) of the list.
-     * @param lst The list to query
-     * @return Current size of the list
-     */
-    usize (*size)(list);
-    /**
-     * @brief Append a value to the end of the list.
-     * @param lst The list to append to
-     * @param value The value to append
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*append)(list, object);
-    /**
-     * @brief Get the value at the specified index in the list.
-     * @param lst The list to query
-     * @param index Index of the value to retrieve
-     * @param out_value Pointer to store the retrieved value
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*get)(list, usize, object *);
-    /**
-     * @brief Remove the element at the specified index from the list.
-     * @param lst The list to modify
-     * @param index Index of the element to remove
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*remove)(list, usize);
-    /**
-     * @brief Overwrite the value at the specified index in the list.
-     * @param lst The list to modify
-     * @param index Index at which to set the value
-     * @param value Value to set
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*set)(list, usize, object);
-    /**
-     * @brief Insert a value at the specified index in the list, shifting subsequent elements right.
-     * @param lst The list to modify
-     * @param index Index at which to insert the value
-     * @param value Value to insert
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*insert)(list, usize, object);
-    /**
-     * @brief Prepend a value to the start of the list.
-     * @param lst The list to modify
-     * @param value Value to prepend
-     * @return 0 on OK; otherwise, non-zero
-     */
-    int (*prepend)(list, object);
-    /**
-     * @brief Clear the contents of the list. Does not free individual elements.
-     * @param lst The list to clear
-     */
-    void (*clear)(list);
+   /**
+    * @brief Create a new list with the specified initial capacity and element stride.
+    * @param capacity Initial list capacity
+    * @param stride Size of each element in the list
+    */
+   list (*new)(usize, usize);
+   /**
+    * @brief Dispose of the list and free associated resources.
+    * @param lst The list to dispose of
+    */
+   void (*dispose)(list);
+   /**
+    * @brief Get the current capacity of the list.
+    * @param lst The list to query
+    * @return Current capacity of the list
+    */
+   usize (*capacity)(list);
+   /**
+    * @brief Get the current size (number of elements) of the list.
+    * @param lst The list to query
+    * @return Current size of the list
+    */
+   usize (*size)(list);
+   /**
+    * @brief Append a value to the end of the list.
+    * @param lst The list to append to
+    * @param value The value to append
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*append)(list, object);
+   /**
+    * @brief Get the value at the specified index in the list.
+    * @param lst The list to query
+    * @param index Index of the value to retrieve
+    * @param out_value Pointer to store the retrieved value
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*get)(list, usize, object *);
+   /**
+    * @brief Remove the element at the specified index from the list.
+    * @param lst The list to modify
+    * @param index Index of the element to remove
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*remove)(list, usize);
+   /**
+    * @brief Overwrite the value at the specified index in the list.
+    * @param lst The list to modify
+    * @param index Index at which to set the value
+    * @param value Value to set
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*set)(list, usize, object);
+   /**
+    * @brief Insert a value at the specified index in the list, shifting subsequent elements right.
+    * @param lst The list to modify
+    * @param index Index at which to insert the value
+    * @param value Value to insert
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*insert)(list, usize, object);
+   /**
+    * @brief Prepend a value to the start of the list.
+    * @param lst The list to modify
+    * @param value Value to prepend
+    * @return 0 on OK; otherwise, non-zero
+    */
+   int (*prepend)(list, object);
+   /**
+    * @brief Clear the contents of the list. Does not free individual elements.
+    * @param lst The list to clear
+    */
+   void (*clear)(list);
+   /**
+    * @brief Create an iterator for the list.
+    * @param lst The list to iterate over
+    * @return New iterator instance, or NULL on failure
+    */
+   iterator (*create_iterator)(list);
 } sc_list_i;
 extern const sc_list_i List;
