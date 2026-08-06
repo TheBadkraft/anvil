@@ -17,12 +17,14 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/document.c \
 			 $(ANVL)/src/core/source.c \
 			 $(ANVL)/src/sigma/list.c \
+			 $(ANVL)/src/sigma/map.c \
 			 $(ANVL)/src/sigma/arrays.c \
-             $(ANVL)/src/sigma/memory.c \
-             $(ANVL)/src/sigma/strings.c \
+          $(ANVL)/src/sigma/memory.c \
+          $(ANVL)/src/sigma/strings.c \
 			 $(ANVL)/src/sigma/collections.c
 
 TEST_HELPER  = $(ANVL)/test/utilities/helpers.c
+TEST_DEBUG   = $(ANVL)/test/utilities/debug.c
 
 RESOLVER_SRCS = $(ANVL)/src/resolver/resolver.c
 VARS_SRCS     = $(ANVL)/src/vars/vars.c
@@ -57,11 +59,11 @@ define run_test_bin
 endef
 
 .PHONY: all clean val build test test_release
-.PHONY: build_test_version build_test_core build_test_fixtures
-.PHONY: test_version test_core $(UNIT_CASES)
+.PHONY: build_test_version build_test_module build_test_fixtures
+.PHONY: test_version test_module $(UNIT_CASES)
 
 all: $(BIN)/test_version \
-	$(BIN)/test_core \
+	$(BIN)/test_module \
 	$(BIN)/test_fixtures
 
 $(BIN)/test_version: test_version.c $(ANVIL_SRCS) $(TESTBIT_SRC)
@@ -73,14 +75,14 @@ build_test_version: $(BIN)/test_version
 test_version: $(BIN)/test_version
 	$(call run_test_bin,test_version)
 
-$(BIN)/test_core: test_core.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
+$(BIN)/test_module: test_module.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
-build_test_core: $(BIN)/test_core
+build_test_module: $(BIN)/test_module
 
-test_core: $(BIN)/test_version $(BIN)/test_core
-	$(call run_test_bin,test_core)
+test_module: $(BIN)/test_version $(BIN)/test_module
+	$(call run_test_bin,test_module)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi
@@ -97,15 +99,15 @@ test_fixtures: $(BIN)/test_version $(BIN)/test_fixtures
 		$(BIN)/test_version; \
 	fi
 
-# Shorthand aliases: make core [val|build] -> make test_core [val|build]
+# Shorthand aliases: make core [val|build] -> make test_module [val|build]
 $(UNIT_CASES): %: test_%
 	@:
 
-# Mode-switch goal for: make test_core val
+# Mode-switch goal for: make test_module val
 val:
 	@:
 
-# Mode-switch goal for: make test_core build
+# Mode-switch goal for: make test_module build
 build:
 	@:
 
@@ -122,12 +124,12 @@ test:
 # 	@$(BIN)/test_amp_collections
 # 	@$(BIN)/test_version
 #
-# $(BIN)/test_context: test_context.c $(ANVIL_SRCS) $(TESTBIT_SRC)
+# $(BIN)/test_module: test_module.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 # 	@mkdir -p $(BIN)
 # 	$(CC) $(CFLAGS) $^ -o $@
 #
-# test_context: $(BIN)/test_version $(BIN)/test_context
-# 	@$(BIN)/test_context
+# test_module: $(BIN)/test_version $(BIN)/test_module
+# 	@$(BIN)/test_module
 # 	@$(BIN)/test_version
 #
 # $(BIN)/test_parser_core: test_parser_core.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
@@ -139,10 +141,10 @@ test:
 # 	@$(BIN)/test_version
 
 test_release: $(LIB_RELEASE)
-	$(CC) $(CFLAGS) test_core.c $(TEST_HELPER) $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_core
+	$(CC) $(CFLAGS) test_module.c $(TEST_HELPER) $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_module
 	$(CC) $(CFLAGS) test_version.c          $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_version
 	@echo "-- release QC --"
-	@$(BIN)/rel_test_core
+	@$(BIN)/rel_test_module
 	@$(BIN)/rel_test_version
 
 clean:

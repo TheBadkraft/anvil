@@ -4,11 +4,9 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/include",
+                "${workspaceFolder}/../testbit/include",
                 "${workspaceFolder}/**",
                 "/usr/local/include",
-                "/usr/local/include/sigma.test",
-                "/usr/local/include/sigma",
-                "/usr/local/include/sigma",
                 "/usr/include"
             ],
             "defines": [],

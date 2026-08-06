@@ -80,10 +80,6 @@ void doc_dispose(module_document doc) {
       Source.dispose(doc->source);
       doc->source = NULL;
    }
-   if (doc->filepath) {
-      String.dispose(doc->filepath);
-      doc->filepath = NULL;
-   }
 
    Allocator.dispose(doc);
 }

@@ -36,7 +36,7 @@ static void test_im02_map_set_get_update(void) {
    TestBit.is_equal_int(0, (long long)Map.set(m, "alpha", 5, 10), "IM02: set alpha OK");
    TestBit.is_equal_int(0, (long long)Map.set(m, "beta", 4, 20), "IM02: set beta OK");
 
-   usize out = 0;
+   addr out = 0;
    TestBit.is_true(Map.get(m, "alpha", 5, &out) == 1, "IM02: get alpha found");
    TestBit.is_equal_int(10, (long long)out, "IM02: alpha value is 10");
 
@@ -59,7 +59,7 @@ static void test_im03_map_has_remove(void) {
    TestBit.is_true(Map.remove(m, "gone", 4) == 1, "IM03: remove existing key returns 1");
    TestBit.is_true(Map.has(m, "gone", 4) == 0, "IM03: has is false after remove");
 
-   usize out = 0;
+   addr out = 0;
    TestBit.is_true(Map.get(m, "gone", 4, &out) == 0, "IM03: get removed key is not found");
    TestBit.is_true(Map.remove(m, "gone", 4) == 0, "IM03: removing missing key returns 0");
    TestBit.is_equal_int(0, (long long)Map.count(m), "IM03: count is 0 after remove");
@@ -77,7 +77,7 @@ static void test_im04_map_resize_preserves(void) {
    char keys[64][16];
    for (int i = 0; i < 64; i++) {
       snprintf(keys[i], sizeof(keys[i]), "k%02d", i);
-      int rc = Map.set(m, keys[i], strlen(keys[i]), (usize)(1000 + i));
+      int rc = Map.set(m, keys[i], strlen(keys[i]), (addr)(1000 + i));
       TestBit.is_equal_int(0, (long long)rc, "IM04: set during resize path returns OK");
    }
 
@@ -85,7 +85,7 @@ static void test_im04_map_resize_preserves(void) {
    TestBit.is_equal_int(64, (long long)Map.count(m), "IM04: count is 64 after inserts");
 
    for (int i = 0; i < 64; i++) {
-      usize out = 0;
+      addr out = 0;
       int found = Map.get(m, keys[i], strlen(keys[i]), &out);
       TestBit.is_true(found == 1, "IM04: key found after resize");
       TestBit.is_equal_int(1000 + i, (long long)out, "IM04: value preserved after resize");

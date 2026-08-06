@@ -39,7 +39,8 @@ VALGRIND_LOG = $(BIN)/valgrind_test_list.log
 all: $(BIN)/test_version \
      $(BIN)/test_files \
      $(BIN)/test_strings \
-     $(BIN)/test_utils
+	 $(BIN)/test_utils \
+	 $(BIN)/test_map
 
 $(BIN)/test_version: $(VERSION_SRC) $(SIGMA_SRCS) $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)

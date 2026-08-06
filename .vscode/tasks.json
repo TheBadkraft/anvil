@@ -6,24 +6,84 @@
             "description": "Test path (e.g. unit/parser, unit, performance)",
             "default": "unit",
             "type": "promptString"
+        },
+        {
+            "id": "gitCommitCount",
+            "type": "command",
+            "command": "shellCommand.execute",
+            "args": {
+                "command": "git -C \"${workspaceFolder}\" rev-list --count HEAD",
+                "removeNewlines": true,
+                "useFirstResult": true
+            }
         }
     ],
     "tasks": [
+        // test git build input
+        {
+            "label": "test git commit count",
+            "type": "shell",
+            "command": "echo",
+            "args": [
+                "Build Count: ${input:gitCommitCount}"
+            ],
+            "problemMatcher": []
+        },
+        // create bin directory
+        {
+            "label": "create bin directory",
+            "type": "shell",
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "${fileDirname}/bin"
+            ]
+        },
+        // link active test
         {
             "label": "link active test",
             "type": "shell",
-            "command": "make",
+            "command": "gcc",
             "args": [
-                "build_${fileBasenameNoExtension}"
+                "-Wall",
+                "-Wextra",
+                "-g",
+                "-std=c2x",
+                "-I\"${workspaceFolder}/include\"",
+                "-I\"${workspaceFolder}/../testbit/include\"",
+                "-D_POSIX_C_SOURCE=200809L",
+                "-DANVL_BUILD=${input:gitCommitCount}",
+                "\"${file}\"",
+                "\"${workspaceFolder}/src/core/anvil.c\"",
+                "\"${workspaceFolder}/src/core/errors.c\"",
+                "\"${workspaceFolder}/src/core/files.c\"",
+                "\"${workspaceFolder}/src/core/module.c\"",
+                "\"${workspaceFolder}/src/core/document.c\"",
+                "\"${workspaceFolder}/src/core/source.c\"",
+                "\"${workspaceFolder}/src/sigma/list.c\"",
+                "\"${workspaceFolder}/src/sigma/arrays.c\"",
+                "\"${workspaceFolder}/src/sigma/memory.c\"",
+                "\"${workspaceFolder}/src/sigma/strings.c\"",
+                "\"${workspaceFolder}/src/sigma/collections.c\"",
+                "\"${workspaceFolder}/test/utilities/helpers.c\"",
+                "\"${workspaceFolder}/test/utilities/debug.c\"",
+                "\"${workspaceFolder}/../testbit/src/testbit.c\"",
+                "-o",
+                "\"${fileDirname}/bin/${fileBasenameNoExtension}\""
             ],
             "options": {
-                "cwd": "${fileDirname}"
+                "cwd": "${workspaceFolder}"
             },
-            "problemMatcher": "$msCompile",
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            "dependsOn": [
+                "create bin directory"
+            ]
         }
     ]
 }

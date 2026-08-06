@@ -24,7 +24,7 @@
 #include <sigma/types.h>
 
 /* ----------------------------------------------------------------------- *
- * Dialect: AML vs ASL vs AMP vs Aurora                                    *
+ * Dialect: AML vs ASL vs AMP
  * ----------------------------------------------------------------------- */
 typedef enum {
    ANVL_DIALECT_AML,   // Anvil Markup Language (full features)
@@ -34,7 +34,7 @@ typedef enum {
 } anvl_dialect;
 
 /* ----------------------------------------------------------------------- *
- * Result codes                                                            *
+ * Result codes
  * ----------------------------------------------------------------------- */
 typedef enum {
    ANVL_RES_OK,       // Operation completed successfully
@@ -46,19 +46,31 @@ typedef enum {
 } anvl_result;
 
 /* ----------------------------------------------------------------------- *
- * typedefs - Opaque Handles                                               *
+ * typedefs - Opaque Handles
  * ----------------------------------------------------------------------- */
 typedef struct anvl_mod_ctx_t *module_context;
 typedef struct anvl_mod_doc_t *module_document;
 typedef struct anvl_node_t *anvl_node;
+typedef struct anvl_doc_identity_t *doc_identity;
 
 /* ----------------------------------------------------------------------- *
- * typedefs - Error state                                                  *
+ * typedefs - Context Specification
+ * ----------------------------------------------------------------------- */
+typedef struct anvl_ctx_spec_t {
+   usize docs_cap;
+   usize errs_cap;
+   usize map_cap;
+   bool strict_namespace;
+} anvl_ctx_spec;
+typedef anvl_ctx_spec *context_spec;
+
+/* ----------------------------------------------------------------------- *
+ * typedefs - Error state
  * ----------------------------------------------------------------------- */
 typedef struct anvl_err_state_t *anvl_error;
 
 /* ----------------------------------------------------------------------- *
- * anvl_mod_t *AnvilMod                                                    *
+ * anvl_mod_t *AnvilMod
  * ----------------------------------------------------------------------- */
 typedef struct anvl_mod_t *AnvlMod;
 struct anvl_mod_t {

@@ -1,0 +1,25 @@
+#!aml
+
+/* ******************************************************** *
+ * This is a sample build configuration file. It is AML so  *
+ * there is no `vars` section, interpolation, or functions. *
+ * It is verbose by design, so you can see what is this is  *
+ * what the ASL (AnvilScript) will generate. Sigma.Build    *
+ * accepts both AML and ASL.                                *
+ * ******************************************************** */
+
+// let's begin by defining how the commands will be
+// constructed from the object model.
+
+cc : = gcc; // the C compiler command
+
+// we can define a command template for the compiler, linker, and other tools
+c_flags : = [
+   "-std=c2x", // Use the C2x language standard version
+   "-Wall",    // Enable all warnings
+   "-Wextra",  // Enable extra warnings
+   "-O2",      // Optimization level 2
+   "-g"        // Generate debug information
+];
+
+source_files : = [ "src/main.c", "src/utils.c" ];

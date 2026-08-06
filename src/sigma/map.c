@@ -36,8 +36,8 @@
 static map map_new(usize capacity);
 static void map_init(map *m, usize capacity);
 static void map_dispose(map m);
-static int map_set(map m, const char *key, usize len, usize val);
-static int map_get(map m, const char *key, usize len, usize *out_val);
+static int map_set(map m, const char *key, usize len, addr val);
+static int map_get(map m, const char *key, usize len, addr *out_val);
 static int map_has(map m, const char *key, usize len);
 static int map_remove(map m, const char *key, usize len);
 static usize map_count(map m);
@@ -61,14 +61,14 @@ typedef struct {
    uint64_t hash;   // FNV-1a hash; 0 = empty slot, 1 = tombstone
    const char *key; // Key pointer (caller-owned)
    usize key_len;   // Key length in bytes
-   usize value;     // Stored value
-} map_bucket;
+   addr value;      // Stored value
+} map_slot;
 
 /**
  * @brief Map structure
  */
 struct sc_map_s {
-   map_bucket *buckets;
+   map_slot *buckets;
    usize count; // Number of occupied slots (excludes tombstones)
    usize capacity;
 };
@@ -76,7 +76,7 @@ struct sc_map_s {
 // Sparse iterator operations for Map
 static const sc_sparse_i map_sparse_ops = {
    .is_empty_slot = (bool (*)(object, usize))map_is_empty_slot,
-   .capacity = (usize(*)(object))map_capacity,
+   .capacity = (usize (*)(object))map_capacity,
    .get_at = (int (*)(object, usize, object *))map_get_at,
 };
 
@@ -143,7 +143,7 @@ static int map_find_slot(map m, const char *key, usize len, uint64_t hash, usize
    usize first_tombstone = m->capacity; // Invalid index
 
    for (usize probe = 0; probe < m->capacity; probe++) {
-      map_bucket *bucket = &m->buckets[idx];
+      map_slot *bucket = &m->buckets[idx];
 
       // Empty slot - key not found
       if (bucket->hash == 0) {
@@ -182,14 +182,14 @@ static int map_find_slot(map m, const char *key, usize len, uint64_t hash, usize
  * @return 0 on success; -1 on allocation failure
  */
 static int map_resize(map m, usize new_capacity) {
-   map_bucket *old_buckets = m->buckets;
+   map_slot *old_buckets = m->buckets;
    usize old_capacity = m->capacity;
 
    if (new_capacity < 8) {
       new_capacity = 8;
    }
 
-   map_bucket *new_buckets = Allocator.alloc(sizeof(map_bucket) * new_capacity);
+   map_slot *new_buckets = Allocator.alloc(sizeof(map_slot) * new_capacity);
    if (!new_buckets) {
       return ERR;
    }
@@ -200,7 +200,7 @@ static int map_resize(map m, usize new_capacity) {
 
    // Rehash all entries from old table
    for (usize i = 0; i < old_capacity; i++) {
-      map_bucket bucket = old_buckets[i];
+      map_slot bucket = old_buckets[i];
 
       // Skip empty and tombstone slots
       if (bucket.hash > 1) {
@@ -277,7 +277,7 @@ static void map_init(map *m_ptr, usize capacity) {
       capacity = 8;
    }
 
-   m->buckets = Allocator.alloc(sizeof(map_bucket) * capacity);
+   m->buckets = Allocator.alloc(sizeof(map_slot) * capacity);
    if (!m->buckets) {
       m->capacity = 0;
       m->count = 0;
@@ -306,7 +306,7 @@ static void map_dispose(map m) {
 /**
  * @brief Insert or update entry
  */
-static int map_set(map m, const char *key, usize len, usize val) {
+static int map_set(map m, const char *key, usize len, addr val) {
    if (!m || !key || !m->buckets || m->capacity == 0) {
       return ERR;
    }
@@ -325,7 +325,7 @@ static int map_set(map m, const char *key, usize len, usize val) {
    usize idx;
    int found = map_find_slot(m, key, len, hash, &idx);
 
-   map_bucket bucket = {.hash = hash, .key = key, .key_len = len, .value = val};
+   map_slot bucket = {.hash = hash, .key = key, .key_len = len, .value = val};
    m->buckets[idx] = bucket;
 
    // Only increment count if this is a new entry
@@ -339,7 +339,7 @@ static int map_set(map m, const char *key, usize len, usize val) {
 /**
  * @brief Look up entry
  */
-static int map_get(map m, const char *key, usize len, usize *out_val) {
+static int map_get(map m, const char *key, usize len, addr *out_val) {
    if (!m || !key || !out_val || !m->buckets || m->capacity == 0) {
       return 0;
    }
@@ -381,7 +381,7 @@ static int map_remove(map m, const char *key, usize len) {
    usize idx;
    if (map_find_slot(m, key, len, hash, &idx)) {
       // Mark as tombstone (hash = 1)
-      map_bucket tombstone = {.hash = 1};
+      map_slot tombstone = {.hash = 1};
       m->buckets[idx] = tombstone;
       m->count--;
       return 1;
@@ -408,7 +408,7 @@ static bool map_is_empty_slot(map m, usize index) {
       return true;
    }
 
-   map_bucket bucket = m->buckets[index];
+   map_slot bucket = m->buckets[index];
 
    // Empty (hash=0) or tombstone (hash=1) are considered empty
    return bucket.hash <= 1;
@@ -423,14 +423,14 @@ static int map_get_at(map m, usize index, object *out_entry) {
       return ERR;
    }
 
-   map_bucket bucket = m->buckets[index];
+   map_slot bucket = m->buckets[index];
 
    if (bucket.hash <= 1) {
       return ERR; // Empty or tombstone
    }
 
-   // Copy current bucket payload into a stable map_entry view.
-   static map_entry entry;
+   // Thread-local projection avoids cross-thread races while preserving API.
+   static _Thread_local map_entry entry;
    entry.key = bucket.key;
    entry.key_len = bucket.key_len;
    entry.value = bucket.value;

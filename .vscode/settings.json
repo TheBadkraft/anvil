@@ -1,21 +1,71 @@
 {
+    "files.autoSave": "onFocusChange",
     "editor.formatOnSave": true,
-    "[c]": {
-        "editor.defaultFormatter": "xaver.clang-format",
-        "editor.insertSpaces": true,
-        "editor.tabSize": 3,
-        "editor.formatOnSave": true,
-        "editor.detectIndentation": false
+    "debug.focusWindowOnBreak": false,
+    "editor.semanticHighlighting.enabled": true,
+    "editor.semanticTokenColorCustomizations": {
+        "enabled": true,
+        "rules": {
+            "function": "#E2B714",
+            "method": "#E2B714",
+            "property": "#E2B714",
+            "function.declaration": "#E2B714",
+            "method.declaration": "#E2B714",
+            "type": "#9CDCFE",
+            "struct": "#9CDCFE",
+            "class": "#9CDCFE",
+            "typedef": "#9CDCFE",
+            "variable": "#88A6A6",
+            "variable.global": "#888888",
+            "variable.readonly.global": "#888888"
+        }
     },
-    "[cpp]": {
-        "editor.defaultFormatter": "xaver.clang-format",
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": [
+                    "entity.name.function",
+                    "meta.function-call",
+                    "support.function"
+                ],
+                "settings": {
+                    "foreground": "#E2B714"
+                }
+            },
+            {
+                "scope": [
+                    "entity.name.type",
+                    "support.type",
+                    "storage.type"
+                ],
+                "settings": {
+                    "foreground": "#9CDCFE"
+                }
+            },
+            {
+                "scope": [
+                    "variable",
+                    "variable.other.readwrite"
+                ],
+                "settings": {
+                    "foreground": "#88A6A6"
+                }
+            }
+        ]
+    },
+    "C_Cpp.formatting": "clangFormat",
+    "C_Cpp.enhancedColorization": "Enabled",
+    "C_Cpp.clang_format_style": "file",
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
         "editor.insertSpaces": true,
         "editor.tabSize": 3,
         "editor.formatOnSave": true,
         "editor.detectIndentation": false
     },
     "files.associations": {
-        "*.h": "c"
+        "*.h": "c",
+        "*.anvl": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
