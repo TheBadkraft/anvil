@@ -137,11 +137,12 @@ static void test_cr00e_mod_ctx_spec_null_out_err(void) {
 }
 
 /* ---------------------------------------------------------------------- *
- * CR01 — mod_ctx_default_initialize success path
+ * CR01a — mod_ctx_default_initialize success path
  * Commentary: verifies the contract for successful context creation
- * and the expected initialized graph state.
+ * and the expected initialized graph state. NULL spec resolves to default
+ * specification values.
  * ---------------------------------------------------------------------- */
-static void test_cr01_mod_ctx_default_init_success(void) {
+static void test_cr01a_mod_ctx_default_init_success(void) {
    module_context ctx = NULL;
    anvl_err_code err_code = ANVL_ERR_NONE;
 
@@ -153,12 +154,27 @@ static void test_cr01_mod_ctx_default_init_success(void) {
    TestBit.is_not_null(ctx->errors, "CR01: context errors list is initialized");
    TestBit.is_not_null(ctx->doc_map, "CR01: context doc_map is initialized");
    TestBit.is_equal_int(0, (long long)List.size(ctx->docs), "CR01: docs list starts empty");
+   TestBit.is_equal_int(ANVL_CTX_DEFAULTS.docs_cap, (long long)List.capacity(ctx->docs),
+                        "CR01: docs list capacity matches default");
    TestBit.is_equal_int(0, (long long)List.size(ctx->errors), "CR01: errors list starts empty");
+   TestBit.is_equal_int(ANVL_CTX_DEFAULTS.errs_cap, (long long)List.capacity(ctx->errors),
+                        "CR01: errors list capacity matches default");
    TestBit.is_equal_int(0, (long long)Map.count(ctx->doc_map), "CR01: doc_map starts empty");
+   TestBit.is_equal_int(ANVL_CTX_DEFAULTS.map_cap, (long long)Map.capacity(ctx->doc_map),
+                        "CR01: doc_map capacity matches default");
 
    // Debug.dispose_ctx(ctx);
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * CR01b — mod_ctx_initialize with custom spec
+ * Commentary: verifies that a custom context spec is honored and
+ * that the resulting context is initialized with the expected capacities.
+ * ---------------------------------------------------------------------- */
+static void test_cr01b_mod_ctx_custom_spec_init(void) {
+   
+}
+
 /* ---------------------------------------------------------------------- *
  * CR02 — mod_ctx_initialize negative: out_ctx is NULL
  * Commentary: invalid destination pointer should fail fast and

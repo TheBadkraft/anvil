@@ -157,6 +157,7 @@ void mod_dispose(AnvlMod *mod_ptr) {
  * Context management                                                      *
  * ----------------------------------------------------------------------- */
 #if 1 // module_context management
+// if context_spec is NULL, use default values
 anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
                                anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;

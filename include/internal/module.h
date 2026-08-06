@@ -68,7 +68,7 @@ struct anvl_doc_identity_t {
  * @brief Initialize a module context.
  * @param[out] out_ctx Pointer to the module context to initialize.
  * @param[out] out_err_code Pointer to the error code if initialization fails.
- * @return Anvl result indicating success or failure.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  */
 anvl_result mod_initialize(AnvlMod *, anvl_err_code *);
 void mod_dispose(AnvlMod *);
@@ -76,7 +76,7 @@ void mod_dispose(AnvlMod *);
  * @brief Resolve the context specification, returning the default if NULL is provided.
  * @param[out] spec_ptr Pointer to the context specification to resolve.
  * @param[out] out_err_code Pointer to the error code if resolution fails.
- * @return Anvl result indicating success or failure.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  * @details This function resolves the context specification for module initialization. If the
  * provided spec_ptr is NULL (no variable provided), it returns an error state. Otherwise, it
  * returns the default context specification. If a valid spec_ptr is provided, it updates the base
@@ -88,10 +88,11 @@ anvl_result resolve_context_spec(context_spec *, anvl_err_code *);
  * @param ctx_spec Specification for the context initialization.
  * @param[out] out_ctx Pointer to the module context to initialize.
  * @param[out] out_err_code Pointer to the error code if initialization fails.
- * @return Anvl result indicating success or failure.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  * @details This function initializes a module context based on the provided context
- * specification. It allocates necessary resources and sets up internal structures. If any
- * allocation fails, it cleans up and returns an error code.
+ * specification. If context spec is NULL, the default values are used. Function allocates necessary
+ * resources and sets up internal structures. If any allocation fails, allocations are cleaned up
+ * and an error code is returned.
  */
 anvl_result mod_ctx_initialize(context_spec, module_context *, anvl_err_code *);
 /**
