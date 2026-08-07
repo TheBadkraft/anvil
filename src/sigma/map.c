@@ -22,6 +22,7 @@
 #include <sigma/map.h>
 #include <sigma/allocator.h>
 #include <sigma/collections.h>
+#include <sigma/math.h>
 #include <string.h>
 #include <sigma/internal/collections.h>
 
@@ -46,7 +47,6 @@ static sparse_iterator map_create_iterator(map m);
 
 // Forward declarations - helper functions
 static uint64_t fnv1a_hash(const char *data, usize len);
-static usize next_power_of_two(usize n);
 static int map_resize(map m, usize new_capacity);
 static int map_find_slot(map m, const char *key, usize len, uint64_t hash, usize *out_idx);
 
@@ -113,22 +113,6 @@ static uint64_t fnv1a_hash(const char *data, usize len) {
 }
 
 /**
- * @brief Round up to next power of 2
- */
-static usize next_power_of_two(usize n) {
-   if (n == 0)
-      return 1;
-   if ((n & (n - 1)) == 0)
-      return n; // Already power of 2
-
-   usize power = 1;
-   while (power < n) {
-      power <<= 1;
-   }
-   return power;
-}
-
-/**
  * @brief Find slot for key (for get/set/remove operations)
  * @param m The map
  * @param key Key bytes
@@ -185,9 +169,11 @@ static int map_resize(map m, usize new_capacity) {
    map_slot *old_buckets = m->buckets;
    usize old_capacity = m->capacity;
 
-   if (new_capacity < 8) {
-      new_capacity = 8;
+   usize normalized_capacity = 0;
+   if (Math.normalize_pow_2_min_checked(new_capacity, 8, &normalized_capacity) != SC_MATH_OK) {
+      return ERR;
    }
+   new_capacity = normalized_capacity;
 
    map_slot *new_buckets = Allocator.alloc(sizeof(map_slot) * new_capacity);
    if (!new_buckets) {
@@ -271,11 +257,13 @@ static void map_init(map *m_ptr, usize capacity) {
       m->buckets = NULL;
    }
 
-   // Round up to power of 2, minimum 8
-   capacity = next_power_of_two(capacity);
-   if (capacity < 8) {
-      capacity = 8;
+   usize normalized_capacity = 0;
+   if (Math.normalize_pow_2_min_checked(capacity, 8, &normalized_capacity) != SC_MATH_OK) {
+      m->capacity = 0;
+      m->count = 0;
+      return;
    }
+   capacity = normalized_capacity;
 
    m->buckets = Allocator.alloc(sizeof(map_slot) * capacity);
    if (!m->buckets) {

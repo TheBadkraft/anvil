@@ -25,9 +25,9 @@
 #include <sigma/list.h>
 #include <stdbool.h>
 
-/* ----------------------------------------------------------------- */
-/* Error Codes                                                        */
-/* ----------------------------------------------------------------- */
+/**
+ * @brief Anvil error codes
+ */
 typedef enum {
    ANVL_ERR_NONE = 0,
 
@@ -152,9 +152,9 @@ typedef enum {
    ANVL_ERR_INVALID_ARGUMENT = 9002,
 } anvl_err_code;
 
-/* ----------------------------------------------------------------- */
-/* Error State Structure                                             */
-/* ----------------------------------------------------------------- */
+/* -----------------------------------------------------------------
+ * Error State Structure
+ * ----------------------------------------------------------------- */
 typedef struct anvl_err_state_t {
    anvl_err_code code;
    const char *message;

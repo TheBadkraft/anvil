@@ -15,10 +15,12 @@
  * File: src/core/module.c                                                 *
  * *********************************************************************** */
 
+#include "internal/constants.h"
 #include "internal/module.h"
 #include "types.h"
 #include "constants.h"
 #include "std.h"
+#include <sigma/math.h>
 
 static ssize_t mod_size = sizeof(struct anvl_mod_t);
 static ssize_t ctx_size = sizeof(struct anvl_mod_ctx_t);
@@ -27,10 +29,10 @@ static ssize_t ctx_size = sizeof(struct anvl_mod_ctx_t);
  * Context Specification
  * ----------------------------------------------------------------------- */
 static const anvl_ctx_spec ANVL_CTX_DEFAULTS = {
-   .docs_cap = 5,
-   .errs_cap = 5,
-   .map_cap = 5,
-   .strict_namespace = false,
+   .docs_cap = ANVL_CTX_DEFAULT_DOC_CAP,
+   .errs_cap = ANVL_CTX_DEFAULT_ERR_CAP,
+   .map_cap = ANVL_CTX_DEFAULT_MAP_CAP, // must be power-of-two for map
+   .strict_namespace = ANVL_CTX_DEFAULT_STRICT_NAMESPACE,
 };
 // modify base if context initialized with custom spec
 static anvl_ctx_spec ANVL_CTX_BASE = ANVL_CTX_DEFAULTS; // struct copy of defaults
@@ -42,6 +44,7 @@ static anvl_ctx_spec ANVL_CTX_BASE = ANVL_CTX_DEFAULTS; // struct copy of defaul
 anvl_result resolve_context_spec(context_spec *spec_ptr, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_ctx_spec candidate;
+   usize normalized_map_cap = 0;
    if (out_err_code) {
       *out_err_code = err_code;
    }
@@ -70,6 +73,12 @@ anvl_result resolve_context_spec(context_spec *spec_ptr, anvl_err_code *out_err_
    }
    candidate.strict_namespace = (*spec_ptr)->strict_namespace;
 
+   if (Math.normalize_pow_2_min_checked(candidate.map_cap, 8, &normalized_map_cap) != SC_MATH_OK) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+   candidate.map_cap = normalized_map_cap;
+
    /* Validation gate: fail before commit. */
    if (candidate.docs_cap == 0 || candidate.errs_cap == 0 || candidate.map_cap == 0) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
@@ -91,14 +100,44 @@ error:
  * AnvlMod management                                                      *
  * ----------------------------------------------------------------------- */
 #if 1 // module management
-anvl_result mod_set_context(AnvlMod mod, module_context ctx) {
-   if (!mod || !ctx) {
-      return ANVL_RES_ERR;
-   }
-   mod->context = ctx;
-   return ANVL_RES_OK;
-}
 anvl_result mod_initialize(AnvlMod *out_mod, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   AnvlMod mod = NULL;
+
+   module_context ctx;
+   // we treat a NULL ctx_spec as the user saying they do not want a copy returned
+   context_spec spec = NULL;
+   if (mod_new(out_mod ? &mod : NULL, out_err_code) == ANVL_RES_OK &&
+       mod_ctx_initialize(spec, &ctx, out_err_code) == ANVL_RES_OK &&
+       mod_attach_context(&mod, ctx) == ANVL_RES_OK) {
+
+      mod->root = NULL;
+      *out_mod = mod;
+   } else {
+      err_code = out_err_code ? *out_err_code : ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+   if (!mod) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+
+   return ANVL_RES_OK;
+
+error: {
+   Allocator.dispose(mod);
+   mod = NULL;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (out_mod) {
+      *out_mod = mod;
+   }
+   return ANVL_RES_ERR;
+}
+}
+anvl_result mod_new(AnvlMod *out_mod, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    AnvlMod mod = NULL;
 
@@ -119,6 +158,7 @@ anvl_result mod_initialize(AnvlMod *out_mod, anvl_err_code *out_err_code) {
 
    memset(mod, 0, mod_size);
    mod->context = NULL;
+   mod->root = NULL;
    *out_mod = mod;
    return ANVL_RES_OK;
 
@@ -135,21 +175,38 @@ error: {
    return ANVL_RES_ERR;
 }
 }
-anvl_result mod_init_with_context(AnvlMod *out_mod, module_context ctx,
-                                  anvl_err_code *out_err_code) {
-   anvl_result res = mod_initialize(out_mod, out_err_code);
-   anvl_err_code err_code = (out_err_code) ? *out_err_code : ANVL_ERR_NONE;
-
-   // assign provided context
-   if (res != ANVL_RES_OK) {
-      return res;
+void mod_dispose(AnvlMod *mod_ptr) {
+   if (!mod_ptr || !*mod_ptr) {
+      return;
+   }
+   AnvlMod mod = *mod_ptr;
+   if (mod->context) {
+      mod_ctx_dispose(mod->context);
+   }
+   Allocator.dispose(mod);
+   *mod_ptr = NULL;
+}
+anvl_result mod_attach_context(AnvlMod *mod, module_context ctx) {
+   module_context old_ctx = NULL;
+   if (!mod || !*mod || !ctx) {
+      goto error;
    }
 
-   return mod_set_context(*out_mod, ctx);
-}
-void mod_dispose(AnvlMod *mod_ptr) {
-   // stub
-   (void)mod_ptr;
+   if ((*mod)->context == ctx) {
+      return ANVL_RES_OK;
+   }
+
+   old_ctx = (*mod)->context;
+   (*mod)->context = ctx;
+
+   if (old_ctx) {
+      mod_ctx_dispose(old_ctx);
+   }
+
+   return ANVL_RES_OK;
+
+error:
+   return ANVL_RES_ERR;
 }
 #endif
 
@@ -172,6 +229,10 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
    }
    *out_ctx = NULL;
 
+   if (ANVL_RES_OK != resolve_context_spec(&ctx_spec, &err_code) || !ctx_spec) {
+      goto error;
+   }
+
    ctx = Allocator.alloc(ctx_size);
    if (!ctx) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
@@ -179,11 +240,11 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
    }
    memset(ctx, 0, ctx_size);
 
-   ctx->docs = List.new(5, sizeof(module_document));
-   ctx->errors = List.new(5, sizeof(anvl_error));
+   ctx->docs = List.new(ctx_spec->docs_cap, sizeof(module_document));
+   ctx->errors = List.new(ctx_spec->errs_cap, sizeof(anvl_error));
    // doc_map contract: key = namespace bytes, value = (addr)doc_identity.
    // Keys are caller-owned and must remain valid while present in the map.
-   ctx->doc_map = Map.new(5);
+   ctx->doc_map = Map.new(ctx_spec->map_cap);
    if (!ctx->docs || !ctx->errors || !ctx->doc_map) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
@@ -192,7 +253,7 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
    *out_err_code = err_code;
    return ANVL_RES_OK;
 
-error:
+error: {
    if (ctx) {
       List.dispose(ctx->docs);
       List.dispose(ctx->errors);
@@ -212,19 +273,33 @@ error:
    }
    return ANVL_RES_ERR;
 }
+}
 void mod_ctx_dispose(module_context ctx) {
-   // stub
-   (void)ctx;
+   if (!ctx) {
+      return;
+   }
+   mod_ctx_clear_docs(ctx->docs);
+   mod_ctx_clear_errs(ctx->errors);
+   Map.dispose(ctx->doc_map);
+   ctx->docs = NULL;
+   ctx->errors = NULL;
+   ctx->doc_map = NULL;
+   Allocator.dispose(ctx);
 }
 void mod_ctx_add_doc(module_context ctx, module_document doc) {
-   // stub
-   (void)ctx;
-   (void)doc;
+   // make sure we have a valid context and document
+   if (!ctx || !doc) {
+      return;
+   }
+
+   List.append(ctx->docs, (object)doc);
 }
 void mod_ctx_set_parser(module_context ctx, anvl_parser parser) {
-   // stub
-   (void)ctx;
-   (void)parser;
+   // make sure we have a valid context and document
+   if (!ctx || !parser) {
+      return;
+   }
+   ctx->parser = parser;
 }
 void mod_ctx_clear_docs(list docs) {
    // iterate through the list and dispose of each module_document

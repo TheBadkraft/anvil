@@ -18,6 +18,7 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/source.c \
 			 $(ANVL)/src/sigma/list.c \
 			 $(ANVL)/src/sigma/map.c \
+			 $(ANVL)/src/sigma/math.c \
 			 $(ANVL)/src/sigma/arrays.c \
           $(ANVL)/src/sigma/memory.c \
           $(ANVL)/src/sigma/strings.c \

@@ -15,7 +15,8 @@ SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
 			 $(ANVL)/src/sigma/arrays.c \
              $(ANVL)/src/sigma/collections.c \
 			 $(ANVL)/src/sigma/list.c \
-			 $(ANVL)/src/sigma/map.c
+			 $(ANVL)/src/sigma/map.c \
+			 $(ANVL)/src/sigma/math.c
 
 ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/files.c 
@@ -32,15 +33,16 @@ BIN = bin
 VALGRIND_LOG = $(BIN)/valgrind_test_list.log
 
 .PHONY: all clean
-.PHONY: build_test_version build_test_files build_test_strings build_test_utils build_test_list build_test_map
-.PHONY: test_version test_files test_strings test_utils test_map
+.PHONY: build_test_version build_test_files build_test_strings build_test_utils build_test_list build_test_map build_test_math
+.PHONY: test_version test_files test_strings test_utils test_map test_math
 .PHONY: valgrind_test_list
 
 all: $(BIN)/test_version \
      $(BIN)/test_files \
      $(BIN)/test_strings \
 	 $(BIN)/test_utils \
-	 $(BIN)/test_map
+	 $(BIN)/test_map \
+	 $(BIN)/test_math
 
 $(BIN)/test_version: $(VERSION_SRC) $(SIGMA_SRCS) $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
@@ -81,6 +83,10 @@ $(BIN)/test_map: test_map.c $(ANVIL_SRCS) $(SIGMA_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
+$(BIN)/test_math: test_math.c $(ANVIL_SRCS) $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
 .PHONY: test_list
 test_list: $(BIN)/test_version $(BIN)/test_list
 	@$(BIN)/test_list
@@ -94,6 +100,13 @@ test_map: $(BIN)/test_version $(BIN)/test_map
 	@$(BIN)/test_version
 
 build_test_map: $(BIN)/test_map
+
+.PHONY: test_math
+test_math: $(BIN)/test_version $(BIN)/test_math
+	@$(BIN)/test_math
+	@$(BIN)/test_version
+
+build_test_math: $(BIN)/test_math
 
 valgrind_test_list: $(BIN)/test_version $(BIN)/test_list
 	@mkdir -p $(BIN)
