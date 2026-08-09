@@ -7,7 +7,7 @@
 
 **A**ttributed **N**ode **V**ariadic **L**anguage
 
-> “JSON died so Anvil could live.”  
+> “JSON died so ANVL could live.”  
 > ~ Badkraft, 2025
 
 Anvil is not another config format.  
