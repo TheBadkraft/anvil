@@ -15,6 +15,9 @@
  * File: src/core/source.c                                                 *
  * *********************************************************************** */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active implementation is in src/core/source.c.
+
 #include "internal/source.h"
 #include "internal/module.h"
 #include "utils.h"

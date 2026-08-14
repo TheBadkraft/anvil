@@ -19,6 +19,14 @@
  */
 #pragma once
 
+/*
+ * REFACTOR NOTE (2026-08-09): This header defines the legacy public Context,
+ * Source, and CtxBuilder interfaces. The active refactor has moved the module
+ * context into `include/internal/module.h` (module_context and related
+ * functions). Once all remaining consumers are migrated, this file will be
+ * reconciled or removed.
+ */
+
 #include "constants.h"
 #include "errors.h"
 // #include "operators.h"

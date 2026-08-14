@@ -1,5 +1,5 @@
 # Anvil — The Final Data Language  
-**ANVL · Version 0.5.0-alpha · June 23, 2026**  
+**ANVL · Version 0.7.0-alpha · August 9, 2026**  
 
 **Private Repository · Reference Implementation in Pure C**
 
@@ -29,6 +29,31 @@ This repository contains the **reference implementation of Anvil in pure C**. We
 - Python
 - Rust
 - Node
+
+---
+
+## Refactor Status
+
+Anvil is in a major architectural refactor. The active implementation is the
+module-context rewrite (`module_context`, `module_document`, `doc_identity`);
+legacy source files prefixed with `_` are retained for comparison and will be
+removed once the refactor is complete (AnvilScript **ASL** excepted).
+
+### Changelog
+
+| Date | Milestone |
+|------|-----------|
+| 2026-07-30 | Module/context lifecycle API hardened: `mod_initialize`, `mod_new`, `mod_attach_context`, checked context-spec resolution, Sigma Math integration. |
+| 2026-08-09 | Source review after agent-model change; `files.c` allocator hygiene fixed; legacy source files annotated. |
+
+### TODO
+
+- `src/core/files.c`: allocator hygiene fixed — verify `test/infra/test_files` remains green.
+- `include/context.h`: reconcile or remove after migrating remaining consumers to `module_context` in `include/internal/module.h`.
+- `src/core/_*.c`: archive/delete once refactor is complete.
+- `src/core/parser.c`: rewrite as refactor progresses.
+- Namespaces: finalize auto-namespace vs. optional namespacing rules for import/document-map lookups.
+- Type system: design strong-typing opt-in for deterministic AnvilSchema behavior.
 
 ---
 

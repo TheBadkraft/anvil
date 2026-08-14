@@ -17,10 +17,13 @@
 
 #include "internal/constants.h"
 #include "internal/module.h"
+#include "internal/source.h"
+#include "internal/source_registry.h"
 #include "types.h"
 #include "constants.h"
 #include "std.h"
 #include <sigma/math.h>
+#include <sigma/strings.h>
 
 static ssize_t mod_size = sizeof(struct anvl_mod_t);
 static ssize_t ctx_size = sizeof(struct anvl_mod_ctx_t);
@@ -32,7 +35,6 @@ static const anvl_ctx_spec ANVL_CTX_DEFAULTS = {
    .docs_cap = ANVL_CTX_DEFAULT_DOC_CAP,
    .errs_cap = ANVL_CTX_DEFAULT_ERR_CAP,
    .map_cap = ANVL_CTX_DEFAULT_MAP_CAP, // must be power-of-two for map
-   .strict_namespace = ANVL_CTX_DEFAULT_STRICT_NAMESPACE,
 };
 // modify base if context initialized with custom spec
 static anvl_ctx_spec ANVL_CTX_BASE = ANVL_CTX_DEFAULTS; // struct copy of defaults
@@ -71,7 +73,6 @@ anvl_result resolve_context_spec(context_spec *spec_ptr, anvl_err_code *out_err_
    if ((*spec_ptr)->map_cap) {
       candidate.map_cap = (*spec_ptr)->map_cap;
    }
-   candidate.strict_namespace = (*spec_ptr)->strict_namespace;
 
    if (Math.normalize_pow_2_min_checked(candidate.map_cap, 8, &normalized_map_cap) != SC_MATH_OK) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
@@ -125,8 +126,7 @@ anvl_result mod_initialize(AnvlMod *out_mod, anvl_err_code *out_err_code) {
    return ANVL_RES_OK;
 
 error: {
-   Allocator.dispose(mod);
-   mod = NULL;
+   mod_dispose(&mod);
 
    if (out_err_code) {
       *out_err_code = err_code;
@@ -159,6 +159,11 @@ anvl_result mod_new(AnvlMod *out_mod, anvl_err_code *out_err_code) {
    memset(mod, 0, mod_size);
    mod->context = NULL;
    mod->root = NULL;
+
+   // Ensure the process-wide source registry exists before any document is
+   // registered. The registry is cleared in mod_dispose().
+   Registry.init();
+
    *out_mod = mod;
    return ANVL_RES_OK;
 
@@ -183,6 +188,12 @@ void mod_dispose(AnvlMod *mod_ptr) {
    if (mod->context) {
       mod_ctx_dispose(mod->context);
    }
+
+   // Release this module's reference to the global source registry. When the
+   // reference count reaches zero, the registry is cleared. Documents
+   // unregister themselves individually during context disposal.
+   Registry.release();
+
    Allocator.dispose(mod);
    *mod_ptr = NULL;
 }
@@ -242,10 +253,7 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
 
    ctx->docs = List.new(ctx_spec->docs_cap, sizeof(module_document));
    ctx->errors = List.new(ctx_spec->errs_cap, sizeof(anvl_error));
-   // doc_map contract: key = namespace bytes, value = (addr)doc_identity.
-   // Keys are caller-owned and must remain valid while present in the map.
-   ctx->doc_map = Map.new(ctx_spec->map_cap);
-   if (!ctx->docs || !ctx->errors || !ctx->doc_map) {
+   if (!ctx->docs || !ctx->errors) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
@@ -257,10 +265,8 @@ error: {
    if (ctx) {
       List.dispose(ctx->docs);
       List.dispose(ctx->errors);
-      Map.dispose(ctx->doc_map);
       ctx->docs = NULL;
       ctx->errors = NULL;
-      ctx->doc_map = NULL;
       Allocator.dispose(ctx);
    }
    ctx = NULL;
@@ -280,19 +286,57 @@ void mod_ctx_dispose(module_context ctx) {
    }
    mod_ctx_clear_docs(ctx->docs);
    mod_ctx_clear_errs(ctx->errors);
-   Map.dispose(ctx->doc_map);
    ctx->docs = NULL;
    ctx->errors = NULL;
-   ctx->doc_map = NULL;
    Allocator.dispose(ctx);
 }
-void mod_ctx_add_doc(module_context ctx, module_document doc) {
-   // make sure we have a valid context and document
-   if (!ctx || !doc) {
-      return;
+anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const char *filepath,
+                                 anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!ctx || !doc || !doc->source) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   if (Source.hash(doc->source) == 0) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   if (Registry.find(Source.hash(doc->source)) != NULL) {
+      err_code = ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT;
+      goto error;
+   }
+
+   doc->context = ctx;
+   if (filepath) {
+      if (doc->filepath) {
+         String.dispose(doc->filepath);
+      }
+      doc->filepath = String.copy((string)filepath);
+      if (!doc->filepath) {
+         err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         goto error;
+      }
+   }
+
+   if (Registry.add(doc, &err_code) != ANVL_RES_OK) {
+      goto error;
    }
 
    List.append(ctx->docs, (object)doc);
+
+   return ANVL_RES_OK;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
 }
 void mod_ctx_set_parser(module_context ctx, anvl_parser parser) {
    // make sure we have a valid context and document
@@ -321,5 +365,13 @@ void mod_ctx_clear_errs(list errors) {
       }
    }
    List.dispose(errors);
+}
+
+void mod_ctx_add_doc(module_context ctx, module_document doc) {
+   if (!ctx || !doc) {
+      return;
+   }
+
+   List.append(ctx->docs, (object)doc);
 }
 #endif

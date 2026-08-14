@@ -21,18 +21,17 @@
 
 static anvl_result files_load(const char *path, const char **out_source, size_t *out_len,
                               anvl_err_code *out_err_code) {
-   anvl_result res = ANVL_RES_UNKNOWN;
-   *out_err_code = ANVL_ERR_NONE;
-   
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
    if (!path) {
-      // invalid path - set 
-      *out_err_code = ANVL_ERR_IO_INVALID_PATH;
+      // invalid path - set
+      err_code = ANVL_ERR_IO_INVALID_PATH;
       goto error;
    }
 
    FILE *f = fopen(path, "rb");
    if (!f) {
-      *out_err_code = ANVL_ERR_IO_FILE_NOT_FOUND;
+      err_code = ANVL_ERR_IO_FILE_NOT_FOUND;
       goto error;
    }
 
@@ -43,14 +42,14 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
    char *filebuff = Allocator.alloc((size_t)len + 1);
    if (!filebuff) {
       fclose(f);
-      *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
    if (fread(filebuff, 1, (size_t)len, f) != (size_t)len) {
-      free(filebuff);
+      Allocator.dispose(filebuff);
       fclose(f);
-      *out_err_code = ANVL_ERR_IO_FILE_READ;
+      err_code = ANVL_ERR_IO_FILE_READ;
       goto error;
    }
 
@@ -59,13 +58,16 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
    filebuff[len] = '\0';
    *out_source = filebuff;
    *out_len = (size_t)len;
-   res = ANVL_RES_OK;
-
-   return res;
+   if (out_err_code) {
+      *out_err_code = ANVL_ERR_NONE;
+   }
+   return ANVL_RES_OK;
 
 error:
-   res = ANVL_RES_ERR;
-   return res;
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
 }
 static const char *files_filename(const char *path) {
    if (!path)
@@ -76,22 +78,44 @@ static const char *files_filename(const char *path) {
    return filename ? filename + 1 : path;
 }
 static anvl_dialect files_get_dialect_hint(const char *filepath) {
+   anvl_dialect dialect = ANVL_DIALECT_AML; // default to AML if no extension is found
    // retrieves dialect hint from the file's extension
    if (!filepath)
+      return dialect;
+
+   // find the last dot in the filepath to get the extension
+   const char *ext = strrchr(filepath, '.');
+   if (!ext) {
+      return ANVL_DIALECT_AML;
+   }
+
+   if (strcmp(ext, ANVL_EXT_AMP) == 0)
+      return ANVL_DIALECT_AMP;
+   if (strcmp(ext, ANVL_EXT_AML) == 0 || strcmp(ext, ANVL_EXT_ANVL) == 0)
+      return ANVL_DIALECT_AML;
+   if (strcmp(ext, ANVL_EXT_ASL) == 0)
       return ANVL_DIALECT_ASL;
 
-   usize len = strlen(filepath);
-   // if the file extension is !.aml, then just return ASL
-   if (len > ANVL_EXT_LEN && strcmp(filepath + len - ANVL_EXT_LEN, ANVL_EXT_AML) == 0)
-      return ANVL_DIALECT_AML;
-   if (len > ANVL_EXT_LEN && strcmp(filepath + len - ANVL_EXT_LEN, ANVL_EXT_AMP) == 0)
-      return ANVL_DIALECT_AMP;
+   return dialect; // default
+}
+static usize files_get_length(const char *path) {
+   if (!path)
+      return 0;
 
-   return ANVL_DIALECT_ASL; // default
+   FILE *f = fopen(path, "rb");
+   if (!f)
+      return 0;
+
+   fseek(f, 0, SEEK_END);
+   long len = ftell(f);
+   fclose(f);
+
+   return (len >= 0) ? (usize)len : 0;
 }
 
 const anvl_files_i Files = {
    .load = files_load,
    .filename = files_filename,
    .dialect_hint = files_get_dialect_hint,
+   .length = files_get_length,
 };

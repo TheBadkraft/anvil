@@ -30,8 +30,8 @@
 #define ANVL_VERSION_MAJOR 0
 #define ANVL_VERSION_MINOR 7
 #define ANVL_VERSION_PATCH 0
-#define ANVL_VERSION_TAG   "alpha"
-#define ANVL_VERSION_STR   "0.7.0-alpha"
+#define ANVL_VERSION_TAG "alpha"
+#define ANVL_VERSION_STR "0.7.0-alpha"
 
 /* ----------------------------------------------------------------------- *
  * Constants                                                               *
@@ -44,3 +44,4 @@
 #define ANVL_EXT_AML ".aml"
 #define ANVL_EXT_AMP ".amp"
 #define ANVL_EXT_ASL ".asl"
+#define ANVL_EXT_ANVL ".anvl"

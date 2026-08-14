@@ -15,4 +15,3 @@
 #define ANVL_CTX_DEFAULT_DOC_CAP 5
 #define ANVL_CTX_DEFAULT_ERR_CAP 5
 #define ANVL_CTX_DEFAULT_MAP_CAP 8 // must be power-of-two for map
-#define ANVL_CTX_DEFAULT_STRICT_NAMESPACE false

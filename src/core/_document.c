@@ -15,6 +15,9 @@
  * File: src/core/document.c                                               *
  * *********************************************************************** */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active implementation is in src/core/document.c.
+
 // NOTE: use kernal pattern error/exit handling for all functions
 
 #include "internal/files.h"

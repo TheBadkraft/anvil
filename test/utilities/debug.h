@@ -26,8 +26,8 @@
  * explicit teardown and isolation of failures during testing.            *
  * ********************************************************************** */
 typedef struct anvl_debug_i {
-   /* Allocate a zeroed stub document (context/filepath/source/op all NULL). */
-   module_document (*stub_doc)(anvl_source, struct anvl_mod_doc_i *);
+   /* Allocate a zeroed stub document (context/filepath/source all NULL). */
+   module_document (*stub_doc)(anvl_source);
    /* Dispose a stub document and any owned source/filepath. */
    void (*dispose_doc)(module_document);
    /* Dispose every document in the list, then the list itself. */

@@ -25,7 +25,7 @@ typedef struct anvl_files_i {
     * @param[out] out_err_code Pointer to the error code if loading fails.
     * @return Anvl result indicating success or failure.
     */
-   anvl_result (*load)(const char *, const char **, size_t *, anvl_err_code *);
+   anvl_result (*load)(const char *, const char **, usize *, anvl_err_code *);
    /**
     * @brief Get the filename from a path.
     * @param[in] path The path to the file.
@@ -38,6 +38,12 @@ typedef struct anvl_files_i {
     * @return The dialect hint.
     */
    anvl_dialect (*dialect_hint)(const char *);
+   /**
+    * @brief Get the length of a file.
+    * @param[in] path The path to the file.
+    * @return The length of the file.
+    */
+   usize (*length)(const char *);
 } anvl_files_i;
 
 extern const anvl_files_i Files;

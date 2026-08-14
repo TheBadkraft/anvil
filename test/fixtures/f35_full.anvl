@@ -4,60 +4,50 @@
 // import another document to be included in the module
 import 'other.anvl'
 
-/* ***************************** *
-  * Multi-line block comment         *
-  * ***************************** */
-@[doc-level]    // document-level attributes
+   /* ***************************** *
+    * Multi-line block comment         *
+    * ***************************** */
+   @[ doc - level ] // document-level attributes
 
-// vars block
-vars {
-    version := 0.05.17+138;
-    created := @date`2026-07-07`;
-    host := 127.0.0.1;
-    port := 5050;
-    user := David;
-};
-
-// basic statement
-motd := $"Welcome, {user}";
-age := 42;
-host := localhost;
-port := 8080;
-val := null;
+   // basic statement
+   age: = 42;
+host : = localhost;
+port : = 8080;
+val : = null;
 
 // blobs
-date := @sel`#input-date`;
-remark := @md`**ANVL** is boss!`;
+date : = @sel`#input - date`;
+remark : = @md`* *ANVL * *is boss !`;
 
 // numerics
-integers := 32;
-negint := -1285;
-pi := 3.14;
-decimal := -3.402823466;
-hex := #12D4F;
-exp :=  1.7976931348623157e+308;
-large :=  18446744073709551615;
+integers : = 32;
+negint : = -1285;
+pi : = 3.14;
+decimal : = -3.402823466;
+hex : = #12D4F;
+exp : = 1.7976931348623157e+308;
+large : = 18446744073709551615;
 
 // array
-tags := [alpha, beta];
+tags : = [ alpha, beta ];
 
 // tuple
-coords := (10, 20);
+coords : = (10, 20);
 
 // object
-config := {
-    host := $host;  // vars.host
-    port := $port;   // vars.port
+config : = {
+   host : = localhost;
+   port : = 8080;
 };
 
 // anonymous object (read-only)
 document {
-    name := "ANVL For Dummies";
-    author := "The Badkraft";
+   name:= "ANVL For Dummies";
+   author:= "The Badkraft";
 };
 
 // attributed entry
-server @[env=production, active] := {
-    host := localhost;
-    port := 8080;
+server @[ env = production, active ] : = {
+   host : = localhost;
+   port : = 8080;
 };

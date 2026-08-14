@@ -25,4 +25,5 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// we define our own boolean type
+// std.h — standard C library includes used throughout the project.
+// Project-specific types (including bool) live in types.h.

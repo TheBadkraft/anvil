@@ -16,6 +16,7 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/module.c \
 			 $(ANVL)/src/core/document.c \
 			 $(ANVL)/src/core/source.c \
+			 $(ANVL)/src/core/source_registry.c \
 			 $(ANVL)/src/sigma/list.c \
 			 $(ANVL)/src/sigma/map.c \
 			 $(ANVL)/src/sigma/math.c \
@@ -60,11 +61,13 @@ define run_test_bin
 endef
 
 .PHONY: all clean val build test test_release
-.PHONY: build_test_version build_test_module build_test_fixtures
-.PHONY: test_version test_module $(UNIT_CASES)
+.PHONY: build_test_version build_test_module build_test_registry build_test_fixtures
+.PHONY: test_version test_module test_registry $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
+	$(BIN)/test_document \
+	$(BIN)/test_registry \
 	$(BIN)/test_fixtures
 
 $(BIN)/test_version: test_version.c $(ANVIL_SRCS) $(TESTBIT_SRC)
@@ -84,6 +87,30 @@ build_test_module: $(BIN)/test_module
 
 test_module: $(BIN)/test_version $(BIN)/test_module
 	$(call run_test_bin,test_module)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_document: test_document.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_document: $(BIN)/test_document
+
+test_document: $(BIN)/test_version $(BIN)/test_document
+	$(call run_test_bin,test_document)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_registry: test_registry.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_registry: $(BIN)/test_registry
+
+test_registry: $(BIN)/test_version $(BIN)/test_registry
+	$(call run_test_bin,test_registry)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

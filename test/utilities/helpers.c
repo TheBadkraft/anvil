@@ -28,7 +28,6 @@ anvl_result reset_context_spec_defaults(anvl_err_code *out_err_code) {
       .docs_cap = ANVL_CTX_DEFAULT_DOC_CAP,
       .errs_cap = ANVL_CTX_DEFAULT_ERR_CAP,
       .map_cap = ANVL_CTX_DEFAULT_MAP_CAP,
-      .strict_namespace = ANVL_CTX_DEFAULT_STRICT_NAMESPACE,
    };
    context_spec spec = &defaults;
    return resolve_context_spec(&spec, out_err_code);

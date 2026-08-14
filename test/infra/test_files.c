@@ -13,6 +13,8 @@
 #include "../utilities/helpers.h"
 #include "testbit.h"
 #include "std.h"
+// ----------------
+#include <sigma/memory.h>
 
 static void td(void) {}
 
@@ -39,7 +41,7 @@ static void test_if01_load_valid_file(void) {
    TestBit.is_not_null((void *)src, "IF01: source buffer is non-null");
    TestBit.is_true(len > 0, "IF01: source length is non-zero");
 
-   free((void *)src);
+   Allocator.dispose((void *)src);
 }
 /* ----------------------------------------------------------------- *
  * IF02 — load non-existent file                                      *

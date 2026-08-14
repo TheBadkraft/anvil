@@ -13,32 +13,12 @@
 #include "std.h"
 #include "types.h"
 #include "internal/source.h"
+#include "internal/source_registry.h"
 // -----------------------------------------------------------------
 #include <sigma/strings.h>
 #include <string.h>
 
-doc_identity make_stub_doc_identity(const char *namespace_key, const char *filepath) {
-   ssize_t id_size = sizeof(struct anvl_doc_identity_t);
-   doc_identity identity = Allocator.alloc(id_size);
-   if (!identity)
-      return NULL;
-
-   memset(identity, 0, id_size);
-   identity->namespace = String.copy((char *)namespace_key);
-   if (!identity->namespace) {
-      Allocator.dispose(identity);
-      return NULL;
-   }
-   identity->filepath = String.copy((char *)filepath);
-   if (!identity->filepath) {
-      String.dispose(identity->namespace);
-      Allocator.dispose(identity);
-      return NULL;
-   }
-
-   return identity;
-}
-module_document make_stub_doc(anvl_source source, struct anvl_mod_doc_i *op) {
+module_document make_stub_doc(anvl_source source) {
    static ssize_t doc_size = sizeof(struct anvl_mod_doc_t);
    module_document doc = Allocator.alloc(doc_size);
    if (!doc)
@@ -46,7 +26,6 @@ module_document make_stub_doc(anvl_source source, struct anvl_mod_doc_i *op) {
 
    memset(doc, 0, doc_size);
    doc->source = source;
-   doc->op = op;
 
    return doc;
 }
@@ -55,8 +34,14 @@ void dispose_doc_manual(module_document doc) {
       return;
 
    if (doc->source) {
+      Registry.remove(Source.hash(doc->source));
       Source.dispose(doc->source);
       doc->source = NULL;
+   }
+
+   if (doc->filepath) {
+      String.dispose(doc->filepath);
+      doc->filepath = NULL;
    }
 
    Allocator.dispose(doc);

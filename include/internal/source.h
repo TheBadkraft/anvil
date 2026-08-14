@@ -32,17 +32,22 @@
  * Source structure                                                        *
  * ----------------------------------------------------------------- */
 struct anvl_source_t {
-   anvl_err_code err_code;
+   // anvl_err_code err_code; (why would we have this here ... ???)
+
    // farray-compatible buffer structure
    struct {
       void *bucket; // pointer to first element (raw bytes)
       void *end;    // one past allocated memory
    } buffer;
+
+   // metadata for source content
+   usize length; // length of the buffer in bytes
    anvl_dialect dialect;
    usize stride; // size of each element in bytes (1 for byte arrays)
    usize pos;
    usize line;
    usize col;
+   uint64_t hash; // FNV-1a 64-bit content hash; 0 = no content loaded
 };
 
 /* ----------------------------------------------------------------- *
@@ -50,15 +55,52 @@ struct anvl_source_t {
  * ----------------------------------------------------------------- */
 typedef struct anvl_source_i {
    /**
-    * @brief Create a source object from input text.
+    * @brief Create an empty source object.
+    * @param[out] out_src Receives the created source object on success.
+    * @param[out] out_err_code Receives ANVL_ERR_NONE on success, otherwise a failure code.
+    * @return Anvil result indicating success or failure.
+    */
+   anvl_result (*create)(anvl_source *, anvl_err_code *);
+   /**
+    * @brief Create a source object from a file path.
     * @param[in] filepath Input source file path.
     * @param[out] out_src Receives the created source object on success.
     * @param[out] out_err_code Receives ANVL_ERR_NONE on success, otherwise a failure code.
-    * @return Anvl result indicating success or failure.
+    * @return Anvil result indicating success or failure.
     */
-   anvl_result (*create)(const char *, anvl_source *, anvl_err_code *);
+   anvl_result (*from_file)(anvl_source *, const char *, anvl_err_code *);
+   /**
+    * @brief Create a source object from a memory buffer.
+    * @param[in] buffer Input source buffer.
+    * @param[in] len Length of the input buffer.
+    * @param[out] out_src Receives the created source object on success.
+    * @param[out] out_err_code Receives ANVL_ERR_NONE on success, otherwise a failure code.
+    * @return Anvil result indicating success or failure.
+    */
+   anvl_result (*from_buffer)(anvl_source *, const char *, size_t, anvl_err_code *);
+   /**
+    * @brief Dispose of a source object, releasing all associated resources.
+    * @param src The source object to dispose.
+    * @details This function disposes of the specified source object, releasing its buffer and any
+    * other associated resources. After calling this function, the source object should not be used.
+    */
    void (*dispose)(anvl_source);
+   /**
+    * @brief Get the source dialect (AMP, AML, ASL, or error) for the given source object.
+    * @param src The source object to query.
+    * @return The dialect of the source object.
+    * @details This function retrieves the dialect of the specified source object. The dialect can
+    * be one of the following: ANVL_DIALECT_AMP, ANVL_DIALECT_AML, ANVL_DIALECT_ASL, or
+    * ANVL_DIALECT_ERROR.
+    */
    anvl_dialect (*dialect)(anvl_source);
+   /**
+    * @brief Get the FNV-1a 64-bit content hash for the given source object.
+    * @param src The source object to query.
+    * @return The content hash, or 0 if no content has been loaded.
+    */
+   uint64_t (*hash)(anvl_source);
+
    // Error handling - per source object
    bool (*has_errors)(anvl_source);
 

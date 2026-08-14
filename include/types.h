@@ -51,7 +51,6 @@ typedef enum {
 typedef struct anvl_mod_ctx_t *module_context;
 typedef struct anvl_mod_doc_t *module_document;
 typedef struct anvl_node_t *anvl_node;
-typedef struct anvl_doc_identity_t *doc_identity;
 
 /* ----------------------------------------------------------------------- *
  * typedefs - Context Specification
@@ -60,7 +59,6 @@ typedef struct anvl_ctx_spec_t {
    usize docs_cap;
    usize errs_cap;
    usize map_cap;
-   bool strict_namespace;
 } anvl_ctx_spec;
 typedef anvl_ctx_spec *context_spec;
 

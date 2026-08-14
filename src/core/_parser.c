@@ -21,6 +21,9 @@
  * for reference and historical purposes.
  */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active parser will be rewritten in src/core/parser.c.
+
 #include "anvil.h"
 #include "context_internal.h"
 #include "errors.h"

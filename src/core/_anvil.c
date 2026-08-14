@@ -16,6 +16,9 @@
  * ----------------------------------------------------------------------- *
  */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active implementation is in src/core/anvil.c.
+
 // NOTE: use kernal pattern happy path/error/exit handling for all functions
 
 #include "anvil.h"

@@ -16,6 +16,9 @@
  * ----------------------------------------------------------------------- *
  */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active implementation is in src/core/module.c.
+
  #include "internal/module.h"
  #include "types.h"
  #include "utils.h"

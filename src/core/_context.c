@@ -16,6 +16,10 @@
  * ----------------------------------------------------------------------- *
  */
 
+// LEGACY (2026-08-09): pre-refactor implementation kept for comparison.
+// Do not compile. Active context work is in include/internal/module.h and
+// src/core/module.c.
+
 #include "context.h"
 #include "context_internal.h"
 #include "parser.h"

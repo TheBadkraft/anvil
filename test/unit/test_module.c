@@ -13,6 +13,7 @@
 #include "internal/constants.h"
 #include "internal/module.h"
 #include "internal/source.h"
+#include "internal/source_registry.h"
 #include "testbit.h"
 #include "std.h"
 // ----------------
@@ -46,8 +47,6 @@ static void test_cr00a_mod_ctx_spec_default_resolution(void) {
    TestBit.is_equal_int(ANVL_CTX_DEFAULT_ERR_CAP, spec->errs_cap,
                         "CR00a: errs_cap matches default");
    TestBit.is_equal_int(ANVL_CTX_DEFAULT_MAP_CAP, spec->map_cap, "CR00a: map_cap matches default");
-   TestBit.is_equal_int(ANVL_CTX_DEFAULT_STRICT_NAMESPACE, spec->strict_namespace,
-                        "CR00a: strict_namespace matches default");
 
    // verify that the returned spec pointer is the same as the default spec
    res = resolve_context_spec(&dup_spec, &err_code);
@@ -69,12 +68,10 @@ static void test_cr00c_mod_ctx_spec_full_override_commits_base(void) {
    static int docs_cap = 15;
    static int errs_cap = 20;
    static int map_cap = 15;
-   static bool strict_namespace = true;
    anvl_ctx_spec custom = {
       .docs_cap = docs_cap,
       .errs_cap = errs_cap,
       .map_cap = map_cap,
-      .strict_namespace = strict_namespace,
    };
    context_spec spec = &custom;
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -87,8 +84,6 @@ static void test_cr00c_mod_ctx_spec_full_override_commits_base(void) {
    TestBit.is_equal_int(docs_cap, (long long)spec->docs_cap, "CR00c: docs_cap committed");
    TestBit.is_equal_int(errs_cap, (long long)spec->errs_cap, "CR00c: errs_cap committed");
    TestBit.is_equal_int(16, (long long)spec->map_cap, "CR00c: map_cap normalized and committed");
-   TestBit.is_equal_int(strict_namespace, (long long)spec->strict_namespace,
-                        "CR00c: strict_namespace committed");
 }
 /* ---------------------------------------------------------------------- *
  * CR00d — resolve_context_spec partial override preserves non-overridden
@@ -105,7 +100,6 @@ static void test_cr00d_mod_ctx_spec_partial_override(void) {
       .docs_cap = before->docs_cap + 5, // override
       // .errs_cap = 0,                    preserve
       // .map_cap = 0,                     preserve
-      .strict_namespace = !before->strict_namespace,
    };
 
    after = &partial;
@@ -118,8 +112,6 @@ static void test_cr00d_mod_ctx_spec_partial_override(void) {
                         "CR00d: errs_cap preserved");
    TestBit.is_equal_int((long long)before->map_cap, (long long)after->map_cap,
                         "CR00d: map_cap preserved");
-   TestBit.is_equal_int((long long)partial.strict_namespace, (long long)after->strict_namespace,
-                        "CR00d: strict_namespace updated");
 }
 /* ---------------------------------------------------------------------- *
  * CR00f — resolve_context_spec allows NULL out_err_code
@@ -147,16 +139,12 @@ static void test_cr01a_mod_ctx_default_init_success(void) {
    TestBit.is_not_null(ctx, "CR01a: out context is allocated");
    TestBit.is_not_null(ctx->docs, "CR01a: context docs list is initialized");
    TestBit.is_not_null(ctx->errors, "CR01a: context errors list is initialized");
-   TestBit.is_not_null(ctx->doc_map, "CR01a: context doc_map is initialized");
    TestBit.is_equal_int(0, (long long)List.size(ctx->docs), "CR01a: docs list starts empty");
    TestBit.is_equal_int(ANVL_CTX_DEFAULT_DOC_CAP, (long long)List.capacity(ctx->docs),
                         "CR01a: docs list capacity matches default");
    TestBit.is_equal_int(0, (long long)List.size(ctx->errors), "CR01a: errors list starts empty");
    TestBit.is_equal_int(ANVL_CTX_DEFAULT_ERR_CAP, (long long)List.capacity(ctx->errors),
                         "CR01a: errors list capacity matches default");
-   TestBit.is_equal_int(0, (long long)Map.count(ctx->doc_map), "CR01a: doc_map starts empty");
-   TestBit.is_equal_int(ANVL_CTX_DEFAULT_MAP_CAP, (long long)Map.capacity(ctx->doc_map),
-                        "CR01a: doc_map capacity matches default");
 
    // Debug.dispose_ctx(ctx);
    mod_ctx_dispose(ctx);
@@ -175,7 +163,6 @@ static void test_cr01b_mod_ctx_custom_spec_init(void) {
       .docs_cap = docs_cap,
       .errs_cap = errs_cap,
       .map_cap = map_cap,
-      .strict_namespace = true,
    };
    module_context ctx = NULL;
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -186,16 +173,12 @@ static void test_cr01b_mod_ctx_custom_spec_init(void) {
    TestBit.is_not_null(ctx, "CR01b: out context is allocated");
    TestBit.is_not_null(ctx->docs, "CR01b: context docs list is initialized");
    TestBit.is_not_null(ctx->errors, "CR01b: context errors list is initialized");
-   TestBit.is_not_null(ctx->doc_map, "CR01b: context doc_map is initialized");
    TestBit.is_equal_int(0, (long long)List.size(ctx->docs), "CR01b: docs list starts empty");
    TestBit.is_equal_int(docs_cap, (long long)List.capacity(ctx->docs),
                         "CR01b: docs list capacity matches custom spec");
    TestBit.is_equal_int(0, (long long)List.size(ctx->errors), "CR01b: errors list starts empty");
    TestBit.is_equal_int(errs_cap, (long long)List.capacity(ctx->errors),
                         "CR01b: errors list capacity matches custom spec");
-   TestBit.is_equal_int(0, (long long)Map.count(ctx->doc_map), "CR01b: doc_map starts empty");
-   TestBit.is_equal_int(map_cap, (long long)Map.capacity(ctx->doc_map),
-                        "CR01b: doc_map capacity matches custom spec");
 
    // sanity check: the default spec should match the new base spec after a custom spec is used
    context_spec base_spec = NULL;
@@ -208,8 +191,6 @@ static void test_cr01b_mod_ctx_custom_spec_init(void) {
                         "CR01b: base spec errs_cap matches custom spec");
    TestBit.is_equal_int(map_cap, (long long)base_spec->map_cap,
                         "CR01b: base spec map_cap matches custom spec");
-   TestBit.is_equal_int(true, (long long)base_spec->strict_namespace,
-                        "CR01b: base spec strict_namespace matches custom spec");
 
    mod_ctx_dispose(ctx);
 }
@@ -271,9 +252,6 @@ static void test_cr05a_mod_init_success(void) {
    TestBit.is_equal_int(0, (long long)List.size(ctx->errors), "CR05a: errors list starts empty");
    TestBit.is_equal_int(ANVL_CTX_DEFAULT_ERR_CAP, (long long)List.capacity(ctx->errors),
                         "CR05a: errors list capacity matches default");
-   TestBit.is_equal_int(0, (long long)Map.count(ctx->doc_map), "CR05a: doc_map starts empty");
-   TestBit.is_equal_int(ANVL_CTX_DEFAULT_MAP_CAP, (long long)Map.capacity(ctx->doc_map),
-                        "CR05a: doc_map capacity matches default");
 
    Debug.dispose_mod(mod);
 }
@@ -286,17 +264,14 @@ static void test_cr05b_mod_init_success(void) {
    static int docs_cap = 15;
    static int errs_cap = 20;
    static int map_cap = 15;
-   static bool strict_namespace = true;
    anvl_ctx_spec custom = {
       .docs_cap = docs_cap,
       .errs_cap = errs_cap,
       .map_cap = map_cap,
-      .strict_namespace = strict_namespace,
    };
 
    context_spec spec = &custom;
    anvl_err_code err_code = ANVL_ERR_NONE;
-   int exp_map_cap = Math.next_pow_2(map_cap);
 
    // set the default context
    (void)resolve_context_spec(&spec, &err_code);
@@ -319,9 +294,6 @@ static void test_cr05b_mod_init_success(void) {
    TestBit.is_equal_int(0, (long long)List.size(ctx->errors), "CR05b: errors list starts empty");
    TestBit.is_equal_int(errs_cap, (long long)List.capacity(ctx->errors),
                         "CR05b: errors list capacity matches default");
-   TestBit.is_equal_int(0, (long long)Map.count(ctx->doc_map), "CR05b: doc_map starts empty");
-   TestBit.is_equal_int(exp_map_cap, (long long)Map.capacity(ctx->doc_map),
-                        "CR05b: doc_map capacity matches default");
 
    Debug.dispose_mod(mod);
 }
@@ -480,8 +452,8 @@ static void test_cr10_mod_ctx_clear_docs(void) {
    list docs = List.new(2, sizeof(module_document));
    TestBit.is_not_null(docs, "CR10: docs list allocated");
 
-   module_document d1 = Debug.stub_doc(NULL, NULL);
-   module_document d2 = Debug.stub_doc(NULL, NULL);
+   module_document d1 = Debug.stub_doc(NULL);
+   module_document d2 = Debug.stub_doc(NULL);
    TestBit.is_not_null(d1, "CR10: first stub doc allocated");
    TestBit.is_not_null(d2, "CR10: second stub doc allocated");
 
@@ -551,7 +523,7 @@ static void test_cr12_mod_ctx_add_doc(void) {
       return;
    }
 
-   module_document doc = Debug.stub_doc(NULL, NULL);
+   module_document doc = Debug.stub_doc(NULL);
    TestBit.is_not_null(doc, "CR12: stub doc allocated");
    if (!doc) {
       Debug.dispose_ctx(ctx);
@@ -610,7 +582,7 @@ static void test_cr14_mod_ctx_dispose(void) {
       return;
    }
 
-   module_document doc = Debug.stub_doc(NULL, NULL);
+   module_document doc = Debug.stub_doc(NULL);
    anvl_error err = Debug.stub_err(ANVL_ERR_MEMORY_ALLOC_FAILED);
    if (!doc || !err) {
       if (doc)
@@ -649,6 +621,37 @@ static void test_cr15_mod_dispose(void) {
 
    mod_dispose(&mod);
    TestBit.is_true(mod == NULL, "CR15: mod_dispose nulls caller module pointer");
+}
+
+/* ---------------------------------------------------------------------- *
+ * CR16 — mod_dispose releases the source registry
+ * Commentary: disposing the module should release the global source
+ * registry reference; when the reference count reaches zero, the registry
+ * is cleared and registered documents are no longer findable.
+ * ---------------------------------------------------------------------- */
+static void test_cr16_mod_dispose_releases_registry(void) {
+   AnvlMod mod = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   anvl_result res = mod_initialize(&mod, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "CR16: mod_initialize returns OK");
+   TestBit.is_not_null(mod, "CR16: module allocated");
+
+   module_document doc = Debug.stub_doc(NULL);
+   Source.create(&doc->source, &err_code);
+   const char *buffer = "name := test\n";
+   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
+   uint64_t hash = Source.hash(doc->source);
+
+   res = mod_ctx_register_doc(mod->context, doc, NULL, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "CR16: register doc returns OK");
+   TestBit.is_equal_int(1, (long long)Registry.count(), "CR16: registry contains one document");
+
+   mod_dispose(&mod);
+   TestBit.is_true(mod == NULL, "CR16: mod_dispose nulls caller module pointer");
+   TestBit.is_equal_int(0, (long long)Registry.count(),
+                        "CR16: registry is empty after module disposal");
+   TestBit.is_null(Registry.find(hash), "CR16: document no longer findable after disposal");
 }
 
 /* ---------------------------------------------------------------------- *
@@ -700,8 +703,8 @@ int main(void) {
    TestBit.run_ex("CR13_mod_ctx_set_parser", NULL, test_cr13_mod_ctx_set_parser, td);
    TestBit.run_ex("CR14_mod_ctx_dispose", NULL, test_cr14_mod_ctx_dispose, td);
    TestBit.run_ex("CR15_mod_dispose", NULL, test_cr15_mod_dispose, td);
+   TestBit.run_ex("CR16_mod_dispose_releases_registry", NULL,
+                  test_cr16_mod_dispose_releases_registry, td);
 
    return TestBit.report();
 }
-
-/* Manual lifecycle helpers now live in test/utilities/debug.c */

@@ -33,31 +33,24 @@
 //   - objects
 typedef struct anvl_source_t *anvl_source;
 typedef struct anvl_parser_t *anvl_parser;
-//   - functions/delegates
-typedef void (*set_parser_fn)(module_document, anvl_parser);
 
 struct anvl_mod_ctx_t {
    list docs;          // list of module_document
    list errors;        // list of anvl_error encountered during scanning/parsing
-   map doc_map;        // namespace key -> (addr)doc_identity pointer
    anvl_parser parser; // parser context for the module
 };
+
+typedef enum {
+   ANVL_SOURCE_FROM_FILE = 0,
+   ANVL_SOURCE_FROM_BUFFER,
+} anvl_source_origin;
 /* ---------------------------------------------------------------------- *
  * Document structure
  * ---------------------------------------------------------------------- */
-typedef struct anvl_mod_doc_i {
-   set_parser_fn set_parser; // function to set the parser for the document
-} anvl_mod_doc_i;
-extern const anvl_mod_doc_i Document;
-
 struct anvl_mod_doc_t {
-   anvl_source source;       // source for the document
-   const anvl_mod_doc_i *op; // operations for the document
-};
-struct anvl_doc_identity_t {
-   string namespace;    // namespace key used in module_context.doc_map
-   string filepath;     // normalized path to the loaded module
-   module_document doc; // owned/linked document handle for this identity
+   anvl_source source;     // source for the document
+   module_context context; // owning context, set on registration
+   string filepath;        // normalized path to the loaded module
 };
 
 /* ---------------------------------------------------------------------- *
@@ -96,9 +89,12 @@ void mod_dispose(AnvlMod *);
  * and ensuring it is properly disposed of when no longer needed.
  */
 anvl_result mod_attach_context(AnvlMod *, module_context);
+#endif
+
 /* ---------------------------------------------------------------------- *
  * Internal context function prototypes
  * ---------------------------------------------------------------------- */
+#if 1 // module_context functions
 /**
  * @brief Resolve the context specification, returning the default if NULL is provided.
  * @param[out] spec_ptr Pointer to the context specification to resolve.
@@ -123,8 +119,22 @@ anvl_result mod_ctx_initialize(context_spec, module_context *, anvl_err_code *);
  * @param ctx The module context to dispose.
  */
 void mod_ctx_dispose(module_context);
-void mod_ctx_add_doc(module_context, module_document);
+/**
+ * @brief Register a document with the module context.
+ * @param ctx The module context to register the document with.
+ * @param doc The document to register.
+ * @param namespace The namespace key for the document.
+ * @param filepath The normalized path to the document file.
+ * @param[out] out_id Pointer to the document identity to populate.
+ * @param[out] out_err_code Pointer to the error code if registration fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details This function registers a document with the specified module context. It appends the
+ * document to the context's document list, creates a document identity, resolves the namespace key
+ */
+anvl_result mod_ctx_register_doc(module_context, module_document, const char *filepath,
+                                 anvl_err_code *);
 void mod_ctx_set_parser(module_context, anvl_parser);
+void mod_ctx_add_doc(module_context, module_document);
 /**
  * @brief Clear all documents from the module context.
  * @param docs List of documents to clear.
@@ -140,15 +150,49 @@ void mod_ctx_clear_errs(list);
 /* ---------------------------------------------------------------------- *
  * Internal document functions
  * ---------------------------------------------------------------------- */
-anvl_result doc_initialize(const char *, module_document *, anvl_err_code *);
+#if 1 // module_document functions
+/**
+ * @brief Initialize a module document.
+ * @param[out] out_doc Pointer to the module document to initialize.
+ * @param[out] out_err_code Pointer to the error code if initialization fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details This function allocates and initializes a new module document. It sets the source to
+ * `NULL` and prepares the document for further operations. If allocation fails, an error code is
+ * returned.
+ */
+anvl_result doc_initialize(module_document *, anvl_err_code *);
+/**
+ * @brief Dispose of a module document, releasing all associated resources.
+ * @param doc The module document to dispose.
+ * @details This function disposes of the specified module document, releasing its source and any
+ * other associated resources. After calling this function, the document should not be used.
+ */
 void doc_dispose(module_document);
-anvl_result doc_create_source(const char *, module_document *, anvl_err_code *);
-void doc_dispose_source(module_document);
+/**
+ * @brief Load the source for a document.
+ * @param doc The document to load the source for.
+ * @param origin The origin of the source: `ANVL_SOURCE_FROM_FILE` or `ANVL_SOURCE_FROM_BUFFER`.
+ * @param source The source data: file path or buffer.
+ * @param len The length of the source data.
+ * @param out_err_code Pointer to the error code if loading fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details This function loads the source for the specified document. It initializes the source and
+ * attaches it to the document. If loading fails, an error code is returned.
+ */
+anvl_result doc_load_source(module_document, anvl_source_origin, const char *, size_t,
+                            anvl_err_code *);
+/**
+ * @brief Unload the source from a document.
+ * @param doc The document to unload the source from.
+ * @details This function detaches and disposes of the source associated with the specified
+ * document. After calling this function, the document's source will be set to `NULL`.
+ */
+void doc_unload_source(module_document);
 bool doc_has_errors(module_document);
-void doc_set_error(module_document, anvl_err_code, usize, usize, const char *);
+bool doc_set_error(module_document, anvl_err_code, usize, usize, const char *);
+#endif
 
 /* ---------------------------------------------------------------------- *
  * Internal root functions - deprecated
  * ---------------------------------------------------------------------- */
-anvl_result root_load_source(module_context, const char *);
 anvl_result root_get_doc(module_context, usize, module_document *);

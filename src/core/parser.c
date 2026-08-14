@@ -46,36 +46,36 @@ static const anvl_parser_vt iparser;
  * Parser Initialization                                              *
  * ----------------------------------------------------------------- */
 bool parser_new(anvl_doc doc) {
-  if (!doc || !doc->source) {
-    goto error;
-  }
+   if (!doc || !doc->source) {
+      goto error;
+   }
 
-  // anvl_error_clear();
+   // anvl_error_clear();
 
-  // initialize parser
-  ssize_t p_size = sizeof(anvl_parser);
-  anvl_parser *p = Allocator.alloc(p_size);
-  if (!p) {
-    goto error;
-  }
-  memset(p, 0, p_size);
+   // initialize parser
+   ssize_t p_size = sizeof(anvl_parser);
+   anvl_parser *p = Allocator.alloc(p_size);
+   if (!p) {
+      goto error;
+   }
+   memset(p, 0, p_size);
 
-  p->p = &iparser;
-  doc->set_parser(doc, p);
+   p->p = &iparser;
+   doc->set_parser(doc, p);
 
-  return true;
+   return true;
 
-  error:
+error:
    return false;
 }
 
 void parser_dispose(parser p) {
-  if (!p) {
-    return;
-  }
+   if (!p) {
+      return;
+   }
 
-  Allocator.dispose(p);
+   Allocator.dispose(p);
 }
 
 static const anvl_parser_vt iparser = {
-    .parse = NULL, .parse_statement = NULL, .parse_value = NULL, .reset = NULL};
+   .parse = NULL, .parse_statement = NULL, .parse_value = NULL, .reset = NULL};
