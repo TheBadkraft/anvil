@@ -316,6 +316,95 @@ static void test_src07d_source_hash_from_file(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * SRC08 — source error routing via registry lookup
+ * Commentary: parser/scanner code works with anvl_source handles. Error
+ * state is stored on the owning document's context, recovered through the
+ * global source hash registry.
+ * ---------------------------------------------------------------------- */
+static void test_src08a_source_has_errors_no_errors(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC08a: setup context failed");
+      return;
+   }
+
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC08a: setup document failed");
+      return;
+   }
+
+   const char *buffer = "name := test\n";
+   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
+   mod_ctx_register_doc(ctx, doc, "foo.anvl", &err_code);
+
+   TestBit.is_false(Source.has_errors(doc->source),
+                    "SRC08a: registered source reports no errors initially");
+
+   mod_ctx_dispose(ctx);
+}
+static void test_src08b_source_set_error_and_has_errors(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC08b: setup context failed");
+      return;
+   }
+
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC08b: setup document failed");
+      return;
+   }
+
+   const char *buffer = "name := test\n";
+   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
+   mod_ctx_register_doc(ctx, doc, "foo.anvl", &err_code);
+
+   anvl_result res =
+      Source.set_error(doc->source, ANVL_ERR_PARSER_UNEXPECTED_TOKEN, 2, 5, "foo.anvl", &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "SRC08b: set_error returns OK for registered source");
+   TestBit.is_true(Source.has_errors(doc->source),
+                   "SRC08b: registered source reports errors after set_error");
+   TestBit.is_equal_int(1, (long long)List.size(ctx->errors),
+                        "SRC08b: context error list contains one error");
+
+   anvl_error err = anvl_error_get(ctx->errors, 0);
+   TestBit.is_not_null(err, "SRC08b: error at index 0 is not null");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, (long long)err->code,
+                        "SRC08b: error code matches");
+   TestBit.is_equal_int(2, (long long)err->line, "SRC08b: error line matches");
+   TestBit.is_equal_int(5, (long long)err->column, "SRC08b: error column matches");
+
+   mod_ctx_dispose(ctx);
+}
+static void test_src08c_source_set_error_unregistered_fails(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, "x", 1, &err_code);
+
+   anvl_result res = Source.set_error(src, ANVL_ERR_PARSER_UNEXPECTED_CHAR, 1, 1, NULL, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC08c: set_error returns ERR for unregistered source");
+
+   Source.dispose(src);
+}
+static void test_src08d_source_has_errors_null_source(void) {
+   TestBit.is_false(Source.has_errors(NULL), "SRC08d: NULL source reports no errors");
+}
+static void test_src08e_source_set_error_null_source_fails(void) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = Source.set_error(NULL, ANVL_ERR_PARSER_UNEXPECTED_CHAR, 1, 1, NULL, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC08e: set_error returns ERR for NULL source");
+}
+
+/* ---------------------------------------------------------------------- *
  * DOC00 — doc_initialize success path
  * Commentary: verifies document allocation.
  * ---------------------------------------------------------------------- */
@@ -550,6 +639,17 @@ int main(void) {
    TestBit.run_ex("SRC07c_source_hash_different_content", NULL,
                   test_src07c_source_hash_different_content, td);
    TestBit.run_ex("SRC07d_source_hash_from_file", NULL, test_src07d_source_hash_from_file, td);
+
+   TestBit.run_ex("SRC08a_source_has_errors_no_errors", NULL,
+                  test_src08a_source_has_errors_no_errors, td);
+   TestBit.run_ex("SRC08b_source_set_error_and_has_errors", NULL,
+                  test_src08b_source_set_error_and_has_errors, td);
+   TestBit.run_ex("SRC08c_source_set_error_unregistered_fails", NULL,
+                  test_src08c_source_set_error_unregistered_fails, td);
+   TestBit.run_ex("SRC08d_source_has_errors_null_source", NULL,
+                  test_src08d_source_has_errors_null_source, td);
+   TestBit.run_ex("SRC08e_source_set_error_null_source_fails", NULL,
+                  test_src08e_source_set_error_null_source_fails, td);
 
    TestBit.run_ex("DOC00_doc_initialize_success", NULL, test_doc00_doc_initialize_success, td);
    TestBit.run_ex("DOC01_doc_initialize_null_out_doc", NULL, test_doc01_doc_initialize_null_out_doc,

@@ -68,13 +68,31 @@ identity.
   initialization/attach fails.
 - Added `CR16_mod_dispose_releases_registry` to `test/unit/test_module.c`.
 
+## Completed step 4
+
+- Implemented `Source.has_errors(src)` in `src/core/source.c`.
+  - Returns `false` for NULL source, zero hash, or unregistered source.
+  - Uses `Registry.find(Source.hash(src))` to locate the owning document.
+  - Returns `true` when the document's context error list is non-empty.
+- Implemented `Source.set_error(src, code, line, column, file, out_err_code)` in
+  `src/core/source.c`.
+  - Returns `ANVL_RES_ERR` for NULL source, zero hash, or unregistered source.
+  - Routes to `anvl_error_set(doc->context->errors, ...)` via registry lookup.
+- Added `set_error` function pointer to `anvl_source_i` in
+  `include/internal/source.h`.
+- Added SRC08 tests in `test/unit/test_document.c`:
+  - `SRC08a`: registered source reports no errors initially.
+  - `SRC08b`: set_error records an error and has_errors reports true.
+  - `SRC08c`: set_error fails for an unregistered source.
+  - `SRC08d`: has_errors(false) for NULL source.
+  - `SRC08e`: set_error fails for NULL source.
+
 ## Active step
 
-4. Implement `Source.set_error` and `Source.has_errors` using registry lookup.
+5. Update parser to take `anvl_source` and emit errors via source interface.
 
 ## Follow-up steps
 
-5. Update parser to take `anvl_source` and emit errors via source interface.
 6. Remove or disable intermediate tests that are no longer relevant.
 
 ## Decisions

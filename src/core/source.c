@@ -17,6 +17,8 @@
 
 #include "internal/files.h"
 #include "internal/source.h"
+#include "internal/source_registry.h"
+#include "errors.h"
 #include "std.h"
 // -----------------------------------------------------------------
 #include <sigma/memory.h>
@@ -219,6 +221,54 @@ static uint64_t source_hash(anvl_source src) {
    return src->hash;
 }
 
+/*
+ * Returns true if the source's owning document has accumulated errors.
+ * Uses the global source registry to locate the owning document.
+ */
+static bool source_has_errors(anvl_source src) {
+   if (!src || src->hash == 0) {
+      return false;
+   }
+
+   module_document doc = Registry.find(src->hash);
+   if (!doc || !doc->context) {
+      return false;
+   }
+
+   return List.size(doc->context->errors) > 0;
+}
+
+/*
+ * Records an error on the source's owning document by looking it up in the
+ * global source registry and appending to the context's error list.
+ */
+static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize line, usize column,
+                                    const char *file, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!src || src->hash == 0) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   module_document doc = Registry.find(src->hash);
+   if (!doc || !doc->context) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   return anvl_error_set(doc->context->errors, code, line, column, file, out_err_code);
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
+}
+
 const anvl_source_i Source = {
    .create = source_create,
    .from_file = source_from_file,
@@ -226,4 +276,6 @@ const anvl_source_i Source = {
    .dispose = source_dispose,
    .dialect = source_dialect,
    .hash = source_hash,
+   .has_errors = source_has_errors,
+   .set_error = source_set_error,
 };

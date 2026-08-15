@@ -103,6 +103,20 @@ typedef struct anvl_source_i {
 
    // Error handling - per source object
    bool (*has_errors)(anvl_source);
+   /**
+    * @brief Record a parser/scanner error against the source's owning document.
+    * @param src The source object where the error occurred.
+    * @param code The Anvil error code.
+    * @param line The 1-based line number of the error.
+    * @param column The 1-based column number of the error.
+    * @param file The file path associated with the error (may be NULL).
+    * @param[out] out_err_code Receives a failure code if the error cannot be recorded.
+    * @return `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
+    * @details Looks up the source in the global registry via its content hash and
+    * appends the error to the owning document's context error list.
+    */
+   anvl_result (*set_error)(anvl_source, anvl_err_code, usize, usize, const char *,
+                            anvl_err_code *);
 
    // Position & EOF
    usize (*position)(anvl_source);
