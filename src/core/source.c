@@ -22,12 +22,16 @@
 #include "std.h"
 // -----------------------------------------------------------------
 #include <sigma/memory.h>
+#include <string.h>
 
 // FNV-1a 64-bit hash constants
 #define FNV1A_OFFSET UINT64_C(14695981039346656037)
 #define FNV1A_PRIME UINT64_C(1099511628211)
 
 static ssize_t src_size = sizeof(struct anvl_source_t);
+
+/* Forward declarations */
+static void source_parse_shebang(anvl_source src);
 
 static uint64_t source_compute_hash(const char *data, usize len) {
    uint64_t hash = FNV1A_OFFSET;
@@ -64,6 +68,8 @@ static anvl_result source_create(anvl_source *out_src, anvl_err_code *out_err_co
     */
    // src->err_code = ANVL_ERR_NONE;
    src->dialect = ANVL_DIALECT_AML; // default dialect after refactor
+   src->line = 1;
+   src->col = 1;
 
    *out_src = src;
    return ANVL_RES_OK;
@@ -113,23 +119,35 @@ static anvl_result source_from_file(anvl_source *out_src, const char *filepath,
       goto error;
    }
 
+   // Determine the dialect from the file extension. The shebang, if present, takes precedence and
+   // is parsed inside source_from_buffer.
+   anvl_dialect dialect_hint = Files.dialect_hint(filepath);
+   if (dialect_hint == ANVL_DIALECT_ERROR) {
+      err_code = ANVL_ERR_IO_INVALID_PATH;
+      goto error;
+   }
+
    // now call source_from_buffer with the loaded buffer
    res = Source.from_buffer(out_src, buffer, len, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
 
-   // now get the dialect hint from the file extension and set it in the source object
-   anvl_dialect dialect_hint = Files.dialect_hint(filepath);
-   if (dialect_hint == ANVL_DIALECT_ERROR) {
-      err_code = ANVL_ERR_IO_INVALID_PATH;
-      goto error;
+   // free the intermediate file buffer now that source has its own copy
+   Allocator.dispose((void *)buffer);
+   buffer = NULL;
+
+   // Apply the extension hint only when the source did not provide a shebang.
+   if (!(*out_src)->has_shebang) {
+      (*out_src)->dialect = dialect_hint;
    }
-   (*out_src)->dialect = dialect_hint;
 
    return ANVL_RES_OK;
 
 error:
+   if (buffer) {
+      Allocator.dispose((void *)buffer);
+   }
    if (out_err_code) {
       *out_err_code = err_code;
    }
@@ -181,6 +199,13 @@ static anvl_result source_from_buffer(anvl_source *out_src, const char *buffer, 
    (*out_src)->stride = 1;                 // byte buffer stride
    (*out_src)->dialect = ANVL_DIALECT_AML; // default dialect after refactor
    (*out_src)->hash = source_compute_hash(bucket, len);
+   (*out_src)->line = 1;
+   (*out_src)->col = 1;
+   (*out_src)->has_shebang = false;
+
+   // Detect and consume an optional leading shebang. This positions the source at the first
+   // header/body token and resolves the dialect before the header scanner runs.
+   source_parse_shebang(*out_src);
 
    // atomically update the output source pointer and error code
    if (out_err_code) {
@@ -219,6 +244,239 @@ static uint64_t source_hash(anvl_source src) {
    }
 
    return src->hash;
+}
+
+/* ----------------------------------------------------------------------- *
+ * Source position and data access
+ * ----------------------------------------------------------------------- */
+static usize source_position(anvl_source src) { return src ? src->pos : 0; }
+
+static usize source_line(anvl_source src) { return src ? src->line : 0; }
+
+static usize source_column(anvl_source src) { return src ? src->col : 0; }
+
+static bool source_is_eof(anvl_source src) {
+   if (!src || !src->buffer.bucket) {
+      return true;
+   }
+   return src->pos >= src->length;
+}
+
+static bool source_is_eof_offset(anvl_source src, usize offset) {
+   if (!src || !src->buffer.bucket) {
+      return true;
+   }
+   return src->pos + offset >= src->length;
+}
+
+static char source_peek_offset(anvl_source src, usize offset) {
+   if (!src || !src->buffer.bucket || src->pos + offset >= src->length) {
+      return '\0';
+   }
+   return ((const char *)src->buffer.bucket)[src->pos + offset];
+}
+
+static char source_peek(anvl_source src) { return source_peek_offset(src, 0); }
+
+static const char *source_data(anvl_source src) {
+   if (!src) {
+      return NULL;
+   }
+   return (const char *)src->buffer.bucket;
+}
+
+static usize source_length(anvl_source src) {
+   if (!src) {
+      return 0;
+   }
+   return src->length;
+}
+
+static void source_set_position(anvl_source src, usize pos, usize line, usize col) {
+   if (!src) {
+      return;
+   }
+   if (pos > src->length) {
+      pos = src->length;
+   }
+   src->pos = pos;
+   src->line = line;
+   src->col = col;
+}
+
+static void source_reset(anvl_source src) { source_set_position(src, 0, 1, 1); }
+
+/* ----------------------------------------------------------------------- *
+ * Character classification
+ * ----------------------------------------------------------------------- */
+static bool source_is_alpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+
+static bool source_is_digit(char c) { return c >= '0' && c <= '9'; }
+
+static bool source_is_hex_digit(char c) {
+   return source_is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static bool source_is_identifier_start(char c) { return source_is_alpha(c) || c == '_'; }
+
+static bool source_is_identifier_part(char c) {
+   return source_is_alpha(c) || source_is_digit(c) || c == '_';
+}
+
+/* ----------------------------------------------------------------------- *
+ * Consume and matching
+ * ----------------------------------------------------------------------- */
+static usize source_consume(anvl_source src, usize count) {
+   if (!src || !src->buffer.bucket) {
+      return 0;
+   }
+
+   usize consumed = 0;
+   const char *data = (const char *)src->buffer.bucket;
+   while (consumed < count && src->pos < src->length) {
+      char c = data[src->pos];
+      src->pos++;
+      consumed++;
+      if (c == '\n') {
+         src->line++;
+         src->col = 1;
+      } else {
+         src->col++;
+      }
+   }
+   return consumed;
+}
+
+/*
+ * Parse an optional leading shebang (`#!dialect`) on the source. Leading whitespace is skipped so
+ * that indented or padded shebangs are accepted. The dialect token is validated against the known
+ * AML/AMP/ASL dialects; an invalid token leaves `src->dialect` set to `ANVL_DIALECT_ERROR` and
+ * `src->has_shebang` set so the header scanner can report the error. On success the source position
+ * is advanced past the shebang line; if no shebang is present the position is unchanged (aside from
+ * any leading whitespace that was skipped).
+ */
+static void source_parse_shebang(anvl_source src) {
+   if (!src || !src->buffer.bucket || src->length < 2) {
+      return;
+   }
+
+   const char *data = (const char *)src->buffer.bucket;
+
+   // Skip leading whitespace only; leave comments for the header scanner so it can report
+   // unterminated-comment errors in the proper document context.
+   while (src->pos < src->length) {
+      char c = data[src->pos];
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+         source_consume(src, 1);
+      } else {
+         break;
+      }
+   }
+
+   if (src->pos + 1 >= src->length || data[src->pos] != '#' || data[src->pos + 1] != '!') {
+      return;
+   }
+
+   src->has_shebang = true;
+   source_consume(src, 2); // consume '#!'
+
+   usize dialect_start = src->pos;
+   while (src->pos < src->length && data[src->pos] != '\n') {
+      source_consume(src, 1);
+   }
+   usize dialect_len = src->pos - dialect_start;
+
+   anvl_dialect dialect = ANVL_DIALECT_ERROR;
+   if (dialect_len == 3 && memcmp(data + dialect_start, "aml", 3) == 0) {
+      dialect = ANVL_DIALECT_AML;
+   } else if (dialect_len == 3 && memcmp(data + dialect_start, "amp", 3) == 0) {
+      dialect = ANVL_DIALECT_AMP;
+   } else if (dialect_len == 3 && memcmp(data + dialect_start, "asl", 3) == 0) {
+      dialect = ANVL_DIALECT_ASL;
+   }
+
+   src->dialect = dialect;
+
+   // Consume the terminating newline if present.
+   if (src->pos < src->length && data[src->pos] == '\n') {
+      source_consume(src, 1);
+   }
+}
+
+static usize source_match_length(anvl_source src, const char *s, usize len) {
+   if (!src || !s || len == 0) {
+      return 0;
+   }
+
+   for (usize i = 0; i < len; i++) {
+      if (source_peek_offset(src, i) != s[i]) {
+         return 0;
+      }
+   }
+   return len;
+}
+
+static usize source_match_operator(anvl_source src, const char *op, usize len) {
+   return source_match_length(src, op, len);
+}
+
+/* ----------------------------------------------------------------------- *
+ * Whitespace and comment skipping
+ * ----------------------------------------------------------------------- */
+static usize source_skip_whitespace_and_comments(anvl_source src) {
+   if (!src || !src->buffer.bucket) {
+      return 0;
+   }
+
+   usize skipped = 0;
+   const char *data = (const char *)src->buffer.bucket;
+
+   while (src->pos < src->length) {
+      char c = data[src->pos];
+
+      // whitespace
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+         source_consume(src, 1);
+         skipped++;
+         continue;
+      }
+
+      // line comment
+      if (c == '/' && src->pos + 1 < src->length && data[src->pos + 1] == '/') {
+         while (src->pos < src->length && data[src->pos] != '\n') {
+            source_consume(src, 1);
+            skipped++;
+         }
+         continue;
+      }
+
+      // block comment
+      if (c == '/' && src->pos + 1 < src->length && data[src->pos + 1] == '*') {
+         source_consume(src, 2);
+         skipped += 2;
+         while (src->pos < src->length) {
+            if (data[src->pos] == '*' && src->pos + 1 < src->length && data[src->pos + 1] == '/') {
+               source_consume(src, 2);
+               skipped += 2;
+               break;
+            }
+            source_consume(src, 1);
+            skipped++;
+         }
+         continue;
+      }
+
+      break;
+   }
+
+   return skipped;
+}
+
+static bool source_is_shebang(anvl_source src) {
+   if (!src || !src->buffer.bucket) {
+      return false;
+   }
+   return src->has_shebang;
 }
 
 /*
@@ -278,4 +536,26 @@ const anvl_source_i Source = {
    .hash = source_hash,
    .has_errors = source_has_errors,
    .set_error = source_set_error,
+
+   .position = source_position,
+   .line = source_line,
+   .column = source_column,
+   .is_eof = source_is_eof,
+   .is_eof_offset = source_is_eof_offset,
+   .peek = source_peek,
+   .peek_offset = source_peek_offset,
+   .match_length = source_match_length,
+   .match_operator = source_match_operator,
+   .is_alpha = source_is_alpha,
+   .is_digit = source_is_digit,
+   .is_hex_digit = source_is_hex_digit,
+   .is_identifier_start = source_is_identifier_start,
+   .is_identifier_part = source_is_identifier_part,
+   .consume = source_consume,
+   .data = source_data,
+   .length = source_length,
+   .set_position = source_set_position,
+   .reset = source_reset,
+   .skip_whitespace_and_comments = source_skip_whitespace_and_comments,
+   .is_shebang = source_is_shebang,
 };

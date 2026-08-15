@@ -288,6 +288,7 @@ void mod_ctx_dispose(module_context ctx) {
    mod_ctx_clear_errs(ctx->errors);
    ctx->docs = NULL;
    ctx->errors = NULL;
+
    Allocator.dispose(ctx);
 }
 anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const char *filepath,

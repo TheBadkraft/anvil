@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.7.0-alpha] — pre-release (2026-08-15)
+
+**Status:** Source-hash identity refactor complete; all active unit tests passing and Valgrind-clean
+**Milestone:** Source identity, header scanning, and full Source interface coverage
+
+### Added
+
+- **Process-wide source-hash registry** (`include/internal/source_registry.h`, `src/core/source_registry.c`) — maps FNV-1a 64-bit source content hashes to `module_document` identities. Exposes `Registry` vtable: `init`, `add`, `remove`, `find`, `count`, `release`, `clear`.
+- **Source interface expansion** (`src/core/source.c`) — full vtable implementation covering create/dispose, `from_buffer`, `from_file`, FNV-1a hash, position/line/column tracking, EOF/peek/match helpers, character classification, consume bounds, whitespace/comment skipping, shebang detection, and registry-backed `has_errors`/`set_error`.
+- **Document header scanner** (`src/core/document.c`) — `doc_scan_header` extracts optional shebang, `import` declarations, and module attributes (`@[...]`) before the first body statement. Stores imports/attributes as no-copy `anvl_src_slice` metadata into the source buffer.
+- **Header metadata types** (`include/internal/module.h`) — added `anvl_src_slice_t`, `anvl_doc_import_t`, `anvl_doc_attribute_t`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
+- **Dedicated test suites**
+  - `test/unit/test_header.c` — HDR00–HDR10 covering empty headers, shebangs, imports, comments, malformed imports, invalid shebangs, unterminated comments, attributes, ordering violations, and body termination.
+  - `test/unit/test_source.c` — SRC00–SRC22 covering every public `Source` helper and registry error routing.
+  - `test/unit/test_registry.c` — REG00–REG08 covering registry add/remove/find/count and reference-counted lifecycle.
+- **Test utilities** (`test/utilities/helpers.c`, `test/utilities/helpers.h`) — added `slice_equals`, `slice_is_empty`, and `setup_registered_doc` shared helpers for source-slice assertions and registered-document setup.
+- **Test/infra Makefile update** (`test/infra/Makefile`) — added `errors.c` and `source_registry.c` to `ANVIL_SRCS` so infra suites link against the current core.
+
+### Fixed
+
+- **`Source.from_file` buffer leak** (`src/core/source.c`) — frees the intermediate buffer returned by `Files.load` after copying it into the source object.
+- **`doc_load_source` source leak** (`src/core/document.c`) — no longer creates a new source object when `doc->source` already exists.
+- **`anvl_error_set` NULL output guard** (`src/core/errors.c`) — accepts a NULL `out_err_code` so `Source.set_error(..., NULL)` still appends the error.
+- **Document double-dispose in tests** (`test/unit/test_document.c`) — tests no longer call `doc_dispose` on documents already owned by a context after successful `mod_ctx_register_doc`; prevents use-after-free during `mod_ctx_dispose`.
+- **Registry module reference lifecycle** (`src/core/module.c`) — `mod_dispose` calls `Registry.release()`, and `mod_initialize` error paths call `mod_dispose` to release the registry reference.
+- **Registry cleanup in unit tests** (`test/unit/*.c`) — each suite teardown now calls `Registry.clear()` to obtain clean Valgrind reports when bypassing `mod_new`/`mod_dispose`.
+
+### Changed
+
+- **Shebang parsing moved to source load** (`src/core/source.c`, `src/core/document.c`) — `Source.from_buffer`/`Source.from_file` now detect and consume `#!dialect` and advance the source position past the shebang line. `Source.is_shebang` reports the `has_shebang` flag. File-extension hints are applied only when no shebang is present, so a shebang overrides the extension.
+- **Source struct** (`include/internal/source.h`) — added `bool has_shebang` field.
+- **`test/unit/Makefile`** — added `test_source`, `test_registry`, and `test_header` build/run targets; disabled `test_fixtures` (depends on deprecated root/doc APIs).
+
+### Test Results
+
+- Unit suites: 28/28 module, 31/31 document, 9/9 registry, 11/11 header, 23/23 source — all passing
+- Valgrind: 0 errors and 0 bytes in use at exit across all active unit suites
+- Infra suites: `test_files`, `test_strings`, `test_version` passing
+
+### Notes
+
+- Prefixed legacy files (`_source.c`, `_parser.c`, etc.) remain in the tree as reference material; extract all relevant functionality before archiving them.
+- Sigma library wishlist (`/memories/repo/sigma-wishlist.md`) captures candidates like `String.substring`, `starts_with`/`ends_with`, `trim`, and `index_of`/`contains` for a future Sigma refactoring iteration.
+
+---
+
 ## [v0.5.6-alpha] — pre-release (2026-07-03)
 
 ### Fixed

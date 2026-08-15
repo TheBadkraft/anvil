@@ -44,13 +44,46 @@ typedef enum {
    ANVL_SOURCE_FROM_FILE = 0,
    ANVL_SOURCE_FROM_BUFFER,
 } anvl_source_origin;
+
+/* ---------------------------------------------------------------------- *
+ * Source slice metadata — no-copy references into anvl_source buffer
+ * ---------------------------------------------------------------------- */
+typedef struct anvl_src_slice_t {
+   usize start;  // byte offset into source buffer
+   usize length; // byte length
+} anvl_src_slice;
+
+/* ---------------------------------------------------------------------- *
+ * Header import / attribute metadata
+ * ---------------------------------------------------------------------- */
+typedef struct anvl_doc_import_t {
+   anvl_src_slice decl; // "import \"path\"" (no trailing ';')
+   anvl_src_slice path; // "\"path\"" (quotes included)
+} anvl_doc_import_t;
+typedef anvl_doc_import_t *anvl_doc_import;
+
+typedef struct anvl_doc_attribute_t {
+   anvl_src_slice key;   // identifier
+   anvl_src_slice value; // value text; length 0 means flag attribute
+} anvl_doc_attribute_t;
+typedef anvl_doc_attribute_t *anvl_doc_attribute;
+
+/* ---------------------------------------------------------------------- *
+ * Document header — collected before body parsing
+ * ---------------------------------------------------------------------- */
+struct anvl_doc_header_t {
+   list imports;    // list of anvl_doc_import
+   list attributes; // list of anvl_doc_attribute
+};
+
 /* ---------------------------------------------------------------------- *
  * Document structure
  * ---------------------------------------------------------------------- */
 struct anvl_mod_doc_t {
-   anvl_source source;     // source for the document
-   module_context context; // owning context, set on registration
-   string filepath;        // normalized path to the loaded module
+   anvl_source source;               // source for the document
+   module_context context;           // owning context, set on registration
+   string filepath;                  // normalized path to the loaded module
+   struct anvl_doc_header_t *header; // parsed header metadata
 };
 
 /* ---------------------------------------------------------------------- *
@@ -182,6 +215,17 @@ void doc_dispose(module_document);
 anvl_result doc_load_source(module_document, anvl_source_origin, const char *, size_t,
                             anvl_err_code *);
 /**
+ * @brief Scan the document header for shebang, imports, and module attributes.
+ * @param doc The document to scan. Must have a loaded source and be registered
+ *   in the global source registry.
+ * @param[out] out_err_code Pointer to the error code if scanning fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
+ * @details This function scans the leading header constructs and leaves the
+ * source position at the first body statement. Errors are recorded via
+ * `Source.set_error()`.
+ */
+anvl_result doc_scan_header(module_document, anvl_err_code *);
+/**
  * @brief Unload the source from a document.
  * @param doc The document to unload the source from.
  * @details This function detaches and disposes of the source associated with the specified
@@ -190,6 +234,17 @@ anvl_result doc_load_source(module_document, anvl_source_origin, const char *, s
 void doc_unload_source(module_document);
 bool doc_has_errors(module_document);
 bool doc_set_error(module_document, anvl_err_code, usize, usize, const char *);
+/**
+ * @brief Scan the document header for shebang, imports, and module attributes.
+ * @param doc The document whose source has been loaded and registered with a context.
+ * @param[out] out_err_code Pointer to the error code if scanning fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
+ * @details This function scans the leading header constructs of the document source and populates
+ * `doc->header` with import and attribute metadata. It stops at the first body statement and
+ * leaves `doc->source->pos` at the first body character. Errors are reported via
+ * `Source.set_error` and `out_err_code`.
+ */
+anvl_result doc_scan_header(module_document, anvl_err_code *);
 #endif
 
 /* ---------------------------------------------------------------------- *

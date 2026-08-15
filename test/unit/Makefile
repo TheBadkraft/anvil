@@ -61,14 +61,18 @@ define run_test_bin
 endef
 
 .PHONY: all clean val build test test_release
-.PHONY: build_test_version build_test_module build_test_registry build_test_fixtures
-.PHONY: test_version test_module test_registry $(UNIT_CASES)
+.PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
+.PHONY: test_version test_module test_registry test_header test_source $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
 	$(BIN)/test_document \
 	$(BIN)/test_registry \
-	$(BIN)/test_fixtures
+	$(BIN)/test_header \
+	$(BIN)/test_source
+# test_fixtures is disabled: it depends on the deprecated root/doc APIs that
+# were replaced by the source-hash identity model. Revive after the parser
+# is reintegrated with anvl_source.
 
 $(BIN)/test_version: test_version.c $(ANVIL_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
@@ -115,17 +119,34 @@ test_registry: $(BIN)/test_version $(BIN)/test_registry
 		$(BIN)/test_version; \
 	fi
 
-$(BIN)/test_fixtures: test_fixtures.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
+$(BIN)/test_header: test_header.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
 	@mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $^ -o $@
 
-build_test_fixtures: $(BIN)/test_fixtures
+build_test_header: $(BIN)/test_header
 
-test_fixtures: $(BIN)/test_version $(BIN)/test_fixtures
-	$(call run_test_bin,test_fixtures)
+test_header: $(BIN)/test_version $(BIN)/test_header
+	$(call run_test_bin,test_header)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi
+
+$(BIN)/test_source: test_source.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_source: $(BIN)/test_source
+
+test_source: $(BIN)/test_version $(BIN)/test_source
+	$(call run_test_bin,test_source)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+# test_fixtures disabled — see `all` target comment.
+# $(BIN)/test_fixtures: test_fixtures.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER)
+# 	@mkdir -p $(BIN)
+# 	$(CC) $(CFLAGS) $^ -o $@
 
 # Shorthand aliases: make core [val|build] -> make test_module [val|build]
 $(UNIT_CASES): %: test_%

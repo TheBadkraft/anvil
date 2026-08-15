@@ -47,7 +47,8 @@ struct anvl_source_t {
    usize pos;
    usize line;
    usize col;
-   uint64_t hash; // FNV-1a 64-bit content hash; 0 = no content loaded
+   uint64_t hash;    // FNV-1a 64-bit content hash; 0 = no content loaded
+   bool has_shebang; // true when the source begins with a #! dialect directive
 };
 
 /* ----------------------------------------------------------------- *

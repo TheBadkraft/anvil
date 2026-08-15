@@ -114,6 +114,10 @@ void dispose_mod_manual(AnvlMod mod) {
    dispose_ctx_manual(mod->context);
    mod->context = NULL;
    mod->root = NULL;
+
+   // release the registry reference acquired by mod_new
+   Registry.release();
+
    Allocator.dispose(mod);
 }
 

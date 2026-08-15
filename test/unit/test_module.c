@@ -25,7 +25,10 @@
 
 #define ENABLED 0
 
-static void td(void) { (void)reset_context_spec_defaults(NULL); }
+static void td(void) {
+   (void)reset_context_spec_defaults(NULL);
+   Registry.clear();
+}
 
 /* ---------------------------------------------------------------------- *
  * CR00 — mod_ctx_spec_resolution

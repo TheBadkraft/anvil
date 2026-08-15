@@ -25,6 +25,10 @@
 #include <sigma/strings.h>
 
 static ssize_t doc_size = sizeof(struct anvl_mod_doc_t);
+static ssize_t header_size = sizeof(struct anvl_doc_header_t);
+static ssize_t import_size = sizeof(struct anvl_doc_import_t);
+static ssize_t attribute_size = sizeof(struct anvl_doc_attribute_t);
+static ssize_t list_ptr_size = sizeof(void *);
 
 /* ----------------------------------------------------------------------- *
  * module_document management
@@ -54,6 +58,13 @@ anvl_result doc_initialize(module_document *out_doc, anvl_err_code *out_err_code
    if (err_code != ANVL_ERR_NONE) {
       goto error;
    }
+
+   doc->header = Allocator.alloc(header_size);
+   if (!doc->header) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+   memset(doc->header, 0, header_size);
 
    *out_doc = doc;
    return ANVL_RES_OK;
@@ -86,8 +97,321 @@ void doc_dispose(module_document doc) {
       doc->filepath = NULL;
    }
 
+   if (doc->header) {
+      if (doc->header->imports) {
+         for (usize i = 0; i < List.size(doc->header->imports); i++) {
+            anvl_doc_import imp = NULL;
+            List.get(doc->header->imports, i, (object *)&imp);
+            Allocator.dispose(imp);
+         }
+         List.dispose(doc->header->imports);
+      }
+      if (doc->header->attributes) {
+         for (usize i = 0; i < List.size(doc->header->attributes); i++) {
+            anvl_doc_attribute attr = NULL;
+            List.get(doc->header->attributes, i, (object *)&attr);
+            Allocator.dispose(attr);
+         }
+         List.dispose(doc->header->attributes);
+      }
+      Allocator.dispose(doc->header);
+      doc->header = NULL;
+   }
+
    doc->context = NULL;
    Allocator.dispose(doc);
+}
+
+/* ----------------------------------------------------------------------- *
+ * Header scanning helpers
+ * ----------------------------------------------------------------------- */
+static void header_scan_set_error(module_document doc, anvl_err_code code) {
+   if (!doc || !doc->source) {
+      return;
+   }
+   Source.set_error(doc->source, code, Source.line(doc->source), Source.column(doc->source),
+                    doc->filepath, NULL);
+}
+
+static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code) {
+   anvl_source src = doc->source;
+   const char *data = Source.data(src);
+
+   while (!Source.is_eof(src)) {
+      char c = Source.peek(src);
+
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+         Source.consume(src, 1);
+         continue;
+      }
+
+      if (c == '/' && Source.peek_offset(src, 1) == '/') {
+         while (!Source.is_eof(src) && Source.peek(src) != '\n') {
+            Source.consume(src, 1);
+         }
+         continue;
+      }
+
+      if (c == '/' && Source.peek_offset(src, 1) == '*') {
+         Source.consume(src, 2);
+         while (!Source.is_eof(src)) {
+            if (Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/') {
+               Source.consume(src, 2);
+               break;
+            }
+            Source.consume(src, 1);
+         }
+         if (Source.is_eof(src) &&
+             !(Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/')) {
+            *err_code = ANVL_ERR_PARSER_UNTERMINATED_COMMENT;
+            return false;
+         }
+         continue;
+      }
+
+      break;
+   }
+
+   (void)data;
+   return true;
+}
+
+static bool header_scan_shebang(module_document doc, anvl_err_code *err_code) {
+   if (!doc || !doc->source) {
+      *err_code = ANVL_ERR_INVALID_ARGUMENT;
+      return false;
+   }
+
+   // The shebang was already detected and consumed when the source was loaded. The header scanner
+   // only needs to surface an invalid dialect token as an error.
+   if (doc->source->has_shebang && doc->source->dialect == ANVL_DIALECT_ERROR) {
+      *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+      return false;
+   }
+
+   return true;
+}
+
+static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
+   anvl_source src = doc->source;
+
+   while (true) {
+      if (!header_skip_ws_comments(doc, err_code)) {
+         return false;
+      }
+
+      if (Source.match_length(src, "import", 6) != 6 ||
+          Source.is_identifier_part(Source.peek_offset(src, 6))) {
+         break;
+      }
+
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         *err_code = ANVL_ERR_IMPORT_AMP_FORBIDDEN;
+         return false;
+      }
+
+      usize decl_start = Source.position(src);
+      Source.consume(src, 6); // "import"
+
+      if (!header_skip_ws_comments(doc, err_code)) {
+         return false;
+      }
+
+      if (Source.peek(src) != '"') {
+         *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+         return false;
+      }
+
+      usize path_start = Source.position(src);
+      Source.consume(src, 1); // opening quote
+      while (!Source.is_eof(src) && Source.peek(src) != '"') {
+         Source.consume(src, 1);
+      }
+      if (Source.peek(src) != '"') {
+         *err_code = ANVL_ERR_PARSER_UNTERMINATED_STRING;
+         return false;
+      }
+      usize path_end = Source.position(src); // index of closing quote
+      Source.consume(src, 1);                // closing quote
+      usize decl_end = Source.position(src); // after closing quote, before ';'
+
+      if (!header_skip_ws_comments(doc, err_code)) {
+         return false;
+      }
+      if (Source.peek(src) != ';') {
+         *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+         return false;
+      }
+      Source.consume(src, 1); // semicolon
+
+      anvl_doc_import imp = Allocator.alloc(import_size);
+      if (!imp) {
+         *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         return false;
+      }
+      imp->decl.start = decl_start;
+      imp->decl.length = decl_end - decl_start;
+      imp->path.start = path_start;
+      imp->path.length = path_end + 1 - path_start;
+      List.append(doc->header->imports, (object)imp);
+   }
+
+   return true;
+}
+
+static bool header_scan_attributes(module_document doc, anvl_err_code *err_code) {
+   anvl_source src = doc->source;
+
+   while (true) {
+      if (!header_skip_ws_comments(doc, err_code)) {
+         return false;
+      }
+
+      if (Source.match_length(src, "@[", 2) != 2) {
+         break;
+      }
+
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+         return false;
+      }
+
+      Source.consume(src, 2); // "@["
+
+      while (true) {
+         if (!header_skip_ws_comments(doc, err_code)) {
+            return false;
+         }
+
+         if (!Source.is_identifier_start(Source.peek(src))) {
+            *err_code = ANVL_ERR_PARSER_INVALID_IDENTIFIER;
+            return false;
+         }
+
+         usize key_start = Source.position(src);
+         Source.consume(src, 1);
+         while (Source.is_identifier_part(Source.peek(src))) {
+            Source.consume(src, 1);
+         }
+         usize key_end = Source.position(src);
+
+         anvl_doc_attribute attr = Allocator.alloc(attribute_size);
+         if (!attr) {
+            *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+            return false;
+         }
+         attr->key.start = key_start;
+         attr->key.length = key_end - key_start;
+
+         if (!header_skip_ws_comments(doc, err_code)) {
+            Allocator.dispose(attr);
+            return false;
+         }
+
+         if (Source.peek(src) == '=') {
+            Source.consume(src, 1); // '='
+            if (!header_skip_ws_comments(doc, err_code)) {
+               Allocator.dispose(attr);
+               return false;
+            }
+            usize value_start = Source.position(src);
+            bool in_string = false;
+            while (!Source.is_eof(src)) {
+               char c = Source.peek(src);
+               if (!in_string && (c == ',' || c == ']')) {
+                  break;
+               }
+               if (c == '"') {
+                  in_string = !in_string;
+               }
+               Source.consume(src, 1);
+            }
+            usize value_end = Source.position(src);
+            attr->value.start = value_start;
+            attr->value.length = value_end - value_start;
+         }
+
+         if (!header_skip_ws_comments(doc, err_code)) {
+            Allocator.dispose(attr);
+            return false;
+         }
+
+         List.append(doc->header->attributes, (object)attr);
+
+         if (Source.peek(src) == ',') {
+            Source.consume(src, 1);
+            continue;
+         }
+         if (Source.peek(src) == ']') {
+            Source.consume(src, 1);
+            break;
+         }
+         *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+         return false;
+      }
+   }
+
+   return true;
+}
+
+/* ----------------------------------------------------------------------- *
+ * Document header scanning
+ * ----------------------------------------------------------------------- */
+anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!doc || !doc->source || !doc->header) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   if (!doc->header->imports) {
+      doc->header->imports = List.new(4, list_ptr_size);
+   }
+   if (!doc->header->attributes) {
+      doc->header->attributes = List.new(4, list_ptr_size);
+   }
+   if (!doc->header->imports || !doc->header->attributes) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+
+   if (!header_scan_shebang(doc, &err_code)) {
+      goto error;
+   }
+   if (!header_scan_imports(doc, &err_code)) {
+      goto error;
+   }
+   if (!header_scan_attributes(doc, &err_code)) {
+      goto error;
+   }
+
+   // Leave source position at the first body statement.
+   if (!header_skip_ws_comments(doc, &err_code)) {
+      goto error;
+   }
+
+   // Enforce header ordering: no imports may follow attributes.
+   if (Source.match_length(doc->source, "import", 6) == 6 &&
+       !Source.is_identifier_part(Source.peek_offset(doc->source, 6))) {
+      err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+      goto error;
+   }
+
+   return ANVL_RES_OK;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (doc && doc->source && err_code != ANVL_ERR_INVALID_ARGUMENT &&
+       err_code != ANVL_ERR_MEMORY_ALLOC_FAILED) {
+      header_scan_set_error(doc, err_code);
+   }
+   return ANVL_RES_ERR;
 }
 
 /* ----------------------------------------------------------------------- *
@@ -109,8 +433,10 @@ anvl_result doc_load_source(module_document doc, anvl_source_origin origin, cons
    }
 
    // does document have a source object; if not, create one
-   if (!doc->source || ANVL_RES_OK != Source.create(&doc->source, &err_code)) {
-      goto error;
+   if (!doc->source) {
+      if (ANVL_RES_OK != Source.create(&doc->source, &err_code)) {
+         goto error;
+      }
    }
 
    // switch on origin to load source from file or buffer

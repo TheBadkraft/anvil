@@ -25,7 +25,10 @@
 #include <sigma/memory.h>
 #include <sigma/types.h>
 
-static void td(void) { (void)reset_context_spec_defaults(NULL); }
+static void td(void) {
+   (void)reset_context_spec_defaults(NULL);
+   Registry.clear();
+}
 
 /* ---------------------------------------------------------------------- *
  * SRC00 — source_create empty shell
@@ -607,6 +610,7 @@ static void test_doc10_register_doc_duplicate_hash(void) {
    res = mod_ctx_register_doc(ctx, doc2, "b.anvl", &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "DOC10: duplicate hash register_doc fails");
 
+   // doc1 is owned by ctx; doc2 was not registered because the hash is a duplicate.
    doc_dispose(doc2);
    mod_ctx_dispose(ctx);
 }

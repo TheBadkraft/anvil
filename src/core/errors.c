@@ -246,15 +246,17 @@ static const char *error_names[] = {
 anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize column,
                            const char *file, anvl_err_code *out_err_code) {
    anvl_err_code err_code = code;
+   anvl_error new_error = NULL;
+
    if (out_err_code) {
       *out_err_code = ANVL_ERR_NONE;
    }
-   if (!target || !out_err_code) {
+   if (!target) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
 
-   anvl_error new_error = Allocator.alloc(err_state_size);
+   new_error = Allocator.alloc(err_state_size);
    if (!new_error) {
       // If memory allocation fails, set global error state
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
@@ -284,9 +286,7 @@ error:
    return ANVL_RES_ERR;
 }
 
-bool anvl_error_is_set(list target) {
-   return List.size(target) > 0;
-}
+bool anvl_error_is_set(list target) { return List.size(target) > 0; }
 
 anvl_error anvl_error_get(list target, usize index) {
    if (index >= List.size(target)) {
