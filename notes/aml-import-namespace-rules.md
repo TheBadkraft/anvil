@@ -2,6 +2,8 @@
 
 Implementation reference for the Anvil parser. Edited as the implementation evolves. Derived from design sessions in August 2026.
 
+**Partially superseded** — see `notes/deferred-work.md` § *Superseded notes*: § *Import graph order* below is wrong under diamond imports, and its motivating premise (that document-processing order matters) turned out to be false anyway — the resolver design is map-based, not order-dependent, which also supersedes § 7's bottom-up-parse-order requirement (corrected in `document-header-scan.md` and `document-body-parse.md`). § 6 *Inheritance Syntax* was briefly flagged as stale too but turned out to be correct — `document-body-parse.md` now confirms `Ident : Base { ... }` (no `:=`) as the real `OBJECT_BLOCK` grammar. The rest of this document still stands.
+
 ---
 
 ## 1. No Namespaces, No Import Aliases

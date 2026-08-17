@@ -62,14 +62,17 @@ endef
 
 .PHONY: all clean val build test test_release
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
-.PHONY: test_version test_module test_registry test_header test_source $(UNIT_CASES)
+.PHONY: build_test_body_amp build_test_body_aml
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
 	$(BIN)/test_document \
 	$(BIN)/test_registry \
 	$(BIN)/test_header \
-	$(BIN)/test_source
+	$(BIN)/test_source \
+	$(BIN)/test_body_amp \
+	$(BIN)/test_body_aml
 # test_fixtures is disabled: it depends on the deprecated root/doc APIs that
 # were replaced by the source-hash identity model. Revive after the parser
 # is reintegrated with anvl_source.
@@ -139,6 +142,30 @@ build_test_source: $(BIN)/test_source
 
 test_source: $(BIN)/test_version $(BIN)/test_source
 	$(call run_test_bin,test_source)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_body_amp: test_body_amp.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_body_amp: $(BIN)/test_body_amp
+
+test_body_amp: $(BIN)/test_version $(BIN)/test_body_amp
+	$(call run_test_bin,test_body_amp)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_body_aml: test_body_aml.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_body_aml: $(BIN)/test_body_aml
+
+test_body_aml: $(BIN)/test_version $(BIN)/test_body_aml
+	$(call run_test_bin,test_body_aml)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

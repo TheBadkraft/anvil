@@ -118,6 +118,13 @@ void doc_dispose(module_document doc) {
       doc->header = NULL;
    }
 
+   if (doc->body) {
+      // STUB: doc_parse_body never populates entries yet; nothing to free per-element.
+      // Extend this once the real parser owns statement/value allocations.
+      List.dispose(doc->body);
+      doc->body = NULL;
+   }
+
    doc->context = NULL;
    Allocator.dispose(doc);
 }
@@ -395,6 +402,42 @@ error: {
    }
    return ANVL_RES_ERR;
 }
+}
+
+/* ----------------------------------------------------------------------- *
+ * Document body parsing
+ * ----------------------------------------------------------------------- *
+ * STUB — RED state for notes/document-body-parse.md. Always fails without
+ * recording an error via doc_set_error/Source.set_error, and never
+ * populates doc->body beyond an empty list. Replace with the real parser.
+ * ----------------------------------------------------------------------- */
+anvl_result doc_parse_body(module_document doc, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!doc || !doc->source) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   if (!doc->body) {
+      doc->body = List.new(4, list_ptr_size);
+      if (!doc->body) {
+         err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         goto error;
+      }
+   }
+
+   // TODO: not yet implemented.
+   err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
 }
 
 /* ----------------------------------------------------------------------- *

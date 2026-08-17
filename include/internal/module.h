@@ -80,6 +80,61 @@ struct anvl_doc_header_t {
 };
 
 /* ---------------------------------------------------------------------- *
+ * Body value tree — see notes/document-body-parse.md
+ * ---------------------------------------------------------------------- */
+typedef enum {
+   ANVL_VALUE_NONE = 0,
+   ANVL_VALUE_NULL,
+   ANVL_VALUE_BOOL,
+   ANVL_VALUE_INTEGER,
+   ANVL_VALUE_FLOAT,
+   ANVL_VALUE_STRING,
+   ANVL_VALUE_BLOB,       // standard scalar; tag stored separately, content in text span
+   ANVL_VALUE_ARRAY,
+   ANVL_VALUE_TUPLE,
+   ANVL_VALUE_OBJECT,     // nested statement list, not key/value pairs
+   ANVL_VALUE_IDENTIFIER, // bare symbol: static reference to another statement's value
+} anvl_value_type;
+
+typedef struct anvl_doc_value_t {
+   anvl_value_type type;
+   anvl_slice text; // full source span of the value
+   anvl_slice tag;  // blob tag (e.g. @date, @sel); empty for non-blobs or untagged blobs
+   union {
+      struct {
+         list items; // array/tuple: list of anvl_doc_value pointers
+      } collection;
+      struct {
+         list statements; // object: list of anvl_doc_statement pointers
+      } object;
+   };
+} anvl_doc_value_t;
+typedef anvl_doc_value_t *anvl_doc_value;
+
+/* ---------------------------------------------------------------------- *
+ * Body statements — two forms, both may carry `base` and `attributes`:
+ *   ident [: base] [@[...]] := value;    (ANVL_STMT_ASSIGN)
+ *   ident [: base] [@[...]] { stmts };   (ANVL_STMT_OBJECT_BLOCK)
+ * ---------------------------------------------------------------------- */
+typedef enum {
+   ANVL_STMT_ASSIGN = 0,   // ident [: base] [@[...]] := value;
+   ANVL_STMT_OBJECT_BLOCK, // ident [: base] [@[...]] { statements };
+   ANVL_STMT_VARS,         // vars { ... }
+   ANVL_STMT_USING,        // using "path";
+} anvl_stmt_kind;
+
+typedef struct anvl_doc_statement_t {
+   anvl_stmt_kind kind;
+   anvl_slice span;      // full source span of the statement
+   anvl_slice name;      // declared identifier; empty only for VARS/USING
+   anvl_slice base;      // inheritance base; empty when absent
+   anvl_doc_value value; // ASSIGN only; NULL otherwise
+   list body;            // OBJECT_BLOCK only; nested list of anvl_doc_statement pointers
+   list attributes;      // anvl_doc_attribute pointers, or NULL
+} anvl_doc_statement_t;
+typedef anvl_doc_statement_t *anvl_doc_statement;
+
+/* ---------------------------------------------------------------------- *
  * Document structure
  * ---------------------------------------------------------------------- */
 struct anvl_mod_doc_t {
@@ -87,6 +142,7 @@ struct anvl_mod_doc_t {
    module_context context;           // owning context, set on registration
    string filepath;                  // normalized path to the loaded module
    struct anvl_doc_header_t *header; // parsed header metadata
+   list body;                        // list of anvl_doc_statement pointers; NULL until doc_parse_body runs
 };
 
 /* ---------------------------------------------------------------------- *
@@ -242,6 +298,16 @@ anvl_result doc_scan_header(module_document, anvl_err_code *);
  * as errors on the requesting document.
  */
 anvl_result mod_load_imports(module_context ctx, module_document root, anvl_err_code *out_err_code);
+
+/**
+ * @brief Parse the document body into a list of statements.
+ * @param doc The document whose header has been scanned and whose imports have been loaded.
+ * @param[out] out_err_code Pointer to the error code if parsing fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details See `notes/document-body-parse.md` for the full grammar. Not yet implemented — the
+ * current body is a stub that always fails; see that document's TDD status.
+ */
+anvl_result doc_parse_body(module_document doc, anvl_err_code *out_err_code);
 
 /**
  * @brief Unload the source from a document.

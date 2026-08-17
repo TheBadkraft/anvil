@@ -1,7 +1,0 @@
-#!aml
-
-vars {
-    user := David;
-};
-
-motd := $"Welcome, {user}";

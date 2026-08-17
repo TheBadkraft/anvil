@@ -1,0 +1,6 @@
+#!aml
+
+// AML has no dynamic var-refs or interpolation (reserved for AnvilScript);
+// cross-statement reference is always a static, resolve-once identifier.
+base_var := 42;
+derived_var := base_var;

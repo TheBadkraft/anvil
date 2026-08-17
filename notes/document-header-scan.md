@@ -2,6 +2,8 @@
 
 Implementation reference for the header-scan step that precedes full body parsing in AML. Edited as the implementation evolves.
 
+See `notes/deferred-work.md` for anything raised here that's deferred to a later phase or still an open decision.
+
 ## Context
 
 AML uses a two-phase parse:
@@ -218,7 +220,7 @@ A dedicated test suite in `test/unit/test_header.c` covers the scanner with nine
 
 Current status (build 12+):
 
-- `test_header`: 9/9 scanner tests passing; 5 import-loader tests (HDR11–HDR15) passing against the real loader.
+- `test_header`: 9/9 scanner tests passing; 7 import-loader tests (HDR11–HDR17) passing against the real loader. 17/17 total, Valgrind-clean.
 - `test_document`: 31/31 passing; Valgrind-clean.
 - `test_module`: 28/28 passing; Valgrind-clean.
 - `test_registry`: 9/9 passing; Valgrind-clean.
@@ -257,7 +259,16 @@ A transient stack of source hashes (or document identities) tracks documents cur
 
 The source-hash registry naturally deduplicates diamond imports. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy.
 
-### Import loader test contract (HDR11–HDR15)
+### Path resolution: file-rooted vs. buffer-rooted documents
+
+"Resolve the path relative to `root->filepath`" (above) needs to account for how `root` was loaded, since a root document doesn't always have a real file behind it:
+
+- **File-rooted**: `Anvil.load(filepath)`-style loading gives `root->filepath` a real path. `import_resolve_dir` takes the directory component (everything before the last `/`) as the base for resolving that document's own imports, and this repeats recursively — each document resolves its imports relative to *its own* directory, not the original root's, per `aml-import-namespace-rules.md` §1.
+- **Buffer-rooted**: a document loaded via `Source.from_buffer` (no real file) has no meaningful directory. `import_resolve_dir` falls back to `.` — imports in a buffer-loaded root resolve relative to the process's current working directory at the time the import is loaded, not to any notion of "where the buffer came from" (there isn't one). This falls out of the existing NULL/no-slash handling in `import_resolve_dir` already (an empty or bare-filename `filepath` both resolve to `.`) rather than being special-cased — but there is currently no dedicated test exercising a buffer-rooted document with an import, so this behavior isn't locked in by a test yet. Flagged in `notes/deferred-work.md`.
+
+`./` and `../` are not special-cased differently from each other — both are ordinary relative-path text that gets string-joined onto the resolved parent directory (`import_resolve_dir` + `snprintf("%s/%s", parent_dir, import_name)`) and handed to the filesystem as-is; the OS resolves `.`/`..` segments when the file is actually opened. What's *not* yet implemented is path **canonicalization** before that string join/compare — `aml-import-namespace-rules.md` § *Canonical-path function* already flags this as TBD (`realpath()` or a custom resolver). Without it, two imports of the same file written differently (e.g. `"./a/../a/x"` vs `"./a/x"`) would be treated as distinct paths by the cycle-detection stack's `strcmp` and by dedup, even though they resolve to the same file. No current fixture exercises `../`-style imports, so this gap isn't test-covered either. Also tracked in `notes/deferred-work.md`.
+
+### Import loader test contract (HDR11–HDR17)
 
 A new batch of header-suite tests exercises `mod_load_imports` through fixture files:
 
@@ -266,6 +277,10 @@ A new batch of header-suite tests exercises `mod_load_imports` through fixture f
 - **HDR13** — diamond reuse: root imports base and types, types imports base; both paths point `resolved` at the same base document and only three total documents are registered.
 - **HDR14** — cyclic import rejected: a self-importing fixture reports `ANVL_ERR_IMPORT_CYCLIC`.
 - **HDR15** — missing import file: an import referencing a non-existent file reports an error on the root document.
+- **HDR16** — buffer-rooted document, no fixture file: a document registered with a bare (no-directory) `filepath` via `setup_registered_doc` imports `../fixtures/hdr_import_base.anvl` and resolves successfully, confirming imports on a buffer-loaded root resolve relative to the process's CWD. Passed on the first run with no code changes — the `import_resolve_dir` NULL/no-slash fallback already did the right thing; this test just locks it in.
+- **HDR17** — `../` resolves relative to the importing file's own directory: `test/fixtures/hdr_import_sub/hdr_import_dotdot.anvl` (a new fixture in a new subdirectory) imports `"../hdr_import_base.anvl"`, which correctly navigates back up to `test/fixtures/hdr_import_base.anvl`. Also passed on the first run with no code changes — `import_resolve_dir` computes each document's own directory correctly on recursion, and the unquoted `../` segment is handled by the filesystem when the file is opened, with no canonicalization needed for a single-hop resolve like this one.
+
+Both HDR16 and HDR17 are Valgrind-clean (0 errors, 0 leaks). Together they close the buffer-root and `../`-resolution testing gaps noted in `deferred-work.md`. What's still open — and distinct from what these tests cover — is path **canonicalization** (`realpath()` or equivalent): comparing two *differently-written* paths to the same file (e.g. `"./a/../a/x"` vs `"./a/x"`) for dedup/cycle-detection purposes. HDR17 only proves a single relative resolve works; it doesn't touch canonicalization at all.
 
 These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc_import_t`.
 
@@ -275,6 +290,12 @@ These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc
 - `vars` blocks — to be classified as header or body when ASL design begins.
 - Namespace keyword, if AML ever adds it.
 - Body compaction / `.anvlo` generation — keep the parse layer zero-copy; compaction belongs to a separate compile phase.
+
+## Import-graph processing order — resolved as unnecessary
+
+`mod_load_imports` discovers the import graph via DFS, and `ctx->docs` ends up in DFS *pre-order* (a document is registered before its imports are recursively expanded) as a side effect of that traversal. **No document-processing order is actually required.** The resolver design is map-based: every document in the graph is body-parsed (in any order) before Resolution begins, so by the time anything resolves a `base`/`IDENTIFIER` reference, every statement in the whole graph is already registered in an identifier map. Resolution fails only on a missed lookup, never because of processing order — see `document-body-parse.md` § *Relationship to header scan and import loading* for the full reasoning. This also means `.anvlo` linking's eventual "how do imports fold into a root object" question (`anvlo-compilation.md` open question 4) doesn't need a topological order either, just the same completeness guarantee (whole graph loaded/parsed before linking).
+
+That said, `notes/aml-import-namespace-rules.md` § *Import graph order* contains a genuine bug worth keeping on record independent of whether anything needs the fix: it concludes that **reversing** the pre-order discovery list gives a valid bottom-up (dependencies-first) order. That's only true for tree-shaped import graphs. It breaks under diamond imports, which this project explicitly supports and tests (HDR13): take `u` importing `v` and `w`, where both `v` and `w` import `x` (already registered/deduped by the time `w` is reached). Pre-order discovery is `[u, v, x, w]`; reversing gives `[w, x, v, u]` — but `w` depends on `x`, and `w` now comes *before* `x`. Reversed pre-order is wrong whenever a shared dependency is reachable through more than one path. If an ordering is ever wanted for some other reason (readability, deterministic output, etc.), the correct construction is DFS **post-order** (append each document to the order list only *after* fully recursing into its own imports, skipping documents already in the list for dedup) — no reversal required, and it directly guarantees dependencies precede dependents even through diamonds, unlike reversed pre-order.
 
 ## Resolved questions
 
@@ -298,7 +319,8 @@ The header-scan work required changes beyond the scanner itself. The following f
 - `src/core/module.c` — ensured `mod_dispose` releases the registry reference acquired in `mod_new`; implemented the recursive import loader (`mod_load_imports`, `import_load_child`, `import_load_child_recursive`, `import_path_on_stack`) with cycle detection and diamond deduplication.
 - `src/core/source_registry.c` — unchanged in this phase; `Registry.clear()` remains available for test teardown.
 - `test/utilities/debug.c` — added `Registry.release()` to `dispose_mod_manual` so module-based tests keep the registry refcount correct.
-- `test/unit/test_header.c` — new dedicated header suite (HDR00, HDR02–HDR05, HDR07–HDR10); import-loader tests HDR11–HDR15 appended and passing.
+- `test/unit/test_header.c` — new dedicated header suite (HDR00, HDR02–HDR05, HDR07–HDR10); import-loader tests HDR11–HDR17 appended and passing, including HDR16 (buffer-rooted CWD-relative resolution) and HDR17 (`../` resolves relative to the importing file's own directory).
+- `test/fixtures/hdr_import_sub/hdr_import_dotdot.anvl` — new fixture in a new subdirectory, imports `../hdr_import_base.anvl` to exercise HDR17.
 - `test/utilities/helpers.c`/`helpers.h` — added `slice_equals`, `setup_registered_doc`, and `setup_registered_file` shared helpers for source-slice assertions, registered-document setup, and fixture-based document setup. `slice_equals` now takes only an `anvl_slice` (no separate `anvl_source`, since the slice is self-referential) and compares through `Source.slice_length`/`Source.substring`; the standalone `slice_is_empty` test helper was removed in favor of calling `Source.slice_is_empty` directly.
 - `test/fixtures/hdr_import_*.anvl` — fixture graph for import-loader tests (single, nested, diamond, cyclic, missing); `hdr_import_nested.anvl` was added to create the 3-level import chain required by HDR12.
 - `test/unit/test_source.c` — new dedicated Source interface suite (SRC00–SRC22) covering all public helpers and registry-backed error routing.

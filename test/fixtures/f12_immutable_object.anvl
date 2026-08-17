@@ -1,0 +1,7 @@
+#!aml
+
+// object-block form (no ':='), attributes but no base
+config @[attrib] {
+   addr := 0.0.0.127;
+   port := 8080;
+};

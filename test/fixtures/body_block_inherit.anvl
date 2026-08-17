@@ -1,0 +1,10 @@
+#!aml
+
+// inheritance via the object-block form (no ':=')
+base := {
+   name := "base";
+};
+
+derived : base {
+   override := 2;
+};

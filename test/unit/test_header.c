@@ -459,6 +459,68 @@ static void test_hdr15_import_loader_missing(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * HDR16 — import loader: buffer-rooted document (no real file behind it)
+ * resolves imports relative to the process's current working directory
+ * ---------------------------------------------------------------------- */
+static void test_hdr16_import_loader_buffer_root_cwd(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_doc("import \"../fixtures/hdr_import_base.anvl\";\n",
+                                                &ctx);
+   TestBit.is_not_null(root, "HDR16: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR16: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res,
+                        "HDR16: buffer-rooted import resolves relative to CWD");
+
+   anvl_doc_import imp = NULL;
+   List.get(root->header->imports, 0, (object *)&imp);
+   TestBit.is_not_null(imp, "HDR16: import retrieved");
+   if (imp) {
+      TestBit.is_not_null(imp->resolved, "HDR16: import resolved to child document");
+   }
+   TestBit.is_equal_int(2, (long long)List.size(ctx->docs),
+                        "HDR16: two documents registered (root + child)");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR17 — import loader: '../' resolves relative to the importing file's
+ * own directory, not the original root's
+ * ---------------------------------------------------------------------- */
+static void test_hdr17_import_loader_dotdot(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_sub/hdr_import_dotdot.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR17: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR17: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR17: '../' import resolves");
+
+   anvl_doc_import imp = NULL;
+   List.get(root->header->imports, 0, (object *)&imp);
+   TestBit.is_not_null(imp, "HDR17: import retrieved");
+   if (imp) {
+      TestBit.is_not_null(imp->resolved, "HDR17: '../' import resolved to child document");
+   }
+   TestBit.is_equal_int(2, (long long)List.size(ctx->docs),
+                        "HDR17: two documents registered (root + child)");
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -483,6 +545,9 @@ int main(void) {
    TestBit.run_ex("HDR13_import_loader_diamond", NULL, test_hdr13_import_loader_diamond, th);
    TestBit.run_ex("HDR14_import_loader_cycle", NULL, test_hdr14_import_loader_cycle, th);
    TestBit.run_ex("HDR15_import_loader_missing", NULL, test_hdr15_import_loader_missing, th);
+   TestBit.run_ex("HDR16_import_loader_buffer_root_cwd", NULL,
+                  test_hdr16_import_loader_buffer_root_cwd, th);
+   TestBit.run_ex("HDR17_import_loader_dotdot", NULL, test_hdr17_import_loader_dotdot, th);
 
    return TestBit.report();
 }

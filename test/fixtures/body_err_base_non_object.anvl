@@ -1,0 +1,4 @@
+#!aml
+
+// base implies object-shaped; ':=' after 'base' must be followed by '{', not a scalar
+derived : base := 42;
