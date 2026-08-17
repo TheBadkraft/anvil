@@ -60,6 +60,7 @@
                 "\"${workspaceFolder}/src/core/module.c\"",
                 "\"${workspaceFolder}/src/core/document.c\"",
                 "\"${workspaceFolder}/src/core/source.c\"",
+                "\"${workspaceFolder}/src/core/source_registry.c\"",
                 "\"${workspaceFolder}/src/sigma/map.c\"",
                 "\"${workspaceFolder}/src/sigma/list.c\"",
                 "\"${workspaceFolder}/src/sigma/math.c\"",

@@ -527,21 +527,66 @@ error:
    return ANVL_RES_ERR;
 }
 
+/* ----------------------------------------------------------------------- *
+ * Slice interrogation
+ * ----------------------------------------------------------------------- */
+/*
+ * Get slice length
+ */
+static usize source_slice_length(anvl_slice slice) {
+   if (!slice.data || !slice.start || !slice.end || slice.start > slice.end) {
+      return 0;
+   }
+   return (usize)(slice.end - slice.start);
+}
+/*
+ * Check if slice is empty
+ */
+static bool source_slice_is_empty(anvl_slice slice) {
+   if (!slice.data || !slice.start || !slice.end || slice.start > slice.end) {
+      return true;
+   }
+   return slice.start == slice.end;
+}
+/*
+ * Get source sub-string from slice
+ */
+static usize source_substring(anvl_slice slice, char *out_buffer) {
+   usize len = source_slice_length(slice);
+   if (!slice.data || len == 0 || !out_buffer) {
+      return len;
+   }
+
+   // copy slice to out_buffer
+   memcpy(out_buffer, slice.start, len);
+   out_buffer[len] = '\0';
+
+   return len;
+}
+
 const anvl_source_i Source = {
+   // Management
    .create = source_create,
    .from_file = source_from_file,
    .from_buffer = source_from_buffer,
    .dispose = source_dispose,
+
+   // Properties
    .dialect = source_dialect,
    .hash = source_hash,
+
+   // Error handling
    .has_errors = source_has_errors,
    .set_error = source_set_error,
 
+   // Position management
    .position = source_position,
    .line = source_line,
    .column = source_column,
    .is_eof = source_is_eof,
    .is_eof_offset = source_is_eof_offset,
+
+   // Scanning
    .peek = source_peek,
    .peek_offset = source_peek_offset,
    .match_length = source_match_length,
@@ -558,4 +603,9 @@ const anvl_source_i Source = {
    .reset = source_reset,
    .skip_whitespace_and_comments = source_skip_whitespace_and_comments,
    .is_shebang = source_is_shebang,
+
+   // Slice interrogation
+   .slice_length = source_slice_length,
+   .slice_is_empty = source_slice_is_empty,
+   .substring = source_substring,
 };

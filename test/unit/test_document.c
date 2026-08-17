@@ -461,6 +461,8 @@ static void test_doc03_doc_load_source_buffer(void) {
    TestBit.is_equal_int(ANVL_RES_OK, res, "DOC03: doc_load_source from buffer returns OK");
    TestBit.is_equal_int(ANVL_ERR_NONE, err_code, "DOC03: err_code remains NONE");
    TestBit.is_not_null(doc->source, "DOC03: source is attached to document");
+   TestBit.is_equal_int(ANVL_DIALECT_AMP, (long long)Source.dialect(doc->source),
+                        "DOC03: source dialect is AMP for shebang buffer");
 
    doc_dispose(doc);
 }

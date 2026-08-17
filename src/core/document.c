@@ -132,7 +132,6 @@ static void header_scan_set_error(module_document doc, anvl_err_code code) {
    Source.set_error(doc->source, code, Source.line(doc->source), Source.column(doc->source),
                     doc->filepath, NULL);
 }
-
 static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code) {
    anvl_source src = doc->source;
    const char *data = Source.data(src);
@@ -175,23 +174,6 @@ static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code
    (void)data;
    return true;
 }
-
-static bool header_scan_shebang(module_document doc, anvl_err_code *err_code) {
-   if (!doc || !doc->source) {
-      *err_code = ANVL_ERR_INVALID_ARGUMENT;
-      return false;
-   }
-
-   // The shebang was already detected and consumed when the source was loaded. The header scanner
-   // only needs to surface an invalid dialect token as an error.
-   if (doc->source->has_shebang && doc->source->dialect == ANVL_DIALECT_ERROR) {
-      *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
-      return false;
-   }
-
-   return true;
-}
-
 static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
    anvl_source src = doc->source;
 
@@ -249,16 +231,18 @@ static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
          *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
          return false;
       }
-      imp->decl.start = decl_start;
-      imp->decl.length = decl_end - decl_start;
-      imp->path.start = path_start;
-      imp->path.length = path_end + 1 - path_start;
+      // Store the positions of the declaration and path slices in the import struct.
+      imp->decl.data = src->buffer.bucket;
+      imp->decl.start = src->buffer.bucket + decl_start;
+      imp->decl.end = src->buffer.bucket + decl_end;
+      imp->path.data = src->buffer.bucket;
+      imp->path.start = src->buffer.bucket + path_start;
+      imp->path.end = src->buffer.bucket + path_end + 1;
       List.append(doc->header->imports, (object)imp);
    }
 
    return true;
 }
-
 static bool header_scan_attributes(module_document doc, anvl_err_code *err_code) {
    anvl_source src = doc->source;
 
@@ -300,8 +284,9 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
             *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
             return false;
          }
-         attr->key.start = key_start;
-         attr->key.length = key_end - key_start;
+         attr->key.data = src->buffer.bucket;
+         attr->key.start = src->buffer.bucket + key_start;
+         attr->key.end = src->buffer.bucket + key_end;
 
          if (!header_skip_ws_comments(doc, err_code)) {
             Allocator.dispose(attr);
@@ -327,8 +312,9 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                Source.consume(src, 1);
             }
             usize value_end = Source.position(src);
-            attr->value.start = value_start;
-            attr->value.length = value_end - value_start;
+            attr->value.data = src->buffer.bucket;
+            attr->value.start = src->buffer.bucket + value_start;
+            attr->value.end = src->buffer.bucket + value_end;
          }
 
          if (!header_skip_ws_comments(doc, err_code)) {
@@ -353,7 +339,6 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
 
    return true;
 }
-
 /* ----------------------------------------------------------------------- *
  * Document header scanning
  * ----------------------------------------------------------------------- */
@@ -379,9 +364,6 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
-   if (!header_scan_shebang(doc, &err_code)) {
-      goto error;
-   }
    if (!header_scan_imports(doc, &err_code)) {
       goto error;
    }
@@ -403,7 +385,7 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
 
    return ANVL_RES_OK;
 
-error:
+error: {
    if (out_err_code) {
       *out_err_code = err_code;
    }
@@ -412,6 +394,7 @@ error:
       header_scan_set_error(doc, err_code);
    }
    return ANVL_RES_ERR;
+}
 }
 
 /* ----------------------------------------------------------------------- *

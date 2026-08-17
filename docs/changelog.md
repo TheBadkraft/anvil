@@ -2,6 +2,8 @@
 
 All notable changes to the Anvil project are documented in this file.
 
+**Milestone note:** the source-identity / header-scan milestone is wrapped with the import loader implemented and HDR11–HDR15 passing. Body-parser readiness is the next discussion topic.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -16,13 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Process-wide source-hash registry** (`include/internal/source_registry.h`, `src/core/source_registry.c`) — maps FNV-1a 64-bit source content hashes to `module_document` identities. Exposes `Registry` vtable: `init`, `add`, `remove`, `find`, `count`, `release`, `clear`.
 - **Source interface expansion** (`src/core/source.c`) — full vtable implementation covering create/dispose, `from_buffer`, `from_file`, FNV-1a hash, position/line/column tracking, EOF/peek/match helpers, character classification, consume bounds, whitespace/comment skipping, shebang detection, and registry-backed `has_errors`/`set_error`.
-- **Document header scanner** (`src/core/document.c`) — `doc_scan_header` extracts optional shebang, `import` declarations, and module attributes (`@[...]`) before the first body statement. Stores imports/attributes as no-copy `anvl_src_slice` metadata into the source buffer.
-- **Header metadata types** (`include/internal/module.h`) — added `anvl_src_slice_t`, `anvl_doc_import_t`, `anvl_doc_attribute_t`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
+- **Document header scanner** (`src/core/document.c`) — `doc_scan_header` extracts `import` declarations and module attributes (`@[...]`) before the first body statement. Stores imports/attributes as no-copy `anvl_slice` metadata into the source buffer.
+- **Import loader** (`src/core/module.c`) — `mod_load_imports` expands the import graph recursively with path resolution relative to the parent document, cycle detection via a path stack, and diamond deduplication via the source-hash registry.
+- **Header metadata types** (`include/internal/module.h`) — added `anvl_src_slice_t` (typedef `anvl_slice`, pointer alias `slice`), `anvl_doc_import_t` (with `resolved` back-pointer), `anvl_doc_attribute_t`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
 - **Dedicated test suites**
-  - `test/unit/test_header.c` — HDR00–HDR10 covering empty headers, shebangs, imports, comments, malformed imports, invalid shebangs, unterminated comments, attributes, ordering violations, and body termination.
+  - `test/unit/test_header.c` — HDR00, HDR02–HDR05, HDR07–HDR10 covering empty headers, imports, comments, malformed imports, unterminated comments, attributes, ordering violations, and body termination; HDR11–HDR15 covering import-loader single import, nested import, diamond reuse, cycle rejection, and missing file.
   - `test/unit/test_source.c` — SRC00–SRC22 covering every public `Source` helper and registry error routing.
   - `test/unit/test_registry.c` — REG00–REG08 covering registry add/remove/find/count and reference-counted lifecycle.
-- **Test utilities** (`test/utilities/helpers.c`, `test/utilities/helpers.h`) — added `slice_equals`, `slice_is_empty`, and `setup_registered_doc` shared helpers for source-slice assertions and registered-document setup.
+- **Import-loader fixtures** (`test/fixtures/hdr_import_*.anvl`) — fixture graph for single, nested (`hdr_import_nested.anvl` → `hdr_import_types.anvl` → `hdr_import_base.anvl`), diamond, cyclic, and missing import tests.
+- **Test utilities** (`test/utilities/helpers.c`, `test/utilities/helpers.h`) — added `slice_equals`, `slice_is_empty`, `setup_registered_doc`, and `setup_registered_file` shared helpers for source-slice assertions and registered-document setup and fixture-based document setup.
 - **Test/infra Makefile update** (`test/infra/Makefile`) — added `errors.c` and `source_registry.c` to `ANVIL_SRCS` so infra suites link against the current core.
 
 ### Fixed
@@ -36,13 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Shebang parsing moved to source load** (`src/core/source.c`, `src/core/document.c`) — `Source.from_buffer`/`Source.from_file` now detect and consume `#!dialect` and advance the source position past the shebang line. `Source.is_shebang` reports the `has_shebang` flag. File-extension hints are applied only when no shebang is present, so a shebang overrides the extension.
+- **Slice representation switched to a self-referential pointer triple** (`include/internal/module.h`, `include/internal/source.h`, `src/core/source.c`, `src/core/document.c`, `src/core/module.c`) — `anvl_src_slice_t` (value typedef `anvl_slice`, pointer alias `slice`) now stores `{data, start, end}` char pointers into the owning source buffer instead of `{start, length}` byte offsets. Length, emptiness, and substring extraction are derived from the three pointers rather than cached: `Source.slice_length`/`Source.slice_is_empty` replace direct field access, and `Source.substring` is reworked to take a slice directly (`Source.substring(anvl_slice, char *out_buffer)`) instead of `Source.substring(source, start, length, buffer)`. All header-scan (`document.c`) and import-loader (`module.c`) call sites updated to build and read slices through this API.
+- **Shebang parsing moved to source load** (`src/core/source.c`, `src/core/document.c`) — `Source.from_buffer`/`Source.from_file` now detect and consume `#!dialect` and advance the source position past the shebang line. `Source.is_shebang` reports the `has_shebang` flag, and `Source.dialect` reports `ANVL_DIALECT_ERROR` for invalid shebangs. `doc_scan_header` no longer validates the shebang; invalid shebangs are surfaced by the source loader instead. File-extension hints are applied only when no shebang is present, so a shebang overrides the extension.
 - **Source struct** (`include/internal/source.h`) — added `bool has_shebang` field.
 - **`test/unit/Makefile`** — added `test_source`, `test_registry`, and `test_header` build/run targets; disabled `test_fixtures` (depends on deprecated root/doc APIs).
 
 ### Test Results
 
-- Unit suites: 28/28 module, 31/31 document, 9/9 registry, 11/11 header, 23/23 source — all passing
+- Unit suites: 28/28 module, 31/31 document, 9/9 registry, 15/15 header, 23/23 source — all passing
 - Valgrind: 0 errors and 0 bytes in use at exit across all active unit suites
 - Infra suites: `test_files`, `test_strings`, `test_version` passing
 

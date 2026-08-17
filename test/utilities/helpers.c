@@ -11,6 +11,7 @@
 #include "helpers.h"
 #include "anvil.h"
 #include "internal/constants.h"
+#include "internal/files.h"
 #include "internal/module.h"
 #include "internal/source.h"
 #include "internal/source_registry.h"
@@ -38,19 +39,20 @@ anvl_result reset_context_spec_defaults(anvl_err_code *out_err_code) {
    return resolve_context_spec(&spec, out_err_code);
 }
 
-bool slice_equals(anvl_source src, anvl_src_slice slice, const char *expected) {
-   if (!src || !src->buffer.bucket || !expected) {
+bool slice_equals(anvl_slice slice, const char *expected) {
+   if (!slice.data || !expected) {
       return false;
    }
    usize expected_len = strlen(expected);
-   if (slice.length != expected_len) {
+   if (Source.slice_length(slice) != expected_len) {
       return false;
    }
-   const char *data = (const char *)src->buffer.bucket;
-   return memcmp(data + slice.start, expected, expected_len) == 0;
-}
+   // can we use non-allocated buffer here?
+   char data[256];
+   Source.substring(slice, data);
 
-bool slice_is_empty(anvl_src_slice slice) { return slice.start == 0 && slice.length == 0; }
+   return memcmp(data, expected, expected_len) == 0;
+}
 
 module_document setup_registered_doc(const char *buffer, module_context *out_ctx) {
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -68,6 +70,32 @@ module_document setup_registered_doc(const char *buffer, module_context *out_ctx
 
    if (ANVL_RES_OK != Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code) ||
        ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, "test.anvl", &err_code)) {
+      doc_dispose(doc);
+      mod_ctx_dispose(ctx);
+      return NULL;
+   }
+
+   *out_ctx = ctx;
+   return doc;
+}
+
+module_document setup_registered_file(const char *fixture_name, module_context *out_ctx) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   const char *path = fixture_path(fixture_name);
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      return NULL;
+   }
+
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      return NULL;
+   }
+
+   if (ANVL_RES_OK != doc_load_source(doc, ANVL_SOURCE_FROM_FILE, path, 0, &err_code) ||
+       ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, path, &err_code)) {
       doc_dispose(doc);
       mod_ctx_dispose(ctx);
       return NULL;

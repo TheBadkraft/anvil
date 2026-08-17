@@ -22,6 +22,8 @@
 #include <sigma/list.h>
 #include <sigma/types.h>
 
+#define ENABLED 0
+
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
    Registry.clear();
@@ -49,13 +51,13 @@ static void test_hdr00_empty_header(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
- * HDR01 — shebang detection
+ * HDR02 — single import statement
  * ---------------------------------------------------------------------- */
-static void test_hdr01_shebang_detection(void) {
+static void test_hdr01_single_import(void) {
+   const char *buffer = "import \"base\";\nname := test\n";
    module_context ctx = NULL;
-   module_document doc = setup_registered_doc("#!amp\nname := a3f9\n", &ctx);
+   module_document doc = setup_registered_doc(buffer, &ctx);
    TestBit.is_not_null(doc, "HDR01: registered document allocated");
    if (!doc) {
       return;
@@ -64,15 +66,33 @@ static void test_hdr01_shebang_detection(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_scan_header(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR01: scan header returns OK");
-   TestBit.is_equal_int(ANVL_DIALECT_AMP, (long long)Source.dialect(doc->source),
-                        "HDR01: shebang resolves dialect to AMP");
-   TestBit.is_equal_int(0, (long long)List.size(doc->header->imports),
-                        "HDR01: imports list is empty");
-   TestBit.is_equal_int(6, (long long)doc->source->pos, "HDR01: source position at start of body");
+   TestBit.is_equal_int(1, (long long)List.size(doc->header->imports),
+                        "HDR01: one import captured");
+
+   /*
+      typedef struct anvl_doc_import_t {
+         anvl_slice decl;          // "import \"path\"" (no trailing ';')
+         anvl_slice path;          // "\"path\"" (quotes included)
+         module_document resolved; // child document after import graph expansion; NULL until loaded
+      } anvl_import;
+    */
+   const char *exp_decl = "import \"base\"";
+   const char *exp_path = "\"base\"";
+   anvl_doc_import imp = NULL;
+   List.get(doc->header->imports, 0, (object *)&imp);
+   TestBit.is_not_null(imp, "HDR01: import retrieved");
+   if (imp) {
+      char act_decl[13] = {0};
+      Source.substring(imp->decl, act_decl);
+      char act_path[7] = {0};
+      Source.substring(imp->path, act_path);
+
+      TestBit.is_equal_str(exp_decl, act_decl, "HDR01: import declaration captured");
+      TestBit.is_equal_str(exp_path, act_path, "HDR01: import path captured");
+   }
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR02 — multiple imports in order
  * ---------------------------------------------------------------------- */
@@ -95,27 +115,24 @@ static void test_hdr02_multiple_imports(void) {
    List.get(doc->header->imports, 0, (object *)&imp0);
    TestBit.is_not_null(imp0, "HDR02: first import retrieved");
    if (imp0) {
-      TestBit.is_true(slice_equals(doc->source, imp0->decl, "import \"base\""),
+      TestBit.is_true(slice_equals(imp0->decl, "import \"base\""),
                       "HDR02: first import declaration captured");
-      TestBit.is_true(slice_equals(doc->source, imp0->path, "\"base\""),
-                      "HDR02: first import path captured");
+      TestBit.is_true(slice_equals(imp0->path, "\"base\""), "HDR02: first import path captured");
    }
 
    anvl_doc_import imp1 = NULL;
    List.get(doc->header->imports, 1, (object *)&imp1);
    TestBit.is_not_null(imp1, "HDR02: second import retrieved");
    if (imp1) {
-      TestBit.is_true(slice_equals(doc->source, imp1->decl, "import \"types\""),
+      TestBit.is_true(slice_equals(imp1->decl, "import \"types\""),
                       "HDR02: second import declaration captured");
-      TestBit.is_true(slice_equals(doc->source, imp1->path, "\"types\""),
-                      "HDR02: second import path captured");
+      TestBit.is_true(slice_equals(imp1->path, "\"types\""), "HDR02: second import path captured");
    }
 
    mod_ctx_dispose(ctx);
 }
-
-/* ---------------------------------------------------------------------- *
- * HDR03 — imports interleaved with comments
+/* ---------------------------------------------------------------------- *            \
+ * HDR03 — imports interleaved with comments                                         \
  * ---------------------------------------------------------------------- */
 static void test_hdr03_imports_with_comments(void) {
    const char *buffer = "// load base\nimport \"base\";\n/* then types */\nimport \"types\";\n";
@@ -134,7 +151,6 @@ static void test_hdr03_imports_with_comments(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR04 — missing semicolon after import
  * ---------------------------------------------------------------------- */
@@ -154,7 +170,6 @@ static void test_hdr04_import_missing_semicolon(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR05 — missing quotes around import path
  * ---------------------------------------------------------------------- */
@@ -174,27 +189,6 @@ static void test_hdr05_import_missing_quotes(void) {
 
    mod_ctx_dispose(ctx);
 }
-
-/* ---------------------------------------------------------------------- *
- * HDR06 — invalid shebang dialect
- * ---------------------------------------------------------------------- */
-static void test_hdr06_invalid_shebang(void) {
-   const char *buffer = "#!xyz\nname := test\n";
-   module_context ctx = NULL;
-   module_document doc = setup_registered_doc(buffer, &ctx);
-   TestBit.is_not_null(doc, "HDR06: registered document allocated");
-   if (!doc) {
-      return;
-   }
-
-   anvl_err_code err_code = ANVL_ERR_NONE;
-   anvl_result res = doc_scan_header(doc, &err_code);
-   TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR06: scan header returns ERR for invalid shebang");
-   TestBit.is_true(Source.has_errors(doc->source), "HDR06: source reports an error");
-
-   mod_ctx_dispose(ctx);
-}
-
 /* ---------------------------------------------------------------------- *
  * HDR07 — unterminated comment before shebang
  * ---------------------------------------------------------------------- */
@@ -215,7 +209,6 @@ static void test_hdr07_unterminated_comment_before_shebang(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR08 — module attributes after imports
  * ---------------------------------------------------------------------- */
@@ -240,24 +233,21 @@ static void test_hdr08_attributes_after_imports(void) {
    List.get(doc->header->attributes, 0, (object *)&attr0);
    TestBit.is_not_null(attr0, "HDR08: first attribute retrieved");
    if (attr0) {
-      TestBit.is_true(slice_equals(doc->source, attr0->key, "schema"),
-                      "HDR08: first attribute key is schema");
-      TestBit.is_true(slice_is_empty(attr0->value), "HDR08: first attribute is flag");
+      TestBit.is_true(slice_equals(attr0->key, "schema"), "HDR08: first attribute key is schema");
+      TestBit.is_true(Source.slice_is_empty(attr0->value), "HDR08: first attribute is flag");
    }
 
    anvl_doc_attribute attr1 = NULL;
    List.get(doc->header->attributes, 1, (object *)&attr1);
    TestBit.is_not_null(attr1, "HDR08: second attribute retrieved");
    if (attr1) {
-      TestBit.is_true(slice_equals(doc->source, attr1->key, "schema_version"),
+      TestBit.is_true(slice_equals(attr1->key, "schema_version"),
                       "HDR08: second attribute key is schema_version");
-      TestBit.is_true(slice_equals(doc->source, attr1->value, "1"),
-                      "HDR08: second attribute value is 1");
+      TestBit.is_true(slice_equals(attr1->value, "1"), "HDR08: second attribute value is 1");
    }
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR09 — import after attribute fails (ordering violation)
  * ---------------------------------------------------------------------- */
@@ -278,7 +268,6 @@ static void test_hdr09_import_after_attribute_fails(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * HDR10 — first body statement terminates header scan
  * ---------------------------------------------------------------------- */
@@ -299,18 +288,189 @@ static void test_hdr10_body_statement_terminates_header(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * HDR11 — import loader: single import resolves
+ * ---------------------------------------------------------------------- */
+static void test_hdr11_import_loader_single(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_single.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR11: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR11: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR11: load imports returns OK");
+   TestBit.is_equal_int(1, (long long)List.size(root->header->imports),
+                        "HDR11: one import captured");
+
+   anvl_doc_import imp = NULL;
+   List.get(root->header->imports, 0, (object *)&imp);
+   TestBit.is_not_null(imp, "HDR11: import retrieved");
+   if (imp) {
+      TestBit.is_not_null(imp->resolved, "HDR11: import resolved to child document");
+      if (imp->resolved) {
+         TestBit.is_not_null(imp->resolved->source, "HDR11: resolved document has source");
+      }
+   }
+   TestBit.is_equal_int(2, (long long)List.size(ctx->docs),
+                        "HDR11: two documents registered (root + child)");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR12 — import loader: nested imports resolve recursively
+ * ---------------------------------------------------------------------- */
+static void test_hdr12_import_loader_nested(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_nested.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR12: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR12: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR12: load imports returns OK");
+   TestBit.is_equal_int(1, (long long)List.size(root->header->imports),
+                        "HDR12: root has one import");
+
+   anvl_doc_import root_imp = NULL;
+   List.get(root->header->imports, 0, (object *)&root_imp);
+   TestBit.is_not_null(root_imp, "HDR12: root import retrieved");
+   if (root_imp) {
+      TestBit.is_not_null(root_imp->resolved, "HDR12: root import resolved to types document");
+   }
+   if (!root_imp || !root_imp->resolved) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+
+   module_document types_doc = root_imp->resolved;
+   TestBit.is_equal_int(1, (long long)List.size(types_doc->header->imports),
+                        "HDR12: types document has one import");
+
+   anvl_doc_import types_imp = NULL;
+   List.get(types_doc->header->imports, 0, (object *)&types_imp);
+   TestBit.is_not_null(types_imp, "HDR12: types import retrieved");
+   if (types_imp) {
+      TestBit.is_not_null(types_imp->resolved, "HDR12: nested import resolved to base document");
+   }
+   TestBit.is_equal_int(3, (long long)List.size(ctx->docs),
+                        "HDR12: three documents registered (root + types + base)");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR13 — import loader: diamond import reuses the same document
+ * ---------------------------------------------------------------------- */
+static void test_hdr13_import_loader_diamond(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR13: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR13: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR13: load imports returns OK");
+   TestBit.is_equal_int(2, (long long)List.size(root->header->imports),
+                        "HDR13: root has two imports");
+
+   anvl_doc_import base_imp = NULL;
+   anvl_doc_import types_imp = NULL;
+   List.get(root->header->imports, 0, (object *)&base_imp);
+   List.get(root->header->imports, 1, (object *)&types_imp);
+   TestBit.is_not_null(base_imp, "HDR13: base import retrieved");
+   TestBit.is_not_null(types_imp, "HDR13: types import retrieved");
+   if (base_imp) {
+      TestBit.is_not_null(base_imp->resolved, "HDR13: base import resolved to child document");
+   }
+   if (types_imp) {
+      TestBit.is_not_null(types_imp->resolved, "HDR13: types import resolved to child document");
+   }
+   if (!base_imp || !base_imp->resolved || !types_imp || !types_imp->resolved) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+
+   anvl_doc_import types_base_imp = NULL;
+   List.get(types_imp->resolved->header->imports, 0, (object *)&types_base_imp);
+   TestBit.is_not_null(types_base_imp, "HDR13: types->base import retrieved");
+   if (types_base_imp) {
+      TestBit.is_true(base_imp->resolved == types_base_imp->resolved,
+                      "HDR13: diamond base import resolves to the same document");
+   }
+   TestBit.is_equal_int(3, (long long)List.size(ctx->docs),
+                        "HDR13: three documents registered (root + base + types)");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR14 — import loader: cyclic import is rejected
+ * ---------------------------------------------------------------------- */
+static void test_hdr14_import_loader_cycle(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_self.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR14: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR14: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR14: cyclic import returns ERR");
+   TestBit.is_true(doc_has_errors(root), "HDR14: root document reports an error");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR15 — import loader: missing import file is reported
+ * ---------------------------------------------------------------------- */
+static void test_hdr15_import_loader_missing(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_missing.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR15: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR15: scan header returns OK");
+
+   res = mod_load_imports(ctx, root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR15: missing import returns ERR");
+   TestBit.is_true(doc_has_errors(root), "HDR15: root document reports an error");
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
    TestBit.run_ex("HDR00_empty_header", NULL, test_hdr00_empty_header, th);
-   TestBit.run_ex("HDR01_shebang_detection", NULL, test_hdr01_shebang_detection, th);
+   TestBit.run_ex("HDR01_single_import", NULL, test_hdr01_single_import, th);
+
    TestBit.run_ex("HDR02_multiple_imports", NULL, test_hdr02_multiple_imports, th);
    TestBit.run_ex("HDR03_imports_with_comments", NULL, test_hdr03_imports_with_comments, th);
    TestBit.run_ex("HDR04_import_missing_semicolon", NULL, test_hdr04_import_missing_semicolon, th);
    TestBit.run_ex("HDR05_import_missing_quotes", NULL, test_hdr05_import_missing_quotes, th);
-   TestBit.run_ex("HDR06_invalid_shebang", NULL, test_hdr06_invalid_shebang, th);
    TestBit.run_ex("HDR07_unterminated_comment_before_shebang", NULL,
                   test_hdr07_unterminated_comment_before_shebang, th);
    TestBit.run_ex("HDR08_attributes_after_imports", NULL, test_hdr08_attributes_after_imports, th);
@@ -318,6 +478,11 @@ int main(void) {
                   test_hdr09_import_after_attribute_fails, th);
    TestBit.run_ex("HDR10_body_statement_terminates_header", NULL,
                   test_hdr10_body_statement_terminates_header, th);
+   TestBit.run_ex("HDR11_import_loader_single", NULL, test_hdr11_import_loader_single, th);
+   TestBit.run_ex("HDR12_import_loader_nested", NULL, test_hdr12_import_loader_nested, th);
+   TestBit.run_ex("HDR13_import_loader_diamond", NULL, test_hdr13_import_loader_diamond, th);
+   TestBit.run_ex("HDR14_import_loader_cycle", NULL, test_hdr14_import_loader_cycle, th);
+   TestBit.run_ex("HDR15_import_loader_missing", NULL, test_hdr15_import_loader_missing, th);
 
    return TestBit.report();
 }

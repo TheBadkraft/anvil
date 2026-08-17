@@ -1,0 +1,3 @@
+import "hdr_import_base.anvl";
+import "hdr_import_types.anvl";
+main : = diamond

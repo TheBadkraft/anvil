@@ -49,22 +49,25 @@ typedef enum {
  * Source slice metadata — no-copy references into anvl_source buffer
  * ---------------------------------------------------------------------- */
 typedef struct anvl_src_slice_t {
-   usize start;  // byte offset into source buffer
-   usize length; // byte length
-} anvl_src_slice;
+   char *data;  // pointer to the start of the source buffer (raw bytes)
+   char *start; // pointer to the start of the slice within the source buffer
+   char *end;   // pointer to the end of the slice within the source buffer
+} anvl_slice;
+typedef anvl_slice *slice;
 
 /* ---------------------------------------------------------------------- *
  * Header import / attribute metadata
  * ---------------------------------------------------------------------- */
 typedef struct anvl_doc_import_t {
-   anvl_src_slice decl; // "import \"path\"" (no trailing ';')
-   anvl_src_slice path; // "\"path\"" (quotes included)
-} anvl_doc_import_t;
-typedef anvl_doc_import_t *anvl_doc_import;
+   anvl_slice decl;          // "import \"path\"" (no trailing ';')
+   anvl_slice path;          // "\"path\"" (quotes included)
+   module_document resolved; // child document after import graph expansion; NULL until loaded
+} anvl_import;
+typedef anvl_import *anvl_doc_import;
 
 typedef struct anvl_doc_attribute_t {
-   anvl_src_slice key;   // identifier
-   anvl_src_slice value; // value text; length 0 means flag attribute
+   anvl_slice key;   // identifier
+   anvl_slice value; // value text; length 0 means flag attribute
 } anvl_doc_attribute_t;
 typedef anvl_doc_attribute_t *anvl_doc_attribute;
 
@@ -225,6 +228,21 @@ anvl_result doc_load_source(module_document, anvl_source_origin, const char *, s
  * `Source.set_error()`.
  */
 anvl_result doc_scan_header(module_document, anvl_err_code *);
+
+/**
+ * @brief Recursively expand the import graph starting from a root document.
+ * @param ctx The module context that owns the root document and will own all imported documents.
+ * @param root The document whose header imports should be expanded.
+ * @param[out] out_err_code Pointer to the error code if expansion fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details This function resolves each import path in `root->header->imports` relative to
+ * `root->filepath`, loads the referenced file as a new document, registers it with `ctx`,
+ * scans its header, and recursively expands its imports. Each `anvl_doc_import_t` has its
+ * `resolved` field set to the child document. Cyclic imports and missing files are reported
+ * as errors on the requesting document.
+ */
+anvl_result mod_load_imports(module_context ctx, module_document root, anvl_err_code *out_err_code);
+
 /**
  * @brief Unload the source from a document.
  * @param doc The document to unload the source from.

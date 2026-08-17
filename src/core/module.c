@@ -346,6 +346,228 @@ void mod_ctx_set_parser(module_context ctx, anvl_parser parser) {
    }
    ctx->parser = parser;
 }
+
+/* ----------------------------------------------------------------------- *
+ * Import graph expansion
+ * ----------------------------------------------------------------------- */
+
+#define IMPORT_PATH_MAX 1024
+
+static anvl_result import_load_child_recursive(module_context ctx, module_document doc, list stack,
+                                               anvl_err_code *out_err_code);
+
+static void import_resolve_dir(const char *path, char *out_dir, usize out_size) {
+   if (!path || out_size == 0) {
+      if (out_size > 0) {
+         out_dir[0] = '\0';
+      }
+      return;
+   }
+
+   const char *last_slash = strrchr(path, '/');
+   if (!last_slash) {
+      if (out_size > 0) {
+         out_dir[0] = '.';
+         out_dir[1] = '\0';
+      }
+      return;
+   }
+
+   usize len = (usize)(last_slash - path);
+   if (len >= out_size) {
+      len = out_size - 1;
+   }
+   memcpy(out_dir, path, len);
+   out_dir[len] = '\0';
+}
+
+static bool import_path_on_stack(list stack, const char *path) {
+   if (!stack || !path) {
+      return false;
+   }
+
+   for (usize i = 0; i < List.size(stack); i++) {
+      const char *entry = NULL;
+      List.get(stack, i, (object *)&entry);
+      if (entry && strcmp(entry, path) == 0) {
+         return true;
+      }
+   }
+   return false;
+}
+
+static anvl_result import_load_child(module_context ctx, module_document parent,
+                                     anvl_doc_import imp, list stack, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   usize path_len = Source.slice_length(imp->path);
+   if (path_len < 2) {
+      err_code = ANVL_ERR_IMPORT_FILE_NOT_FOUND;
+      goto error;
+   }
+
+   // Strip surrounding quotes from the path slice.
+   path_len -= 2;
+   if (path_len >= IMPORT_PATH_MAX) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   char import_name[IMPORT_PATH_MAX];
+   memcpy(import_name, imp->path.start + 1, path_len);
+   import_name[path_len] = '\0';
+
+   // Resolve relative to the parent document's directory.
+   char resolved[IMPORT_PATH_MAX];
+   if (import_name[0] == '/') {
+      if (strlen(import_name) >= IMPORT_PATH_MAX) {
+         err_code = ANVL_ERR_INVALID_ARGUMENT;
+         goto error;
+      }
+      strcpy(resolved, import_name);
+   } else {
+      char parent_dir[IMPORT_PATH_MAX];
+      import_resolve_dir(parent->filepath, parent_dir, sizeof(parent_dir));
+
+      int written = snprintf(resolved, sizeof(resolved), "%s/%s", parent_dir[0] ? parent_dir : ".",
+                             import_name);
+      if (written < 0 || (usize)written >= sizeof(resolved)) {
+         err_code = ANVL_ERR_INVALID_ARGUMENT;
+         goto error;
+      }
+   }
+
+   // Cycle detection: the resolved path must not already be on the recursion stack.
+   if (import_path_on_stack(stack, resolved)) {
+      err_code = ANVL_ERR_IMPORT_CYCLIC;
+      goto error;
+   }
+
+   // Attempt to load the child source. If the file is missing or unreadable, report it.
+   module_document child = NULL;
+   if (ANVL_RES_OK != doc_initialize(&child, &err_code) || !child) {
+      goto error;
+   }
+
+   anvl_result res = doc_load_source(child, ANVL_SOURCE_FROM_FILE, resolved, 0, &err_code);
+   if (res != ANVL_RES_OK) {
+      if (err_code == ANVL_ERR_IO_FILE_NOT_FOUND || err_code == ANVL_ERR_IO_FILE_READ ||
+          err_code == ANVL_ERR_IO_INVALID_PATH) {
+         err_code = ANVL_ERR_IMPORT_FILE_NOT_FOUND;
+      }
+      goto error_child;
+   }
+
+   // Try to register. If the source hash is already registered, this is a diamond: reuse the
+   // existing document and discard the freshly loaded duplicate.
+   res = mod_ctx_register_doc(ctx, child, resolved, &err_code);
+   if (res != ANVL_RES_OK) {
+      if (err_code == ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT) {
+         module_document existing = Registry.find(Source.hash(child->source));
+         if (existing) {
+            imp->resolved = existing;
+            doc_dispose(child);
+            return ANVL_RES_OK;
+         }
+      }
+      goto error_child;
+   }
+
+   // New document registered. Scan its header and recurse into its imports.
+   res = doc_scan_header(child, &err_code);
+   if (res != ANVL_RES_OK) {
+      goto error;
+   }
+
+   imp->resolved = child;
+
+   res = import_load_child_recursive(ctx, child, stack, &err_code);
+   if (res != ANVL_RES_OK) {
+      goto error;
+   }
+
+   return ANVL_RES_OK;
+
+error_child:
+   doc_dispose(child);
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (err_code != ANVL_ERR_NONE) {
+      doc_set_error(parent, err_code, 1, 1, parent->filepath);
+   }
+   return ANVL_RES_ERR;
+}
+
+static anvl_result import_load_child_recursive(module_context ctx, module_document doc, list stack,
+                                               anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (!doc || !doc->filepath) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   // Push this document onto the recursion stack for cycle detection.
+   List.append(stack, (object)doc->filepath);
+
+   for (usize i = 0; i < List.size(doc->header->imports); i++) {
+      anvl_doc_import imp = NULL;
+      List.get(doc->header->imports, i, (object *)&imp);
+      if (!imp) {
+         continue;
+      }
+
+      if (ANVL_RES_OK != import_load_child(ctx, doc, imp, stack, &err_code)) {
+         goto error_pop;
+      }
+   }
+
+   List.remove(stack, List.size(stack) - 1);
+   return ANVL_RES_OK;
+
+error_pop:
+   List.remove(stack, List.size(stack) - 1);
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
+}
+
+anvl_result mod_load_imports(module_context ctx, module_document root,
+                             anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!ctx || !root) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   list stack = List.new(8, sizeof(const char *));
+   if (!stack) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+
+   anvl_result res = import_load_child_recursive(ctx, root, stack, &err_code);
+
+   List.dispose(stack);
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return res;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
+}
 void mod_ctx_clear_docs(list docs) {
    // iterate through the list and dispose of each module_document
    for (usize i = 0; i < List.size(docs); i++) {

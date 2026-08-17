@@ -1,0 +1,2 @@
+import "hdr_import_self.anvl";
+self : = cycle

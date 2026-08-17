@@ -51,9 +51,13 @@ struct anvl_source_t {
    bool has_shebang; // true when the source begins with a #! dialect directive
 };
 
-/* ----------------------------------------------------------------- *
- * AnvlDoc->Source Interface - for interrogating source content            *
- * ----------------------------------------------------------------- */
+/**
+ * @name Source Interface
+ * @brief Function pointers for source operations.
+ * @details This structure defines the interface for source operations, including creation,
+ * disposal, dialect detection, error handling, and position management. Each function pointer
+ * corresponds to a specific operation that can be performed on an `anvl_source` object.
+ */
 typedef struct anvl_source_i {
    /**
     * @brief Create an empty source object.
@@ -103,6 +107,14 @@ typedef struct anvl_source_i {
    uint64_t (*hash)(anvl_source);
 
    // Error handling - per source object
+   /**
+    * @brief Check if the source object has any recorded errors.
+    * @param src The source object to query.
+    * @return true if the source object has errors; false otherwise.
+    * @details This function checks if the specified source object has any recorded errors. It
+    * returns true if there are errors, and false if there are none. If the source object is NULL,
+    * it returns false.
+    */
    bool (*has_errors)(anvl_source);
    /**
     * @brief Record a parser/scanner error against the source's owning document.
@@ -120,48 +132,224 @@ typedef struct anvl_source_i {
                             anvl_err_code *);
 
    // Position & EOF
+   /**
+    * @brief Get the current position in the source object.
+    * @param src The source object to query.
+    * @return The current position in the source object, or 0 if the source is NULL.
+    */
    usize (*position)(anvl_source);
+   /**
+    * @brief Get the current line number in the source object.
+    * @param src The source object to query.
+    * @return The current line number in the source object, or 0 if the source is NULL.
+    */
    usize (*line)(anvl_source);
+   /**
+    * @brief Get the current column number in the source object.
+    * @param src The source object to query.
+    * @return The current column number in the source object, or 0 if the source is NULL.
+    */
    usize (*column)(anvl_source);
+   /**
+    * @brief Check if the source object has reached the end of its content.
+    * @param src The source object to query.
+    * @return true if the source object is at EOF; false otherwise.
+    * @details This function checks if the specified source object has reached the end of its
+    */
    bool (*is_eof)(anvl_source);
+   /**
+    * @brief Check if the source object has reached the end of its content with an offset.
+    * @param src The source object to query.
+    * @param offset The offset to check from the current position.
+    * @return true if the source object is at EOF with the given offset; false otherwise.
+    * @details This function checks if the specified source object has reached the end of its
+    * content when considering the given offset from the current position.
+    */
    bool (*is_eof_offset)(anvl_source, usize);
 
    // Character peek
+   /**
+    * @brief Peek at the character at the current position in the source object.
+    * @param src The source object to query.
+    * @return The character at the current position, or '\0' if the source is NULL or at EOF.
+    * @details This function retrieves the character at the current position in the specified source
+    * object without advancing the position. If the source is NULL or at EOF, it returns '\0'.
+    */
    char (*peek)(anvl_source);
+   /**
+    * @brief Peek at the character at an offset from the current position in the source object.
+    * @param src The source object to query.
+    * @param offset The offset from the current position to peek at.
+    * @return The character at the specified offset, or '\0' if the source is NULL or at EOF.
+    * @details This function retrieves the character at the specified offset from the current
+    * position in the source object without advancing the position. If the source is NULL or at EOF,
+    * it returns '\0'.
+    */
    char (*peek_offset)(anvl_source, usize);
 
    // String matching (returns length if matches, 0 if not)
+   /**
+    * @brief Match a string against the source content at the current position.
+    * @param src The source object to query.
+    * @param str The string to match against the source content.
+    * @param len The length of the string to match.
+    * @return The length of the matched string if it matches; otherwise, 0.
+    * @details This function attempts to match the specified string against the source content at
+    * the current position. If the string matches, it returns the length of the matched string;
+    * otherwise, it returns 0.
+    */
    usize (*match_length)(anvl_source, const char *, usize);
+   /**
+    * @brief Match an operator string against the source content at the current position.
+    * @param src The source object to query.
+    * @param op The operator string to match against the source content.
+    * @param len The length of the operator string to match.
+    * @return The length of the matched operator string if it matches; otherwise, 0.
+    * @details This function attempts to match the specified operator string against the source
+    * content at the current position. If the operator string matches, it returns the length of the
+    * matched operator string; otherwise, it returns 0.
+    */
    usize (*match_operator)(anvl_source, const char *, usize);
 
    // Character classification
+   /**
+    * @brief Check if a character is an alphabetic character (A-Z, a-z).
+    * @param c The character to check.
+    * @return true if the character is alphabetic; false otherwise.
+    */
    bool (*is_alpha)(char);
+   /**
+    * @brief Check if a character is a digit (0-9).
+    * @param c The character to check.
+    * @return true if the character is a digit; false otherwise.
+    */
    bool (*is_digit)(char);
+   /**
+    * @brief Check if a character is a hexadecimal digit (0-9, A-F, a-f).
+    * @param c The character to check.
+    * @return true if the character is a hexadecimal digit; false otherwise.
+    */
    bool (*is_hex_digit)(char);
+   /**
+    * @brief Check if a character is a valid identifier start character (A-Z, a-z, _).
+    * @param c The character to check.
+    * @return true if the character is a valid identifier start character; false otherwise.
+    */
    bool (*is_identifier_start)(char);
+   /**
+    * @brief Check if a character is a valid identifier part character (A-Z, a-z, 0-9, _).
+    * @param c The character to check.
+    * @return true if the character is a valid identifier part character; false otherwise.
+    */
    bool (*is_identifier_part)(char);
 
    // Consume
+   /**
+    * @brief Consume a specified number of characters from the source object.
+    * @param src The source object to consume from.
+    * @param count The number of characters to consume.
+    * @return The number of characters actually consumed.
+    * @details This function advances the current position in the specified source object by the
+    * specified count. It returns the number of characters actually consumed, which may be less than
+    * the requested count if the end of the source is reached.
+    */
    usize (*consume)(anvl_source, usize);
 
    // Data access (for scanning without consuming)
+   /**
+    * @brief Get a pointer to the source content buffer.
+    * @param src The source object to query.
+    * @return A pointer to the source content buffer, or NULL if the source is NULL.
+    * @details This function retrieves a pointer to the raw content buffer of the specified source
+    * object. The buffer contains the entire source content, and the caller should not modify it.
+    */
    const char *(*data)(anvl_source);
+   /**
+    * @brief Get the length of the source content buffer.
+    * @param src The source object to query.
+    * @return The length of the source content buffer in bytes, or 0 if the source is NULL.
+    */
    usize (*length)(anvl_source);
 
-   // Substring extraction (caller-supplied buffer; FR-2603-anvil-002)
-   void (*substring)(anvl_source, usize, usize, char *);
-
    // Whitespace & comments
+   /**
+    * @brief Skip whitespace and comments in the source content.
+    * @param src The source object to operate on.
+    * @return The number of characters skipped.
+    */
    usize (*skip_whitespace_and_comments)(anvl_source);
 
    // Shebang
+   /**
+    * @brief Check if the source content begins with a shebang (#!) directive.
+    * @param src The source object to query.
+    * @return true if the source content begins with a shebang; false otherwise.
+    */
    bool (*is_shebang)(anvl_source);
 
    // Dialect parsing
+   /**
+    * @brief Parse the dialect from the source content, considering an optional shebang.
+    * @param src The source object to operate on.
+    * @param default_dialect The default dialect to use if no shebang is present.
+    * @return The parsed dialect, or the default dialect if no shebang is present.
+    * @details This function checks the source content for a shebang (#!) directive that
+    * specifies the dialect. If a shebang is present, it parses the dialect from it. If no shebang
+    * is present, it returns the provided default dialect. The function also updates the source's
+    * dialect field accordingly.
+    */
    anvl_dialect (*parse_dialect)(anvl_source, anvl_dialect);
 
    // Position management
+   /**
+    * @brief Set the current position, line, and column in the source object.
+    * @param src The source object to operate on.
+    * @param pos The new position to set.
+    * @param line The new line number to set.
+    * @param col The new column number to set.
+    */
    void (*set_position)(anvl_source, usize, usize, usize);
+   /**
+    * @brief Reset the source object to its initial state, clearing any errors and resetting
+    * position.
+    * @param src The source object to reset.
+    * @details This function resets the specified source object to its initial state. It clears any
+    * recorded errors, resets the position to the beginning of the source content, and sets the
+    * line and column numbers to 1. The source content remains unchanged.
+    */
    void (*reset)(anvl_source);
+
+   // Slice interrogation
+   /**
+    * @brief Get the length of a slice.
+    * @param slice The slice to query.
+    * @return The length of the slice in bytes, or 0 if the slice is invalid.
+    */
+   usize (*slice_length)(anvl_slice);
+   /**
+    * @brief Check if a slice is empty.
+    * @param slice The slice to query.
+    * @return `true` if the slice is empty; otherwise `false`.
+    */
+   bool (*slice_is_empty)(anvl_slice);
+   /**
+    * @brief Extract a substring from the source content into a caller-supplied buffer.
+    * @param slice The slice representing the substring to extract.
+    * @param out_buffer The caller-supplied buffer to receive the substring.
+    * @return The length of the extracted substring, or 0 if the slice is invalid.
+    * @details This function copies the content of the specified slice from the source content into
+    * the provided output buffer. The caller is responsible for ensuring that the output buffer is
+    * large enough to hold the substring. The slice should be a valid slice obtained from the
+    * source content.
+    */
+   usize (*substring)(anvl_slice, char *);
 } anvl_source_i;
+/**
+ * @defgroup Global Source Interface Instance
+ * @brief Source interface instance provides access to the source interface functions for creating,
+ * disposing, and manipulating source objects. It is used throughout the Anvil project to interact
+ * with source content.
+ * @{
+ */
 extern const anvl_source_i Source;
+/** @} */

@@ -47,19 +47,22 @@ This function is exposed for independent testing and is called internally by `do
 
 ```c
 typedef struct anvl_src_slice_t {
-   usize start;
-   usize length;
-} anvl_src_slice;
+   char *data;  // pointer to the start of the source buffer (raw bytes)
+   char *start; // pointer to the start of the slice within the source buffer
+   char *end;   // pointer to the end of the slice within the source buffer
+} anvl_slice;
+typedef anvl_slice *slice;
 
 typedef struct anvl_doc_import_t {
-   anvl_src_slice decl;   // "import \"path\"" (no trailing ';')
-   anvl_src_slice path;   // "\"path\"" (quotes included)
-} anvl_doc_import_t;
-typedef anvl_doc_import_t *anvl_doc_import;
+   anvl_slice decl;          // "import \"path\"" (no trailing ';')
+   anvl_slice path;          // "\"path\"" (quotes included)
+   module_document resolved; // child document after import graph expansion; NULL until loaded
+} anvl_import;
+typedef anvl_import *anvl_doc_import;
 
 typedef struct anvl_doc_attribute_t {
-   anvl_src_slice key;    // identifier (e.g., "active", "is_active")
-   anvl_src_slice value;  // value text; length 0 means flag attribute
+   anvl_slice key;   // identifier (e.g., "active", "is_active")
+   anvl_slice value; // value text; empty slice (start == end) means flag attribute
 } anvl_doc_attribute_t;
 typedef anvl_doc_attribute_t *anvl_doc_attribute;
 
@@ -68,6 +71,16 @@ struct anvl_doc_header_t {
    list attributes;  // anvl_doc_attribute pointers
 };
 ```
+
+A slice is self-referential: `data` is the base of the owning source buffer, and `start`/`end` bound the slice within it. Nothing else is stored — length, emptiness, and the substring itself are all derived from these three pointers via the `Source` interface rather than cached:
+
+```c
+usize (*slice_length)(anvl_slice);    // end - start
+bool  (*slice_is_empty)(anvl_slice);  // start == end
+usize (*substring)(anvl_slice, char *out_buffer); // copies start..end into out_buffer, NUL-terminates
+```
+
+This replaced an earlier `usize start; usize length;` offset-pair representation. The pointer form avoids needing the owning source's base pointer as separate context when working with a slice in isolation, and keeps every slice validity check (`data`/`start`/`end` non-NULL, `start <= end`) local to the slice value itself.
 
 The `module_document` struct gains a `header` field:
 
@@ -94,7 +107,7 @@ The parser has always been no-copy. Header metadata follows the same model:
 Header elements must appear in this order:
 
 1. Skip whitespace and comments (`//`, `/* */`).
-2. If the next token is `#!`, the source loader has already parsed the dialect token and advanced the source position past the shebang line. The scanner only checks that the dialect was valid.
+2. The source loader has already consumed any leading shebang; the header scanner starts on the first import/attribute/body token.
 3. Skip whitespace and comments.
 4. While the next token is `import`, parse the quoted path and consume the terminating `;`.
 5. Skip whitespace and comments.
@@ -115,7 +128,7 @@ The shebang line has the form `#!dialect` where `dialect` is one of:
 
 It may be preceded by whitespace. It overrides any file-extension dialect hint. The shebang itself is **not** stored as header metadata; it only affects dialect resolution.
 
-Shebang detection and consumption now happen at source load time (`Source.from_buffer` / `Source.from_file`). After loading, the source position is advanced past the shebang line, so the header scanner starts on the first import/attribute/body token rather than re-reading the shebang. The source object records whether a shebang was found in `src->has_shebang`; `Source.is_shebang` reports this flag. The header scanner only validates that an invalid shebang dialect token surfaces as an error.
+Shebang detection and consumption now happen at source load time (`Source.from_buffer` / `Source.from_file`). After loading, the source position is advanced past the shebang line, so the header scanner starts on the first import/attribute/body token rather than re-reading the shebang. The source object records whether a shebang was found in `src->has_shebang`; `Source.is_shebang` reports this flag, and `Source.dialect` reports `ANVL_DIALECT_ERROR` if the shebang token was invalid. The header scanner itself does not re-validate the shebang.
 
 ## Import path parsing
 
@@ -142,27 +155,28 @@ Example:
 
 ```anvl
 @[schema, schema_version=1]
-@[author="David Boarmahn"]
+@[author="David Boarman"]
 @[created=08-15-2026] // not sure if we're supporting `-` in bare literals; this value might be quoted
 ```
 
 Each attribute entry inside a block (comma-separated) becomes one `anvl_doc_attribute_t`:
 
-- `@[active]` → `key = "active"`, `value.length = 0` (flag).
+- `@[active]` → `key = "active"`, `value` empty (`start == end`, flag).
 - `@[is_active=true]` → `key = "is_active"`, `value = "true"`.
 - `@[ident=null]` → `key = "ident"`, `value = "null"`.
 
-The value slice is raw text after `=` and is trimmed of surrounding whitespace at the slice boundaries without copying. A zero-length value means the attribute is a flag. Full attribute value parsing is deferred until the body parser or resolver needs it.
+The value slice is raw text after `=` and is trimmed of surrounding whitespace at the slice boundaries without copying. An empty value slice means the attribute is a flag. Full attribute value parsing is deferred until the body parser or resolver needs it.
 
 ## Error handling
 
 The scan reports errors such as:
 
 - Unterminated comment.
-- Invalid shebang dialect.
 - Malformed import declaration (missing quotes, missing semicolon).
 - Import after an attribute (ordering violation).
 - Body statement appearing before imports/attributes are complete.
+
+Invalid shebang dialects are reported at source-load time, not by the header scanner.
 
 Errors route through `Source.set_error(doc->source, ...)`.
 
@@ -186,37 +200,81 @@ For tests that exercise only header extraction, create a context, load the sourc
 
 ## Testing strategy
 
-A dedicated test suite in `test/unit/test_header.c` covers the scanner with eleven cases (HDR00–HDR10):
+A dedicated test suite in `test/unit/test_header.c` covers the scanner with nine cases (HDR00, HDR02–HDR05, HDR07–HDR10):
 
 - Empty header (no shebang, no imports).
-- Shebang detection with leading whitespace/comments.
 - Multiple imports in order.
 - Imports interleaved with comments.
 - Missing semicolon after import.
 - Missing quotes around import path.
-- Invalid shebang.
 - Unterminated comment before shebang.
 - Module attributes after imports.
 - Import after attribute fails (ordering violation).
 - First body statement terminates the header scan; source location is placed on the first body character.
 
-`test/unit/test_document.c` includes overlapping header tests (HDR00–HDR10) that exercise `doc_scan_header` through the document API.
+(The dedicated shebang-detection and invalid-shebang tests were removed because shebang handling lives entirely in the source loader; `test_source` and `test_document` still exercise valid shebangs.)
 
-Current status (build 12):
+`test/unit/test_document.c` includes overlapping header tests that exercise `doc_scan_header` through the document API.
 
-- `test_header`: 11/11 passing; Valgrind-clean
-- `test_document`: 31/31 passing; Valgrind-clean
-- `test_module`: 28/28 passing; Valgrind-clean
-- `test_registry`: 9/9 passing; Valgrind-clean
-- `test_source`: 23/23 passing; Valgrind-clean
+Current status (build 12+):
 
-All active unit suites report 0 Valgrind errors and 0 lost bytes (only the expected still-reachable source-hash registry map blocks remain).
+- `test_header`: 9/9 scanner tests passing; 5 import-loader tests (HDR11–HDR15) passing against the real loader.
+- `test_document`: 31/31 passing; Valgrind-clean.
+- `test_module`: 28/28 passing; Valgrind-clean.
+- `test_registry`: 9/9 passing; Valgrind-clean.
+- `test_source`: 23/23 passing; Valgrind-clean.
+
+All active unit suites report 0 Valgrind errors and 0 bytes in use at exit.
+
+The header-scan and import-loader work is wrapped.
+
+## Import graph expansion
+
+After the header scan records import slices, a separate loader phase expands the graph:
+
+```c
+anvl_result mod_load_imports(module_context ctx, module_document root, anvl_err_code *out_err_code);
+```
+
+Responsibilities:
+
+- Walk `root->header->imports` in order.
+- Strip quotes from each `path` slice.
+- Resolve the path relative to `root->filepath`.
+- Load the referenced file as a new document (`doc_load_source` + `mod_ctx_register_doc`).
+- Scan the child header (`doc_scan_header`).
+- Recursively expand the child’s imports.
+- Set `anvl_doc_import_t.resolved` to the loaded child document.
+- Detect cycles and missing files, reporting errors on the requesting document.
+
+The loader does not parse bodies; it only ensures the full import graph is loaded and header-scanned before body parsing begins. This separation keeps path resolution, cycle detection, and duplicate-document deduplication in one place.
+
+### Cycle detection
+
+A transient stack of source hashes (or document identities) tracks documents currently being expanded. If an import resolves to a document already on the stack, the loader reports `ANVL_ERR_IMPORT_CYCLIC` on the requesting document and unwinds.
+
+### Duplicate document deduplication
+
+The source-hash registry naturally deduplicates diamond imports. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy.
+
+### Import loader test contract (HDR11–HDR15)
+
+A new batch of header-suite tests exercises `mod_load_imports` through fixture files:
+
+- **HDR11** — single import resolves: root imports `hdr_import_base.anvl`; `resolved` is set and two documents are registered.
+- **HDR12** — nested imports: root imports `hdr_import_nested.anvl`, which imports `hdr_import_types.anvl`, which imports `hdr_import_base.anvl`; all four documents are loaded and linked.
+- **HDR13** — diamond reuse: root imports base and types, types imports base; both paths point `resolved` at the same base document and only three total documents are registered.
+- **HDR14** — cyclic import rejected: a self-importing fixture reports `ANVL_ERR_IMPORT_CYCLIC`.
+- **HDR15** — missing import file: an import referencing a non-existent file reports an error on the root document.
+
+These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc_import_t`.
 
 ## Deferred to AnvilScript / later work
 
 - `using` declarations (ASL).
 - `vars` blocks — to be classified as header or body when ASL design begins.
 - Namespace keyword, if AML ever adds it.
+- Body compaction / `.anvlo` generation — keep the parse layer zero-copy; compaction belongs to a separate compile phase.
 
 ## Resolved questions
 
@@ -224,22 +282,25 @@ All active unit suites report 0 Valgrind errors and 0 lost bytes (only the expec
 2. **Header storage**: `struct anvl_doc_header_t` with `imports` and `attributes` lists, owned by `module_document`.
 3. **No-copy**: imports/attributes stored as slice metadata into the source buffer.
 4. **Import slice**: declaration slice excludes `;`, path slice includes surrounding quotes.
-5. **Attribute slice**: each attribute stored as key/value slice pair; zero-length value means flag.
-6. **Scan timing**: header scan runs after source load and document registration so errors can route through the source registry.
-7. **vars/usings**: deferred to AnvilScript design.
+5. **Attribute slice**: each attribute stored as key/value slice pair; empty value slice means flag.
+6. **Slice representation**: `anvl_slice` is a self-referential `{data, start, end}` pointer triple into the owning source buffer, not a `{start, length}` offset pair. Length, emptiness, and substring extraction are derived via `Source.slice_length`/`slice_is_empty`/`substring` rather than stored.
+7. **Scan timing**: header scan runs after source load and document registration so errors can route through the source registry.
+8. **vars/usings**: deferred to AnvilScript design.
 
 ## Implementation inventory
 
 The header-scan work required changes beyond the scanner itself. The following files were touched and why:
 
-- `include/internal/module.h` — added `anvl_src_slice_t`, `anvl_doc_import_t`/`anvl_doc_import`, `anvl_doc_attribute_t`/`anvl_doc_attribute`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
+- `include/internal/module.h` — added `anvl_src_slice_t`/`anvl_slice`/`slice`, `anvl_doc_import_t`(`anvl_import`)/`anvl_doc_import`, `anvl_doc_attribute_t`/`anvl_doc_attribute`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
 - `src/core/source.c` — expanded the previously minimal `Source` interface with FNV-1a hashing, peek/consume/match helpers, whitespace/comment skipping, line/column tracking, and registry-backed `has_errors`/`set_error`. The code was newly written for the scanner rather than ported from `_source.c`. Shebang parsing was later moved here from `document.c` so that the source loader advances past the shebang line and resolves the dialect before the header scanner runs.
-- `src/core/document.c` — implemented `doc_scan_header` and its helpers; created/disposed import/attribute lists; fixed `doc_load_source` so it no longer leaks the existing source object when one is already present. `header_scan_shebang` was simplified to a dialect-validity check now that the source loader consumes the shebang.
+- `src/core/document.c` — implemented `doc_scan_header` and its helpers; created/disposed import/attribute lists; fixed `doc_load_source` so it no longer leaks the existing source object when one is already present. `header_scan_shebang` was removed from `doc_scan_header`; shebang handling now lives entirely in the source loader.
 - `src/core/errors.c` — fixed `anvl_error_set` to accept a NULL `out_err_code` so `Source.set_error(..., NULL)` still appends the error.
-- `src/core/module.c` — ensured `mod_dispose` releases the registry reference acquired in `mod_new`.
+- `src/core/module.c` — ensured `mod_dispose` releases the registry reference acquired in `mod_new`; implemented the recursive import loader (`mod_load_imports`, `import_load_child`, `import_load_child_recursive`, `import_path_on_stack`) with cycle detection and diamond deduplication.
 - `src/core/source_registry.c` — unchanged in this phase; `Registry.clear()` remains available for test teardown.
 - `test/utilities/debug.c` — added `Registry.release()` to `dispose_mod_manual` so module-based tests keep the registry refcount correct.
-- `test/unit/test_header.c` — new dedicated header suite (HDR00–HDR10).
+- `test/unit/test_header.c` — new dedicated header suite (HDR00, HDR02–HDR05, HDR07–HDR10); import-loader tests HDR11–HDR15 appended and passing.
+- `test/utilities/helpers.c`/`helpers.h` — added `slice_equals`, `setup_registered_doc`, and `setup_registered_file` shared helpers for source-slice assertions, registered-document setup, and fixture-based document setup. `slice_equals` now takes only an `anvl_slice` (no separate `anvl_source`, since the slice is self-referential) and compares through `Source.slice_length`/`Source.substring`; the standalone `slice_is_empty` test helper was removed in favor of calling `Source.slice_is_empty` directly.
+- `test/fixtures/hdr_import_*.anvl` — fixture graph for import-loader tests (single, nested, diamond, cyclic, missing); `hdr_import_nested.anvl` was added to create the 3-level import chain required by HDR12.
 - `test/unit/test_source.c` — new dedicated Source interface suite (SRC00–SRC22) covering all public helpers and registry-backed error routing.
 - `test/unit/test_document.c` — added SRC08a–SRC08e for source error routing and HDR00–HDR10 for header scanning; fixed double-dispose of documents already owned by a context (SRC08a, SRC08b, DOC09, DOC10).
 - `test/unit/Makefile` — added `test_source` build/run target.
