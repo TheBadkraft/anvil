@@ -101,6 +101,18 @@ void dispose_ctx_manual(module_context ctx) {
       clear_errs_manual(ctx->errors);
       ctx->errors = NULL;
    }
+   if (ctx->statements) {
+      List.dispose(ctx->statements); // non-owning index — see mod_ctx_dispose
+      ctx->statements = NULL;
+   }
+   if (ctx->values) {
+      List.dispose(ctx->values); // non-owning index — see mod_ctx_dispose
+      ctx->values = NULL;
+   }
+   if (ctx->arena) {
+      Allocator.release((sc_ctrl_base_s *)ctx->arena);
+      ctx->arena = NULL;
+   }
 
    Allocator.dispose(ctx);
 }

@@ -16,8 +16,8 @@
  * File: src/core/_parser.c
  * ----------------------------------------------------------------------- *
  * Refactoring Note: This file is the original parser implementation.
- * It has been superseded by src/core/parser.c, which contains the 
- * updated and refactored parser code. The original file is retained 
+ * It has been superseded by src/core/parser.c, which contains the
+ * updated and refactored parser code. The original file is retained
  * for reference and historical purposes.
  */
 
@@ -69,8 +69,8 @@ bool anvl_parse(context ctx) {
    anvl_error_clear();
 
    parser_ctx p = {
-       .ctx = ctx,
-       .src = ctx->source,
+      .ctx = ctx,
+      .src = ctx->source,
    };
 
    bool result = parse_source(&p);
@@ -97,6 +97,7 @@ static bool parse_source(parser_ctx *p) {
    if (Anvil.error_is_set())
       return false;
 
+#if 1 // header
    // import declarations — must precede module attributes, vars, and all statements
    // import is not allowed in AMP dialect
    while (si_match_length(p->src, "import", 6) == 6 &&
@@ -149,7 +150,9 @@ static bool parse_source(parser_ctx *p) {
       if (Anvil.error_is_set())
          return false;
    }
+#endif
 
+#if 1 // vars block
    // vars block must come before all statements (optional; at most one)
    // Only trigger if "vars" is followed by '{' (after whitespace) — not ':='
    if (si_match_length(p->src, "vars", 4) == 4 &&
@@ -170,6 +173,7 @@ static bool parse_source(parser_ctx *p) {
             return false;
       }
    }
+#endif
 
    while (!si_is_eof(p->src)) {
       // Shebang is illegal after statements
@@ -190,9 +194,8 @@ static bool parse_source(parser_ctx *p) {
             la++;
          }
          if (!si_is_eof_offset(p->src, la) && si_peek_offset(p->src, la) == '{') {
-            parser_error(p->ctx->vars_list.parsed
-                             ? ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED
-                             : ANVL_ERR_VARS_NOT_FIRST,
+            parser_error(p->ctx->vars_list.parsed ? ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED
+                                                  : ANVL_ERR_VARS_NOT_FIRST,
                          p->src);
             return false;
          }
@@ -365,7 +368,8 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
    }
 
    // Validate: attributes only valid on complex types
-   if (attr_meta && val->type != ANVL_VALUE_OBJECT && val->type != ANVL_VALUE_ARRAY && val->type != ANVL_VALUE_TUPLE) {
+   if (attr_meta && val->type != ANVL_VALUE_OBJECT && val->type != ANVL_VALUE_ARRAY &&
+       val->type != ANVL_VALUE_TUPLE) {
       parser_error(ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE, s);
       return false;
    }
@@ -395,7 +399,7 @@ static bool parse_statement(parser_ctx *p, statement stmt) {
 
          // Populate element_meta from the temporary tracking array (type + pos + len)
          struct anvl_element_meta *elem_temp =
-             (struct anvl_element_meta *)val->data.collection._elem_types_temp;
+            (struct anvl_element_meta *)val->data.collection._elem_types_temp;
          if (elem_temp) {
             for (usize i = 0; i < elem_count; i++) {
                elem_meta[i].type = elem_temp[i].type;
@@ -749,7 +753,8 @@ static value parse_array(parser_ctx *p) {
    // Old buffers are orphaned in the arena (reclaimed at context dispose).
    // No frames used — parse_array is recursive (frames don't stack on one scope).
    usize elem_cap = 8;
-   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+   struct anvl_element_meta *elem_temp =
+      p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
    if (!elem_temp) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -766,8 +771,7 @@ static value parse_array(parser_ctx *p) {
       }
 
       // AMP: array elements must be scalar or blob
-      if (Source.dialect(s) == ANVL_DIALECT_AMP &&
-          elem->type != ANVL_VALUE_SCALAR &&
+      if (Source.dialect(s) == ANVL_DIALECT_AMP && elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
@@ -776,7 +780,8 @@ static value parse_array(parser_ctx *p) {
       // Grow buffer if full: alloc new (old stays in arena, harmless)
       if (element_count == elem_cap) {
          elem_cap *= 2;
-         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         struct anvl_element_meta *grown =
+            p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
          if (!grown) {
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
             return NULL;
@@ -850,7 +855,8 @@ static value parse_tuple(parser_ctx *p) {
    // Old buffers are orphaned in the arena (reclaimed at context dispose).
    // No frames used — parse_tuple is recursive (frames don't stack on one scope).
    usize elem_cap = 8;
-   struct anvl_element_meta *elem_temp = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+   struct anvl_element_meta *elem_temp =
+      p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
    if (!elem_temp) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -867,8 +873,7 @@ static value parse_tuple(parser_ctx *p) {
       }
 
       // AMP: tuple elements must be scalar or blob
-      if (Source.dialect(s) == ANVL_DIALECT_AMP &&
-          elem->type != ANVL_VALUE_SCALAR &&
+      if (Source.dialect(s) == ANVL_DIALECT_AMP && elem->type != ANVL_VALUE_SCALAR &&
           elem->type != ANVL_VALUE_BLOB) {
          parser_error(ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR, s);
          return NULL;
@@ -877,7 +882,8 @@ static value parse_tuple(parser_ctx *p) {
       // Grow buffer if full: alloc new (old stays in arena, harmless)
       if (element_count == elem_cap) {
          elem_cap *= 2;
-         struct anvl_element_meta *grown = p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
+         struct anvl_element_meta *grown =
+            p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_element_meta) * elem_cap);
          if (!grown) {
             parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
             return NULL;
@@ -979,7 +985,8 @@ static bool parse_scalar_value(parser_ctx *p, usize *start, usize *len, anvl_val
       }
       while (!si_is_eof(s)) {
          char c = si_peek(s);
-         if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == '}' || c == ']' || c == ')')
+         if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == '}' || c == ']' ||
+             c == ')')
             break;
          si_consume(s, 1);
       }
@@ -1120,8 +1127,7 @@ static bool lookahead_is_anon_object(parser_ctx *p) {
    }
 
    // Optional inheritance prefix: ':' <identifier>
-   if (!si_is_eof_offset(s, la) &&
-       si_peek_offset(s, la) == ':' &&
+   if (!si_is_eof_offset(s, la) && si_peek_offset(s, la) == ':' &&
        (si_is_eof_offset(s, la + 1) || si_peek_offset(s, la + 1) != '=')) {
       la++; // ':'
       while (!si_is_eof_offset(s, la)) {
@@ -1146,10 +1152,8 @@ static bool lookahead_is_anon_object(parser_ctx *p) {
    }
 
    // Optionally skip @[...] attribute blocks (bracket-depth scan, no consuming)
-   while (!si_is_eof_offset(s, la) &&
-          si_peek_offset(s, la) == '@' &&
-          !si_is_eof_offset(s, la + 1) &&
-          si_peek_offset(s, la + 1) == '[') {
+   while (!si_is_eof_offset(s, la) && si_peek_offset(s, la) == '@' &&
+          !si_is_eof_offset(s, la + 1) && si_peek_offset(s, la + 1) == '[') {
       la += 2; // '@['
       int depth = 1;
       while (!si_is_eof_offset(s, la) && depth > 0) {
@@ -1404,15 +1408,15 @@ static bool parse_vars_block(parser_ctx *p) {
 
       // Determine value span: for VARREF, store the identifier span (not '$')
       usize vpos = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.pos : value_start;
-      usize vlen = (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.len
-                                                    : (value_end - value_start);
+      usize vlen =
+         (val->type == ANVL_VALUE_VARREF) ? val->data.scalar.len : (value_end - value_start);
 
       ci_add_vars_entry(p->ctx, (struct anvl_vars_entry){
-                                    .key_pos = key_pos,
-                                    .key_len = key_len,
-                                    .value_pos = vpos,
-                                    .value_len = vlen,
-                                    .value_type = val->type,
+                                   .key_pos = key_pos,
+                                   .key_len = key_len,
+                                   .value_pos = vpos,
+                                   .value_len = vlen,
+                                   .value_type = val->type,
                                 });
       // val lives in the arena; no individual free needed.
 
@@ -1489,8 +1493,7 @@ static bool parse_import_decl(parser_ctx *p) {
    // Optional:  as <alias>
    usize alias_pos = 0;
    usize alias_len = 0;
-   if (si_match_length(s, "as", 2) == 2 &&
-       !Source.is_identifier_part(si_peek_offset(s, 2))) {
+   if (si_match_length(s, "as", 2) == 2 && !Source.is_identifier_part(si_peek_offset(s, 2))) {
       si_consume(s, 2); // consume "as"
       si_skip_whitespace_and_comments(s);
       if (Anvil.error_is_set())
@@ -1508,10 +1511,10 @@ static bool parse_import_decl(parser_ctx *p) {
    }
 
    ci_add_import_decl(p->ctx, (struct anvl_import_decl){
-                                  .path_pos = path_pos,
-                                  .path_len = path_len,
-                                  .alias_pos = alias_pos,
-                                  .alias_len = alias_len,
+                                 .path_pos = path_pos,
+                                 .path_len = path_len,
+                                 .alias_pos = alias_pos,
+                                 .alias_len = alias_len,
                               });
    return true;
 }
@@ -1543,8 +1546,8 @@ static bool parse_using_decl(parser_ctx *p) {
    }
 
    ci_add_using_decl(p->ctx, (struct anvl_using_decl){
-                                 .name_pos = name_pos,
-                                 .name_len = name_len,
+                                .name_pos = name_pos,
+                                .name_len = name_len,
                              });
    return true;
 }
@@ -1617,7 +1620,7 @@ static value parse_interp_string(parser_ctx *p) {
    // Dynamic segment array (allocated from context parse arena)
    usize cap = 16;
    struct anvl_interp_segment *segs =
-       p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * cap);
+      p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * cap);
    if (!segs) {
       parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);
       return NULL;
@@ -1626,22 +1629,22 @@ static value parse_interp_string(parser_ctx *p) {
    usize nseg = 0;
 
    // Helper: grow segment array if needed (old buffer left in arena; new buffer allocated)
-#define SEGS_PUSH(is_r, p_, l_)                                                                 \
-   do {                                                                                         \
-      if (nseg >= cap) {                                                                        \
-         usize newcap_ = cap * 2;                                                               \
-         struct anvl_interp_segment *nb_ =                                                      \
-             p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_); \
-         if (!nb_) {                                                                            \
-            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                 \
-            return NULL;                                                                        \
-         }                                                                                      \
-         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                          \
-         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                          \
-         segs = nb_;                                                                            \
-         cap = newcap_;                                                                         \
-      }                                                                                         \
-      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)};  \
+#define SEGS_PUSH(is_r, p_, l_)                                                                    \
+   do {                                                                                            \
+      if (nseg >= cap) {                                                                           \
+         usize newcap_ = cap * 2;                                                                  \
+         struct anvl_interp_segment *nb_ =                                                         \
+            p->ctx->arena->alloc(p->ctx->arena, sizeof(struct anvl_interp_segment) * newcap_);     \
+         if (!nb_) {                                                                               \
+            parser_error(ANVL_ERR_MEMORY_ALLOCATION_FAILED, s);                                    \
+            return NULL;                                                                           \
+         }                                                                                         \
+         memset(nb_, 0, sizeof(struct anvl_interp_segment) * newcap_);                             \
+         memcpy(nb_, segs, sizeof(struct anvl_interp_segment) * nseg);                             \
+         segs = nb_;                                                                               \
+         cap = newcap_;                                                                            \
+      }                                                                                            \
+      segs[nseg++] = (struct anvl_interp_segment){.is_ref = (is_r), .pos = (p_), .len = (l_)};     \
    } while (0)
 
    usize lit_start = si_position(s);

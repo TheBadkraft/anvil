@@ -31,7 +31,8 @@
 static ssize_t src_size = sizeof(struct anvl_source_t);
 
 /* Forward declarations */
-static void source_parse_shebang(anvl_source src);
+static void source_parse_shebang(anvl_source);
+static bump_allocator source_get_arena(anvl_source, anvl_err_code *);
 
 static uint64_t source_compute_hash(const char *data, usize len) {
    uint64_t hash = FNV1A_OFFSET;
@@ -144,7 +145,7 @@ static anvl_result source_from_file(anvl_source *out_src, const char *filepath,
 
    return ANVL_RES_OK;
 
-error:
+error: {
    if (buffer) {
       Allocator.dispose((void *)buffer);
    }
@@ -153,6 +154,7 @@ error:
    }
    // we don't want to deallocate the user's source object.
    return ANVL_RES_ERR;
+}
 }
 /*
  * Loads source content from a memory buffer into the source object. The buffer is copied into a new
@@ -283,6 +285,16 @@ static const char *source_data(anvl_source src) {
       return NULL;
    }
    return (const char *)src->buffer.bucket;
+}
+/*
+ * Pointer to the source's current cursor position — Source.data(src) + Source.position(src),
+ * computed directly rather than via those two calls.
+ */
+static const char *source_at(anvl_source src) {
+   if (!src || !src->buffer.bucket) {
+      return NULL;
+   }
+   return (const char *)src->buffer.bucket + src->pos;
 }
 
 static usize source_length(anvl_source src) {
@@ -495,7 +507,6 @@ static bool source_has_errors(anvl_source src) {
 
    return List.size(doc->context->errors) > 0;
 }
-
 /*
  * Records an error on the source's owning document by looking it up in the
  * global source registry and appending to the context's error list.
@@ -526,7 +537,182 @@ error:
    }
    return ANVL_RES_ERR;
 }
+/*
+ * Retrieves the bump allocator (arena) associated with the source's owning document. Uses the
+ * global source registry to locate the document and its context. Returns NULL if the source is
+ * NULL, if the source is not registered, or if the context's arena is not initialized. The output
+ * error code is set to ANVL_ERR_NONE on success, or to an appropriate error code on failure. The
+ * caller is responsible for checking the error code to determine the reason for failure.
+ */
+static bump_allocator source_get_arena(anvl_source src, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   // 1. guard source
+   if (!src || src->hash == 0) {
+      err_code = ANVL_ERR_SOURCE_NOT_FOUND;
+      goto error;
+   }
+   // 2. guard registry lookup
+   module_document doc = Registry.find(src->hash);
+   if (!doc || !doc->context) {
+      err_code = ANVL_ERR_CONTEXT_INVALID;
+      goto error;
+   }
+   // 3. guard context arena
+   if (!doc->context->arena) {
+      err_code = ANVL_ERR_ARENA_NOT_INITIALIZED;
+      goto error;
+   }
 
+   // 4. return the context's arena
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return doc->context->arena;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+
+   return NULL;
+}
+/*
+ * Constructs a new node (statement or value) in the source's owning document's context. Uses the
+ * global source registry to locate the document and its context. Allocates the node from the
+ * context's bump allocator (arena). Returns a pointer to the new node on success, or NULL on
+ * failure. The output error code is set to ANVL_ERR_NONE on success, or to an appropriate error
+ * code on failure. The caller is responsible for checking the error code to determine the reason
+ * for failure. The node is automatically appended to the context's statement or value list based on
+ * the kind. The caller is responsible for initializing the node's fields after allocation. The
+ * node's source reference is cached in the node itself for later retrieval. The node's memory is
+ * managed by the context's arena and will be freed when the context is disposed. The caller should
+ * not attempt to free the node manually.
+ */
+static void *source_new_node(anvl_source src, anvl_node_kind kind, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   if (!src || src->hash == 0) {
+      err_code = ANVL_ERR_SOURCE_NOT_FOUND;
+      goto error;
+   }
+
+   // get the document from the source lookup
+   module_document doc = Registry.find(src->hash);
+   module_context context = doc ? doc->context : NULL;
+   if (!doc || !context) {
+      err_code = ANVL_ERR_CONTEXT_INVALID;
+      goto error;
+   }
+
+   bump_allocator arena = context->arena;
+   if (!arena) {
+      err_code = ANVL_ERR_ARENA_NOT_INITIALIZED;
+      goto error;
+   }
+
+   // allocate a new node from the arena based on the kind
+   usize size = 0;
+   switch (kind) {
+   case ANVL_NODE_STATEMENT:
+      size = sizeof(anvl_statement_t);
+      break;
+   case ANVL_NODE_VALUE:
+      size = sizeof(anvl_value_t);
+      break;
+   default:
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+
+   // allocate from the arena
+   void *node = arena->alloc(arena, size);
+   if (!node) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+
+   // 1. cache the node's source reference
+   // 2. append the new node to the appropriate index list
+   switch (kind) {
+   case ANVL_NODE_STATEMENT:
+
+      List.append(context->statements, node);
+      break;
+   case ANVL_NODE_VALUE:
+      List.append(context->values, node);
+      break;
+   default:
+      break; // unreachable — already guarded above
+   }
+
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return node;
+
+error: {
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return NULL;
+}
+}
+/*
+ * Simple slice initializer. Fills in the slice's `data` field with the source's buffer base.
+ */
+static void source_init_slice(anvl_source src, anvl_slice *out_slice) {
+   if (!out_slice) {
+      return;
+   }
+   out_slice->data = Source.data(src);
+}
+/*
+ * Freezes a parser's finished top-level statement list into the owning document's
+ * body as a farray, then disposes `statements`. Takes ownership of `statements`
+ * regardless of outcome — see the doc comment on anvl_source_i.finish_body.
+ */
+static anvl_result source_finish_body(anvl_source src, list statements,
+                                      anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (!src || src->hash == 0) {
+      err_code = ANVL_ERR_SOURCE_NOT_FOUND;
+      goto error;
+   }
+
+   module_document doc = Registry.find(src->hash);
+   if (!doc || !doc->context) {
+      err_code = ANVL_ERR_CONTEXT_INVALID;
+      goto error;
+   }
+
+   usize count = List.size(statements);
+   farray arr = FArray.new(count, sizeof(anvl_statement));
+   if (!arr) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+
+   for (usize i = 0; i < count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(statements, i, (object *)&stmt);
+      FArray.set(arr, i, sizeof(anvl_statement), &stmt);
+   }
+
+   doc->body = arr;
+
+   List.dispose(statements);
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_OK;
+
+error:
+   List.dispose(statements);
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
+}
 /* ----------------------------------------------------------------------- *
  * Slice interrogation
  * ----------------------------------------------------------------------- */
@@ -575,9 +761,13 @@ const anvl_source_i Source = {
    .dialect = source_dialect,
    .hash = source_hash,
 
-   // Error handling
+   // Extensions methods
    .has_errors = source_has_errors,
    .set_error = source_set_error,
+   .get_arena = source_get_arena,
+   .new_node = source_new_node,
+   .init_slice = source_init_slice,
+   .finish_body = source_finish_body,
 
    // Position management
    .position = source_position,
@@ -598,6 +788,7 @@ const anvl_source_i Source = {
    .is_identifier_part = source_is_identifier_part,
    .consume = source_consume,
    .data = source_data,
+   .at = source_at,
    .length = source_length,
    .set_position = source_set_position,
    .reset = source_reset,

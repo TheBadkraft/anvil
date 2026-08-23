@@ -23,6 +23,8 @@
 #include "constants.h"
 #include "errors.h"
 // ----------------
+#include <sigma/allocator.h>
+#include <sigma/farray.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <sigma/types.h>
@@ -35,9 +37,16 @@ typedef struct anvl_source_t *anvl_source;
 typedef struct anvl_parser_t *anvl_parser;
 
 struct anvl_mod_ctx_t {
-   list docs;          // list of module_document
-   list errors;        // list of anvl_error encountered during scanning/parsing
-   anvl_parser parser; // parser context for the module
+   list docs;            // list of module_document
+   list errors;          // list of anvl_error encountered during scanning/parsing
+   anvl_parser parser;   // parser context for the module
+   bump_allocator arena; // body-parse node arena, shared across every document in ctx->docs;
+                         // NULL until mod_ctx_create_arena runs. See notes/document-body-parse.md
+                         // "Arena-backed allocation".
+   list statements;      // index of every anvl_statement allocated via Source.new_node; does not
+                         // own the pointed-to nodes (the arena does) — see "Arena node iteration".
+   list values;          // index of every anvl_value allocated via Source.new_node; same non-owning
+                         // relationship to the arena as `statements` above.
 };
 
 typedef enum {
@@ -49,58 +58,64 @@ typedef enum {
  * Source slice metadata — no-copy references into anvl_source buffer
  * ---------------------------------------------------------------------- */
 typedef struct anvl_src_slice_t {
-   char *data;  // pointer to the start of the source buffer (raw bytes)
-   char *start; // pointer to the start of the slice within the source buffer
-   char *end;   // pointer to the end of the slice within the source buffer
+   const char *data;  // pointer to the start of the source buffer (raw bytes)
+   const char *start; // pointer to the start of the slice within the source buffer
+   const char *end;   // pointer to the end of the slice within the source buffer
 } anvl_slice;
 typedef anvl_slice *slice;
 
 /* ---------------------------------------------------------------------- *
  * Header import / attribute metadata
  * ---------------------------------------------------------------------- */
-typedef struct anvl_doc_import_t {
+typedef struct anvl_import_t {
    anvl_slice decl;          // "import \"path\"" (no trailing ';')
    anvl_slice path;          // "\"path\"" (quotes included)
    module_document resolved; // child document after import graph expansion; NULL until loaded
-} anvl_import;
-typedef anvl_import *anvl_doc_import;
+} anvl_import_t;
+typedef anvl_import_t *anvl_import;
 
-typedef struct anvl_doc_attribute_t {
+typedef struct anvl_attribute_t {
    anvl_slice key;   // identifier
    anvl_slice value; // value text; length 0 means flag attribute
-} anvl_doc_attribute_t;
-typedef anvl_doc_attribute_t *anvl_doc_attribute;
+} anvl_attribute_t;
+typedef anvl_attribute_t *anvl_attribute;
 
 /* ---------------------------------------------------------------------- *
  * Document header — collected before body parsing
  * ---------------------------------------------------------------------- */
 struct anvl_doc_header_t {
-   list imports;    // list of anvl_doc_import
-   list attributes; // list of anvl_doc_attribute
+   list imports;    // list of anvl_import
+   list attributes; // list of anvl_attribute
 };
 
 /* ---------------------------------------------------------------------- *
  * Body value tree — see notes/document-body-parse.md
+ *   - no collection/container may be empty (e.g. [] or () or {} are invalid)
+ *   - tuples must have at least 2 elements (e.g. (1) is invalid)
+ *   - assigning a `null` value to any type is valid (e.g. `foo := null;`)
+ *   - ANVL's default is a weak type system
  * ---------------------------------------------------------------------- */
 typedef enum {
    ANVL_VALUE_NONE = 0,
-   ANVL_VALUE_NULL,
-   ANVL_VALUE_BOOL,
-   ANVL_VALUE_INTEGER,
-   ANVL_VALUE_FLOAT,
-   ANVL_VALUE_STRING,
+   ANVL_VALUE_NULL,       // explicit null value (e.g. `null` keyword)
+   ANVL_VALUE_BOOL,       // explicit bare literal boolean value (e.g. `true` or `false`)
+   ANVL_VALUE_NUMERIC,    // standard scalar numeric - integer, float, hex, exponential, etc.
+   ANVL_VALUE_STRING,     // standard scalar quoted string; may contain escape sequences
    ANVL_VALUE_BLOB,       // standard scalar; tag stored separately, content in text span
-   ANVL_VALUE_ARRAY,
-   ANVL_VALUE_TUPLE,
+   ANVL_VALUE_ARRAY,      // collection (e.g. `[1, 2, 3]`) - elements are anvl_value pointers
+   ANVL_VALUE_TUPLE,      // collection (e.g. `(1, 2, 3)`) - elements are anvl_value pointers
    ANVL_VALUE_OBJECT,     // nested statement list, not key/value pairs
    ANVL_VALUE_IDENTIFIER, // bare symbol: static reference to another statement's value
 } anvl_value_type;
 
-typedef struct anvl_doc_value_t {
+typedef struct anvl_value_t {
+   // text & type are always set; the union below is set based on type
    anvl_value_type type;
    anvl_slice text; // full source span of the value
-   anvl_slice tag;  // blob tag (e.g. @date, @sel); empty for non-blobs or untagged blobs
    union {
+      struct {
+         anvl_slice tag; // blob tag (e.g. @date, @sel); empty for non-blobs or untagged blobs
+      } blob;
       struct {
          list items; // array/tuple: list of anvl_doc_value pointers
       } collection;
@@ -108,8 +123,8 @@ typedef struct anvl_doc_value_t {
          list statements; // object: list of anvl_doc_statement pointers
       } object;
    };
-} anvl_doc_value_t;
-typedef anvl_doc_value_t *anvl_doc_value;
+} anvl_value_t;
+typedef anvl_value_t *anvl_value;
 
 /* ---------------------------------------------------------------------- *
  * Body statements — two forms, both may carry `base` and `attributes`:
@@ -123,16 +138,24 @@ typedef enum {
    ANVL_STMT_USING,        // using "path";
 } anvl_stmt_kind;
 
-typedef struct anvl_doc_statement_t {
+/* ---------------------------------------------------------------------- *
+ * Arena node kind — selects allocation size/index for Source.new_node
+ * ---------------------------------------------------------------------- */
+typedef enum {
+   ANVL_NODE_STATEMENT = 0,
+   ANVL_NODE_VALUE,
+} anvl_node_kind;
+
+typedef struct anvl_statement_t {
    anvl_stmt_kind kind;
-   anvl_slice span;      // full source span of the statement
-   anvl_slice name;      // declared identifier; empty only for VARS/USING
-   anvl_slice base;      // inheritance base; empty when absent
-   anvl_doc_value value; // ASSIGN only; NULL otherwise
-   list body;            // OBJECT_BLOCK only; nested list of anvl_doc_statement pointers
-   list attributes;      // anvl_doc_attribute pointers, or NULL
-} anvl_doc_statement_t;
-typedef anvl_doc_statement_t *anvl_doc_statement;
+   anvl_slice span;  // full source span of the statement
+   anvl_slice name;  // declared identifier; empty only for VARS/USING
+   anvl_slice base;  // inheritance base; empty when absent
+   anvl_value value; // ASSIGN only; NULL otherwise
+   list body;        // OBJECT_BLOCK only; nested list of anvl_statement pointers
+   list attributes;  // anvl_attribute pointers, or NULL
+} anvl_statement_t;
+typedef anvl_statement_t *anvl_statement;
 
 /* ---------------------------------------------------------------------- *
  * Document structure
@@ -142,7 +165,10 @@ struct anvl_mod_doc_t {
    module_context context;           // owning context, set on registration
    string filepath;                  // normalized path to the loaded module
    struct anvl_doc_header_t *header; // parsed header metadata
-   list body;                        // list of anvl_doc_statement pointers; NULL until doc_parse_body runs
+   farray body; // frozen array of anvl_statement pointers (this document's own top-level
+                // statements only, in parse order); NULL until Source.finish_body runs at the
+                // end of a parse. See notes/document-body-parse.md "Document body — accumulate
+                // then freeze".
 };
 
 /* ---------------------------------------------------------------------- *
@@ -225,8 +251,37 @@ void mod_ctx_dispose(module_context);
  */
 anvl_result mod_ctx_register_doc(module_context, module_document, const char *filepath,
                                  anvl_err_code *);
+/**
+ * @brief Set the parser for the module context.
+ * @param ctx The module context to set the parser for.
+ * @param parser The parser to set for the context.
+ * @details This function sets the parser for the specified module context. It ensures that both
+ * the context and parser are valid before setting the parser. If either is NULL, the function
+ * returns without making any changes.
+ */
 void mod_ctx_set_parser(module_context, anvl_parser);
-void mod_ctx_add_doc(module_context, module_document);
+/**
+ * @brief Create the context's shared body-parse arena, sized to hold every document's output.
+ * @param ctx The module context to create the arena on.
+ * @param size Initial arena capacity in bytes (e.g. the sum of Source.length() across ctx->docs).
+ * @param[out] out_err_code Pointer to the error code if creation fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details Call once, after mod_load_imports has fully expanded the import graph (so the size can
+ * be computed from the complete document set) and before any doc_parse_body call. Not yet
+ * implemented — stub for RED-state testing; see notes/document-body-parse.md.
+ */
+anvl_result mod_ctx_create_arena(module_context ctx, usize size, anvl_err_code *out_err_code);
+/**
+ * @brief Apply the working arena-sizing heuristic to a summed source length.
+ * @param summed_source_length Sum of `Source.length()` across every document in the import graph —
+ * typically `mod_load_imports`'s `out_body_size_hint`.
+ * @return `max(summed_source_length * ANVL_ARENA_SIZE_MULTIPLIER, ANVL_ARENA_MIN_SIZE)`.
+ * @details Pure arithmetic, no failure mode. See notes/document-body-parse.md "Initial sizing
+ * heuristic" and the constants themselves (`include/constants.h`) for the reasoning behind the
+ * multiplier and floor. The result is meant as the `size` argument to `mod_ctx_create_arena`. Not
+ * yet implemented — stub for RED-state testing.
+ */
+usize mod_ctx_arena_size_hint(usize summed_source_length);
 /**
  * @brief Clear all documents from the module context.
  * @param docs List of documents to clear.
@@ -289,6 +344,10 @@ anvl_result doc_scan_header(module_document, anvl_err_code *);
  * @brief Recursively expand the import graph starting from a root document.
  * @param ctx The module context that owns the root document and will own all imported documents.
  * @param root The document whose header imports should be expanded.
+ * @param[out] out_body_size_hint Optional; if non-NULL, receives the sum of `Source.length()`
+ * across root and every newly-registered imported document (diamonds counted once). Pass NULL
+ * if the caller doesn't need it. Intended as the `size` input to `mod_ctx_create_arena` — see
+ * notes/document-body-parse.md "Arena-backed allocation".
  * @param[out] out_err_code Pointer to the error code if expansion fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  * @details This function resolves each import path in `root->header->imports` relative to
@@ -297,7 +356,8 @@ anvl_result doc_scan_header(module_document, anvl_err_code *);
  * `resolved` field set to the child document. Cyclic imports and missing files are reported
  * as errors on the requesting document.
  */
-anvl_result mod_load_imports(module_context ctx, module_document root, anvl_err_code *out_err_code);
+anvl_result mod_load_imports(module_context ctx, module_document root, usize *out_body_size_hint,
+                             anvl_err_code *out_err_code);
 
 /**
  * @brief Parse the document body into a list of statements.

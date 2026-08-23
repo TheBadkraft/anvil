@@ -257,7 +257,11 @@ A transient stack of source hashes (or document identities) tracks documents cur
 
 ### Duplicate document deduplication
 
-The source-hash registry naturally deduplicates diamond imports. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy.
+The source-hash registry naturally deduplicates diamond imports. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy. The freshly-loaded duplicate `module_document` that `mod_ctx_register_doc` rejected is then disposed via the ordinary `doc_dispose`.
+
+**Resolved — bug found and fixed: disposing the discarded duplicate was silently un-registering the original.** `doc_dispose` used to call `Registry.remove(Source.hash(doc->source))` unconditionally for whatever source it was disposing. Since the discarded duplicate shares the *exact same content hash* as the original document it lost the dedup race to, disposing it removed the registry entry belonging to the still-alive original — even though that original was never disposed and remained in `ctx->docs`. From that point on, any `Source.*` registry-lookup call (`get_arena`, `new_node`, `set_error`, `has_errors`) would silently fail for that document, indistinguishable from it being genuinely unregistered.
+
+This went undetected through `HDR13` (diamond reuse) because that test only checks `ctx->docs` size and `resolved` pointer equality — it never performs a registry lookup afterward. It surfaced only once `notes/document-body-parse.md`'s arena work needed a real post-diamond-load registry lookup (`Source.new_node` on the surviving document, from `test_module.c`'s `CR22`). Fixed in `doc_dispose` (`src/core/document.c`) by only removing the registry entry when this document is actually the one currently registered under that hash: `if (Registry.find(hash) == doc) { Registry.remove(hash); }`. Covered directly by `HDR20` (below).
 
 ### Path resolution: file-rooted vs. buffer-rooted documents
 
@@ -268,7 +272,7 @@ The source-hash registry naturally deduplicates diamond imports. When the loader
 
 `./` and `../` are not special-cased differently from each other — both are ordinary relative-path text that gets string-joined onto the resolved parent directory (`import_resolve_dir` + `snprintf("%s/%s", parent_dir, import_name)`) and handed to the filesystem as-is; the OS resolves `.`/`..` segments when the file is actually opened. What's *not* yet implemented is path **canonicalization** before that string join/compare — `aml-import-namespace-rules.md` § *Canonical-path function* already flags this as TBD (`realpath()` or a custom resolver). Without it, two imports of the same file written differently (e.g. `"./a/../a/x"` vs `"./a/x"`) would be treated as distinct paths by the cycle-detection stack's `strcmp` and by dedup, even though they resolve to the same file. No current fixture exercises `../`-style imports, so this gap isn't test-covered either. Also tracked in `notes/deferred-work.md`.
 
-### Import loader test contract (HDR11–HDR17)
+### Import loader test contract (HDR11–HDR20)
 
 A new batch of header-suite tests exercises `mod_load_imports` through fixture files:
 
@@ -281,6 +285,10 @@ A new batch of header-suite tests exercises `mod_load_imports` through fixture f
 - **HDR17** — `../` resolves relative to the importing file's own directory: `test/fixtures/hdr_import_sub/hdr_import_dotdot.anvl` (a new fixture in a new subdirectory) imports `"../hdr_import_base.anvl"`, which correctly navigates back up to `test/fixtures/hdr_import_base.anvl`. Also passed on the first run with no code changes — `import_resolve_dir` computes each document's own directory correctly on recursion, and the unquoted `../` segment is handled by the filesystem when the file is opened, with no canonicalization needed for a single-hop resolve like this one.
 
 Both HDR16 and HDR17 are Valgrind-clean (0 errors, 0 leaks). Together they close the buffer-root and `../`-resolution testing gaps noted in `deferred-work.md`. What's still open — and distinct from what these tests cover — is path **canonicalization** (`realpath()` or equivalent): comparing two *differently-written* paths to the same file (e.g. `"./a/../a/x"` vs `"./a/x"`) for dedup/cycle-detection purposes. HDR17 only proves a single relative resolve works; it doesn't touch canonicalization at all.
+
+- **HDR18** — repeated shebang rejected: a document with two `#!` lines reports `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS`.
+- **HDR19** — import loader body-size hint: `mod_load_imports`'s `out_body_size_hint` sums `Source.length()` across the whole graph, diamond counted once — verified against an independent walk of `ctx->docs` on the diamond fixture rather than hardcoded byte counts. See `notes/document-body-parse.md` "Arena-backed allocation".
+- **HDR20** — registry survives disposal of a discarded diamond duplicate: the bug fix documented above, in "Duplicate document deduplication". After the diamond fixture's import graph fully resolves, the surviving `base` document must still be findable via `Registry.find` by its own content hash.
 
 These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc_import_t`.
 

@@ -35,6 +35,7 @@ static const char *error_messages[] = {
    [ANVL_ERR_IO_INVALID_PATH] = "IO invalid file path",
 
    // Parser Errors (200x-400x)
+   [ANVL_ERR_PARSER_INITIALIZATION_FAILED] = "Parser initialization failed",
    [ANVL_ERR_PARSER_EXPECTED_IDENTIFIER] = "Expected identifier",
    [ANVL_ERR_PARSER_EXPECTED_ASSIGN] = "Expected ':=' after identifier",
    [ANVL_ERR_PARSER_EXPECTED_VALUE] = "Expected content",

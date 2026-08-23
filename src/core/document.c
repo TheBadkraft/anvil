@@ -18,6 +18,7 @@
 #include "std.h"
 #include "types.h"
 #include "internal/module.h"
+#include "internal/parser.h"
 #include "internal/source.h"
 #include "internal/source_registry.h"
 //
@@ -26,8 +27,8 @@
 
 static ssize_t doc_size = sizeof(struct anvl_mod_doc_t);
 static ssize_t header_size = sizeof(struct anvl_doc_header_t);
-static ssize_t import_size = sizeof(struct anvl_doc_import_t);
-static ssize_t attribute_size = sizeof(struct anvl_doc_attribute_t);
+static ssize_t import_size = sizeof(struct anvl_import_t);
+static ssize_t attribute_size = sizeof(struct anvl_attribute_t);
 static ssize_t list_ptr_size = sizeof(void *);
 
 /* ----------------------------------------------------------------------- *
@@ -87,7 +88,16 @@ void doc_dispose(module_document doc) {
    }
 
    if (doc->source) {
-      Registry.remove(Source.hash(doc->source));
+      // Only remove the registry entry if this doc is actually the one
+      // registered under that hash. A document whose own registration
+      // failed (e.g. the discarded duplicate in a diamond import — see
+      // import_load_child's ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT
+      // handling) shares its content hash with a different, still-alive
+      // document; disposing it must not evict that document's entry.
+      uint64_t hash = Source.hash(doc->source);
+      if (Registry.find(hash) == doc) {
+         Registry.remove(hash);
+      }
       Source.dispose(doc->source);
       doc->source = NULL;
    }
@@ -100,7 +110,7 @@ void doc_dispose(module_document doc) {
    if (doc->header) {
       if (doc->header->imports) {
          for (usize i = 0; i < List.size(doc->header->imports); i++) {
-            anvl_doc_import imp = NULL;
+            anvl_import imp = NULL;
             List.get(doc->header->imports, i, (object *)&imp);
             Allocator.dispose(imp);
          }
@@ -108,7 +118,7 @@ void doc_dispose(module_document doc) {
       }
       if (doc->header->attributes) {
          for (usize i = 0; i < List.size(doc->header->attributes); i++) {
-            anvl_doc_attribute attr = NULL;
+            anvl_attribute attr = NULL;
             List.get(doc->header->attributes, i, (object *)&attr);
             Allocator.dispose(attr);
          }
@@ -119,9 +129,11 @@ void doc_dispose(module_document doc) {
    }
 
    if (doc->body) {
-      // STUB: doc_parse_body never populates entries yet; nothing to free per-element.
-      // Extend this once the real parser owns statement/value allocations.
-      List.dispose(doc->body);
+      // doc->body is a frozen farray of anvl_statement pointers, owned by Source.finish_body
+      // (see notes/document-body-parse.md "Document body — accumulate then freeze"). The
+      // pointed-to statement/value nodes themselves are arena-owned, freed with the context's
+      // arena — this only releases the array's own backing storage.
+      FArray.dispose(doc->body);
       doc->body = NULL;
    }
 
@@ -233,7 +245,7 @@ static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
       }
       Source.consume(src, 1); // semicolon
 
-      anvl_doc_import imp = Allocator.alloc(import_size);
+      anvl_import imp = Allocator.alloc(import_size);
       if (!imp) {
          *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
          return false;
@@ -286,7 +298,7 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
          }
          usize key_end = Source.position(src);
 
-         anvl_doc_attribute attr = Allocator.alloc(attribute_size);
+         anvl_attribute attr = Allocator.alloc(attribute_size);
          if (!attr) {
             *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
             return false;
@@ -390,6 +402,13 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
+   // The one legitimate shebang was already reconciled at source-load time
+   // (before the header scanner ever runs); any repeated '#!' here is invalid.
+   if (Source.match_length(doc->source, "#!", 2) == 2) {
+      err_code = ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS;
+      goto error;
+   }
+
    return ANVL_RES_OK;
 
 error: {
@@ -407,9 +426,9 @@ error: {
 /* ----------------------------------------------------------------------- *
  * Document body parsing
  * ----------------------------------------------------------------------- *
- * STUB — RED state for notes/document-body-parse.md. Always fails without
- * recording an error via doc_set_error/Source.set_error, and never
- * populates doc->body beyond an empty list. Replace with the real parser.
+ * Delegates to anvl_parse (src/core/parser.c) — see notes/document-body-parse.md
+ * for the full grammar and current implementation status. doc->body is set by
+ * Source.finish_body at the end of anvl_parse, not by this function directly.
  * ----------------------------------------------------------------------- */
 anvl_result doc_parse_body(module_document doc, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -422,15 +441,10 @@ anvl_result doc_parse_body(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
-   if (!doc->body) {
-      doc->body = List.new(4, list_ptr_size);
-      if (!doc->body) {
-         err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
-         goto error;
-      }
-   }
-
-   // TODO: not yet implemented.
+   // doc->body is no longer pre-created here — it stays NULL until Source.finish_body
+   // freezes the parser's scratch list into it at the end of anvl_parse, on both the
+   // success and failure exit paths (partial results stay inspectable after a failed parse).
+   return anvl_parse(doc->source);
    err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
 
 error:

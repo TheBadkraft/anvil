@@ -48,7 +48,7 @@ static module_document setup_aml_doc(const char *fixture_name, module_context *o
    if (ANVL_RES_OK != doc_scan_header(doc, &err_code)) {
       return doc;
    }
-   (void)mod_load_imports(*out_ctx, doc, &err_code);
+   (void)mod_load_imports(*out_ctx, doc, NULL, &err_code);
    return doc;
 }
 
@@ -66,10 +66,11 @@ static void test_aml00_tuple_assign(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML00: parse body returns OK");
-   TestBit.is_equal_int(1, (long long)List.size(doc->body), "AML00: one statement captured");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML00: one statement captured");
 
-   anvl_doc_statement stmt = NULL;
-   List.get(doc->body, 0, (object *)&stmt);
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "AML00: statement retrieved");
    if (stmt && stmt->value) {
       TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value->type, "AML00: value is TUPLE");
@@ -93,10 +94,11 @@ static void test_aml01_object_value_assign(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML01: parse body returns OK");
-   TestBit.is_equal_int(2, (long long)List.size(doc->body), "AML01: two statements captured");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML01: two statements captured");
 
-   anvl_doc_statement stmt = NULL;
-   List.get(doc->body, 0, (object *)&stmt);
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "AML01: 'config' statement retrieved");
    if (stmt) {
       TestBit.is_equal_int(ANVL_STMT_ASSIGN, (long long)stmt->kind, "AML01: statement is ASSIGN");
@@ -125,10 +127,11 @@ static void test_aml02_static_value_reference(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML02: parse body returns OK");
-   TestBit.is_equal_int(2, (long long)List.size(doc->body), "AML02: two statements captured");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML02: two statements captured");
 
-   anvl_doc_statement derived = NULL;
-   List.get(doc->body, 1, (object *)&derived);
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
    TestBit.is_not_null(derived, "AML02: 'derived_var' statement retrieved");
    if (derived && derived->value) {
       TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)derived->value->type,
@@ -153,13 +156,15 @@ static void test_aml03_inherit_via_assign(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML03: parse body returns OK");
-   TestBit.is_equal_int(2, (long long)List.size(doc->body), "AML03: two statements captured");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML03: two statements captured");
 
-   anvl_doc_statement derived = NULL;
-   List.get(doc->body, 1, (object *)&derived);
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
    TestBit.is_not_null(derived, "AML03: 'derived' statement retrieved");
    if (derived) {
-      TestBit.is_equal_int(ANVL_STMT_ASSIGN, (long long)derived->kind, "AML03: statement is ASSIGN");
+      TestBit.is_equal_int(ANVL_STMT_ASSIGN, (long long)derived->kind,
+                           "AML03: statement is ASSIGN");
       TestBit.is_false(Source.slice_is_empty(derived->base), "AML03: base is set");
       TestBit.is_not_null(derived->value, "AML03: statement has a value");
       if (derived->value) {
@@ -203,10 +208,11 @@ static void test_aml05_namespace_block(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML05: parse body returns OK");
-   TestBit.is_equal_int(1, (long long)List.size(doc->body), "AML05: one statement captured");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML05: one statement captured");
 
-   anvl_doc_statement stmt = NULL;
-   List.get(doc->body, 0, (object *)&stmt);
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "AML05: 'label' statement retrieved");
    if (stmt) {
       TestBit.is_equal_int(ANVL_STMT_OBJECT_BLOCK, (long long)stmt->kind,
@@ -236,10 +242,11 @@ static void test_aml06_immutable_object_block(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML06: parse body returns OK");
-   TestBit.is_equal_int(1, (long long)List.size(doc->body), "AML06: one statement captured");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML06: one statement captured");
 
-   anvl_doc_statement stmt = NULL;
-   List.get(doc->body, 0, (object *)&stmt);
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "AML06: 'config' statement retrieved");
    if (stmt) {
       TestBit.is_equal_int(ANVL_STMT_OBJECT_BLOCK, (long long)stmt->kind,
@@ -268,10 +275,11 @@ static void test_aml07_inherit_via_block(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML07: parse body returns OK");
-   TestBit.is_equal_int(2, (long long)List.size(doc->body), "AML07: two statements captured");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML07: two statements captured");
 
-   anvl_doc_statement derived = NULL;
-   List.get(doc->body, 1, (object *)&derived);
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
    TestBit.is_not_null(derived, "AML07: 'derived' statement retrieved");
    if (derived) {
       TestBit.is_equal_int(ANVL_STMT_OBJECT_BLOCK, (long long)derived->kind,
@@ -295,10 +303,11 @@ static void test_aml08_base_and_attributes(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML08: parse body returns OK");
-   TestBit.is_equal_int(2, (long long)List.size(doc->body), "AML08: two statements captured");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML08: two statements captured");
 
-   anvl_doc_statement derived = NULL;
-   List.get(doc->body, 1, (object *)&derived);
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
    TestBit.is_not_null(derived, "AML08: 'derived' statement retrieved");
    if (derived) {
       TestBit.is_false(Source.slice_is_empty(derived->base), "AML08: base is set");
@@ -361,10 +370,11 @@ static void test_aml11_import_and_static_reference(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML11: parse body returns OK");
-   TestBit.is_equal_int(1, (long long)List.size(doc->body), "AML11: one statement captured");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML11: one statement captured");
 
-   anvl_doc_statement alias = NULL;
-   List.get(doc->body, 0, (object *)&alias);
+   anvl_statement alias = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&alias);
    TestBit.is_not_null(alias, "AML11: 'alias' statement retrieved");
    if (alias && alias->value) {
       TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)alias->value->type,
@@ -384,16 +394,17 @@ int main(void) {
    TestBit.run_ex("AML01_object_value_assign", NULL, test_aml01_object_value_assign, th);
    TestBit.run_ex("AML02_static_value_reference", NULL, test_aml02_static_value_reference, th);
    TestBit.run_ex("AML03_inherit_via_assign", NULL, test_aml03_inherit_via_assign, th);
-   TestBit.run_ex("AML04_base_requires_object_value", NULL,
-                  test_aml04_base_requires_object_value, th);
+   TestBit.run_ex("AML04_base_requires_object_value", NULL, test_aml04_base_requires_object_value,
+                  th);
    TestBit.run_ex("AML05_namespace_block", NULL, test_aml05_namespace_block, th);
    TestBit.run_ex("AML06_immutable_object_block", NULL, test_aml06_immutable_object_block, th);
    TestBit.run_ex("AML07_inherit_via_block", NULL, test_aml07_inherit_via_block, th);
    TestBit.run_ex("AML08_base_and_attributes", NULL, test_aml08_base_and_attributes, th);
-   TestBit.run_ex("AML09_unterminated_object_block", NULL, test_aml09_unterminated_object_block, th);
+   TestBit.run_ex("AML09_unterminated_object_block", NULL, test_aml09_unterminated_object_block,
+                  th);
    TestBit.run_ex("AML10_bare_base_statement", NULL, test_aml10_bare_base_statement, th);
-   TestBit.run_ex("AML11_import_and_static_reference", NULL,
-                  test_aml11_import_and_static_reference, th);
+   TestBit.run_ex("AML11_import_and_static_reference", NULL, test_aml11_import_and_static_reference,
+                  th);
 
    return TestBit.report();
 }

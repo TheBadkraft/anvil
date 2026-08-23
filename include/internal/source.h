@@ -130,6 +130,61 @@ typedef struct anvl_source_i {
     */
    anvl_result (*set_error)(anvl_source, anvl_err_code, usize, usize, const char *,
                             anvl_err_code *);
+   /**
+    * @brief Look up the shared body-parse arena for the source's owning module context.
+    * @param src The source object whose owning context's arena is wanted.
+    * @param[out] out_err_code Receives a failure code if the arena cannot be retrieved.
+    * @return The context's `bump_allocator`, or NULL if the source is unregistered or the
+    * context hasn't created its arena yet (see `mod_ctx_create_arena`).
+    * @details Same "the parser only ever holds a `source` handle" pattern as `has_errors`/
+    * `set_error`: looks the owning document up in the global registry via the source's content
+    * hash, then returns `doc->context->arena`. Pure lookup — never creates the arena itself.
+    */
+   bump_allocator (*get_arena)(anvl_source, anvl_err_code *);
+   /**
+    * @brief Allocate a new arena-backed statement or value node and index it on the owning
+    * module context, in one call.
+    * @param src The source object whose owning context's arena the node is allocated from.
+    * @param kind Which node type to allocate — selects the allocation size
+    * (`sizeof(anvl_statement_t)` or `sizeof(anvl_value_t)`) and which index list (`ctx->statements`
+    * or `ctx->values`) the returned pointer is appended to.
+    * @param[out] out_err_code Receives a failure code if the node cannot be allocated.
+    * @return A zeroed pointer to the new node, or NULL on failure (unregistered source, or the
+    * context's arena hasn't been created yet via `mod_ctx_create_arena`).
+    * @details Same registry-lookup pattern as `get_arena`/`set_error`. This is the parser's one
+    * entry point for building statement/value nodes — it never calls `get_arena` directly for node
+    * construction, so the arena allocation and the context's node index can never drift apart. See
+    * notes/document-body-parse.md "Arena node iteration".
+    */
+   void *(*new_node)(anvl_source, anvl_node_kind, anvl_err_code *);
+   /**
+    * @brief Initialize a slice from a start/end pointer pair, filling in the buffer-base `data`
+    * field correctly.
+    * @param src The source the slice is cut from.
+    * @param[out] out_slice Receives the constructed slice. Untouched if NULL.
+    * @details Pure initialization, no failure mode, no registry lookup — unlike `get_arena`/
+    * `new_node`/`set_error`, this depends only on `src` itself, not its owning document. Exists
+    * to stop every slice-building call site from repeating `data`/`start`/`end` by hand, which
+    * has already produced one real bug (`data` set equal to `start` instead of the buffer base —
+    * see notes/document-body-parse.md "Source.new_slice — centralizing slice construction").
+    */
+   void (*init_slice)(anvl_source src, anvl_slice *out_slice);
+   /**
+    * @brief Freeze a parser's finished top-level statement list into the owning document's body.
+    * @param src The source whose owning document's body is being finished.
+    * @param statements A list of `anvl_statement` pointers, in parse order. Ownership transfers
+    * to this call regardless of outcome — the caller must not use or dispose it afterward.
+    * @param[out] out_err_code Receives a failure code if the source is unregistered.
+    * @return `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
+    * @details Converts `statements` into a frozen `farray` (dense, no further growth — the right
+    * shape for a body that's done being built, unlike the growable `list` used while accumulating
+    * it) and assigns it to `doc->body`, then disposes `statements`. Intended to be called once, at
+    * the end of `parse_source`, on both the success and failure exit paths — a document that fails
+    * partway through still has every statement parsed before the failure point preserved in
+    * `doc->body`, not silently dropped. See notes/document-body-parse.md "Document body —
+    * accumulate then freeze".
+    */
+   anvl_result (*finish_body)(anvl_source src, list statements, anvl_err_code *out_err_code);
 
    // Position & EOF
    /**
@@ -264,6 +319,14 @@ typedef struct anvl_source_i {
     * object. The buffer contains the entire source content, and the caller should not modify it.
     */
    const char *(*data)(anvl_source);
+   /**
+    * @brief Get a pointer to the current position in the source content buffer.
+    * @param src The source object to query.
+    * @return A pointer to the current position in the source content buffer, or NULL if the source
+    * is NULL.
+    * @details This function is equivalent to Source.data(src) + Source.position(src).
+    */
+   const char *(*at)(anvl_source);
    /**
     * @brief Get the length of the source content buffer.
     * @param src The source object to query.

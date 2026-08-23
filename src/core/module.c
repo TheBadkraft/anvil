@@ -97,8 +97,13 @@ error:
    return ANVL_RES_ERR;
 }
 
+/* ----------------------------------------------------------------- *
+ * Module Function Declarations
+ * ----------------------------------------------------------------- */
+void mod_ctx_dispose_arena(bump_allocator);
+
 /* ----------------------------------------------------------------------- *
- * AnvlMod management                                                      *
+ * AnvlMod management
  * ----------------------------------------------------------------------- */
 #if 1 // module management
 anvl_result mod_initialize(AnvlMod *out_mod, anvl_err_code *out_err_code) {
@@ -222,7 +227,7 @@ error:
 #endif
 
 /* ----------------------------------------------------------------------- *
- * Context management                                                      *
+ * Context management
  * ----------------------------------------------------------------------- */
 #if 1 // module_context management
 // if context_spec is NULL, use default values
@@ -253,7 +258,9 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
 
    ctx->docs = List.new(ctx_spec->docs_cap, sizeof(module_document));
    ctx->errors = List.new(ctx_spec->errs_cap, sizeof(anvl_error));
-   if (!ctx->docs || !ctx->errors) {
+   ctx->statements = List.new(ANVL_CTX_DEFAULT_NODE_CAP, sizeof(anvl_statement));
+   ctx->values = List.new(ANVL_CTX_DEFAULT_NODE_CAP, sizeof(anvl_value));
+   if (!ctx->docs || !ctx->errors || !ctx->statements || !ctx->values) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
@@ -265,8 +272,12 @@ error: {
    if (ctx) {
       List.dispose(ctx->docs);
       List.dispose(ctx->errors);
+      List.dispose(ctx->statements);
+      List.dispose(ctx->values);
       ctx->docs = NULL;
       ctx->errors = NULL;
+      ctx->statements = NULL;
+      ctx->values = NULL;
       Allocator.dispose(ctx);
    }
    ctx = NULL;
@@ -289,8 +300,27 @@ void mod_ctx_dispose(module_context ctx) {
    ctx->docs = NULL;
    ctx->errors = NULL;
 
+   // statements/values are non-owning indexes into the arena (see
+   // notes/document-body-parse.md "Arena node iteration") — the arena release
+   // below frees the pointed-to nodes; these lists just need their own
+   // container storage released, no per-element disposal.
+   List.dispose(ctx->statements);
+   List.dispose(ctx->values);
+   ctx->statements = NULL;
+   ctx->values = NULL;
+
+   mod_ctx_dispose_arena(ctx->arena);
+
    Allocator.dispose(ctx);
 }
+/*
+ * Register a document with the context and global source registry. The document's
+ * source must be loaded and have a non-zero hash. If the document is already
+ * registered, the call fails with ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT.
+ * If a filepath is provided, it is copied into the document's filepath field.
+ * The document is appended to the context's docs list.
+ * Returns ANVL_RES_OK on success, or ANVL_RES_ERR on failure.
+ */
 anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const char *filepath,
                                  anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -339,6 +369,9 @@ error:
    }
    return ANVL_RES_ERR;
 }
+/*
+ * Set the parser for the context.
+ */
 void mod_ctx_set_parser(module_context ctx, anvl_parser parser) {
    // make sure we have a valid context and document
    if (!ctx || !parser) {
@@ -346,15 +379,68 @@ void mod_ctx_set_parser(module_context ctx, anvl_parser parser) {
    }
    ctx->parser = parser;
 }
+/*
+ * Get arena-backed bump allocator for the context. Sets out_err_code to ANVL_ERR_INVALID_ARGUMENT
+ * if ctx is NULL, or ANVL_ERR_MEMORY_ALLOC_FAILED if the arena is not initialized. If allocation
+ * fails, the context's arena is NULL.
+ */
+anvl_result mod_ctx_create_arena(module_context ctx, usize size, anvl_err_code *out_err_code) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
 
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   if (!ctx || size == 0) {
+      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      goto error;
+   }
+   ctx->arena = NULL;
+
+   // get arena memory allocation
+   bump_allocator arena = Allocator.create_bump(size);
+   if (!arena) {
+      err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      goto error;
+   }
+   ctx->arena = arena;
+
+   return ANVL_RES_OK;
+
+error:
+   if (out_err_code) {
+      *out_err_code = err_code;
+   }
+   return ANVL_RES_ERR;
+}
+/*
+ * Calculate a size hint for the context's arena based on the summed length of all source files. The
+ * size hint is the greater of the summed source length multiplied by ANVL_ARENA_SIZE_MULTIPLIER or
+ * ANVL_ARENA_MIN_SIZE. This function does not allocate memory; it only computes a size value. The
+ * caller is responsible for creating the arena with the returned size hint using
+ * mod_ctx_create_arena(). Returns the calculated size hint.
+ */
+usize mod_ctx_arena_size_hint(usize summed_source_length) {
+   // calculate arena size hint
+   usize hint = summed_source_length * ANVL_ARENA_SIZE_MULTIPLIER;
+   // ensure hint is at least the minimum size
+   return hint > ANVL_ARENA_MIN_SIZE ? hint : ANVL_ARENA_MIN_SIZE;
+}
+/*
+ * Dispose context's arena.
+ */
+void mod_ctx_dispose_arena(bump_allocator arena) {
+   if (!arena) {
+      return;
+   }
+   Allocator.release((sc_ctrl_base_s *)arena);
+}
 /* ----------------------------------------------------------------------- *
  * Import graph expansion
  * ----------------------------------------------------------------------- */
-
 #define IMPORT_PATH_MAX 1024
 
-static anvl_result import_load_child_recursive(module_context ctx, module_document doc, list stack,
-                                               anvl_err_code *out_err_code);
+static anvl_result import_load_dependencies(module_context ctx, module_document doc, list stack,
+                                            usize *out_size, anvl_err_code *out_err_code);
 
 static void import_resolve_dir(const char *path, char *out_dir, usize out_size) {
    if (!path || out_size == 0) {
@@ -396,8 +482,8 @@ static bool import_path_on_stack(list stack, const char *path) {
    return false;
 }
 
-static anvl_result import_load_child(module_context ctx, module_document parent,
-                                     anvl_doc_import imp, list stack, anvl_err_code *out_err_code) {
+static anvl_result import_load_child(module_context ctx, module_document parent, anvl_import imp,
+                                     list stack, usize *out_size, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    usize path_len = Source.slice_length(imp->path);
    if (path_len < 2) {
@@ -472,7 +558,13 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
       goto error_child;
    }
 
-   // New document registered. Scan its header and recurse into its imports.
+   // New document registered — count its source toward the module's body-parse
+   // arena size hint before recursing into its own imports.
+   if (out_size) {
+      *out_size += Source.length(child->source);
+   }
+
+   // Scan its header and recurse into its imports.
    res = doc_scan_header(child, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
@@ -480,7 +572,7 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
 
    imp->resolved = child;
 
-   res = import_load_child_recursive(ctx, child, stack, &err_code);
+   res = import_load_dependencies(ctx, child, stack, out_size, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
@@ -499,8 +591,8 @@ error:
    return ANVL_RES_ERR;
 }
 
-static anvl_result import_load_child_recursive(module_context ctx, module_document doc, list stack,
-                                               anvl_err_code *out_err_code) {
+static anvl_result import_load_dependencies(module_context ctx, module_document doc, list stack,
+                                            usize *out_size, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (!doc || !doc->filepath) {
@@ -512,13 +604,13 @@ static anvl_result import_load_child_recursive(module_context ctx, module_docume
    List.append(stack, (object)doc->filepath);
 
    for (usize i = 0; i < List.size(doc->header->imports); i++) {
-      anvl_doc_import imp = NULL;
+      anvl_import imp = NULL;
       List.get(doc->header->imports, i, (object *)&imp);
       if (!imp) {
          continue;
       }
 
-      if (ANVL_RES_OK != import_load_child(ctx, doc, imp, stack, &err_code)) {
+      if (ANVL_RES_OK != import_load_child(ctx, doc, imp, stack, out_size, &err_code)) {
          goto error_pop;
       }
    }
@@ -535,7 +627,7 @@ error:
    return ANVL_RES_ERR;
 }
 
-anvl_result mod_load_imports(module_context ctx, module_document root,
+anvl_result mod_load_imports(module_context ctx, module_document root, usize *out_body_size_hint,
                              anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
@@ -547,16 +639,23 @@ anvl_result mod_load_imports(module_context ctx, module_document root,
       goto error;
    }
 
+   // Root counts toward the arena size hint too — it never passes through
+   // import_load_child, so it isn't picked up by the recursion below.
+   usize total = Source.length(root->source);
+
    list stack = List.new(8, sizeof(const char *));
    if (!stack) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
-   anvl_result res = import_load_child_recursive(ctx, root, stack, &err_code);
+   anvl_result res = import_load_dependencies(ctx, root, stack, &total, &err_code);
 
    List.dispose(stack);
 
+   if (out_body_size_hint) {
+      *out_body_size_hint = total;
+   }
    if (out_err_code) {
       *out_err_code = err_code;
    }
@@ -590,11 +689,4 @@ void mod_ctx_clear_errs(list errors) {
    List.dispose(errors);
 }
 
-void mod_ctx_add_doc(module_context ctx, module_document doc) {
-   if (!ctx || !doc) {
-      return;
-   }
-
-   List.append(ctx->docs, (object)doc);
-}
 #endif

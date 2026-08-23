@@ -78,7 +78,7 @@ static void test_hdr01_single_import(void) {
     */
    const char *exp_decl = "import \"base\"";
    const char *exp_path = "\"base\"";
-   anvl_doc_import imp = NULL;
+   anvl_import imp = NULL;
    List.get(doc->header->imports, 0, (object *)&imp);
    TestBit.is_not_null(imp, "HDR01: import retrieved");
    if (imp) {
@@ -111,7 +111,7 @@ static void test_hdr02_multiple_imports(void) {
    TestBit.is_equal_int(2, (long long)List.size(doc->header->imports),
                         "HDR02: two imports captured");
 
-   anvl_doc_import imp0 = NULL;
+   anvl_import imp0 = NULL;
    List.get(doc->header->imports, 0, (object *)&imp0);
    TestBit.is_not_null(imp0, "HDR02: first import retrieved");
    if (imp0) {
@@ -120,7 +120,7 @@ static void test_hdr02_multiple_imports(void) {
       TestBit.is_true(slice_equals(imp0->path, "\"base\""), "HDR02: first import path captured");
    }
 
-   anvl_doc_import imp1 = NULL;
+   anvl_import imp1 = NULL;
    List.get(doc->header->imports, 1, (object *)&imp1);
    TestBit.is_not_null(imp1, "HDR02: second import retrieved");
    if (imp1) {
@@ -229,7 +229,7 @@ static void test_hdr08_attributes_after_imports(void) {
    TestBit.is_equal_int(2, (long long)List.size(doc->header->attributes),
                         "HDR08: two attributes captured");
 
-   anvl_doc_attribute attr0 = NULL;
+   anvl_attribute attr0 = NULL;
    List.get(doc->header->attributes, 0, (object *)&attr0);
    TestBit.is_not_null(attr0, "HDR08: first attribute retrieved");
    if (attr0) {
@@ -237,7 +237,7 @@ static void test_hdr08_attributes_after_imports(void) {
       TestBit.is_true(Source.slice_is_empty(attr0->value), "HDR08: first attribute is flag");
    }
 
-   anvl_doc_attribute attr1 = NULL;
+   anvl_attribute attr1 = NULL;
    List.get(doc->header->attributes, 1, (object *)&attr1);
    TestBit.is_not_null(attr1, "HDR08: second attribute retrieved");
    if (attr1) {
@@ -303,12 +303,12 @@ static void test_hdr11_import_loader_single(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR11: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR11: load imports returns OK");
    TestBit.is_equal_int(1, (long long)List.size(root->header->imports),
                         "HDR11: one import captured");
 
-   anvl_doc_import imp = NULL;
+   anvl_import imp = NULL;
    List.get(root->header->imports, 0, (object *)&imp);
    TestBit.is_not_null(imp, "HDR11: import retrieved");
    if (imp) {
@@ -337,12 +337,12 @@ static void test_hdr12_import_loader_nested(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR12: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR12: load imports returns OK");
    TestBit.is_equal_int(1, (long long)List.size(root->header->imports),
                         "HDR12: root has one import");
 
-   anvl_doc_import root_imp = NULL;
+   anvl_import root_imp = NULL;
    List.get(root->header->imports, 0, (object *)&root_imp);
    TestBit.is_not_null(root_imp, "HDR12: root import retrieved");
    if (root_imp) {
@@ -357,7 +357,7 @@ static void test_hdr12_import_loader_nested(void) {
    TestBit.is_equal_int(1, (long long)List.size(types_doc->header->imports),
                         "HDR12: types document has one import");
 
-   anvl_doc_import types_imp = NULL;
+   anvl_import types_imp = NULL;
    List.get(types_doc->header->imports, 0, (object *)&types_imp);
    TestBit.is_not_null(types_imp, "HDR12: types import retrieved");
    if (types_imp) {
@@ -383,13 +383,13 @@ static void test_hdr13_import_loader_diamond(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR13: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR13: load imports returns OK");
    TestBit.is_equal_int(2, (long long)List.size(root->header->imports),
                         "HDR13: root has two imports");
 
-   anvl_doc_import base_imp = NULL;
-   anvl_doc_import types_imp = NULL;
+   anvl_import base_imp = NULL;
+   anvl_import types_imp = NULL;
    List.get(root->header->imports, 0, (object *)&base_imp);
    List.get(root->header->imports, 1, (object *)&types_imp);
    TestBit.is_not_null(base_imp, "HDR13: base import retrieved");
@@ -405,7 +405,7 @@ static void test_hdr13_import_loader_diamond(void) {
       return;
    }
 
-   anvl_doc_import types_base_imp = NULL;
+   anvl_import types_base_imp = NULL;
    List.get(types_imp->resolved->header->imports, 0, (object *)&types_base_imp);
    TestBit.is_not_null(types_base_imp, "HDR13: types->base import retrieved");
    if (types_base_imp) {
@@ -432,7 +432,7 @@ static void test_hdr14_import_loader_cycle(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR14: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR14: cyclic import returns ERR");
    TestBit.is_true(doc_has_errors(root), "HDR14: root document reports an error");
 
@@ -453,7 +453,7 @@ static void test_hdr15_import_loader_missing(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR15: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR15: missing import returns ERR");
    TestBit.is_true(doc_has_errors(root), "HDR15: root document reports an error");
 
@@ -465,8 +465,8 @@ static void test_hdr15_import_loader_missing(void) {
  * ---------------------------------------------------------------------- */
 static void test_hdr16_import_loader_buffer_root_cwd(void) {
    module_context ctx = NULL;
-   module_document root = setup_registered_doc("import \"../fixtures/hdr_import_base.anvl\";\n",
-                                                &ctx);
+   module_document root =
+      setup_registered_doc("import \"../fixtures/hdr_import_base.anvl\";\n", &ctx);
    TestBit.is_not_null(root, "HDR16: root document loaded");
    if (!root) {
       return;
@@ -476,11 +476,10 @@ static void test_hdr16_import_loader_buffer_root_cwd(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR16: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
-   TestBit.is_equal_int(ANVL_RES_OK, res,
-                        "HDR16: buffer-rooted import resolves relative to CWD");
+   res = mod_load_imports(ctx, root, NULL, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR16: buffer-rooted import resolves relative to CWD");
 
-   anvl_doc_import imp = NULL;
+   anvl_import imp = NULL;
    List.get(root->header->imports, 0, (object *)&imp);
    TestBit.is_not_null(imp, "HDR16: import retrieved");
    if (imp) {
@@ -507,10 +506,10 @@ static void test_hdr17_import_loader_dotdot(void) {
    anvl_result res = doc_scan_header(root, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR17: scan header returns OK");
 
-   res = mod_load_imports(ctx, root, &err_code);
+   res = mod_load_imports(ctx, root, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "HDR17: '../' import resolves");
 
-   anvl_doc_import imp = NULL;
+   anvl_import imp = NULL;
    List.get(root->header->imports, 0, (object *)&imp);
    TestBit.is_not_null(imp, "HDR17: import retrieved");
    if (imp) {
@@ -521,7 +520,123 @@ static void test_hdr17_import_loader_dotdot(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * HDR18 — a repeated shebang after the one already reconciled at
+ * source-load time is rejected
+ * ---------------------------------------------------------------------- */
+static void test_hdr18_repeated_shebang_rejected(void) {
+   const char *buffer = "#!aml\n#!aml\nname := test\n";
+   module_context ctx = NULL;
+   module_document doc = setup_registered_doc(buffer, &ctx);
+   TestBit.is_not_null(doc, "HDR18: registered document allocated");
+   if (!doc) {
+      return;
+   }
 
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR18: scan header returns ERR for repeated shebang");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS, err_code,
+                        "HDR18: err_code is SHEBANG_AFTER_STATEMENTS");
+   TestBit.is_true(Source.has_errors(doc->source), "HDR18: source reports an error");
+
+   mod_ctx_dispose(ctx);
+}
+
+/* ---------------------------------------------------------------------- *
+ * HDR19 — import loader: body size hint sums every registered document
+ * exactly once, including diamond-shared imports.
+ * Commentary: rather than hardcoding fixture byte counts (fragile if the
+ * fixtures change), the expected total is computed independently by
+ * walking ctx->docs and summing Source.length() per document. That walk
+ * can't double-count a diamond import (ctx->docs only ever holds one entry
+ * per registered document), so it's exactly the ground truth the threaded
+ * accumulator needs to match.
+ * ---------------------------------------------------------------------- */
+static void test_hdr19_import_loader_body_size_hint(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR19: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(root, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR19: scan header returns OK");
+
+   usize size_hint = 0;
+   res = mod_load_imports(ctx, root, &size_hint, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "HDR19: load imports returns OK");
+   TestBit.is_equal_int(3, (long long)List.size(ctx->docs),
+                        "HDR19: three documents registered (root + base + types)");
+
+   usize expected = 0;
+   for (usize i = 0; i < List.size(ctx->docs); i++) {
+      module_document doc = NULL;
+      List.get(ctx->docs, i, (object *)&doc);
+      if (doc) {
+         expected += Source.length(doc->source);
+      }
+   }
+   TestBit.is_true(expected > 0, "HDR19: expected total is non-zero");
+   TestBit.is_equal_int((long long)expected, (long long)size_hint,
+                        "HDR19: size hint matches the sum over ctx->docs, diamond counted once");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * HDR20 — registry survives disposal of a discarded diamond duplicate
+ * Commentary: when types.anvl re-imports base.anvl, import_load_child
+ * registers a fresh `child` document, gets ANVL_ERR_PARSER_DUPLICATE_FIELD_
+ * IN_OBJECT back (base.anvl's content hash is already registered), reuses
+ * the *original* base document, and disposes the discarded duplicate via
+ * doc_dispose. doc_dispose unconditionally calls Registry.remove(hash) for
+ * whatever source it's disposing — since the duplicate shares base.anvl's
+ * exact content hash, this removes the registry entry for the *original*
+ * base document too, even though that original is still alive in ctx->docs.
+ * From that point, any Source.*-registry-lookup call (get_arena, new_node,
+ * set_error, has_errors) silently fails for the original base document,
+ * even though it's never been disposed. This is the direct pressure-point
+ * test: after a diamond import fully resolves, the surviving document must
+ * still be findable in the registry by its own hash.
+ * ---------------------------------------------------------------------- */
+static void test_hdr20_registry_survives_diamond_duplicate_dispose(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   TestBit.is_not_null(root, "HDR20: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, doc_scan_header(root, &err_code),
+                        "HDR20: scan header returns OK");
+   TestBit.is_equal_int(ANVL_RES_OK, mod_load_imports(ctx, root, NULL, &err_code),
+                        "HDR20: load imports returns OK");
+
+   anvl_import base_imp = NULL;
+   List.get(root->header->imports, 0, (object *)&base_imp);
+   TestBit.is_not_null(base_imp, "HDR20: base import retrieved");
+   if (!base_imp || !base_imp->resolved) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+
+   module_document base = base_imp->resolved;
+   uint64_t base_hash = Source.hash(base->source);
+   TestBit.is_true(base_hash != 0, "HDR20: base document has a non-zero content hash");
+
+   module_document found = Registry.find(base_hash);
+   TestBit.is_not_null(found,
+                       "HDR20: base document is still findable in the registry after the "
+                       "diamond re-import's discarded duplicate was disposed");
+   TestBit.is_true(found == base,
+                   "HDR20: the registry entry is the surviving base document, not a stale "
+                   "or wrong pointer");
+
+   mod_ctx_dispose(ctx);
+}
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -548,6 +663,12 @@ int main(void) {
    TestBit.run_ex("HDR16_import_loader_buffer_root_cwd", NULL,
                   test_hdr16_import_loader_buffer_root_cwd, th);
    TestBit.run_ex("HDR17_import_loader_dotdot", NULL, test_hdr17_import_loader_dotdot, th);
+   TestBit.run_ex("HDR18_repeated_shebang_rejected", NULL, test_hdr18_repeated_shebang_rejected,
+                  th);
+   TestBit.run_ex("HDR19_import_loader_body_size_hint", NULL,
+                  test_hdr19_import_loader_body_size_hint, th);
+   TestBit.run_ex("HDR20_registry_survives_diamond_duplicate_dispose", NULL,
+                  test_hdr20_registry_survives_diamond_duplicate_dispose, th);
 
    return TestBit.report();
 }

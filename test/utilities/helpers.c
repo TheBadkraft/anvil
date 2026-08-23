@@ -104,3 +104,35 @@ module_document setup_registered_file(const char *fixture_name, module_context *
    *out_ctx = ctx;
    return doc;
 }
+
+void report_throughput(const anvl_parse_metrics_t *metrics, void *userdata) {
+   (void)userdata; // unused: TestBit.log() already attributes the line to the current test
+   if (!metrics) {
+      return;
+   }
+   double sec = (double)metrics->elapsed_ns / 1e9;
+   double mb_per_sec = sec > 0 ? ((double)metrics->bytes / 1e6) / sec : 0.0;
+
+   char buf[128];
+   snprintf(buf, sizeof(buf), "%zu bytes in %.3f ms (%.2f MB/s)", metrics->bytes, sec * 1000.0,
+            mb_per_sec);
+   TestBit.log(buf);
+}
+
+module_document setup_amp_doc(const char *buffer, module_context *out_ctx) {
+   module_document doc = setup_registered_doc(buffer, out_ctx);
+   if (!doc) {
+      return NULL;
+   }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   if (ANVL_RES_OK != doc_scan_header(doc, &err_code)) {
+      return doc;
+   }
+
+   usize size_hint = 0;
+   (void)mod_load_imports(*out_ctx, doc, &size_hint, &err_code);
+   usize capacity = mod_ctx_arena_size_hint(size_hint);
+   mod_ctx_create_arena(*out_ctx, capacity, &err_code);
+
+   return doc;
+}

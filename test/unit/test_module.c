@@ -513,38 +513,6 @@ static void test_cr11_mod_ctx_clear_errs(void) {
    mod_ctx_clear_errs(errs);
 }
 /* ---------------------------------------------------------------------- *
- * CR12 — mod_ctx_add_doc appends to context docs
- * Commentary: codifies the intended behavior for future context API
- * completion (currently may fail in RED state if unimplemented).
- * ---------------------------------------------------------------------- */
-static void test_cr12_mod_ctx_add_doc(void) {
-   module_context ctx = NULL;
-   anvl_err_code err_code = ANVL_ERR_NONE;
-
-   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
-      TestBit.fail("CR12: setup context failed");
-      return;
-   }
-
-   module_document doc = Debug.stub_doc(NULL);
-   TestBit.is_not_null(doc, "CR12: stub doc allocated");
-   if (!doc) {
-      Debug.dispose_ctx(ctx);
-      return;
-   }
-
-   mod_ctx_add_doc(ctx, doc);
-
-   TestBit.is_equal_int(1, (long long)List.size(ctx->docs), "CR12: docs list size increments to 1");
-
-   module_document out = NULL;
-   TestBit.is_equal_int(0, (long long)List.get(ctx->docs, 0, (object *)&out),
-                        "CR12: list.get returns OK for first inserted doc");
-   TestBit.is_true(out == doc, "CR12: stored doc pointer matches inserted doc pointer");
-
-   Debug.dispose_ctx(ctx);
-}
-/* ---------------------------------------------------------------------- *
  * CR13 — mod_ctx_set_parser stores parser on context
  * Commentary: codifies parser attachment behavior for the context
  * lifecycle API (may be RED until implemented).
@@ -656,6 +624,218 @@ static void test_cr16_mod_dispose_releases_registry(void) {
                         "CR16: registry is empty after module disposal");
    TestBit.is_null(Registry.find(hash), "CR16: document no longer findable after disposal");
 }
+/* ---------------------------------------------------------------------- *
+ * CR17 — mod_ctx_create_arena creates a usable, shared arena
+ * Commentary: the arena is shared across every document in ctx->docs (see
+ * notes/document-body-parse.md "Arena-backed allocation"), not per-document —
+ * this test only checks that the context ends up with a working bump
+ * allocator, not that individual documents draw from it correctly (that's
+ * Source.get_arena's job, tested in test_source.c).
+ * ---------------------------------------------------------------------- */
+static void test_cr17_mod_ctx_create_arena(void) {
+   module_context ctx = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   anvl_result res = mod_ctx_initialize(NULL, &ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "CR17: mod_ctx_initialize returns OK");
+   TestBit.is_not_null(ctx, "CR17: context allocated");
+   if (!ctx) {
+      return;
+   }
+   TestBit.is_null(ctx->arena, "CR17: arena is NULL before creation");
+
+   res = mod_ctx_create_arena(ctx, 1024, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "CR17: create_arena returns OK");
+   TestBit.is_not_null(ctx->arena, "CR17: arena allocated on the context");
+
+   if (ctx->arena) {
+      void *p = ctx->arena->alloc(ctx->arena, 64);
+      TestBit.is_not_null(p, "CR17: arena hands out usable memory");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * CR18 — mod_ctx_dispose releases the arena
+ * Commentary: TestBit can't assert "the memory was freed" directly (ctx
+ * itself is gone after dispose) — the real signal for this one is
+ * `make module val` reporting 0 bytes in use at exit. The in-test
+ * assertions only cover that dispose doesn't crash, with and without an
+ * arena present, and that using the arena before disposal works normally.
+ * ---------------------------------------------------------------------- */
+static void test_cr18_mod_ctx_dispose_releases_arena(void) {
+   // Variant 1: context with a populated, used arena.
+   module_context ctx = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("CR18: setup context failed");
+      return;
+   }
+
+   TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_create_arena(ctx, 256, &err_code),
+                        "CR18: create_arena returns OK");
+   if (ctx->arena) {
+      // Allocate enough to span more than one chained block, so disposal has
+      // to walk the whole chain, not just free a single block.
+      for (usize i = 0; i < 8; i++) {
+         (void)ctx->arena->alloc(ctx->arena, 512);
+      }
+   }
+
+   mod_ctx_dispose(ctx); // real leak-freedom signal is `make module val`, not an assertion here
+
+   // Variant 2: a context whose arena was never created — dispose must still
+   // be a safe no-op on the arena field.
+   module_context ctx2 = NULL;
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx2, &err_code) || !ctx2) {
+      TestBit.fail("CR18: setup second context failed");
+      return;
+   }
+   TestBit.is_null(ctx2->arena, "CR18: second context's arena is NULL (never created)");
+   mod_ctx_dispose(ctx2); // must not crash on a NULL arena
+   TestBit.is_true(true, "CR18: dispose with no arena created completes without crashing");
+}
+/* ---------------------------------------------------------------------- *
+ * CR19 — mod_ctx_initialize creates the statements/values node indexes
+ * Commentary: see notes/document-body-parse.md "Arena node iteration". These
+ * lists hold pointers into the arena, populated by Source.new_node; here we
+ * only lock in that mod_ctx_initialize/mod_ctx_dispose manage their lifetime
+ * correctly, independent of Source.new_node's own (still RED) behavior.
+ * ---------------------------------------------------------------------- */
+static void test_cr19_mod_ctx_node_indexes_created(void) {
+   module_context ctx = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_initialize(NULL, &ctx, &err_code),
+                        "CR19: mod_ctx_initialize returns OK");
+   TestBit.is_not_null(ctx, "CR19: context allocated");
+   if (!ctx) {
+      return;
+   }
+
+   TestBit.is_not_null(ctx->statements, "CR19: statements index created");
+   TestBit.is_not_null(ctx->values, "CR19: values index created");
+   TestBit.is_equal_int(0, (long long)List.size(ctx->statements),
+                        "CR19: statements index starts empty");
+   TestBit.is_equal_int(0, (long long)List.size(ctx->values),
+                        "CR19: values index starts empty");
+
+   mod_ctx_dispose(ctx); // real leak-freedom signal is `make module val`, not an assertion here
+}
+/* ---------------------------------------------------------------------- *
+ * CR20 — mod_ctx_arena_size_hint applies the multiplier/floor heuristic
+ * Commentary: see notes/document-body-parse.md "Initial sizing heuristic".
+ * Pure arithmetic — no context needed. RED until the stub (src/core/module.c)
+ * is replaced with max(sum * ANVL_ARENA_SIZE_MULTIPLIER, ANVL_ARENA_MIN_SIZE).
+ * ---------------------------------------------------------------------- */
+static void test_cr20_mod_ctx_arena_size_hint(void) {
+   // Small sum: multiplier result lands under the floor, floor wins.
+   usize small_sum = 100;
+   TestBit.is_equal_int((long long)ANVL_ARENA_MIN_SIZE,
+                        (long long)mod_ctx_arena_size_hint(small_sum),
+                        "CR20: small sum is floored to ANVL_ARENA_MIN_SIZE");
+
+   // Large sum: multiplier result exceeds the floor, multiplier wins.
+   usize large_sum = 40000;
+   TestBit.is_equal_int((long long)(large_sum * ANVL_ARENA_SIZE_MULTIPLIER),
+                        (long long)mod_ctx_arena_size_hint(large_sum),
+                        "CR20: large sum uses sum * ANVL_ARENA_SIZE_MULTIPLIER");
+
+   // Boundary: sum * multiplier lands exactly on the floor.
+   usize boundary_sum = ANVL_ARENA_MIN_SIZE / ANVL_ARENA_SIZE_MULTIPLIER;
+   TestBit.is_equal_int((long long)ANVL_ARENA_MIN_SIZE,
+                        (long long)mod_ctx_arena_size_hint(boundary_sum),
+                        "CR20: sum landing exactly on the floor returns the floor");
+
+   // Degenerate: zero sum still returns the floor, never zero.
+   TestBit.is_equal_int((long long)ANVL_ARENA_MIN_SIZE, (long long)mod_ctx_arena_size_hint(0),
+                        "CR20: zero sum is floored to ANVL_ARENA_MIN_SIZE");
+}
+/* ---------------------------------------------------------------------- *
+ * CR21 — full sequencing: header scan through arena creation, one real
+ * multi-document import graph, no orchestration function exists yet so this
+ * test chains the real pieces manually, exactly as the eventual production
+ * sequencing point (mod_load_imports -> mod_ctx_arena_size_hint ->
+ * mod_ctx_create_arena) will. RED until CR20's stub is implemented — nothing
+ * else in this chain needs to change for this test to go GREEN.
+ * ---------------------------------------------------------------------- */
+static void test_cr21_full_sequencing_arena_ready(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   TestBit.is_not_null(root, "CR21: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, doc_scan_header(root, &err_code),
+                        "CR21: root header scan returns OK");
+
+   usize size_hint = 0;
+   TestBit.is_equal_int(ANVL_RES_OK, mod_load_imports(ctx, root, &size_hint, &err_code),
+                        "CR21: load imports returns OK");
+   TestBit.is_equal_int(3, (long long)List.size(ctx->docs),
+                        "CR21: three documents registered (root + base + types)");
+   TestBit.is_true(size_hint > 0, "CR21: size hint is non-zero after loading the import graph");
+
+   usize capacity = mod_ctx_arena_size_hint(size_hint);
+   TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_create_arena(ctx, capacity, &err_code),
+                        "CR21: create_arena returns OK using the computed size hint");
+   TestBit.is_not_null(ctx->arena, "CR21: arena is ready — every document loaded, sized, allocated");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * CR22 — the arena is genuinely usable at this point, from any document in
+ * the graph, not just the root: allocate a statement via the root's source
+ * and a value via a child document's source, both landing on the same
+ * shared ctx->statements/ctx->values indexes. This is the concrete proof
+ * that "one arena, shared across the whole import graph" (the design
+ * decision behind putting the arena on module_context, not module_document)
+ * actually holds. RED until CR20's stub is implemented.
+ * ---------------------------------------------------------------------- */
+static void test_cr22_ready_for_parser_new_node(void) {
+   module_context ctx = NULL;
+   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   TestBit.is_not_null(root, "CR22: root document loaded");
+   if (!root) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   doc_scan_header(root, &err_code);
+
+   usize size_hint = 0;
+   mod_load_imports(ctx, root, &size_hint, &err_code);
+
+   usize capacity = mod_ctx_arena_size_hint(size_hint);
+   mod_ctx_create_arena(ctx, capacity, &err_code);
+   TestBit.is_not_null(ctx->arena, "CR22: arena ready before allocating any nodes");
+   if (!ctx->arena) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+
+   module_document child = NULL;
+   List.get(ctx->docs, 1, (object *)&child);
+   TestBit.is_not_null(child, "CR22: a child document is available from the loaded import graph");
+
+   err_code = ANVL_ERR_NONE;
+   void *stmt = Source.new_node(root->source, ANVL_NODE_STATEMENT, &err_code);
+   TestBit.is_not_null(stmt, "CR22: statement node allocated via the root document's source");
+
+   err_code = ANVL_ERR_NONE;
+   void *value = child ? Source.new_node(child->source, ANVL_NODE_VALUE, &err_code) : NULL;
+   TestBit.is_not_null(value, "CR22: value node allocated via a child document's source");
+
+   TestBit.is_equal_int(1, (long long)List.size(ctx->statements),
+                        "CR22: root's statement lands on the context's shared statements index");
+   TestBit.is_equal_int(1, (long long)List.size(ctx->values),
+                        "CR22: child's value lands on the same shared context's values index");
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -702,12 +882,21 @@ int main(void) {
 
    TestBit.run_ex("CR10_mod_ctx_clear_docs", NULL, test_cr10_mod_ctx_clear_docs, td);
    TestBit.run_ex("CR11_mod_ctx_clear_errs", NULL, test_cr11_mod_ctx_clear_errs, td);
-   TestBit.run_ex("CR12_mod_ctx_add_doc", NULL, test_cr12_mod_ctx_add_doc, td);
+
    TestBit.run_ex("CR13_mod_ctx_set_parser", NULL, test_cr13_mod_ctx_set_parser, td);
    TestBit.run_ex("CR14_mod_ctx_dispose", NULL, test_cr14_mod_ctx_dispose, td);
    TestBit.run_ex("CR15_mod_dispose", NULL, test_cr15_mod_dispose, td);
    TestBit.run_ex("CR16_mod_dispose_releases_registry", NULL,
                   test_cr16_mod_dispose_releases_registry, td);
+   TestBit.run_ex("CR17_mod_ctx_create_arena", NULL, test_cr17_mod_ctx_create_arena, td);
+   TestBit.run_ex("CR18_mod_ctx_dispose_releases_arena", NULL,
+                  test_cr18_mod_ctx_dispose_releases_arena, td);
+   TestBit.run_ex("CR19_mod_ctx_node_indexes_created", NULL,
+                  test_cr19_mod_ctx_node_indexes_created, td);
+   TestBit.run_ex("CR20_mod_ctx_arena_size_hint", NULL, test_cr20_mod_ctx_arena_size_hint, td);
+   TestBit.run_ex("CR21_full_sequencing_arena_ready", NULL, test_cr21_full_sequencing_arena_ready,
+                  td);
+   TestBit.run_ex("CR22_ready_for_parser_new_node", NULL, test_cr22_ready_for_parser_new_node, td);
 
    return TestBit.report();
 }

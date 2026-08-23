@@ -48,7 +48,6 @@ static void test_src00_create_dispose(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC01 — create with null outputs
  * ---------------------------------------------------------------------- */
@@ -56,7 +55,6 @@ static void test_src01_create_null_outputs(void) {
    anvl_result res = Source.create(NULL, NULL);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC01: create with null outputs returns ERR");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC02 — dispose null is no-op
  * ---------------------------------------------------------------------- */
@@ -64,7 +62,6 @@ static void test_src02_dispose_null(void) {
    Source.dispose(NULL);
    TestBit.is_true(true, "SRC02: dispose(NULL) does not crash");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC03 — from_buffer copies content and computes hash
  * ---------------------------------------------------------------------- */
@@ -87,7 +84,6 @@ static void test_src03_from_buffer(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC04 — from_buffer rejects null buffer
  * ---------------------------------------------------------------------- */
@@ -101,7 +97,6 @@ static void test_src04_from_buffer_null_buffer(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC05 — from_buffer accepts zero-length buffer
  * ---------------------------------------------------------------------- */
@@ -117,7 +112,6 @@ static void test_src05_from_buffer_zero_length(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC06 — from_buffer rejects null out_src
  * ---------------------------------------------------------------------- */
@@ -126,7 +120,6 @@ static void test_src06_from_buffer_null_out_src(void) {
    anvl_result res = Source.from_buffer(NULL, "x", 1, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC06: from_buffer with null out_src returns ERR");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC07 — from_file loads fixture and derives dialect
  * ---------------------------------------------------------------------- */
@@ -146,7 +139,6 @@ static void test_src07_from_file(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC08 — from_file rejects null path
  * ---------------------------------------------------------------------- */
@@ -160,7 +152,6 @@ static void test_src08_from_file_null_path(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC09 — from_file rejects missing file
  * ---------------------------------------------------------------------- */
@@ -174,7 +165,6 @@ static void test_src09_from_file_missing(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC10 — hash is stable for identical content and different otherwise
  * ---------------------------------------------------------------------- */
@@ -201,7 +191,6 @@ static void test_src10_hash_stable_and_distinct(void) {
    Source.dispose(s2);
    Source.dispose(s3);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC11 — position, line, and column tracking during consume
  * ---------------------------------------------------------------------- */
@@ -227,7 +216,6 @@ static void test_src11_position_tracking(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC12 — EOF and offset EOF
  * ---------------------------------------------------------------------- */
@@ -249,7 +237,6 @@ static void test_src12_eof_and_offset_eof(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC13 — peek and peek_offset
  * ---------------------------------------------------------------------- */
@@ -268,7 +255,6 @@ static void test_src13_peek(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC14 — match_length and match_operator
  * ---------------------------------------------------------------------- */
@@ -289,7 +275,6 @@ static void test_src14_match(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC15 — character classification helpers
  * ---------------------------------------------------------------------- */
@@ -316,7 +301,6 @@ static void test_src15_character_classification(void) {
    TestBit.is_true(Source.is_identifier_part('1'), "SRC15: '1' is identifier part");
    TestBit.is_false(Source.is_identifier_part('-'), "SRC15: '-' is not identifier part");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC16 — consume respects buffer bounds
  * ---------------------------------------------------------------------- */
@@ -337,7 +321,6 @@ static void test_src16_consume_bounds(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC17 — data and length accessors
  * ---------------------------------------------------------------------- */
@@ -358,7 +341,6 @@ static void test_src17_data_and_length(void) {
    TestBit.is_equal_int(0, (long long)Source.length(NULL), "SRC17: length on null is 0");
    TestBit.is_null((void *)Source.data(NULL), "SRC17: data on null is NULL");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC18 — set_position and reset
  * ---------------------------------------------------------------------- */
@@ -389,7 +371,6 @@ static void test_src18_set_position_and_reset(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC19 — skip whitespace and comments
  * ---------------------------------------------------------------------- */
@@ -407,7 +388,6 @@ static void test_src19_skip_whitespace_and_comments(void) {
 
    Source.dispose(src);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC20 — is_shebang
  * ---------------------------------------------------------------------- */
@@ -427,7 +407,6 @@ static void test_src20_is_shebang(void) {
 
    TestBit.is_false(Source.is_shebang(NULL), "SRC20: null source is not shebang");
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC21 — has_errors and set_error via registry
  * ---------------------------------------------------------------------- */
@@ -470,7 +449,6 @@ static void test_src21_has_errors_and_set_error(void) {
 
    mod_ctx_dispose(ctx);
 }
-
 /* ---------------------------------------------------------------------- *
  * SRC22 — set_error fails for unregistered source
  * ---------------------------------------------------------------------- */
@@ -483,6 +461,322 @@ static void test_src22_set_error_unregistered(void) {
 
    anvl_result res = Source.set_error(src, ANVL_ERR_PARSER_UNEXPECTED_CHAR, 1, 1, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC22: set_error fails for unregistered source");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC23 — get_arena via registry, success path
+ * Commentary: same "source is the only handle" registry-lookup pattern as
+ * has_errors/set_error, but returning the owning context's shared arena
+ * instead of routing an error. ctx->arena is populated directly here via
+ * Allocator.create_bump — mod_ctx_create_arena is a separate function
+ * (test_module.c CR17) and get_arena's correctness shouldn't depend on it.
+ * ---------------------------------------------------------------------- */
+static void test_src23_get_arena(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC23: setup context failed");
+      return;
+   }
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC23: setup document failed");
+      return;
+   }
+
+   Source.from_buffer(&doc->source, "name := test\n", 13, &err_code);
+   mod_ctx_register_doc(ctx, doc, "src23.anvl", &err_code);
+
+   ctx->arena = Allocator.create_bump(256);
+   TestBit.is_not_null(ctx->arena, "SRC23: context arena created directly for this test");
+
+   err_code = ANVL_ERR_NONE;
+   bump_allocator found = Source.get_arena(doc->source, &err_code);
+   TestBit.is_true(found == ctx->arena, "SRC23: get_arena returns the context's own arena");
+   TestBit.is_equal_int(ANVL_ERR_NONE, err_code, "SRC23: err_code stays NONE on success");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC24 — get_arena on an unregistered source
+ * ---------------------------------------------------------------------- */
+static void test_src24_get_arena_unregistered(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, "x", 1, &err_code);
+
+   err_code = ANVL_ERR_NONE;
+   TestBit.is_null(Source.get_arena(src, &err_code),
+                   "SRC24: get_arena is NULL for an unregistered source");
+   TestBit.is_equal_int(ANVL_ERR_CONTEXT_INVALID, err_code,
+                        "SRC24: err_code reports CONTEXT_INVALID for an unregistered source");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC25 — get_arena on a NULL source
+ * ---------------------------------------------------------------------- */
+static void test_src25_get_arena_null_source(void) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   TestBit.is_null(Source.get_arena(NULL, &err_code), "SRC25: get_arena is NULL for a NULL source");
+   TestBit.is_equal_int(ANVL_ERR_SOURCE_NOT_FOUND, err_code,
+                        "SRC25: err_code reports SOURCE_NOT_FOUND for a NULL source");
+}
+/* ---------------------------------------------------------------------- *
+ * SRC26 — get_arena on a registered source whose context has no arena yet
+ * ---------------------------------------------------------------------- */
+static void test_src26_get_arena_not_initialized(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC26: setup context failed");
+      return;
+   }
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC26: setup document failed");
+      return;
+   }
+
+   Source.from_buffer(&doc->source, "name := test\n", 13, &err_code);
+   mod_ctx_register_doc(ctx, doc, "src26.anvl", &err_code);
+   TestBit.is_null(ctx->arena, "SRC26: context arena not yet created");
+
+   err_code = ANVL_ERR_NONE;
+   TestBit.is_null(Source.get_arena(doc->source, &err_code),
+                   "SRC26: get_arena is NULL before the context creates one");
+   TestBit.is_equal_int(ANVL_ERR_ARENA_NOT_INITIALIZED, err_code,
+                        "SRC26: err_code reports ARENA_NOT_INITIALIZED");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC27 — new_node via registry, success path
+ * Commentary: RED until Source.new_node's stub (src/core/source.c) is
+ * replaced with the real registry lookup + ctx->arena->alloc + index-append.
+ * See notes/document-body-parse.md "Arena node iteration". Covers both node
+ * kinds landing in the right index list.
+ * ---------------------------------------------------------------------- */
+static void test_src27_new_node(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC27: setup context failed");
+      return;
+   }
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC27: setup document failed");
+      return;
+   }
+
+   Source.from_buffer(&doc->source, "name := test\n", 13, &err_code);
+   mod_ctx_register_doc(ctx, doc, "src27.anvl", &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_create_arena(ctx, 256, &err_code),
+                        "SRC27: create_arena returns OK");
+
+   err_code = ANVL_ERR_NONE;
+   void *stmt_node = Source.new_node(doc->source, ANVL_NODE_STATEMENT, &err_code);
+   TestBit.is_not_null(stmt_node, "SRC27: new_node returns a statement node");
+   TestBit.is_equal_int(ANVL_ERR_NONE, err_code, "SRC27: err_code stays NONE for statement node");
+   TestBit.is_equal_int(1, (long long)List.size(ctx->statements),
+                        "SRC27: statement node appended to ctx->statements");
+   TestBit.is_equal_int(0, (long long)List.size(ctx->values),
+                        "SRC27: ctx->values untouched by a statement allocation");
+
+   err_code = ANVL_ERR_NONE;
+   void *value_node = Source.new_node(doc->source, ANVL_NODE_VALUE, &err_code);
+   TestBit.is_not_null(value_node, "SRC27: new_node returns a value node");
+   TestBit.is_equal_int(ANVL_ERR_NONE, err_code, "SRC27: err_code stays NONE for value node");
+   TestBit.is_equal_int(1, (long long)List.size(ctx->values),
+                        "SRC27: value node appended to ctx->values");
+   TestBit.is_equal_int(1, (long long)List.size(ctx->statements),
+                        "SRC27: ctx->statements untouched by a value allocation");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC28 — new_node on an unregistered source
+ * ---------------------------------------------------------------------- */
+static void test_src28_new_node_unregistered(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, "x", 1, &err_code);
+
+   err_code = ANVL_ERR_NONE;
+   TestBit.is_null(Source.new_node(src, ANVL_NODE_STATEMENT, &err_code),
+                   "SRC28: new_node is NULL for an unregistered source");
+   TestBit.is_equal_int(ANVL_ERR_CONTEXT_INVALID, err_code,
+                        "SRC28: err_code reports CONTEXT_INVALID for an unregistered source");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC29 — new_node on a NULL source
+ * ---------------------------------------------------------------------- */
+static void test_src29_new_node_null_source(void) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   TestBit.is_null(Source.new_node(NULL, ANVL_NODE_STATEMENT, &err_code),
+                   "SRC29: new_node is NULL for a NULL source");
+   TestBit.is_equal_int(ANVL_ERR_SOURCE_NOT_FOUND, err_code,
+                        "SRC29: err_code reports SOURCE_NOT_FOUND for a NULL source");
+}
+/* ---------------------------------------------------------------------- *
+ * SRC30 — new_node on a registered source whose context has no arena yet
+ * ---------------------------------------------------------------------- */
+static void test_src30_new_node_not_initialized(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC30: setup context failed");
+      return;
+   }
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC30: setup document failed");
+      return;
+   }
+
+   Source.from_buffer(&doc->source, "name := test\n", 13, &err_code);
+   mod_ctx_register_doc(ctx, doc, "src30.anvl", &err_code);
+   TestBit.is_null(ctx->arena, "SRC30: context arena not yet created");
+
+   err_code = ANVL_ERR_NONE;
+   TestBit.is_null(Source.new_node(doc->source, ANVL_NODE_STATEMENT, &err_code),
+                   "SRC30: new_node is NULL before the context creates an arena");
+   TestBit.is_equal_int(ANVL_ERR_ARENA_NOT_INITIALIZED, err_code,
+                        "SRC30: err_code reports ARENA_NOT_INITIALIZED");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC31 — init_slice sets data to the buffer base
+ * Commentary: init_slice only fills `.data` (the buffer base, via
+ * Source.data(src)) — start/end are set by the caller afterward, matching
+ * how parse_identifier/parse_numeric_literal (src/core/parser.c) actually
+ * use it. This is the simpler, shipped version of the "centralize slice
+ * construction" idea from notes/document-body-parse.md.
+ * ---------------------------------------------------------------------- */
+static void test_src31_init_slice(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "name := test\n";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   anvl_slice slice = {0};
+   Source.init_slice(src, &slice);
+
+   TestBit.is_true(slice.data == Source.data(src),
+                   "SRC31: init_slice sets data to the buffer base");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC32 — init_slice with a NULL out_slice does not crash
+ * ---------------------------------------------------------------------- */
+static void test_src32_init_slice_null_out(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, "x", 1, &err_code);
+
+   Source.init_slice(src, NULL);
+   TestBit.is_true(true, "SRC32: init_slice with a NULL out_slice does not crash");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC33 — finish_body freezes a scratch list into doc->body, in order
+ * Commentary: RED until the stub is replaced. finish_body takes ownership
+ * of `scratch` regardless of outcome (see its doc comment) — this test
+ * deliberately never disposes `scratch` itself, even in the current RED
+ * state where the stub doesn't yet honor that and `scratch` leaks. That
+ * leak is expected and temporary: it's testing the real contract, not the
+ * stub's, and resolves to 0 leaks the moment the real implementation lands.
+ * ---------------------------------------------------------------------- */
+static void test_src33_finish_body(void) {
+   module_context ctx = NULL;
+   module_document doc = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      TestBit.fail("SRC33: setup context failed");
+      return;
+   }
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      TestBit.fail("SRC33: setup document failed");
+      return;
+   }
+
+   Source.from_buffer(&doc->source, "name := test\n", 13, &err_code);
+   mod_ctx_register_doc(ctx, doc, "src33.anvl", &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_create_arena(ctx, 256, &err_code),
+                        "SRC33: create_arena returns OK");
+
+   anvl_statement stmt1 = Source.new_node(doc->source, ANVL_NODE_STATEMENT, &err_code);
+   anvl_statement stmt2 = Source.new_node(doc->source, ANVL_NODE_STATEMENT, &err_code);
+   TestBit.is_not_null(stmt1, "SRC33: first statement node allocated");
+   TestBit.is_not_null(stmt2, "SRC33: second statement node allocated");
+
+   list scratch = List.new(4, sizeof(anvl_statement));
+   List.append(scratch, stmt1);
+   List.append(scratch, stmt2);
+
+   err_code = ANVL_ERR_NONE;
+   anvl_result res = Source.finish_body(doc->source, scratch, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "SRC33: finish_body returns OK");
+   TestBit.is_not_null(doc->body, "SRC33: doc->body is set");
+   if (doc->body) {
+      TestBit.is_equal_int(2, FArray.capacity(doc->body, sizeof(anvl_statement)),
+                           "SRC33: doc->body has two entries");
+      anvl_statement got1 = NULL;
+      anvl_statement got2 = NULL;
+      FArray.get(doc->body, 0, sizeof(anvl_statement), &got1);
+      FArray.get(doc->body, 1, sizeof(anvl_statement), &got2);
+      TestBit.is_true(got1 == stmt1, "SRC33: first entry matches, in order");
+      TestBit.is_true(got2 == stmt2, "SRC33: second entry matches, in order");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC34 — finish_body on an unregistered source
+ * Commentary: same ownership-transfer leak note as SRC33 applies to
+ * `scratch` here in the current RED state.
+ * ---------------------------------------------------------------------- */
+static void test_src34_finish_body_unregistered(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, "x", 1, &err_code);
+
+   list scratch = List.new(1, sizeof(anvl_statement));
+
+   err_code = ANVL_ERR_NONE;
+   anvl_result res = Source.finish_body(src, scratch, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "SRC34: finish_body fails for an unregistered source");
+   TestBit.is_equal_int(ANVL_ERR_CONTEXT_INVALID, err_code,
+                        "SRC34: err_code reports CONTEXT_INVALID");
 
    Source.dispose(src);
 }
@@ -515,6 +809,19 @@ int main(void) {
    TestBit.run_ex("SRC20_is_shebang", NULL, test_src20_is_shebang, ts);
    TestBit.run_ex("SRC21_has_errors_and_set_error", NULL, test_src21_has_errors_and_set_error, ts);
    TestBit.run_ex("SRC22_set_error_unregistered", NULL, test_src22_set_error_unregistered, ts);
+   TestBit.run_ex("SRC23_get_arena", NULL, test_src23_get_arena, ts);
+   TestBit.run_ex("SRC24_get_arena_unregistered", NULL, test_src24_get_arena_unregistered, ts);
+   TestBit.run_ex("SRC25_get_arena_null_source", NULL, test_src25_get_arena_null_source, ts);
+   TestBit.run_ex("SRC26_get_arena_not_initialized", NULL, test_src26_get_arena_not_initialized,
+                  ts);
+   TestBit.run_ex("SRC27_new_node", NULL, test_src27_new_node, ts);
+   TestBit.run_ex("SRC28_new_node_unregistered", NULL, test_src28_new_node_unregistered, ts);
+   TestBit.run_ex("SRC29_new_node_null_source", NULL, test_src29_new_node_null_source, ts);
+   TestBit.run_ex("SRC30_new_node_not_initialized", NULL, test_src30_new_node_not_initialized, ts);
+   TestBit.run_ex("SRC31_init_slice", NULL, test_src31_init_slice, ts);
+   TestBit.run_ex("SRC32_init_slice_null_out", NULL, test_src32_init_slice_null_out, ts);
+   TestBit.run_ex("SRC33_finish_body", NULL, test_src33_finish_body, ts);
+   TestBit.run_ex("SRC34_finish_body_unregistered", NULL, test_src34_finish_body_unregistered, ts);
 
    return TestBit.report();
 }

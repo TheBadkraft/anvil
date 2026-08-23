@@ -25,19 +25,35 @@
 // -----------------------------------------------------------------
 #include <stdbool.h>
 
-typedef struct anvl_parser_vt {
-  bool (*parse)(anvl_doc doc);
-  bool (*parse_statement)(anvl_doc doc);
-  bool (*parse_value)(anvl_doc doc);
-  void (*reset)(anvl_doc doc);
-} anvl_parser_vt;
+/* ----------------------------------------------------------------- *
+ * Parse instrumentation hook
+ * ----------------------------------------------------------------- *
+ * Optional, zero-cost-when-unset observer for a finished parse. The parser
+ * depends only on this callback signature, not on any specific consumer
+ * (a test framework, a logger, a profiler) — whoever calls
+ * anvl_parser_set_hook() owns what happens with the metrics.
+ * ----------------------------------------------------------------- */
+typedef struct {
+   usize bytes;      // Source.length() of what was parsed
+   usize elapsed_ns; // Time.elapsed(start, end)
+} anvl_parse_metrics_t;
 
-typedef struct anvl_parser {
-  const anvl_parser_vt *p;
-} anvl_parser;
+typedef void (*anvl_parse_hook_fn)(const anvl_parse_metrics_t *metrics, void *userdata);
 
-/* ----------------------------------------------------------------- */
-/* Parser Interface                                                   */
-/* ----------------------------------------------------------------- */
-bool parser_new(anvl_doc doc);
-void parser_dispose(parser parser);
+/**
+ * @brief Register a hook to be called with metrics after every finished parse.
+ * @param fn The hook function to call, or NULL to disable.
+ * @param userdata Opaque pointer passed through to the hook unchanged.
+ */
+void anvl_parser_set_hook(anvl_parse_hook_fn fn, void *userdata);
+/**
+ * @brief Clear any registered parse hook.
+ */
+void anvl_parser_clear_hook(void);
+
+/* ----------------------------------------------------------------- *
+ * Internal Parser Functions
+ * ----------------------------------------------------------------- */
+anvl_result anvl_parse(anvl_source);
+void anvl_cleanup(void);
+anvl_err_code anvl_get_error(void);

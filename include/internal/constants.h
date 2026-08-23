@@ -15,3 +15,7 @@
 #define ANVL_CTX_DEFAULT_DOC_CAP 5
 #define ANVL_CTX_DEFAULT_ERR_CAP 5
 #define ANVL_CTX_DEFAULT_MAP_CAP 8 // must be power-of-two for map
+// Node index lists grow with source size, not document count (see
+// notes/document-body-parse.md "Arena node iteration") — a higher starting
+// point than docs/errors, still just a growth hint via List.append.
+#define ANVL_CTX_DEFAULT_NODE_CAP 32
