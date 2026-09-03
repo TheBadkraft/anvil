@@ -878,6 +878,19 @@ static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
       Source.consume(src, 1);
    }
 
+   // '@'/'`' immediately after bare-literal content is invalid, not a silent terminator —
+   // both are blob-dispatch leading symbols, and were explicitly decided *not* to be legal
+   // mid-token characters (see notes/document-body-parse.md "Bare literal grammar"). Checking
+   // this here, rather than letting the loop above simply stop and leave '@'/'`' unconsumed,
+   // gives a precise error instead of silently truncating to a shorter "successful" literal
+   // and letting the leftover '@'/'`' trip a confusing, unrelated failure downstream (e.g. a
+   // generic "expected ';'" that doesn't name the actual cause).
+   char next = Source.peek(src);
+   if (next == ANVL_TOK_ATTRIB || next == ANVL_TOK_BACKTICK) {
+      parser_set_error(src, ANVL_ERR_PARSER_INVALID_BARE_LITERAL);
+      return false;
+   }
+
    anvl_slice text = {0};
    Source.init_slice(src, &text);
    text.start = start;

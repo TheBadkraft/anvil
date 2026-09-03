@@ -1006,6 +1006,43 @@ static void test_amp23_second_decimal_point_declines_to_bare(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * AMP24 — '@'/'`' mid-bare-literal rejected, not silently truncated
+ * Commentary: both are blob-dispatch leading symbols and were explicitly
+ * decided *not* to be legal bare-literal continuation characters (see
+ * notes/document-body-parse.md "Bare literal grammar"). err_code is
+ * asserted specifically because the pre-fix behavior wasn't silent
+ * acceptance — it was a real rejection, but for the *wrong* reason
+ * (a truncated 'bar' bare literal "succeeded", then the leftover
+ * '@baz'/'`baz' tripped an unrelated, confusing UNTERMINATED_STATEMENT
+ * error instead of naming the actual problem).
+ * ---------------------------------------------------------------------- */
+static void test_amp24_bare_literal_rejects_at_and_backtick(void) {
+   const char *buffers[2] = {
+      "#!amp\n"
+      "foo := bar@baz;\n",
+      "#!amp\n"
+      "foo := bar`baz;\n",
+   };
+
+   for (usize i = 0; i < 2; i++) {
+      module_context ctx = NULL;
+      module_document doc = setup_amp_doc(buffers[i], &ctx);
+      TestBit.is_not_null(doc, "AMP24: document loaded");
+      if (!doc) {
+         continue;
+      }
+
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      anvl_result res = doc_parse_body(doc, &err_code);
+      TestBit.is_equal_int(ANVL_RES_ERR, res, "AMP24: parse body returns ERR");
+      TestBit.is_true(doc_has_errors(doc), "AMP24: document reports an error");
+      TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_BARE_LITERAL, err_code,
+                           "AMP24: err_code reports INVALID_BARE_LITERAL");
+
+      mod_ctx_dispose(ctx);
+   }
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -1057,6 +1094,8 @@ int main(void) {
                   th);
    TestBit.run_ex("AMP23_second_decimal_point_declines_to_bare", NULL,
                   test_amp23_second_decimal_point_declines_to_bare, th);
+   TestBit.run_ex("AMP24_bare_literal_rejects_at_and_backtick", NULL,
+                  test_amp24_bare_literal_rejects_at_and_backtick, th);
 
    return TestBit.report();
 }
