@@ -255,16 +255,17 @@ typedef struct anvl_source_i {
     */
    usize (*match_length)(anvl_source, const char *, usize);
    /**
-    * @brief Match an operator string against the source content at the current position.
+    * @brief Match a fixed token string (operator, punctuation, keyword) against the source
+    * content at the current position.
     * @param src The source object to query.
-    * @param op The operator string to match against the source content.
-    * @param len The length of the operator string to match.
-    * @return The length of the matched operator string if it matches; otherwise, 0.
-    * @details This function attempts to match the specified operator string against the source
-    * content at the current position. If the operator string matches, it returns the length of the
-    * matched operator string; otherwise, it returns 0.
+    * @param token The token string to match against the source content.
+    * @param len The length of the token string to match.
+    * @return The length of the matched token string if it matches; otherwise, 0.
+    * @details Same match as `match_length` — kept as a separate name because callers matching a
+    * grammar token (`:=`, a reserved keyword) read more clearly than a bare `match_length` call
+    * at each site, even though the underlying check is identical.
     */
-   usize (*match_operator)(anvl_source, const char *, usize);
+   usize (*match_token)(anvl_source, const char *, usize);
 
    // Character classification
    /**
@@ -297,6 +298,16 @@ typedef struct anvl_source_i {
     * @return true if the character is a valid identifier part character; false otherwise.
     */
    bool (*is_identifier_part)(char);
+   /**
+    * @brief Check if a character may continue a bare literal (A-Z, a-z, 0-9, _, -, ., /, :, $).
+    * @param c The character to check.
+    * @return true if the character may continue a bare literal; false otherwise.
+    * @details See notes/document-body-parse.md "Bare literal grammar" — deliberately wider than
+    * is_identifier_part. Mid-token only: none of these characters trigger a different dispatch
+    * mid-scan (e.g. '$' only starts a VarRef as a value's *leading* character), so it's safe to
+    * allow all of them once a bare literal has already committed to being one.
+    */
+   bool (*is_bare_literal_part)(char);
 
    // Consume
    /**
@@ -406,6 +417,25 @@ typedef struct anvl_source_i {
     * source content.
     */
    usize (*substring)(anvl_slice, char *);
+   /**
+    * @brief Compare a slice's content against a NUL-terminated string.
+    * @param slice The slice to compare.
+    * @param expected The NUL-terminated string to compare against.
+    * @return `true` if the slice's length and content exactly match `expected`; otherwise `false`.
+    * @details Zero-allocation: compares directly against `slice.start` rather than copying into
+    * an intermediate buffer (contrast with `substring`).
+    */
+   bool (*slice_equals)(anvl_slice, const char *);
+   /**
+    * @brief Check whether a slice's content is one of Anvil's reserved keywords.
+    * @param slice The slice to check (e.g. a scanned identifier).
+    * @return `true` if the slice matches a reserved keyword exactly; otherwise `false`.
+    * @details Checks against the full reserved set (`import`, `using`, `vars`, `true`, `false`,
+    * `null`) — callers needing only the value-position subset (`true`/`false`/`null`) match those
+    * directly via `match_token` instead, since that check runs against the live cursor before a
+    * candidate token is consumed, not against an already-scanned slice.
+    */
+   bool (*is_keyword)(anvl_slice);
 } anvl_source_i;
 /**
  * @defgroup Global Source Interface Instance

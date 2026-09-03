@@ -444,8 +444,17 @@ anvl_result doc_parse_body(module_document doc, anvl_err_code *out_err_code) {
    // doc->body is no longer pre-created here — it stays NULL until Source.finish_body
    // freezes the parser's scratch list into it at the end of anvl_parse, on both the
    // success and failure exit paths (partial results stay inspectable after a failed parse).
-   return anvl_parse(doc->source);
-   err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+   if (anvl_parse(doc->source) != ANVL_RES_OK) {
+      // Read the actual recorded error back from doc->context->errors (the same list
+      // Source.set_error appends to) instead of guessing a code from has_errors' bool —
+      // parser.c's own err_code is file-local static state, not reachable from here.
+      anvl_error last = doc->context ? anvl_error_get(doc->context->errors,
+                                                      List.size(doc->context->errors) - 1)
+                                     : NULL;
+      err_code = last ? last->code : ANVL_ERR_PARSER_INITIALIZATION_FAILED;
+      goto error;
+   }
+   return ANVL_RES_OK;
 
 error:
    if (out_err_code) {

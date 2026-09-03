@@ -30,6 +30,11 @@
 
 static ssize_t src_size = sizeof(struct anvl_source_t);
 
+// Reserved keywords for Anvil (import, using, vars, true, false, null)
+static const char *reserved_keywords[] = {ANVL_KEYWORD_IMPORT, ANVL_KEYWORD_USING,
+                                          ANVL_KEYWORD_VARS,   ANVL_KEYWORD_TRUE,
+                                          ANVL_KEYWORD_FALSE,  ANVL_KEYWORD_NULL};
+
 /* Forward declarations */
 static void source_parse_shebang(anvl_source);
 static bump_allocator source_get_arena(anvl_source, anvl_err_code *);
@@ -335,6 +340,11 @@ static bool source_is_identifier_part(char c) {
    return source_is_alpha(c) || source_is_digit(c) || c == '_';
 }
 
+static bool source_is_bare_literal_part(char c) {
+   return source_is_identifier_part(c) || c == '-' || c == ANVL_TOK_DOT || c == '/' || c == ':' ||
+          c == '$';
+}
+
 /* ----------------------------------------------------------------------- *
  * Consume and matching
  * ----------------------------------------------------------------------- */
@@ -428,10 +438,9 @@ static usize source_match_length(anvl_source src, const char *s, usize len) {
    return len;
 }
 
-static usize source_match_operator(anvl_source src, const char *op, usize len) {
-   return source_match_length(src, op, len);
+static usize source_match_token(anvl_source src, const char *token, usize len) {
+   return source_match_length(src, token, len);
 }
-
 /* ----------------------------------------------------------------------- *
  * Whitespace and comment skipping
  * ----------------------------------------------------------------------- */
@@ -749,6 +758,34 @@ static usize source_substring(anvl_slice slice, char *out_buffer) {
 
    return len;
 }
+/*
+ * Compare slice content against a NUL-terminated string (zero-allocation)
+ */
+static bool source_slice_equals(anvl_slice slice, const char *expected) {
+   if (!slice.start || !slice.end || !expected) {
+      return false;
+   }
+   usize len = source_slice_length(slice);
+   usize expected_len = strlen(expected);
+   if (len != expected_len) {
+      return false;
+   }
+   return memcmp(slice.start, expected, expected_len) == 0;
+}
+/*
+ * Check whether a slice matches one of Anvil's reserved keywords. Operates on an
+ * already-scanned slice rather than the live cursor, so it's safe to call after an
+ * identifier has already been consumed (unlike a cursor-position peek, which would
+ * silently check whatever text follows the identifier instead of the identifier itself).
+ */
+static bool source_is_keyword(anvl_slice slice) {
+   for (usize i = 0; i < sizeof(reserved_keywords) / sizeof(reserved_keywords[0]); i++) {
+      if (source_slice_equals(slice, reserved_keywords[i])) {
+         return true;
+      }
+   }
+   return false;
+}
 
 const anvl_source_i Source = {
    // Management
@@ -780,12 +817,13 @@ const anvl_source_i Source = {
    .peek = source_peek,
    .peek_offset = source_peek_offset,
    .match_length = source_match_length,
-   .match_operator = source_match_operator,
+   .match_token = source_match_token,
    .is_alpha = source_is_alpha,
    .is_digit = source_is_digit,
    .is_hex_digit = source_is_hex_digit,
    .is_identifier_start = source_is_identifier_start,
    .is_identifier_part = source_is_identifier_part,
+   .is_bare_literal_part = source_is_bare_literal_part,
    .consume = source_consume,
    .data = source_data,
    .at = source_at,
@@ -799,4 +837,6 @@ const anvl_source_i Source = {
    .slice_length = source_slice_length,
    .slice_is_empty = source_slice_is_empty,
    .substring = source_substring,
+   .slice_equals = source_slice_equals,
+   .is_keyword = source_is_keyword,
 };

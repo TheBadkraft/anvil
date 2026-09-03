@@ -256,7 +256,7 @@ static void test_src13_peek(void) {
    Source.dispose(src);
 }
 /* ---------------------------------------------------------------------- *
- * SRC14 — match_length and match_operator
+ * SRC14 — match_length and match_token
  * ---------------------------------------------------------------------- */
 static void test_src14_match(void) {
    anvl_source src = NULL;
@@ -270,8 +270,8 @@ static void test_src14_match(void) {
                         "SRC14: match_length returns keyword length");
    TestBit.is_equal_int(0, (long long)Source.match_length(src, "IMPORT", 6),
                         "SRC14: case-sensitive mismatch returns 0");
-   TestBit.is_equal_int(6, (long long)Source.match_operator(src, "import", 6),
-                        "SRC14: match_operator delegates to match_length");
+   TestBit.is_equal_int(6, (long long)Source.match_token(src, "import", 6),
+                        "SRC14: match_token delegates to match_length");
 
    Source.dispose(src);
 }
@@ -780,6 +780,80 @@ static void test_src34_finish_body_unregistered(void) {
 
    Source.dispose(src);
 }
+/* ---------------------------------------------------------------------- *
+ * SRC35 — slice_equals: matching slice and string
+ * ---------------------------------------------------------------------- */
+static void test_src35_slice_equals_match(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "import := 1\n";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   anvl_slice slice = {0};
+   Source.init_slice(src, &slice);
+   slice.start = Source.data(src);
+   slice.end = slice.start + 6;
+
+   TestBit.is_true(Source.slice_equals(slice, "import"),
+                   "SRC35: slice_equals matches equal slice and string");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC36 — slice_equals: different length is not equal
+ * ---------------------------------------------------------------------- */
+static void test_src36_slice_equals_length_mismatch(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "import := 1\n";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   anvl_slice slice = {0};
+   Source.init_slice(src, &slice);
+   slice.start = Source.data(src);
+   slice.end = slice.start + 6;
+
+   TestBit.is_false(Source.slice_equals(slice, "import2"),
+                    "SRC36: slice_equals rejects a different length");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC37 — slice_equals: same length, different content is not equal
+ * ---------------------------------------------------------------------- */
+static void test_src37_slice_equals_content_mismatch(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "vars12 := 1\n";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   anvl_slice slice = {0};
+   Source.init_slice(src, &slice);
+   slice.start = Source.data(src);
+   slice.end = slice.start + 6;
+
+   TestBit.is_false(Source.slice_equals(slice, "using1"),
+                    "SRC37: slice_equals rejects same-length different content");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC38 — slice_equals: NULL-safety
+ * ---------------------------------------------------------------------- */
+static void test_src38_slice_equals_null_safety(void) {
+   anvl_slice empty = {0};
+
+   TestBit.is_false(Source.slice_equals(empty, "import"),
+                    "SRC38: slice_equals is false for an invalid (empty) slice");
+   TestBit.is_false(Source.slice_equals(empty, NULL),
+                    "SRC38: slice_equals is false for a NULL expected string");
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -822,6 +896,10 @@ int main(void) {
    TestBit.run_ex("SRC32_init_slice_null_out", NULL, test_src32_init_slice_null_out, ts);
    TestBit.run_ex("SRC33_finish_body", NULL, test_src33_finish_body, ts);
    TestBit.run_ex("SRC34_finish_body_unregistered", NULL, test_src34_finish_body_unregistered, ts);
+   TestBit.run_ex("SRC35_slice_equals_match", NULL, test_src35_slice_equals_match, ts);
+   TestBit.run_ex("SRC36_slice_equals_length_mismatch", NULL, test_src36_slice_equals_length_mismatch, ts);
+   TestBit.run_ex("SRC37_slice_equals_content_mismatch", NULL, test_src37_slice_equals_content_mismatch, ts);
+   TestBit.run_ex("SRC38_slice_equals_null_safety", NULL, test_src38_slice_equals_null_safety, ts);
 
    return TestBit.report();
 }

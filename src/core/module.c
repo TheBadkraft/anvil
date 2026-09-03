@@ -302,8 +302,28 @@ void mod_ctx_dispose(module_context ctx) {
 
    // statements/values are non-owning indexes into the arena (see
    // notes/document-body-parse.md "Arena node iteration") — the arena release
-   // below frees the pointed-to nodes; these lists just need their own
-   // container storage released, no per-element disposal.
+   // below frees the pointed-to nodes themselves. But a value's own
+   // collection/object list (.collection.items for ARRAY/TUPLE,
+   // .object.statements for OBJECT) is a separate list, heap-allocated via
+   // List.new — not part of the arena, so the arena release doesn't touch it,
+   // and nothing else walks the value tree to free it. No tree recursion
+   // needed to reach every one, though: source_new_node already registers
+   // every value node — at any nesting depth — in this same flat ctx->values
+   // index, so one pass over it here reaches them all.
+   usize value_count = List.size(ctx->values);
+   for (usize i = 0; i < value_count; i++) {
+      anvl_value val = NULL;
+      List.get(ctx->values, i, (object *)&val);
+      if (!val) {
+         continue;
+      }
+      if (val->type == ANVL_VALUE_ARRAY || val->type == ANVL_VALUE_TUPLE) {
+         List.dispose(val->collection.items);
+      } else if (val->type == ANVL_VALUE_OBJECT) {
+         List.dispose(val->object.statements);
+      }
+   }
+
    List.dispose(ctx->statements);
    List.dispose(ctx->values);
    ctx->statements = NULL;

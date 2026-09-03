@@ -66,6 +66,8 @@
                 "\"${workspaceFolder}/src/sigma/list.c\"",
                 "\"${workspaceFolder}/src/sigma/math.c\"",
                 "\"${workspaceFolder}/src/sigma/arrays.c\"",
+                "\"${workspaceFolder}/src/sigma/farray.c\"",
+                "\"${workspaceFolder}/src/sigma/array_base.c\"",
                 "\"${workspaceFolder}/src/sigma/memory.c\"",
                 "\"${workspaceFolder}/src/sigma/strings.c\"",
                 "\"${workspaceFolder}/src/sigma/time.c\"",

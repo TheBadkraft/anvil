@@ -6,5 +6,7 @@ base := {
 };
 
 derived : base {
-   override := 2;
+   // override
+   name := "bob";
+   member := 2;
 };

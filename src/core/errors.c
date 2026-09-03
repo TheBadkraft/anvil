@@ -65,6 +65,7 @@ static const char *error_messages[] = {
    [ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT] = "Invalid key as identifier",
    [ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD] = "Identifier cannot be a keyword",
    [ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD] = "Attribute name cannot be a keyword",
+   [ANVL_ERR_PARSER_VALUE_IS_KEYWORD] = "Reserved keyword cannot be used as a bare value",
    [ANVL_ERR_PARSER_TUPLE_TOO_SHORT] = "Tuple requires minimum 2 values",
    [ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE] = "Missing ',' in tuple",
    [ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT] = "Missing element in tuple",
@@ -176,6 +177,7 @@ static const char *error_names[] = {
    [ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT] = "ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT",
    [ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD] = "ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD",
    [ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD] = "ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD",
+   [ANVL_ERR_PARSER_VALUE_IS_KEYWORD] = "ANVL_ERR_PARSER_VALUE_IS_KEYWORD",
    [ANVL_ERR_PARSER_TUPLE_TOO_SHORT] = "ANVL_ERR_PARSER_TUPLE_TOO_SHORT",
    [ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE] = "ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE",
    [ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT] = "ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT",
@@ -255,6 +257,14 @@ anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize co
    if (!target) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
+   }
+   // First-error-wins: once a target already holds an error, later calls up the call
+   // stack (a caller's own generic fallback after a callee already recorded the real,
+   // more specific cause) are no-ops rather than overwriting it. Without this, e.g.
+   // parse_identifier's ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD gets silently buried by
+   // parse_statement's ANVL_ERR_PARSER_EXPECTED_IDENTIFIER fallback a moment later.
+   if (List.size(target) > 0) {
+      return ANVL_RES_OK;
    }
 
    new_error = Allocator.alloc(err_state_size);

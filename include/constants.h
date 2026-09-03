@@ -47,6 +47,65 @@
 #define ANVL_EXT_ANVL ".anvl"
 
 /* ----------------------------------------------------------------------- *
+ * Grammar tokens — the fixed vocabulary of AML/AMP body syntax. Only
+ * tokens worth a shared name: multi-character operators (not obvious at a
+ * glance, and their length would otherwise be a second, easily-desynced
+ * magic number), and single characters that carry more than one grammar
+ * role (so one canonical name is shared across every place that role
+ * shows up, instead of several unrelated-looking literals that happen to
+ * be identical). See notes/document-body-parse.md.
+ * ----------------------------------------------------------------------- */
+#define ANVL_TOK_SHEBANG_PREFIX "#!"
+#define ANVL_TOK_SHEBANG_PREFIX_LEN (sizeof(ANVL_TOK_SHEBANG_PREFIX) - 1)
+#define ANVL_TOK_ASSIGN ":="
+#define ANVL_TOK_ASSIGN_LEN (sizeof(ANVL_TOK_ASSIGN) - 1)
+#define ANVL_TOK_STMT_TERMINATOR ';'
+#define ANVL_TOK_QUOTE '"'
+#define ANVL_TOK_BACKTICK '`'
+#define ANVL_TOK_ATTRIB '@'
+// Left/right delimiters for structured values (object, array/attributes, tuple, blob)
+#define ANVL_TOK_LBRACE '{'
+#define ANVL_TOK_RBRACE '}'
+#define ANVL_TOK_LBRACKET '['
+#define ANVL_TOK_RBRACKET ']'
+#define ANVL_TOK_LPAREN '('
+#define ANVL_TOK_RPAREN ')'
+// Escape sequence and characters
+#define ANVL_TOK_ESCAPE '\\'
+#define ANVL_TOK_NEWLINE '\n'
+#define ANVL_TOK_RETURN '\r'
+#define ANVL_TOK_TAB '\t'
+
+// Decimal separator in a numeric literal (parse_numeric_literal) *and* the
+// namespace/member separator in a dotted bare-literal path (`foo.bar.baz`,
+// not yet implemented) — one name for both, since it's genuinely one token
+// playing two roles, not two coincidentally-identical characters.
+#define ANVL_TOK_DOT '.'
+
+/* ----------------------------------------------------------------------- *
+ * Reserved keywords — see notes/document-body-parse.md. Two groups, by
+ * role, not one flat list: RESERVED words are illegal both as an
+ * identifier and as a bare value; VALUE words are illegal as an
+ * identifier but classify a value when seen in value position (`true`/
+ * `false` -> ANVL_VALUE_BOOL, `null` -> ANVL_VALUE_NULL). `vars`/`using`
+ * are reserved ahead of their actual feature (AnvlScript, not yet
+ * implemented) so a name chosen today doesn't silently break later.
+ * ----------------------------------------------------------------------- */
+#define ANVL_KEYWORD_IMPORT "import"
+#define ANVL_KEYWORD_IMPORT_LEN (sizeof(ANVL_KEYWORD_IMPORT) - 1)
+#define ANVL_KEYWORD_VARS "vars"
+#define ANVL_KEYWORD_VARS_LEN (sizeof(ANVL_KEYWORD_VARS) - 1)
+#define ANVL_KEYWORD_USING "using"
+#define ANVL_KEYWORD_USING_LEN (sizeof(ANVL_KEYWORD_USING) - 1)
+
+#define ANVL_KEYWORD_TRUE "true"
+#define ANVL_KEYWORD_TRUE_LEN (sizeof(ANVL_KEYWORD_TRUE) - 1)
+#define ANVL_KEYWORD_FALSE "false"
+#define ANVL_KEYWORD_FALSE_LEN (sizeof(ANVL_KEYWORD_FALSE) - 1)
+#define ANVL_KEYWORD_NULL "null"
+#define ANVL_KEYWORD_NULL_LEN (sizeof(ANVL_KEYWORD_NULL) - 1)
+
+/* ----------------------------------------------------------------------- *
  * Arena sizing — see notes/document-body-parse.md "Initial sizing heuristic"
  * capacity = max(sum(Source.length() across ctx->docs) * ANVL_ARENA_SIZE_MULTIPLIER,
  *                ANVL_ARENA_MIN_SIZE)
