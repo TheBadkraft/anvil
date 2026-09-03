@@ -81,6 +81,9 @@ static bool parser_create_ctx(anvl_source, context *);
 static void parser_dispose_ctx(context *);
 static bool parse_source(context);
 static bool parse_statement(anvl_source, anvl_statement *);
+static bool parse_statement_list(anvl_source, list *);
+static bool parse_attribute_list(anvl_source, list *);
+static void dispose_attribute_list(list);
 static bool parse_identifier(anvl_source, anvl_slice *);
 static bool parse_value(anvl_source, anvl_value *);
 static bool parse_scalar_value(anvl_source, anvl_value *);
@@ -91,6 +94,7 @@ static bool parse_blob_literal(anvl_source, anvl_value *);
 static bool parse_bare_literal(anvl_source, anvl_value *);
 static bool parse_array(anvl_source, anvl_value *);
 static bool parse_tuple(anvl_source, anvl_value *);
+static bool parse_object_value(anvl_source, anvl_value *);
 static bool is_value_boundary(anvl_source);
 static void skip_same_line_whitespace(anvl_source);
 static void parser_set_error(anvl_source, anvl_err_code);
@@ -285,6 +289,149 @@ static void skip_same_line_whitespace(anvl_source src) {
       Source.consume(src, 1);
    }
 }
+// Dispose an attribute list built by parse_attribute_list. Each anvl_attribute is its own
+// heap allocation (not arena-owned — attributes aren't a Source.new_node kind, unlike
+// statements/values), so disposing the list container alone would leak every attribute in
+// it; this frees each one first. Safe to call on a partially-built list from an error path.
+static void dispose_attribute_list(list attrs) {
+   if (!attrs) {
+      return;
+   }
+   usize count = List.size(attrs);
+   for (usize i = 0; i < count; i++) {
+      anvl_attribute attr = NULL;
+      List.get(attrs, i, (object *)&attr);
+      Allocator.dispose(attr);
+   }
+   List.dispose(attrs);
+}
+// Parse a statement-level attribute list '@[key, key=value, ...]', with the opening '@['
+// already confirmed present (not yet consumed) by the caller. Mirrors header_scan_attributes's
+// shape (src/core/document.c) for module-level attributes, adapted to build and return a
+// fresh list per statement rather than appending into a pre-existing document-level one. No
+// trailing comma before ']' — matches header_scan_attributes's own behavior, not a separate
+// design choice.
+static bool parse_attribute_list(anvl_source src, list *out_attributes) {
+   Source.consume(src, 2); // "@["
+   Source.skip_whitespace_and_comments(src);
+
+   list attrs = List.new(4, ptr_size);
+   if (!attrs) {
+      parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+      return false;
+   }
+
+   while (true) {
+      Source.skip_whitespace_and_comments(src);
+
+      if (!Source.is_identifier_start(Source.peek(src))) {
+         parser_set_error(src, ANVL_ERR_PARSER_INVALID_IDENTIFIER);
+         dispose_attribute_list(attrs);
+         return false;
+      }
+
+      const char *key_start = Source.at(src);
+      Source.consume(src, 1);
+      while (Source.is_identifier_part(Source.peek(src))) {
+         Source.consume(src, 1);
+      }
+      const char *key_end = Source.at(src);
+
+      anvl_attribute attr = Allocator.alloc(sizeof(anvl_attribute_t));
+      if (!attr) {
+         parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+         dispose_attribute_list(attrs);
+         return false;
+      }
+      Source.init_slice(src, &attr->key);
+      attr->key.start = key_start;
+      attr->key.end = key_end;
+
+      Source.skip_whitespace_and_comments(src);
+
+      // optional '=value' — flag attribute (empty .value) when absent
+      if (Source.peek(src) == '=') {
+         Source.consume(src, 1);
+         Source.skip_whitespace_and_comments(src);
+         const char *value_start = Source.at(src);
+         bool in_string = false;
+         while (!Source.is_eof(src)) {
+            char c = Source.peek(src);
+            if (!in_string && (c == ',' || c == ANVL_TOK_RBRACKET)) {
+               break;
+            }
+            if (c == ANVL_TOK_QUOTE) {
+               in_string = !in_string;
+            }
+            Source.consume(src, 1);
+         }
+         Source.init_slice(src, &attr->value);
+         attr->value.start = value_start;
+         attr->value.end = Source.at(src);
+      }
+
+      List.append(attrs, attr);
+
+      Source.skip_whitespace_and_comments(src);
+
+      if (Source.peek(src) == ',') {
+         Source.consume(src, 1);
+         continue;
+      }
+      if (Source.peek(src) == ANVL_TOK_RBRACKET) {
+         Source.consume(src, 1);
+         break;
+      }
+
+      parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+      dispose_attribute_list(attrs);
+      return false;
+   }
+
+   *out_attributes = attrs;
+   return true;
+}
+// Parse a `{ statements }` body, recursively — shared by ASSIGN's object-typed value
+// (parse_object_value, `:= { ... }`) and the direct OBJECT_BLOCK statement form
+// (`ident { ... }`, in parse_statement). Consumes the opening and closing braces. An empty
+// body ('{}') is a parse error, same "no collection/container may be empty" invariant as
+// array/tuple (see the value-tree design comment in include/internal/module.h). Each nested
+// anvl_statement is arena-owned via parse_statement's own Source.new_node call, same as any
+// top-level one — only this function's own `list` container needs disposing on an error path.
+static bool parse_statement_list(anvl_source src, list *out_statements) {
+   Source.consume(src, 1); // '{'
+   Source.skip_whitespace_and_comments(src);
+
+   if (Source.peek(src) == ANVL_TOK_RBRACE) {
+      parser_set_error(src, ANVL_ERR_PARSER_EMPTY_OBJECT_NOT_ALLOWED);
+      return false;
+   }
+
+   list statements = List.new(4, ptr_size);
+   if (!statements) {
+      parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+      return false;
+   }
+
+   while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_RBRACE) {
+      anvl_statement stmt = NULL;
+      if (!parse_statement(src, &stmt)) {
+         List.dispose(statements);
+         return false;
+      }
+      List.append(statements, stmt);
+   }
+
+   if (Source.peek(src) != ANVL_TOK_RBRACE) {
+      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE);
+      List.dispose(statements);
+      return false;
+   }
+   Source.consume(src, 1); // '}'
+
+   *out_statements = statements;
+   return true;
+}
 // Parse a single statement from the source
 static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
    // Parse statement
@@ -302,23 +449,84 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
    // - consume whitespace
    Source.skip_whitespace_and_comments(src);
 
-   // - assignment operator
-   if (!Source.match_token(src, ANVL_TOK_ASSIGN, ANVL_TOK_ASSIGN_LEN)) {
+   // - optional inheritance base ': base' — ':' not immediately followed by '=' (that's the
+   // assignment operator, checked below). AML-only; AMP forbids inheritance entirely (AMP11).
+   // `base` reuses parse_identifier, so a keyword there is rejected the same as anywhere else.
+   if (Source.peek(src) == ':' && Source.peek_offset(src, 1) != '=') {
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      Source.consume(src, 1); // ':'
+      Source.skip_whitespace_and_comments(src);
+      if (!parse_identifier(src, &(*out_stmt)->base)) {
+         parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
+         return false;
+      }
+      Source.skip_whitespace_and_comments(src);
+   }
+
+   // - optional statement-level attributes '@[...]' — AML-only; AMP forbids them entirely
+   // (see AMP15). Matches header_scan_attributes's own AMP-gate (src/core/document.c), and
+   // is checked before consuming anything so an AMP document errors cleanly, not partially.
+   if (Source.match_length(src, "@[", 2) == 2) {
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      if (!parse_attribute_list(src, &(*out_stmt)->attributes)) {
+         return false; // parse_attribute_list already set its own error
+      }
+      Source.skip_whitespace_and_comments(src);
+   }
+
+   // - dispatch: ':=' (ASSIGN) or a direct '{' (OBJECT_BLOCK) — both accept the same optional
+   // base/attributes already parsed above. AMP forbids OBJECT_BLOCK entirely (AMP12), checked
+   // before attempting to parse it, matching the reject-before-parsing shape used throughout
+   // this file (arrays/tuples' AMP-element rejection, attributes' and base's own AMP gates).
+   if (Source.match_token(src, ANVL_TOK_ASSIGN, ANVL_TOK_ASSIGN_LEN)) {
+      // - consume assignment operator
+      Source.consume(src, ANVL_TOK_ASSIGN_LEN);
+      // - consume same-line whitespace only — see skip_same_line_whitespace's doc comment
+      skip_same_line_whitespace(src);
+
+      // - base implies object-shaped, deterministically: if a base was captured, ':=' must be
+      // followed immediately by '{' — checked here, before attempting to parse any value at
+      // all, not as a post-hoc type check performed after generically parsing one (see notes/
+      // document-body-parse.md "Resolved questions" #3).
+      if (!Source.slice_is_empty((*out_stmt)->base) && Source.peek(src) != ANVL_TOK_LBRACE) {
+         parser_set_error(src, ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT);
+         return false;
+      }
+
+      // - value
+      if (!parse_value(src, &(*out_stmt)->value)) {
+         parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
+         return false;
+      }
+      // - consume whitespace
+      Source.skip_whitespace_and_comments(src);
+   } else if (Source.peek(src) == ANVL_TOK_LBRACE) {
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      (*out_stmt)->kind = ANVL_STMT_OBJECT_BLOCK;
+      if (!parse_statement_list(src, &(*out_stmt)->body)) {
+         return false; // parse_statement_list already set its own error
+      }
+      // - end of statement terminator ';' is still required after the closing '}'
+      skip_same_line_whitespace(src);
+      if (Source.peek(src) != ANVL_TOK_STMT_TERMINATOR) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNTERMINATED_STATEMENT);
+         return false;
+      }
+      Source.consume(src, 1);
+      Source.skip_whitespace_and_comments(src);
+   } else {
       parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_ASSIGN);
       return false;
    }
-   // - consume assignment operator
-   Source.consume(src, ANVL_TOK_ASSIGN_LEN);
-   // - consume same-line whitespace only — see skip_same_line_whitespace's doc comment
-   skip_same_line_whitespace(src);
-
-   // - value
-   if (!parse_value(src, &(*out_stmt)->value)) {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
-      return false;
-   }
-   // - consume whitespace
-   Source.skip_whitespace_and_comments(src);
 
    return true;
 }
@@ -358,11 +566,11 @@ static bool parse_value(anvl_source src, anvl_value *out_value) {
       return false; // Failed to allocate value node
    }
 
-   // Value dispatch: scalar, then array/tuple by leading symbol, then (once implemented)
-   // object. Only the final `else` sets a generic error — every other branch either succeeds
-   // or has already set its own, more specific error via parser_set_error internally, so
-   // there's exactly one call site for ANVL_ERR_PARSER_EXPECTED_VALUE and no risk of a
-   // generic error silently overwriting a specific one that already fired.
+   // Value dispatch: scalar, then array/tuple/object by leading symbol. Only the final `else`
+   // sets a generic error — every other branch either succeeds or has already set its own,
+   // more specific error via parser_set_error internally, so there's exactly one call site for
+   // ANVL_ERR_PARSER_EXPECTED_VALUE and no risk of a generic error silently overwriting a
+   // specific one that already fired.
    if (parse_scalar_value(src, out_value)) {
       // fall through to terminator check
    } else if (Source.peek(src) == ANVL_TOK_LBRACKET) {
@@ -373,8 +581,17 @@ static bool parse_value(anvl_source src, anvl_value *out_value) {
       if (!parse_tuple(src, out_value)) {
          return false; // tuple already set its own error
       }
+   } else if (Source.peek(src) == ANVL_TOK_LBRACE) {
+      // AMP forbids an object-typed ASSIGN value entirely (AMP16) — rejected on sight, same
+      // shape as every other AMP-forbidden construct in this file.
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      if (!parse_object_value(src, out_value)) {
+         return false; // object already set its own error
+      }
    } else {
-      // [TODO] check for object ('{') here too, same shape, before this final else
       parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
       return false; // Not a scalar, not a collection start — genuinely not a value
    }
@@ -765,13 +982,117 @@ static bool parse_array(anvl_source src, anvl_value *out_value) {
 
    return true; // Successfully parsed array
 }
-// Parse a tuple value — called with the opening '(' already consumed by parse_value.
+// Parse a tuple value. Same element-parsing shape as parse_array (see its own doc comment) —
+// elements via parse_scalar_value, AMP rejects a nested collection element on sight of its
+// leading symbol, reusing ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR (matching the legacy parser's
+// own choice, src/core/_parser.c:876-880, to reuse the array error code for tuple's identical
+// AMP restriction rather than a separate TUPLE-specific one). Unlike an array, a tuple
+// requires at least two elements — empty and single-element tuples are both parse errors,
+// since a one-element tuple isn't meaningfully positional (checked before consuming the
+// closing ')', matching legacy's own ordering). AML's eventual "a tuple element may be any
+// value, including a nested array/object/tuple" is deferred until object/array-value dispatch
+// exists elsewhere — element parsing here is scalar-only for now, same as array.
 static bool parse_tuple(anvl_source src, anvl_value *out_value) {
-   (void)src;
-   (void)out_value;
+   const char *start = Source.at(src);
+   // consume the tuple start token
+   Source.consume(src, 1);
+   Source.skip_whitespace_and_comments(src);
 
-   // TODO: Implement tuple parsing logic here
-   return false;
+   // Check for empty tuple (INVALID)
+   if (Source.peek(src) == ANVL_TOK_RPAREN) {
+      parser_set_error(src, ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED);
+      return false;
+   }
+
+   list items = List.new(4, sizeof(anvl_value));
+   if (!items) {
+      parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+      return false;
+   }
+
+   while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_RPAREN) {
+      // AMP forbids nested collections as tuple elements — same reject-on-sight
+      // treatment as parse_array; see its own doc comment for why.
+      char lead = Source.peek(src);
+      if (Source.dialect(src) == ANVL_DIALECT_AMP &&
+          (lead == ANVL_TOK_LBRACE || lead == ANVL_TOK_LBRACKET || lead == ANVL_TOK_LPAREN)) {
+         parser_set_error(src, ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR);
+         List.dispose(items);
+         return false;
+      }
+
+      anvl_value elem = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
+      if (!elem) {
+         parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+         List.dispose(items);
+         return false;
+      }
+      if (!parse_scalar_value(src, &elem)) {
+         parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
+         List.dispose(items);
+         return false;
+      }
+      List.append(items, elem);
+
+      Source.skip_whitespace_and_comments(src);
+
+      if (Source.peek(src) == ',') {
+         Source.consume(src, 1);
+         Source.skip_whitespace_and_comments(src);
+         continue; // may land on ')' now (trailing comma) — loop condition handles it
+      }
+      if (Source.peek(src) == ANVL_TOK_RPAREN) {
+         break;
+      }
+
+      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE);
+      List.dispose(items);
+      return false;
+   }
+
+   if (Source.peek(src) != ANVL_TOK_RPAREN) {
+      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE);
+      List.dispose(items);
+      return false;
+   }
+
+   // minimum 2 elements — checked before consuming ')', matching legacy's own ordering
+   if (List.size(items) < 2) {
+      parser_set_error(src, ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS);
+      List.dispose(items);
+      return false;
+   }
+   Source.consume(src, 1); // consume ')'
+
+   // set value type & initialize the value slice
+   (*out_value)->type = ANVL_VALUE_TUPLE;
+   Source.init_slice(src, &(*out_value)->text);
+   (*out_value)->text.start = start;
+   (*out_value)->text.end = Source.at(src);
+   (*out_value)->collection.items = items;
+
+   return true; // Successfully parsed tuple
+}
+// Parse an object-typed value ('name := { statements };') — the exact same recursive
+// statement-list shape as the direct OBJECT_BLOCK statement form (see parse_statement_list's
+// own doc comment), just reached through ':=' instead of directly. No 'PAIR'/key-value form —
+// object.statements is a nested statement list, same as OBJECT_BLOCK's own body.
+static bool parse_object_value(anvl_source src, anvl_value *out_value) {
+   const char *start = Source.at(src);
+
+   list statements = NULL;
+   if (!parse_statement_list(src, &statements)) {
+      return false; // parse_statement_list already set its own error
+   }
+
+   // set value type & initialize the value slice
+   (*out_value)->type = ANVL_VALUE_OBJECT;
+   Source.init_slice(src, &(*out_value)->text);
+   (*out_value)->text.start = start;
+   (*out_value)->text.end = Source.at(src);
+   (*out_value)->object.statements = statements;
+
+   return true; // Successfully parsed object value
 }
 // Parse an error and record it in the source's error state
 static void parser_set_error(anvl_source src, anvl_err_code code) {

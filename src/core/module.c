@@ -324,6 +324,35 @@ void mod_ctx_dispose(module_context ctx) {
       }
    }
 
+   // Same reasoning as the value-tree pass above, for a statement's own .attributes: each
+   // anvl_attribute is its own individual heap allocation (not arena-owned, not just a list
+   // container to release), so it needs disposing per-element, not just List.dispose on the
+   // container. ctx->statements already indexes every statement node flatly, same as values.
+   usize stmt_count = List.size(ctx->statements);
+   for (usize i = 0; i < stmt_count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(ctx->statements, i, (object *)&stmt);
+      if (!stmt) {
+         continue;
+      }
+      if (stmt->attributes) {
+         usize attr_count = List.size(stmt->attributes);
+         for (usize j = 0; j < attr_count; j++) {
+            anvl_attribute attr = NULL;
+            List.get(stmt->attributes, j, (object *)&attr);
+            Allocator.dispose(attr);
+         }
+         List.dispose(stmt->attributes);
+      }
+      // OBJECT_BLOCK's own body — a nested statement list reached directly, not through a
+      // value. Its member statements are already indexed flatly in ctx->statements (any
+      // nesting depth), same as array/object values' items are in ctx->values, so this is
+      // just releasing the list container, not walking into it again.
+      if (stmt->body) {
+         List.dispose(stmt->body);
+      }
+   }
+
    List.dispose(ctx->statements);
    List.dispose(ctx->values);
    ctx->statements = NULL;

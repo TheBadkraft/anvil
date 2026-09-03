@@ -1,0 +1,5 @@
+#!aml
+
+// attributes on the ASSIGN form, no base — isolates attribute parsing
+// from object/OBJECT_BLOCK and inheritance, both still unimplemented.
+server @[active, env=production] := "prod-1";

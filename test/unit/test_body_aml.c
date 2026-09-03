@@ -13,10 +13,9 @@
  * and behaves identically here, so it isn't re-tested. See               *
  * notes/document-body-parse.md.                                          *
  *                                                                        *
- * RED-state note: doc_parse_body (src/core/document.c) is currently a    *
- * stub that always returns ANVL_RES_ERR without recording a document     *
- * error. Every test below is expected to fail until the real parser is  *
- * implemented.                                                           *
+ * Status: complete and GREEN against the real parser (src/core/parser.c) *
+ * — all cases pass, including object/OBJECT_BLOCK, statement            *
+ * attributes, and inheritance/base, the last pieces to land.             *
  * ********************************************************************** */
 
 #include "anvil.h"
@@ -48,7 +47,10 @@ static module_document setup_aml_doc(const char *fixture_name, module_context *o
    if (ANVL_RES_OK != doc_scan_header(doc, &err_code)) {
       return doc;
    }
-   (void)mod_load_imports(*out_ctx, doc, NULL, &err_code);
+   usize size_hint = 0;
+   (void)mod_load_imports(*out_ctx, doc, &size_hint, &err_code);
+   usize capacity = mod_ctx_arena_size_hint(size_hint);
+   mod_ctx_create_arena(*out_ctx, capacity, &err_code);
    return doc;
 }
 
@@ -191,6 +193,8 @@ static void test_aml04_base_requires_object_value(void) {
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "AML04: parse body returns ERR");
    TestBit.is_true(doc_has_errors(doc), "AML04: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT, err_code,
+                        "AML04: err_code reports INHERITANCE_REQUIRES_OBJECT");
 
    mod_ctx_dispose(ctx);
 }
@@ -331,6 +335,8 @@ static void test_aml09_unterminated_object_block(void) {
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "AML09: parse body returns ERR");
    TestBit.is_true(doc_has_errors(doc), "AML09: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE, err_code,
+                        "AML09: err_code reports EXPECTED_OBJECT_CLOSE");
 
    mod_ctx_dispose(ctx);
 }
@@ -350,6 +356,8 @@ static void test_aml10_bare_base_statement(void) {
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "AML10: parse body returns ERR");
    TestBit.is_true(doc_has_errors(doc), "AML10: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_EXPECTED_ASSIGN, err_code,
+                        "AML10: err_code reports EXPECTED_ASSIGN (neither ':=' nor '{' follows)");
 
    mod_ctx_dispose(ctx);
 }
@@ -385,6 +393,69 @@ static void test_aml11_import_and_static_reference(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * AML12 — statement-level attributes on the ASSIGN form, no base
+ * (body_assign_attrs.anvl)
+ * Commentary: isolates attribute-list parsing (parse_attribute_list) from
+ * object/OBJECT_BLOCK and inheritance, neither of which exists yet — none
+ * of AML06/AML08 (the other attribute-bearing fixtures) can pass without
+ * those too, so this is the one place attribute parsing gets verified on
+ * its own. Covers both a flag attribute (no '=value') and a key=value one
+ * in the same list.
+ * ---------------------------------------------------------------------- */
+static void test_aml12_attributes_on_assign(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_aml_doc("body_assign_attrs.anvl", &ctx);
+   TestBit.is_not_null(doc, "AML12: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "AML12: parse body returns OK");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML12: one statement captured");
+
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML12: 'server' statement retrieved");
+   if (!stmt) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+   TestBit.is_true(Source.slice_is_empty(stmt->base), "AML12: base is empty (no inheritance)");
+   TestBit.is_not_null(stmt->attributes, "AML12: attributes captured");
+   if (stmt->attributes) {
+      TestBit.is_equal_int(2, (long long)List.size(stmt->attributes),
+                           "AML12: two attributes captured");
+
+      anvl_attribute attr = NULL;
+      List.get(stmt->attributes, 0, (object *)&attr);
+      TestBit.is_not_null(attr, "AML12: first attribute retrieved");
+      if (attr) {
+         TestBit.is_true(slice_equals(attr->key, "active"), "AML12: first attribute key is 'active'");
+         TestBit.is_true(Source.slice_is_empty(attr->value),
+                         "AML12: first attribute is a flag (empty value)");
+      }
+
+      attr = NULL;
+      List.get(stmt->attributes, 1, (object *)&attr);
+      TestBit.is_not_null(attr, "AML12: second attribute retrieved");
+      if (attr) {
+         TestBit.is_true(slice_equals(attr->key, "env"), "AML12: second attribute key is 'env'");
+         TestBit.is_true(slice_equals(attr->value, "production"),
+                         "AML12: second attribute value is 'production'");
+      }
+   }
+   TestBit.is_not_null(stmt->value, "AML12: statement has a value");
+   if (stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_STRING, (long long)stmt->value->type,
+                           "AML12: value is STRING");
+   }
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -405,6 +476,7 @@ int main(void) {
    TestBit.run_ex("AML10_bare_base_statement", NULL, test_aml10_bare_base_statement, th);
    TestBit.run_ex("AML11_import_and_static_reference", NULL, test_aml11_import_and_static_reference,
                   th);
+   TestBit.run_ex("AML12_attributes_on_assign", NULL, test_aml12_attributes_on_assign, th);
 
    return TestBit.report();
 }

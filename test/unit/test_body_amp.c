@@ -680,6 +680,8 @@ static void test_amp11_base_rejected(void) {
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "AMP11: parse body returns ERR");
    TestBit.is_true(doc_has_errors(doc), "AMP11: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, err_code,
+                        "AMP11: err_code reports UNEXPECTED_TOKEN (the actual AMP-base gate)");
 
    mod_ctx_dispose(ctx);
 }
@@ -763,6 +765,12 @@ static void test_amp14_using_rejected(void) {
 }
 /* ---------------------------------------------------------------------- *
  * AMP15 — statement-level '@[...]' attributes rejected in AMP
+ * Commentary: err_code is asserted specifically (not just ERR + has_errors)
+ * because this test used to pass for the wrong reason — before statement
+ * attributes were implemented, `@` right after an identifier just failed
+ * the generic `:=` check (ANVL_ERR_PARSER_EXPECTED_ASSIGN), which also
+ * happened to satisfy the old loose assertions without ever exercising
+ * the actual AMP-attribute-forbidden gate. Same gotcha shape as AMP00b.
  * ---------------------------------------------------------------------- */
 static void test_amp15_statement_attributes_rejected(void) {
    module_context ctx = NULL;
@@ -778,6 +786,8 @@ static void test_amp15_statement_attributes_rejected(void) {
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "AMP15: parse body returns ERR");
    TestBit.is_true(doc_has_errors(doc), "AMP15: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, err_code,
+                        "AMP15: err_code reports UNEXPECTED_TOKEN (the actual AMP-attribute gate)");
 
    mod_ctx_dispose(ctx);
 }
@@ -802,10 +812,45 @@ static void test_amp16_object_value_rejected(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
+ * AMP17 — scalar tuple assignment (resolved AMP-legal — see notes/
+ * document-body-parse.md "Dialect scope"). Same footing as AMP05a's
+ * scalar array, now that parse_tuple is implemented.
+ * ---------------------------------------------------------------------- */
+static void test_amp17_scalar_tuple_assign(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!amp\n"
+                                       "coords := (10, 20, 30);\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "AMP17: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "AMP17: parse body returns OK");
+   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AMP17: one statement captured");
+
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AMP17: statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value->type, "AMP17: value is TUPLE");
+      TestBit.is_equal_int(3, (long long)List.size(stmt->value->collection.items),
+                           "AMP17: tuple has three elements");
+      anvl_value elem = NULL;
+      List.get(stmt->value->collection.items, 0, (object *)&elem);
+      if (elem) {
+         TestBit.is_equal_int(ANVL_VALUE_NUMERIC, (long long)elem->type,
+                              "AMP17: first element is NUMERIC");
+      }
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
  * AMP18 — empty array rejected
- * Note: AMP17 is deliberately skipped here — reserved (per notes/document-
- * body-parse.md) for the future tuple-in-AMP *positive* case, not yet
- * written since parse_tuple is still a stub.
  * ---------------------------------------------------------------------- */
 static void test_amp18_empty_array_rejected(void) {
    module_context ctx = NULL;
@@ -1000,6 +1045,7 @@ int main(void) {
    TestBit.run_ex("AMP15_statement_attributes_rejected", NULL,
                   test_amp15_statement_attributes_rejected, th);
    TestBit.run_ex("AMP16_object_value_rejected", NULL, test_amp16_object_value_rejected, th);
+   TestBit.run_ex("AMP17_scalar_tuple_assign", NULL, test_amp17_scalar_tuple_assign, th);
    TestBit.run_ex("AMP18_empty_array_rejected", NULL, test_amp18_empty_array_rejected, th);
    TestBit.run_ex("AMP19_missing_comma_in_array_rejected", NULL,
                   test_amp19_missing_comma_in_array_rejected, th);
