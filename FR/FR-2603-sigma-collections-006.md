@@ -14,7 +14,7 @@
 
 Add a heapless, early-break, predicate-driven scan primitive to `sigma.collections` — a leaner alternative to `Iterator`/`Collections.create_iterator` for one-off query-shaped access (find-first-match, any-match) over a contiguous run of elements. Takes a base pointer, a stride, a count, and a predicate function with the ability to stop scanning as soon as it's satisfied — no `Allocator.alloc` at all, for either a collection view or an iterator object.
 
-The repo owner has a prior implementation of this idea, mechanically equivalent to .NET's `IEnumerator` pattern. The signature below is a starting proposal, not a mandate — please check it against that prior implementation before finalizing.
+The repo owner recalls building something like this before — mechanically equivalent to .NET's `IEnumerator` pattern — predating a major Sigma refactor, and it was never re-implemented afterward. That prior version is not readily available (would take significant effort to locate, if it still exists at all), so it should **not** block finalizing this FR — the signature below is a fresh proposal to be judged on its own merits, not a placeholder awaiting comparison against unrecoverable prior art.
 
 ---
 
