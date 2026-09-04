@@ -12,9 +12,7 @@ Single index of everything intentionally deferred to a later phase, or left as a
 
 ## Deferred to Resolution phase (phase 4)
 
-**`$identifier` VarRef resolution, the `base`/anonymous-object legality check, and the global identifier map are implemented** — `src/core/resolver.c` (`mod_resolve_context`), `test/unit/test_resolver.c` (10/10, Valgrind-clean). See `notes/resolution-phase.md` for the full design and its "Implementation" section for what landed.
-
-**Still deferred**: full field-merging inheritance (copying/overriding a derived object's own fields from its `base`'s fields) — only `base` *target legality* (missing, or anonymous) is checked today; the actual merge mechanism (something like the legacy `anvl.bak` resolver's lazy `merge_cache`) remains undesigned. `notes/resolution-phase.md` is the dedicated note for this iteration.
+**Resolution is fully implemented** — the global identifier map, `$identifier` VarRef resolution, `base`/anonymous-object legality, and full field-merging inheritance (including transitive chains and inheritance-cycle detection) are all in `src/core/resolver.c` (`mod_resolve_context`), covered by `test/unit/test_resolver.c` (14/14, 73 assertions, Valgrind-clean). See `notes/resolution-phase.md` for the full design and its "Implementation" section for what landed. Nothing remains deferred in this phase.
 
 Import-graph processing order (topological sort) is **not** on this list — it was considered and resolved as unnecessary; see `document-header-scan.md` § *Import-graph processing order — resolved as unnecessary* and `notes/resolution-phase.md` § *Why document processing order doesn't matter*.
 

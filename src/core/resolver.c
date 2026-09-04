@@ -28,6 +28,7 @@
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <sigma/types.h>
+#include <string.h>
 
 // Builds ctx->identifiers: top-level statement name -> anvl_statement, across every document
 // in ctx->docs. Only doc->body (a document's own top-level list) is walked, never the flat
@@ -113,6 +114,119 @@ static anvl_result validate_bases(module_context ctx, anvl_err_code *out_err_cod
    return ANVL_RES_OK;
 }
 
+// True if two slices have identical content.
+static bool slices_equal(anvl_slice a, anvl_slice b) {
+   usize len_a = Source.slice_length(a);
+   usize len_b = Source.slice_length(b);
+   if (len_a != len_b) {
+      return false;
+   }
+   if (len_a == 0) {
+      return true;
+   }
+   return memcmp(a.start, b.start, len_a) == 0;
+}
+
+// The list of a statement's own, as-parsed fields (nested statements) — the OBJECT_BLOCK body,
+// or an ASSIGN statement's object-typed value's statements. NULL for anything else — a
+// non-object-shaped statement never has a non-empty base to merge in the first place, per
+// body-parse's own "base implies object-shaped" invariant (document-body-parse.md, Resolved
+// Questions #3).
+static list own_fields(anvl_statement stmt) {
+   if (stmt->kind == ANVL_STMT_OBJECT_BLOCK) {
+      return stmt->body;
+   }
+   if (stmt->value && stmt->value->type == ANVL_VALUE_OBJECT) {
+      return stmt->value->object.statements;
+   }
+   return NULL;
+}
+
+// True if `fields` already has a statement named `name`.
+static bool fields_has_name(list fields, anvl_slice name) {
+   usize count = List.size(fields);
+   for (usize i = 0; i < count; i++) {
+      anvl_statement s = NULL;
+      List.get(fields, i, (object *)&s);
+      if (s && slices_equal(s->name, name)) {
+         return true;
+      }
+   }
+   return false;
+}
+
+// Merges inherited fields into `stmt`'s own field list, in place — appending an *aliased*
+// pointer (never a copy) for each of an ancestor's fields not already present by name in
+// `stmt`'s current set, walking the base chain nearest-ancestor-first so a closer override
+// always wins over a farther one, and a transitive chain (`c : b : a`) falls out naturally
+// without needing recursion. Mutating `stmt`'s own list directly, rather than building a
+// separate merged view, was a deliberate call: two representations of the same field (an
+// original and a shadow copy in some other list) is exactly the risk to avoid, not something
+// to introduce here — after this runs, `stmt`'s own field list *is* its complete, correct
+// field set.
+//
+// Cycle-safe via the same hop-counter technique resolve_varref_chain uses: since `base` is a
+// single slice per statement, the "inherits from" relation never branches, so with N distinct
+// names in `identifiers`, a non-cyclic chain can't need more than N hops — exceeding that is a
+// cycle. Unlike a VarRef, an inheritance cycle is a hard error here (ANVL_ERR_RESOLVER_CYCLE_
+// DETECTED) — a cyclic chain can't produce a sensible merged object at all, matching the
+// legacy anvl.bak resolver's own policy on inheritance cycles specifically.
+static anvl_result merge_inherited_fields(module_context ctx, anvl_statement stmt,
+                                          anvl_err_code *out_err_code) {
+   list fields = own_fields(stmt);
+   if (!fields) {
+      return ANVL_RES_OK;
+   }
+
+   usize max_hops = Map.count(ctx->identifiers) + 1;
+   anvl_slice current_base = stmt->base;
+
+   for (usize hop = 0; hop < max_hops; hop++) {
+      usize len = Source.slice_length(current_base);
+      addr val = 0;
+      if (!Map.get(ctx->identifiers, current_base.start, len, &val)) {
+         return ANVL_RES_OK; // unreachable - validate_bases already confirmed this exists
+      }
+      anvl_statement ancestor = (anvl_statement)val;
+      list ancestor_fields = own_fields(ancestor);
+      if (ancestor_fields) {
+         usize count = List.size(ancestor_fields);
+         for (usize i = 0; i < count; i++) {
+            anvl_statement field = NULL;
+            List.get(ancestor_fields, i, (object *)&field);
+            if (field && !fields_has_name(fields, field->name)) {
+               List.append(fields, field);
+            }
+         }
+      }
+      if (Source.slice_length(ancestor->base) == 0) {
+         return ANVL_RES_OK; // reached the root of the chain
+      }
+      current_base = ancestor->base;
+   }
+
+   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, __FILE__, NULL);
+   *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
+   return ANVL_RES_ERR;
+}
+
+// Runs merge_inherited_fields for every statement in the context (any nesting depth) that has
+// a non-empty base.
+static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
+   usize stmt_count = List.size(ctx->statements);
+   for (usize i = 0; i < stmt_count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(ctx->statements, i, (object *)&stmt);
+      if (!stmt || Source.slice_length(stmt->base) == 0) {
+         continue;
+      }
+      if (ANVL_RES_OK != merge_inherited_fields(ctx, stmt, out_err_code)) {
+         return ANVL_RES_ERR;
+      }
+   }
+   return ANVL_RES_OK;
+}
+
 // Chases a VarRef target to its final concrete value, following a chain of VarRefs
 // (`a := $b; b := $c;` resolves all the way to c's value, not just one hop to b's).
 // Cycle-safe without a visited set: with N distinct top-level names in ctx->identifiers, any
@@ -179,6 +293,13 @@ anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code)
    }
 
    if (ANVL_RES_OK != validate_bases(ctx, &err_code)) {
+      if (out_err_code) {
+         *out_err_code = err_code;
+      }
+      return ANVL_RES_ERR;
+   }
+
+   if (ANVL_RES_OK != merge_all_inheritance(ctx, &err_code)) {
       if (out_err_code) {
          *out_err_code = err_code;
       }

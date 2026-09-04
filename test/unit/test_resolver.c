@@ -335,6 +335,176 @@ static void test_rsv10_valid_base_resolves(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * RSV11 — inheritance merges base's fields into derived's own field list,
+ * in place; derived's own same-named field wins over base's
+ * ---------------------------------------------------------------------- */
+static void test_rsv11_merge_appends_and_overrides(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "base := {\n"
+                                       "   x := 1;\n"
+                                       "   y := 2;\n"
+                                       "};\n"
+                                       "derived : base := {\n"
+                                       "   y := 20;\n"
+                                       "   z := 3;\n"
+                                       "};\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV11: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV11: body parses");
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = mod_resolve_context(ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "RSV11: resolve returns OK");
+
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
+   TestBit.is_not_null(derived, "RSV11: 'derived' statement retrieved");
+   if (derived && derived->value) {
+      list fields = derived->value->object.statements;
+      TestBit.is_equal_int(3, (long long)List.size(fields),
+                           "RSV11: derived has own y/z plus inherited x — three fields");
+
+      anvl_statement f = NULL;
+      List.get(fields, 0, (object *)&f);
+      TestBit.is_true(f && slice_equals(f->name, "y"), "RSV11: first field is own 'y'");
+      if (f && f->value) {
+         TestBit.is_true(slice_equals(f->value->text, "20"),
+                         "RSV11: derived's own 'y' (20) wins, not base's (2)");
+      }
+
+      f = NULL;
+      List.get(fields, 2, (object *)&f);
+      TestBit.is_true(f && slice_equals(f->name, "x"),
+                      "RSV11: third field is inherited 'x', appended after derived's own");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * RSV12 — transitive inheritance (c : b : a) merges through the whole
+ * chain, not just the immediate base
+ * ---------------------------------------------------------------------- */
+static void test_rsv12_transitive_merge(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "a := {\n"
+                                       "   x := 1;\n"
+                                       "};\n"
+                                       "b : a := {\n"
+                                       "   y := 2;\n"
+                                       "};\n"
+                                       "c : b := {\n"
+                                       "   z := 3;\n"
+                                       "};\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV12: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV12: body parses");
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = mod_resolve_context(ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "RSV12: resolve returns OK");
+
+   anvl_statement c_stmt = NULL;
+   FArray.get(doc->body, 2, sizeof(anvl_statement), (object *)&c_stmt);
+   TestBit.is_not_null(c_stmt, "RSV12: 'c' statement retrieved");
+   if (c_stmt && c_stmt->value) {
+      list fields = c_stmt->value->object.statements;
+      TestBit.is_equal_int(3, (long long)List.size(fields),
+                           "RSV12: c has its own z, plus y (from b) and x (from a) — three fields");
+
+      bool has_x = false, has_y = false, has_z = false;
+      usize count = List.size(fields);
+      for (usize i = 0; i < count; i++) {
+         anvl_statement f = NULL;
+         List.get(fields, i, (object *)&f);
+         if (!f) {
+            continue;
+         }
+         if (slice_equals(f->name, "x")) {
+            has_x = true;
+         }
+         if (slice_equals(f->name, "y")) {
+            has_y = true;
+         }
+         if (slice_equals(f->name, "z")) {
+            has_z = true;
+         }
+      }
+      TestBit.is_true(has_x && has_y && has_z, "RSV12: c has x, y, and z");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * RSV13 — OBJECT_BLOCK-form derived ('derived : base { ... };') merges
+ * from an ASSIGN-form base the same way the ASSIGN-form derived does
+ * ---------------------------------------------------------------------- */
+static void test_rsv13_object_block_derived_merges(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "base := {\n"
+                                       "   x := 1;\n"
+                                       "};\n"
+                                       "derived : base {\n"
+                                       "   y := 2;\n"
+                                       "};\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV13: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV13: body parses");
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = mod_resolve_context(ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "RSV13: resolve returns OK");
+
+   anvl_statement derived = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
+   TestBit.is_not_null(derived, "RSV13: 'derived' statement retrieved");
+   if (derived) {
+      TestBit.is_equal_int(2, (long long)List.size(derived->body),
+                           "RSV13: derived's body has own y plus inherited x");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * RSV14 — an inheritance cycle (a : b; b : a;) is a hard error, unlike a
+ * VarRef cycle
+ * ---------------------------------------------------------------------- */
+static void test_rsv14_inheritance_cycle_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "a : b := {\n"
+                                       "   p := 1;\n"
+                                       "};\n"
+                                       "b : a := {\n"
+                                       "   q := 2;\n"
+                                       "};\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV14: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV14: body parses");
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = mod_resolve_context(ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "RSV14: resolve returns ERR");
+   TestBit.is_equal_int(ANVL_ERR_RESOLVER_CYCLE_DETECTED, err_code,
+                        "RSV14: err_code reports CYCLE_DETECTED");
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -357,6 +527,13 @@ int main(void) {
    TestBit.run_ex("RSV08_missing_base_rejected", NULL, test_rsv08_missing_base_rejected, th);
    TestBit.run_ex("RSV09_anonymous_base_rejected", NULL, test_rsv09_anonymous_base_rejected, th);
    TestBit.run_ex("RSV10_valid_base_resolves", NULL, test_rsv10_valid_base_resolves, th);
+   TestBit.run_ex("RSV11_merge_appends_and_overrides", NULL,
+                  test_rsv11_merge_appends_and_overrides, th);
+   TestBit.run_ex("RSV12_transitive_merge", NULL, test_rsv12_transitive_merge, th);
+   TestBit.run_ex("RSV13_object_block_derived_merges", NULL,
+                  test_rsv13_object_block_derived_merges, th);
+   TestBit.run_ex("RSV14_inheritance_cycle_rejected", NULL,
+                  test_rsv14_inheritance_cycle_rejected, th);
 
    return TestBit.report();
 }
