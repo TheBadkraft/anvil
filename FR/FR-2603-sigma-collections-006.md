@@ -4,7 +4,7 @@
 **Type:** Feature Request
 **Owner:** sigma.collections
 **Filed:** 2026-09-04
-**Status:** open
+**Status:** implemented (2026-09-04) — see Resolution below; `chore/sigma-subset-workspace` branch, awaiting merge/review by the regular anvil agent
 **Requested by:** Anvil (downstream consumer — `anvil/src/core/parser.c`, `document.c`, and the upcoming Resolution phase)
 **Tags:** sigma-collections, iterator, query, zero-allocation
 
@@ -61,44 +61,160 @@ bool Collections.predicate_scan(const void *base, usize stride, usize count,
 
 ---
 
-## Resolution (2026-09-04) — supersedes "Requested API" above
+## Resolution (2026-09-04, expanded) — supersedes "Requested API" above
 
-Reviewed against the actual codebase (`sigma.anvil`, the sigma subset workspace) before implementation. Two things changed from the original proposal; this section is authoritative over "Requested API" for whoever implements this.
+Reviewed against the actual codebase (`sigma.anvil`, the sigma subset workspace) before implementation, across several rounds of design review. This section is authoritative over "Requested API" for whoever implements this — it changed shape twice during review, and this is the final form.
 
-### 1. Serve both `farray` and `parray`, via the shared `array_base` layer — not a free `Collections` function
+### Why the original signature changed
 
-The original signature (`Collections.predicate_scan(const void *base, usize stride, usize count, ...)`) would require exposing a raw base pointer publicly, which neither `FArray` nor `PArray` do today — both are opaque handles. It's also unnecessary: `farray` and `parray` are both already castable to the internal `sc_array_base` (`{handle, bucket, end}` — see `include/sigma/internal/array_base.h`), and every existing operation (`capacity`, `clear`, `set`, `get`, `remove`, `compact`) is already implemented once at that shared layer, then re-exposed per type as a one-line cast+delegate in `farray.c`/`parray.c`. This scan primitive should follow that exact, already-established pattern instead of introducing a new public raw-pointer capability.
+`Collections.predicate_scan(const void *base, usize stride, usize count, ...)` would've required exposing a raw base pointer publicly, which no type in this codebase does. It also hard-coded "stop at the first match" into the primitive itself, which turned out to be the wrong layer for that decision — see below. Both problems dissolve once the actual foundation is built correctly: a heapless, resumable cursor, unified across every collection type this subset has (not just `farray`/`parray`).
 
-(`parray` itself was header-only in this subset with no `.c`/build wiring — ported from `sigma.collections` as a prerequisite for this FR, along with its `slotarray` dependency. Both are now implemented, tested-green against the existing suite, and wired into `test/sigma/Makefile`.)
+### The core abstraction: `sc_queryable` + `Query`
 
-### 2. Early-break is caller-driven via a resumable cursor, not baked into the primitive
-
-The original proposal hard-codes "stop at the first match" into the primitive itself. Reconsidered during review: `sc_array_base` is POD with no heap state, so a scan *position* is just one more index alongside it — a resumable cursor costs nothing extra over a fixed-stop function, and building the fixed-stop version first only means rebuilding it under a cursor later. Build the cursor as the actual foundation now.
-
-**A new `Query` vtable is introduced as the forward-looking home for this family** (`Query` over `Find` — this needs to keep growing past one verb: `first`, later `any`/`where`/`count`, is a namespace, not an operation). Its natural input is `collection` (the codebase's existing type-erased handle), matching how `Collections.create_iterator` already works — but that means anything under `Query` pays for a `collection` view when the caller doesn't already have one, which reopens the exact allocation this FR exists to eliminate. So the scope split is deliberate:
-
-- **This FR (FR-006) delivers only the true zero-allocation path** — `FArray.select_first` / `PArray.select_first`, called directly against a raw `farray`/`parray` handle, no `collection` involved. This is the concrete fix for the motivating AMP06 case.
-- **`Query` itself — `Query.first(collection, ...)` and beyond — is explicitly out of scope for this FR.** `Query.first` is FR-2603-sigma-collections-008's job (already filed, scoped as the `collection`-holding convenience this FR doesn't cover); the broader `any`/`where`/`count` family is FR-2603-sigma-collections-009 (to be filed). Both build on the exact same internal engine this FR lands — no reimplementation, just a second and third front door onto it.
-
-### Revised shape to implement
+A **new public header, `include/sigma/query.h`**, and a new top-level vtable, `Query` — chosen over `Find` because this is meant to be a growing namespace of query verbs, not one operation. Its foundation is a heapless, POD cursor that any collection type can produce, and one generic engine that walks it:
 
 ```c
-// include/sigma/collection.h — shared, both farray.h and parray.h already include it
+// include/sigma/collection.h — shared; farray.h/parray.h already include it
 typedef bool (*sc_predicate_fn)(const void *element, usize index, void *userdata);
 
-// include/sigma/internal/array_base.h — internal, not public
-typedef struct {
-    const sc_array_base *arr;
-    usize element_size;
-    usize index;          // next position to examine
-} sc_scan_cursor;
+// include/sigma/query.h
+// Advances *self by exactly one matching element. Implemented once per source
+// *kind* (dense array-backed vs. sparse hash-backed) — see "Producers" below —
+// never once per caller. This is the one seam that lets Map/SlotArray (which
+// must skip empty/tombstone slots) and farray/parray/collection/list (which
+// don't) share the exact same Query.next/Query.first on top.
+typedef bool (*sc_query_advance_fn)(struct sc_queryable *self, const void **out_element);
 
-bool array_base_scan_next(sc_scan_cursor *cur, sc_predicate_fn pred, void *userdata,
-                           const void **out_element, usize *out_index);
+typedef struct sc_queryable {
+    void *source;                  // the underlying handle (farray/parray/collection/map/slotarray)
+    usize element_size;            // meaningful for dense sources; ignored by sparse ones
+    usize index;                   // current scan position — mutated by advance()
+    sc_query_advance_fn advance;   // the behavior — see Producers below
+} sc_queryable;
+
+typedef struct sc_query_i {
+    // The real primitive: pull the next element, caller decides whether to keep going.
+    // No predicate, no allocation, no early-break imposed — "roll your own query loop."
+    bool (*next)(sc_queryable *q, const void **out_element, usize *out_index);
+
+    // A one-call specialization of `next`: loop internally, stop at the first match.
+    // Covers "find first" (real out_index) and "any" (caller ignores out_index) in
+    // one function, exactly as the original FR's rationale intended.
+    bool (*first)(sc_queryable q, sc_predicate_fn pred, void *userdata, usize *out_index);
+} sc_query_i;
+extern const sc_query_i Query;
 ```
 
-`FArray.select_first(farray arr, usize stride, sc_predicate_fn pred, void *userdata, usize *out_index)` and `PArray.select_first(parray arr, sc_predicate_fn pred, void *userdata, usize *out_index)` (no `stride` — `PArray`'s element size is always `sizeof(addr)`, matching its existing no-stride convention) each build a cursor over their own `sc_array_base` cast and call `array_base_scan_next` exactly once, discarding the cursor — this is what makes `select_first` a trivial specialization of the cursor rather than separate logic.
+`Query.first` is implemented purely in terms of `Query.next` — it is not a separate mechanism:
 
-The cursor type itself stays internal for this FR — not part of the public surface yet. Whether FR-009's `Query.where` exposes it directly (a walkable enumerator) or wraps it behind a callback is that FR's design question, not this one's.
+```c
+bool query_first(sc_queryable q, sc_predicate_fn pred, void *userdata, usize *out_index) {
+    const void *elem; usize idx;
+    while (Query.next(&q, &elem, &idx)) {
+        if (pred(elem, idx, userdata)) { if (out_index) *out_index = idx; return true; }
+    }
+    return false;
+}
+```
 
-**Test coverage** (new: this subset has zero existing tests for `farray`, and now `parray`) — `test/sigma/test_farray.c` and `test/sigma/test_parray.c`, following this subset's `TestBit` convention (not `sigma.collections`' `sigtest`/`Assert` framework, which doesn't apply here): first-match found, no-match exhausts the full scan, early-break actually stops before scanning remaining elements (assert via a call-counting predicate), empty collection, `out_index` correctness on both match and no-match, NULL-argument invariants (`arr`/`pred` NULL).
+### Producers — who can become a `sc_queryable`, and how
+
+**Dense sources** (`farray`, `parray`, `collection`, `list`) — all reduce to the internal `sc_array_base` (`{handle, bucket, end}`), either directly (`farray`/`parray` *are* one) or by embedding it as their literal first struct member (`collection`), which is what makes casting to it valid. `list` is the one exception — `struct sc_list { collection coll; ... }` holds its collection *by pointer*, not embedded, so it can't be cast directly; it reaches the same place through its own already-existing `collection`, at zero extra allocation cost. All four share one `advance` implementation (`array_base_query_advance`, internal) — indexes forward, reads via the existing `array_base_get_element_ptr`, never skips anything.
+
+```c
+sc_queryable FArray.as_queryable(farray arr, usize stride);
+sc_queryable PArray.as_queryable(parray arr);
+sc_queryable Collections.as_queryable(collection coll);
+sc_queryable List.as_queryable(list lst);   // reaches into lst's own existing collection — O(1), no allocation
+```
+
+**Sparse sources** (`map`, `slotarray`) — neither reduces to `sc_array_base` at all (different struct shape entirely), and more importantly, a dense walk would be *wrong* for them, not just inapplicable: both reuse freed slots, so raw index-order walking would hand a predicate garbage/tombstone entries. This is exactly why `SparseIterator` already exists as a distinct thing from `Iterator` in this codebase — `Map`/`SlotArray` already implement the skip-empty-slots contract that mechanism uses (`sc_sparse_i`: `is_empty_slot`/`capacity`/`get_at`). Each gets its own `advance` implementation that wraps that same existing logic — no new scanning behavior, just a second, generic-shaped front door onto code that already exists:
+
+```c
+sc_queryable Map.as_queryable(map m);   // yields const map_entry * (key + key_len + value together)
+sc_queryable Map.keys(map m);           // yields const sc_key_view * ({ptr, len} — keys aren't NUL-terminated)
+sc_queryable Map.values(map m);         // yields const addr *
+sc_queryable SlotArray.as_queryable(slotarray sa);
+```
+
+`Map.keys`/`Map.values` mirror what `dictionary.Keys`/`dictionary.Values` give you in .NET, and cost almost nothing beyond `Map.as_queryable` itself — same slot walk, just narrower projection. `values()` is free (a value is already a fixed-size `addr`); `keys()` needs one small wrinkle — a key is `{ptr, len}` (not NUL-terminated, per `map.h`'s own contract), so its `advance` copies that pair into a small scratch field carried on the cursor and yields a pointer to it, rather than a bare pointer that would silently drop the length:
+
+```c
+typedef struct { const char *ptr; usize len; } sc_key_view;
+```
+
+### What this looks like to a caller
+
+The motivating case (`AMP06` in `test_body_amp.c`) today pays for a `collection` view and an `iterator` object just to walk a list of statements and stop at one:
+
+```c
+// Before — two allocations for what's really a query
+collection view = FArray.as_collection(doc->body, sizeof(anvl_statement));
+iterator it = Collections.create_iterator(view);
+while (Iterator.next(it)) {
+    anvl_statement stmt = *(anvl_statement *)Iterator.current(it);
+    if (slice_equals(stmt->name, "third")) { /* found it */ break; }
+}
+Iterator.dispose(it);
+Collections.dispose(view);
+```
+
+```c
+// After — zero allocations, and it reads as what it actually is: a query
+static bool is_named_third(const void *element, usize index, void *userdata) {
+    anvl_statement stmt = *(anvl_statement *)element;
+    return slice_equals(stmt->name, "third");
+}
+
+sc_queryable q = FArray.as_queryable(doc->body, sizeof(anvl_statement));
+usize idx;
+if (Query.first(q, is_named_third, NULL, &idx)) {
+    // found at idx — nothing to dispose, nothing was allocated
+}
+```
+
+"Any element satisfies this?" is the same call, ignoring the index:
+
+```c
+if (Query.first(FArray.as_queryable(doc->body, sizeof(anvl_statement)), is_named_third, NULL, NULL)) {
+    // at least one exists
+}
+```
+
+Rolling your own loop instead of using a predicate — `Query.next` directly, exactly like a hand-written `for` loop, just heapless and uniform across every collection type:
+
+```c
+sc_queryable names = Map.keys(symbol_table);
+const sc_key_view *k; usize i;
+while (Query.next(&names, (const void **)&k, &i)) {
+    printf("%.*s\n", (int)k->len, k->ptr);
+    if (should_stop_here(k)) break;   // caller decides — nothing is imposed
+}
+```
+
+Finding an entry in a `Map` by its *value*, something `Map.get`'s key lookup can't do at all today:
+
+```c
+static bool value_over_100(const void *element, usize index, void *userdata) {
+    return ((const map_entry *)element)->value > 100;
+}
+usize idx;
+if (Query.first(Map.as_queryable(symbol_table), value_over_100, NULL, &idx)) { /* ... */ }
+```
+
+### Explicitly out of scope
+
+A real LINQ-style **deferred, composable** query layer — `Where(...).Select(...).OrderBy(...)` building a plan before anything executes — is a different, much bigger thing (effectively a small query-expression compiler), and not something this FR builds. `Query.next`/`Query.first` plus per-type `.as_queryable()` cover the actual need (uniform, heapless, predicated-or-manual scanning over anything in this subset) without it. Nothing here forecloses building that layer later on top of `.as_queryable()` as its entry point, if it's ever worth doing — it just isn't part of this FR.
+
+### Relationship to FR-008 / FR-009
+
+**FR-2603-sigma-collections-008 is superseded by this FR.** It proposed a `Collections`-level convenience for callers already holding a `collection` — `Collections.as_queryable(collection)` above *is* that, just properly named and homed under `Query` rather than being a one-off `Collections` method. Recommend closing FR-008 as absorbed once this lands.
+
+**FR-2603-sigma-collections-009 narrows, rather than disappearing.** `Query.first` already covers "any" (ignore `out_index`); `Query.next` in a caller-side loop already covers "give me every match" (the original motivation for a `Query.where`) with no new code needed. What's left for FR-009, if it's ever wanted, is genuinely new: the deferred/composable chain library described above — that's the only thing not already covered by what this FR delivers.
+
+### Test coverage
+
+New test files, this subset's `TestBit` convention (not `sigma.collections`' `sigtest`/`Assert`, which doesn't apply here) — `test/sigma/test_farray.c`, `test/sigma/test_parray.c` (both currently have zero coverage in this subset), plus `Query`/`as_queryable` coverage across every producer above:
+
+- **Dense** (`farray`/`parray`/`collection`/`list`, via `Query.next`/`Query.first`): first-match found, no-match exhausts the full scan, early-break via `Query.first` actually stops before scanning remaining elements (call-counting predicate), empty collection, `out_index` correctness on match and no-match, NULL-argument invariants.
+- **Sparse** (`map`/`slotarray`): the same matrix, plus — empty/tombstone slots are correctly skipped and never reach the predicate (the one behavior that's actually new/risky here, not shared with the dense path); `Map.keys`/`Map.values` project the right field; a removed-then-reinserted slot doesn't produce a stale or duplicate yield.

@@ -173,3 +173,27 @@ void parray_element_copy(void *dest, const void *src, usize element_size) {
     addr *dest_ptr = (addr *)dest;
     *dest_ptr = *src_ptr;
 }
+
+// Shared sc_query_advance_fn for every dense source (farray, parray,
+// collection, list via its own already-owned collection). self->bound is
+// the logical element count (not raw allocated capacity — a collection's
+// buffer may be larger than what's actually been appended).
+bool array_base_query_advance(sc_queryable *self, const void **out_element, usize *out_index) {
+    if (!self || !self->source) {
+        return false;
+    }
+    if (self->index >= self->bound) {
+        return false;
+    }
+    const sc_array_base *arr = (const sc_array_base *)self->source;
+    void *element = array_base_get_element_ptr(arr, self->element_size, self->index);
+    if (!element) {
+        return false;
+    }
+    *out_element = element;
+    if (out_index) {
+        *out_index = self->index;
+    }
+    self->index++;
+    return true;
+}

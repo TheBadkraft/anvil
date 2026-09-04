@@ -27,6 +27,7 @@
 #pragma once
 
 #include <sigma/types.h>
+#include <sigma/query.h>
 
 // Unified array structure - both farray and parray can be cast to this
 typedef struct sc_array_base {
@@ -39,6 +40,11 @@ typedef struct sc_array_base {
 int array_base_capacity(const sc_array_base *arr, usize element_size);
 bool array_base_is_valid_index(const sc_array_base *arr, usize element_size, usize index);
 void *array_base_get_element_ptr(const sc_array_base *arr, usize element_size, usize index);
+
+// Shared sc_query_advance_fn for every dense source (farray, parray,
+// collection, and list via its own already-owned collection) — walks
+// self->source (cast to sc_array_base*) at self->element_size, in order.
+bool array_base_query_advance(sc_queryable *self, const void **out_element, usize *out_index);
 
 // Type-specific operations
 typedef bool (*array_element_empty_fn)(const void *element, usize element_size);

@@ -235,6 +235,35 @@ static sparse_iterator slotarray_create_iterator(slotarray sa) {
     return sparse_iterator_new(sa, &slotarray_sparse_ops);
 }
 
+// sc_query_advance_fn for SlotArray.as_queryable — walks the underlying
+// parray directly (same dense mechanics PArray.as_queryable uses), skipping
+// ADDR_EMPTY slots. Yields const addr *, consistent with PArray's own
+// element convention (a pointer to the stored addr, not the addr itself).
+static bool slotarray_query_advance(sc_queryable *self, const void **out_element, usize *out_index) {
+    slotarray sa = (slotarray)self->source;
+    const sc_array_base *arr = (const sc_array_base *)sa->array;
+    while (self->index < self->bound) {
+        usize i = self->index++;
+        void *element = array_base_get_element_ptr(arr, sizeof(addr), i);
+        if (element && *(const addr *)element != ADDR_EMPTY) {
+            *out_element = element;
+            if (out_index) {
+                *out_index = i;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+// produce a heapless queryable over the slotarray's occupied slots
+static sc_queryable slotarray_as_queryable(slotarray sa) {
+    usize cap = sa ? PArray.capacity(sa->array) : 0;
+    return (sc_queryable){
+        .source = sa, .element_size = sizeof(addr), .bound = cap, .index = 0,
+        .advance = slotarray_query_advance};
+}
+
 // public interface implementation
 const sc_slotarray_i SlotArray = {
     .new = slotarray_new,
@@ -248,4 +277,5 @@ const sc_slotarray_i SlotArray = {
     .capacity = slotarray_capacity,
     .clear = slotarray_clear,
     .create_iterator = slotarray_create_iterator,
+    .as_queryable = slotarray_as_queryable,
 };

@@ -297,6 +297,15 @@ iterator collection_create_iterator(collection coll) {
   return it;
 }
 
+/* Produce a heapless queryable over the collection's elements */
+sc_queryable collection_as_queryable(collection coll) {
+  usize length = coll ? coll->length : 0;
+  usize stride = coll ? coll->stride : 0;
+  return (sc_queryable){
+      .source = coll, .element_size = stride, .bound = length, .index = 0,
+      .advance = array_base_query_advance};
+}
+
 //  public interface implementation
 const sc_collections_i Collections = {
     .add = collection_add,
@@ -307,6 +316,7 @@ const sc_collections_i Collections = {
     .create_view = collection_create_view,
     .dispose = collection_dispose,
     .version = collection_get_version,
+    .as_queryable = collection_as_queryable,
 };
 
 /* Advances to next item and returns true if there is one */

@@ -35,6 +35,7 @@
 
 #include <sigma/allocator.h>
 #include <sigma/farray.h>
+#include <sigma/query.h>
 struct sc_slotarray;
 typedef struct sc_slotarray *slotarray;
 
@@ -109,5 +110,14 @@ typedef struct sc_slotarray_i {
      * @return New sparse iterator, or NULL on failure
      */
     sparse_iterator (*create_iterator)(slotarray);
+
+    /**
+     * @brief Produce a heapless queryable over the slotarray's occupied
+     *        slots, for Query.next/Query.first. Skips empty slots
+     *        automatically.
+     * @param sa The slotarray to query
+     * @return An sc_queryable yielding `const object *` per element
+     */
+    sc_queryable (*as_queryable)(slotarray);
 } sc_slotarray_i;
 extern const sc_slotarray_i SlotArray;

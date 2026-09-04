@@ -61,6 +61,7 @@ static int farray_remove_at(farray, usize, usize);
 // Collection interface functions
 static collection farray_as_collection(farray arr, usize stride);
 static collection farray_to_collection(farray arr, usize stride);
+static sc_queryable farray_as_queryable(farray arr, usize stride);
 #endif
 
 // API function implementations
@@ -172,6 +173,14 @@ static collection farray_to_collection(farray arr, usize stride) {
 
     return coll;
 }
+
+// produce a heapless queryable over the farray's elements
+static sc_queryable farray_as_queryable(farray arr, usize stride) {
+    usize count = arr ? (usize)farray_capacity(arr, stride) : 0;
+    return (sc_queryable){
+        .source = arr, .element_size = stride, .bound = count, .index = 0,
+        .advance = array_base_query_advance};
+}
 #endif
 
 //  public interface implementation
@@ -186,4 +195,5 @@ const sc_farray_i FArray = {
     .remove = farray_remove_at,
     .as_collection = farray_as_collection,
     .to_collection = farray_to_collection,
+    .as_queryable = farray_as_queryable,
 };
