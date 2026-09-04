@@ -8,6 +8,7 @@
  * File: test/infra/test_list.c
  */
 #include "sigma/list.h"
+#include "sigma/query.h"
 #include "testbit.h"
 
 static void td(void) {}
@@ -170,6 +171,56 @@ static void test_il08_list_iterator(void) {
    List.dispose(lst);
 }
 
+/* ----------------------------------------------------------------- */
+/* IL09 — List.as_queryable: Query.first finds a match, zero alloc    */
+/* ----------------------------------------------------------------- */
+static bool list_points_to_30(const void *element, usize index, void *userdata) {
+   (void)index;
+   (void)userdata;
+   int *stored = *(int *const *)element;
+   return stored && *stored == 30;
+}
+
+static void test_il09_list_as_queryable_first(void) {
+   list lst = List.new(4, sizeof(void *));
+   int a = 10, b = 20, c = 30, d = 40;
+   List.append(lst, &a);
+   List.append(lst, &b);
+   List.append(lst, &c);
+   List.append(lst, &d);
+
+   sc_queryable q = List.as_queryable(lst);
+   usize idx = 999;
+   TestBit.is_true(Query.first(q, list_points_to_30, NULL, &idx), "IL09: Query.first finds 30");
+   TestBit.is_equal_int(2, (long long)idx, "IL09: 30 is at index 2");
+
+   List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL10 — List.as_queryable: Query.next visits every element in order */
+/* ----------------------------------------------------------------- */
+static void test_il10_list_as_queryable_next(void) {
+   list lst = List.new(4, sizeof(void *));
+   int a = 1, b = 2, c = 3;
+   List.append(lst, &a);
+   List.append(lst, &b);
+   List.append(lst, &c);
+
+   sc_queryable q = List.as_queryable(lst);
+   const void *elem;
+   int expected[3] = {1, 2, 3};
+   int seen = 0;
+   while (Query.next(&q, &elem, NULL)) {
+      int *stored = *(int *const *)elem;
+      TestBit.is_equal_int(expected[seen], (long long)*stored, "IL10: element matches expected order");
+      seen++;
+   }
+   TestBit.is_equal_int(3, (long long)seen, "IL10: Query.next visits all 3 elements");
+
+   List.dispose(lst);
+}
+
 int main(void) {
    TestBit.run_ex("IL01_list_new", NULL, test_il01_list_new, td);
    TestBit.run_ex("IL02_list_append", NULL, test_il02_list_append, td);
@@ -179,6 +230,8 @@ int main(void) {
    TestBit.run_ex("IL06_list_clear", NULL, test_il06_list_clear, td);
    TestBit.run_ex("IL07_list_grow", NULL, test_il07_list_grow, td);
    TestBit.run_ex("IL08_list_iterator", NULL, test_il08_list_iterator, td);
+   TestBit.run_ex("IL09_list_as_queryable_first", NULL, test_il09_list_as_queryable_first, td);
+   TestBit.run_ex("IL10_list_as_queryable_next", NULL, test_il10_list_as_queryable_next, td);
 
    return TestBit.report();
 }

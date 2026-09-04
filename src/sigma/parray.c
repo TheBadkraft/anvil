@@ -60,6 +60,7 @@ static int parray_remove_at(parray, usize);
 // Collection interface functions
 static collection parray_as_collection(parray arr);
 static collection parray_to_collection(parray arr);
+static sc_queryable parray_as_queryable(parray arr);
 #endif
 
 // API function implementations
@@ -196,6 +197,14 @@ static slotarray parray_as_slotarray(parray arr) {
 exit:
     return sa;
 }
+
+// produce a heapless queryable over the parray's elements
+static sc_queryable parray_as_queryable(parray arr) {
+    usize count = arr ? (usize)parray_capacity(arr) : 0;
+    return (sc_queryable){
+        .source = arr, .element_size = sizeof(addr), .bound = count, .index = 0,
+        .advance = array_base_query_advance};
+}
 #endif
 
 //  public interface implementation
@@ -211,4 +220,5 @@ const sc_parray_i PArray = {
     .as_collection = parray_as_collection,
     .to_collection = parray_to_collection,
     .as_slotarray = parray_as_slotarray,
+    .as_queryable = parray_as_queryable,
 };

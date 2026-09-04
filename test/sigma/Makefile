@@ -14,6 +14,7 @@ SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
              $(ANVL)/src/sigma/memory.c \
              $(ANVL)/src/sigma/arrays.c \
              $(ANVL)/src/sigma/array_base.c \
+             $(ANVL)/src/sigma/query.c \
              $(ANVL)/src/sigma/farray.c \
              $(ANVL)/src/sigma/parray.c \
              $(ANVL)/src/sigma/slotarray.c \
@@ -47,12 +48,19 @@ endef
 
 .PHONY: all clean val build test
 .PHONY: build_test_list build_test_map build_test_math build_test_strings
+.PHONY: build_test_query build_test_farray build_test_parray build_test_collections build_test_slotarray
 .PHONY: test_list test_map test_math test_strings $(UNIT_CASES)
+.PHONY: test_query test_farray test_parray test_collections test_slotarray
 
 all: $(BIN)/test_list \
      $(BIN)/test_map \
      $(BIN)/test_math \
-     $(BIN)/test_strings
+     $(BIN)/test_strings \
+     $(BIN)/test_query \
+     $(BIN)/test_farray \
+     $(BIN)/test_parray \
+     $(BIN)/test_collections \
+     $(BIN)/test_slotarray
 
 $(BIN)/test_list: test_list.c $(SIGMA_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
@@ -89,6 +97,51 @@ build_test_strings: $(BIN)/test_strings
 
 test_strings: $(BIN)/test_strings
 	$(call run_test_bin,test_strings)
+
+$(BIN)/test_query: test_query.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_query: $(BIN)/test_query
+
+test_query: $(BIN)/test_query
+	$(call run_test_bin,test_query)
+
+$(BIN)/test_farray: test_farray.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_farray: $(BIN)/test_farray
+
+test_farray: $(BIN)/test_farray
+	$(call run_test_bin,test_farray)
+
+$(BIN)/test_parray: test_parray.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_parray: $(BIN)/test_parray
+
+test_parray: $(BIN)/test_parray
+	$(call run_test_bin,test_parray)
+
+$(BIN)/test_collections: test_collections.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_collections: $(BIN)/test_collections
+
+test_collections: $(BIN)/test_collections
+	$(call run_test_bin,test_collections)
+
+$(BIN)/test_slotarray: test_slotarray.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_slotarray: $(BIN)/test_slotarray
+
+test_slotarray: $(BIN)/test_slotarray
+	$(call run_test_bin,test_slotarray)
 
 # Shorthand aliases: make list [val|build] -> make test_list [val|build]
 $(UNIT_CASES): %: test_%

@@ -41,6 +41,7 @@
 #include <sigma/allocator.h>
 #include <sigma/types.h>
 #include <sigma/collection.h>
+#include <sigma/query.h>
 
 // forward declaration of the array structure
 struct sc_pointer_array;
@@ -121,5 +122,12 @@ typedef struct sc_parray_i {
      * @return A slotarray view, or NULL on failure
      */
     slotarray (*as_slotarray)(parray);
+    /**
+     * @brief Produce a heapless queryable over the array's elements, for
+     *        Query.next/Query.first — no allocation, no collection view.
+     * @param arr The array to query
+     * @return An sc_queryable ready to scan
+     */
+    sc_queryable (*as_queryable)(parray);
 } sc_parray_i;
 extern const sc_parray_i PArray;

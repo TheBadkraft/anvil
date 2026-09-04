@@ -119,5 +119,12 @@ typedef struct sc_list_i {
     * @return New iterator instance, or NULL on failure
     */
    iterator (*create_iterator)(list);
+   /**
+    * @brief Produce a heapless queryable over the list's own already-owned
+    *        collection, for Query.next/Query.first — O(1), no allocation.
+    * @param lst The list to query
+    * @return An sc_queryable ready to scan
+    */
+   sc_queryable (*as_queryable)(list);
 } sc_list_i;
 extern const sc_list_i List;

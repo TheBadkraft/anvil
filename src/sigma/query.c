@@ -21,16 +21,48 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  * ----------------------------------------------------------------------- *
- * File: collection.h
- * Description: Forward declaration for the generic collection type
+ * File: query.c
+ * Description: Source file for Sigma Collections' heapless query mechanism
  */
-#pragma once
 
-#include <sigma/types.h>
+#include <sigma/query.h>
 
-// forward declaration of the collection structure
-struct sc_collection;
-typedef struct sc_collection *collection;
+static bool query_next(sc_queryable *q, const void **out_element, usize *out_index) {
+   if (!q || !q->advance) {
+      return false;
+   }
+   const void *elem = NULL;
+   usize idx = 0;
+   if (!q->advance(q, &elem, &idx)) {
+      return false;
+   }
+   if (out_element) {
+      *out_element = elem;
+   }
+   if (out_index) {
+      *out_index = idx;
+   }
+   return true;
+}
 
-// Return true to stop a scan at this element (it matched); false to keep scanning.
-typedef bool (*sc_predicate_fn)(const void *element, usize index, void *userdata);
+static bool query_first(sc_queryable q, sc_predicate_fn pred, void *userdata, usize *out_index) {
+   if (!pred) {
+      return false;
+   }
+   const void *elem;
+   usize idx;
+   while (query_next(&q, &elem, &idx)) {
+      if (pred(elem, idx, userdata)) {
+         if (out_index) {
+            *out_index = idx;
+         }
+         return true;
+      }
+   }
+   return false;
+}
+
+const sc_query_i Query = {
+   .next = query_next,
+   .first = query_first,
+};

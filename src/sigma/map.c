@@ -54,6 +54,11 @@ static int map_find_slot(map m, const char *key, usize len, uint64_t hash, usize
 static bool map_is_empty_slot(map m, usize index);
 static int map_get_at(map m, usize index, object *out_entry);
 
+// Forward declarations - Query helpers
+static sc_queryable map_as_queryable(map m);
+static sc_queryable map_keys(map m);
+static sc_queryable map_values(map m);
+
 /**
  * @brief Map bucket entry
  */
@@ -92,6 +97,9 @@ const sc_map_i Map = {
    .count = map_count,
    .capacity = map_capacity,
    .create_iterator = map_create_iterator,
+   .as_queryable = map_as_queryable,
+   .keys = map_keys,
+   .values = map_values,
 };
 
 // Helper/utility function definitions
@@ -435,4 +443,106 @@ static sparse_iterator map_create_iterator(map m) {
       return NULL;
    }
    return sparse_iterator_new(m, &map_sparse_ops);
+}
+
+/**
+ * @brief sc_query_advance_fn for Map.as_queryable — yields const map_entry *,
+ *        skipping empty and tombstone slots.
+ */
+static bool map_entry_query_advance(sc_queryable *self, const void **out_element, usize *out_index) {
+   map m = (map)self->source;
+   while (self->index < self->bound) {
+      usize i = self->index++;
+      if (!map_is_empty_slot(m, i)) {
+         object entry;
+         if (map_get_at(m, i, &entry) == OK) {
+            *out_element = entry;
+            if (out_index) {
+               *out_index = i;
+            }
+            return true;
+         }
+      }
+   }
+   return false;
+}
+
+/**
+ * @brief sc_query_advance_fn for Map.keys — yields const sc_key_view *,
+ *        skipping empty and tombstone slots.
+ */
+static bool map_keys_query_advance(sc_queryable *self, const void **out_element, usize *out_index) {
+   map m = (map)self->source;
+   while (self->index < self->bound) {
+      usize i = self->index++;
+      if (!map_is_empty_slot(m, i)) {
+         object entry;
+         if (map_get_at(m, i, &entry) == OK) {
+            static _Thread_local sc_key_view view;
+            const map_entry *e = entry;
+            view.ptr = e->key;
+            view.len = e->key_len;
+            *out_element = &view;
+            if (out_index) {
+               *out_index = i;
+            }
+            return true;
+         }
+      }
+   }
+   return false;
+}
+
+/**
+ * @brief sc_query_advance_fn for Map.values — yields const addr *,
+ *        skipping empty and tombstone slots.
+ */
+static bool map_values_query_advance(sc_queryable *self, const void **out_element, usize *out_index) {
+   map m = (map)self->source;
+   while (self->index < self->bound) {
+      usize i = self->index++;
+      if (!map_is_empty_slot(m, i)) {
+         object entry;
+         if (map_get_at(m, i, &entry) == OK) {
+            static _Thread_local addr value;
+            value = ((const map_entry *)entry)->value;
+            *out_element = &value;
+            if (out_index) {
+               *out_index = i;
+            }
+            return true;
+         }
+      }
+   }
+   return false;
+}
+
+/**
+ * @brief Produce a heapless queryable over the map's entries
+ */
+static sc_queryable map_as_queryable(map m) {
+   usize cap = m ? m->capacity : 0;
+   return (sc_queryable){
+       .source = m, .element_size = 0, .bound = cap, .index = 0,
+       .advance = map_entry_query_advance};
+}
+
+/**
+ * @brief Produce a heapless queryable over the map's keys
+ */
+static sc_queryable map_keys(map m) {
+   usize cap = m ? m->capacity : 0;
+   return (sc_queryable){
+       .source = m, .element_size = 0, .bound = cap, .index = 0,
+       .advance = map_keys_query_advance};
+}
+
+/**
+ * @brief Produce a heapless queryable over the map's values
+ */
+static sc_queryable map_values(map m) {
+   usize cap = m ? m->capacity : 0;
+   return (sc_queryable){
+       .source = m, .element_size = 0, .bound = cap, .index = 0,
+       .advance = map_values_query_advance};
 }

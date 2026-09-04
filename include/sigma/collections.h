@@ -34,6 +34,7 @@
 #include <sigma/collection.h>
 #include <sigma/farray.h>
 #include <sigma/parray.h>
+#include <sigma/query.h>
 
 /* Forward declarations */
 typedef struct iterator_s *iterator;
@@ -103,6 +104,13 @@ typedef struct sc_collections_i {
     * @param use Pointer to sc_alloc_use_t or NULL to restore malloc/free fallback
     */
    void (*alloc_use)(sc_alloc_use_t *use);
+   /**
+    * @brief Produce a heapless queryable over an existing collection's
+    *        elements, for Query.next/Query.first.
+    * @param coll The collection to query
+    * @return An sc_queryable ready to scan
+    */
+   sc_queryable (*as_queryable)(collection coll);
 } sc_collections_i;
 extern const sc_collections_i Collections;
 
