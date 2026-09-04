@@ -57,6 +57,20 @@ typedef struct {
                     // by parser_dispose_ctx) only if parse_source never reaches that hand-off.
 } parser_ctx;
 typedef parser_ctx *context;
+// Array and tuple differ only in delimiter, error codes, and minimum element count — this is
+// that difference, data instead of duplicated control flow (see parse_collection). too_few_err
+// is only consulted when min_elements > 1 (array's own minimum of 1 is already fully covered
+// by the empty-`[]` check up front, so it never needs a second, always-false check or a
+// placeholder code).
+typedef struct {
+   char close;
+   anvl_err_code empty_err;
+   anvl_err_code missing_delim_err;
+   anvl_err_code expected_close_err;
+   usize min_elements;
+   anvl_err_code too_few_err;
+   anvl_value_type value_type;
+} collection_spec_t;
 
 // Global parser state
 static parser_state parser = {0};
@@ -86,12 +100,14 @@ static bool parse_attribute_list(anvl_source, list *);
 static void dispose_attribute_list(list);
 static bool parse_identifier(anvl_source, anvl_slice *);
 static bool parse_value(anvl_source, anvl_value *);
+static bool parse_value_body(anvl_source, anvl_value *);
 static bool parse_scalar_value(anvl_source, anvl_value *);
 static bool parse_reserved_literal(anvl_source, anvl_value *);
 static bool parse_numeric_literal(anvl_source, anvl_value *);
 static bool parse_string_literal(anvl_source, anvl_value *);
 static bool parse_blob_literal(anvl_source, anvl_value *);
 static bool parse_bare_literal(anvl_source, anvl_value *);
+static bool parse_collection(anvl_source, anvl_value *, const collection_spec_t *);
 static bool parse_array(anvl_source, anvl_value *);
 static bool parse_tuple(anvl_source, anvl_value *);
 static bool parse_object_value(anvl_source, anvl_value *);
@@ -558,6 +574,39 @@ static bool parse_identifier(anvl_source src, anvl_slice *out_identifier) {
 
    return true;
 }
+// Value dispatch shared by parse_value (a statement's own value, ';'-terminated) and
+// parse_collection (array/tuple elements, ','/close-delimiter-terminated) — "what kind of
+// value starts here," with no opinion on what has to follow it. Does not allocate the value
+// node itself (the caller already did, via Source.new_node) or check for a terminator.
+// Scalar, then array/tuple/object by leading symbol. Only the final `else` sets a generic
+// error — every other branch either succeeds or has already set its own, more specific error
+// via parser_set_error internally, so there's exactly one call site for
+// ANVL_ERR_PARSER_EXPECTED_VALUE in the whole file, shared by every caller, and no risk of a
+// generic error silently overwriting a specific one that already fired.
+static bool parse_value_body(anvl_source src, anvl_value *out_value) {
+   if (parse_scalar_value(src, out_value)) {
+      return true;
+   }
+   if (Source.peek(src) == ANVL_TOK_LBRACKET) {
+      return parse_array(src, out_value); // array already sets its own error on failure
+   }
+   if (Source.peek(src) == ANVL_TOK_LPAREN) {
+      return parse_tuple(src, out_value); // tuple already sets its own error on failure
+   }
+   if (Source.peek(src) == ANVL_TOK_LBRACE) {
+      // AMP forbids an object-typed value entirely (AMP16 at top level; AMP20-style rejection
+      // for a nested element is handled earlier, in parse_collection, before this is ever
+      // reached for an element) — rejected on sight, same shape as every other AMP-forbidden
+      // construct in this file.
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      return parse_object_value(src, out_value); // object already sets its own error on failure
+   }
+   parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
+   return false; // Not a scalar, not a collection start — genuinely not a value
+}
 // Parse a value from the source
 static bool parse_value(anvl_source src, anvl_value *out_value) {
    *out_value = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
@@ -566,34 +615,8 @@ static bool parse_value(anvl_source src, anvl_value *out_value) {
       return false; // Failed to allocate value node
    }
 
-   // Value dispatch: scalar, then array/tuple/object by leading symbol. Only the final `else`
-   // sets a generic error — every other branch either succeeds or has already set its own,
-   // more specific error via parser_set_error internally, so there's exactly one call site for
-   // ANVL_ERR_PARSER_EXPECTED_VALUE and no risk of a generic error silently overwriting a
-   // specific one that already fired.
-   if (parse_scalar_value(src, out_value)) {
-      // fall through to terminator check
-   } else if (Source.peek(src) == ANVL_TOK_LBRACKET) {
-      if (!parse_array(src, out_value)) {
-         return false; // array already set its own error
-      }
-   } else if (Source.peek(src) == ANVL_TOK_LPAREN) {
-      if (!parse_tuple(src, out_value)) {
-         return false; // tuple already set its own error
-      }
-   } else if (Source.peek(src) == ANVL_TOK_LBRACE) {
-      // AMP forbids an object-typed ASSIGN value entirely (AMP16) — rejected on sight, same
-      // shape as every other AMP-forbidden construct in this file.
-      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
-         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
-         return false;
-      }
-      if (!parse_object_value(src, out_value)) {
-         return false; // object already set its own error
-      }
-   } else {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
-      return false; // Not a scalar, not a collection start — genuinely not a value
+   if (!parse_value_body(src, out_value)) {
+      return false; // parse_value_body already set the appropriate error
    }
 
    // 3. end of statement terminator `;` is required for all dialects. Only same-line
@@ -910,24 +933,23 @@ static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
 
    return true; // Successfully parsed bare literal
 }
-// Parse an array value. Elements are comma-separated (trailing comma allowed), and the list
-// itself owns its `list items` directly — no per-element pos/len bookkeeping needed the way
-// the legacy parser (src/core/_parser.c:733-833) tracked it, since every anvl_value already
-// carries its own `.text` slice from whichever literal parser produced it. AMP restricts
-// elements to scalars only, rejected at the leading symbol on sight — not by generically
-// parsing a nested structure and checking its type afterward, matching the JS reference
-// parser's parseAmpElement (see notes/document-body-parse.md "Dialect scope"). AML's future
-// any-value (including nested collections) element grammar isn't implemented yet, so this
-// only ever calls parse_scalar_value, never the full parse_value, for each element.
-static bool parse_array(anvl_source src, anvl_value *out_value) {
+// Shared skeleton for array/tuple parsing (see parse_array/parse_tuple below for the specifics
+// each one plugs in). Elements are comma-separated (trailing comma allowed), parsed via
+// parse_value_body — any value, not just scalar; AMP's scalar-only restriction is enforced
+// right here, per element, by rejecting a nested collection on sight of its leading symbol,
+// not by restricting what parse_value_body itself can produce (matching the JS reference
+// parser's parseAmpElement, not the legacy parser's parse-then-check-type approach — see
+// notes/document-body-parse.md "Dialect scope"). The list itself owns its `list items`
+// directly — no per-element pos/len bookkeeping needed the way the legacy parser
+// (src/core/_parser.c:733-833, 834-935) tracked it, since every anvl_value already carries
+// its own `.text` slice from whichever parser produced it.
+static bool parse_collection(anvl_source src, anvl_value *out_value, const collection_spec_t *spec) {
    const char *start = Source.at(src);
-   // consume the array start token
-   Source.consume(src, 1);
+   Source.consume(src, 1); // open delimiter — already confirmed present by the caller
    Source.skip_whitespace_and_comments(src);
 
-   // Check for empty array (INVALID)
-   if (Source.peek(src) == ANVL_TOK_RBRACKET) {
-      parser_set_error(src, ANVL_ERR_PARSER_ARRAY_CANNOT_BE_EMPTY);
+   if (Source.peek(src) == spec->close) {
+      parser_set_error(src, spec->empty_err);
       return false;
    }
 
@@ -937,10 +959,9 @@ static bool parse_array(anvl_source src, anvl_value *out_value) {
       return false;
    }
 
-   while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_RBRACKET) {
-      // AMP forbids nested collections as array elements — reject on sight of the leading
-      // symbol, before wasting an attempt on parse_scalar_value (which could never produce
-      // one anyway, but the point is not to imply it was even considered).
+   while (!Source.is_eof(src) && Source.peek(src) != spec->close) {
+      // AMP forbids nested collections as array/tuple elements — reject on sight of the
+      // leading symbol, before wasting an attempt on parse_value_body.
       char lead = Source.peek(src);
       if (Source.dialect(src) == ANVL_DIALECT_AMP &&
           (lead == ANVL_TOK_LBRACE || lead == ANVL_TOK_LBRACKET || lead == ANVL_TOK_LPAREN)) {
@@ -955,11 +976,9 @@ static bool parse_array(anvl_source src, anvl_value *out_value) {
          List.dispose(items);
          return false;
       }
-      // this is an AMP restriction: only scalar values are allowed in arrays
-      if (!parse_scalar_value(src, &elem)) {
-         parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
+      if (!parse_value_body(src, &elem)) {
          List.dispose(items);
-         return false;
+         return false; // parse_value_body already set its own error
       }
       List.append(items, elem);
 
@@ -968,123 +987,71 @@ static bool parse_array(anvl_source src, anvl_value *out_value) {
       if (Source.peek(src) == ',') {
          Source.consume(src, 1);
          Source.skip_whitespace_and_comments(src);
-         continue; // may land on ']' now (trailing comma) — loop condition handles it
+         continue; // may land on the close delimiter now (trailing comma) — loop condition handles it
       }
-      if (Source.peek(src) == ANVL_TOK_RBRACKET) {
+      if (Source.peek(src) == spec->close) {
          break;
       }
 
-      parser_set_error(src, ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY);
+      parser_set_error(src, spec->missing_delim_err);
       List.dispose(items);
       return false;
    }
 
-   if (Source.peek(src) != ANVL_TOK_RBRACKET) {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE);
+   if (Source.peek(src) != spec->close) {
+      parser_set_error(src, spec->expected_close_err);
       List.dispose(items);
       return false;
    }
-   Source.consume(src, 1); // consume ']'
+
+   // minimum element count — checked before consuming the close delimiter, matching the
+   // legacy tuple parser's own ordering.
+   if (spec->min_elements > 1 && List.size(items) < spec->min_elements) {
+      parser_set_error(src, spec->too_few_err);
+      List.dispose(items);
+      return false;
+   }
+   Source.consume(src, 1); // close delimiter
 
    // set value type & initialize the value slice
-   (*out_value)->type = ANVL_VALUE_ARRAY;
+   (*out_value)->type = spec->value_type;
    Source.init_slice(src, &(*out_value)->text);
    (*out_value)->text.start = start;
    (*out_value)->text.end = Source.at(src);
    (*out_value)->collection.items = items;
 
-   return true; // Successfully parsed array
+   return true; // Successfully parsed collection
 }
-// Parse a tuple value. Same element-parsing shape as parse_array (see its own doc comment) —
-// elements via parse_scalar_value, AMP rejects a nested collection element on sight of its
-// leading symbol, reusing ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR (matching the legacy parser's
-// own choice, src/core/_parser.c:876-880, to reuse the array error code for tuple's identical
-// AMP restriction rather than a separate TUPLE-specific one). Unlike an array, a tuple
-// requires at least two elements — empty and single-element tuples are both parse errors,
-// since a one-element tuple isn't meaningfully positional (checked before consuming the
-// closing ')', matching legacy's own ordering). AML's eventual "a tuple element may be any
-// value, including a nested array/object/tuple" is deferred until object/array-value dispatch
-// exists elsewhere — element parsing here is scalar-only for now, same as array.
+// Parse an array value ('[ elements ]'). See parse_collection for the shared shape.
+static bool parse_array(anvl_source src, anvl_value *out_value) {
+   static const collection_spec_t spec = {
+      .close = ANVL_TOK_RBRACKET,
+      .empty_err = ANVL_ERR_PARSER_ARRAY_CANNOT_BE_EMPTY,
+      .missing_delim_err = ANVL_ERR_PARSER_MISSING_COMMA_IN_ARRAY,
+      .expected_close_err = ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE,
+      .min_elements = 1,
+      .too_few_err = ANVL_ERR_NONE, // unused: min_elements <= 1, see parse_collection's doc comment
+      .value_type = ANVL_VALUE_ARRAY,
+   };
+   return parse_collection(src, out_value, &spec);
+}
+// Parse a tuple value ('( elements )'). See parse_collection for the shared shape. Unlike an
+// array, a tuple requires at least two elements — empty and single-element tuples are both
+// parse errors, since a one-element tuple isn't meaningfully positional. Reuses
+// ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR for tuple's identical AMP restriction rather than a
+// separate TUPLE-specific code, matching the legacy parser's own choice
+// (src/core/_parser.c:876-880).
 static bool parse_tuple(anvl_source src, anvl_value *out_value) {
-   const char *start = Source.at(src);
-   // consume the tuple start token
-   Source.consume(src, 1);
-   Source.skip_whitespace_and_comments(src);
-
-   // Check for empty tuple (INVALID)
-   if (Source.peek(src) == ANVL_TOK_RPAREN) {
-      parser_set_error(src, ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED);
-      return false;
-   }
-
-   list items = List.new(4, sizeof(anvl_value));
-   if (!items) {
-      parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
-      return false;
-   }
-
-   while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_RPAREN) {
-      // AMP forbids nested collections as tuple elements — same reject-on-sight
-      // treatment as parse_array; see its own doc comment for why.
-      char lead = Source.peek(src);
-      if (Source.dialect(src) == ANVL_DIALECT_AMP &&
-          (lead == ANVL_TOK_LBRACE || lead == ANVL_TOK_LBRACKET || lead == ANVL_TOK_LPAREN)) {
-         parser_set_error(src, ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR);
-         List.dispose(items);
-         return false;
-      }
-
-      anvl_value elem = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
-      if (!elem) {
-         parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
-         List.dispose(items);
-         return false;
-      }
-      if (!parse_scalar_value(src, &elem)) {
-         parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
-         List.dispose(items);
-         return false;
-      }
-      List.append(items, elem);
-
-      Source.skip_whitespace_and_comments(src);
-
-      if (Source.peek(src) == ',') {
-         Source.consume(src, 1);
-         Source.skip_whitespace_and_comments(src);
-         continue; // may land on ')' now (trailing comma) — loop condition handles it
-      }
-      if (Source.peek(src) == ANVL_TOK_RPAREN) {
-         break;
-      }
-
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE);
-      List.dispose(items);
-      return false;
-   }
-
-   if (Source.peek(src) != ANVL_TOK_RPAREN) {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE);
-      List.dispose(items);
-      return false;
-   }
-
-   // minimum 2 elements — checked before consuming ')', matching legacy's own ordering
-   if (List.size(items) < 2) {
-      parser_set_error(src, ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS);
-      List.dispose(items);
-      return false;
-   }
-   Source.consume(src, 1); // consume ')'
-
-   // set value type & initialize the value slice
-   (*out_value)->type = ANVL_VALUE_TUPLE;
-   Source.init_slice(src, &(*out_value)->text);
-   (*out_value)->text.start = start;
-   (*out_value)->text.end = Source.at(src);
-   (*out_value)->collection.items = items;
-
-   return true; // Successfully parsed tuple
+   static const collection_spec_t spec = {
+      .close = ANVL_TOK_RPAREN,
+      .empty_err = ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED,
+      .missing_delim_err = ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE,
+      .expected_close_err = ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE,
+      .min_elements = 2,
+      .too_few_err = ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS,
+      .value_type = ANVL_VALUE_TUPLE,
+   };
+   return parse_collection(src, out_value, &spec);
 }
 // Parse an object-typed value ('name := { statements };') — the exact same recursive
 // statement-list shape as the direct OBJECT_BLOCK statement form (see parse_statement_list's

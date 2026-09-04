@@ -139,7 +139,12 @@ typedef enum {
    ANVL_ERR_PARSER_INVALID_HEX_LITERAL = 5007,
    ANVL_ERR_PARSER_INVALID_EXPONENT = 5008,
    ANVL_ERR_PARSER_INVALID_NUMBER = 5009,
-   ANVL_ERR_VARS_INVALID_VARREF = 5010,             // '$' not followed by valid identifier
+   // '$' not immediately followed by a syntactically well-formed reference (identifier-shaped
+   // target name) — missing entirely, or whitespace between '$' and it. Purely syntactic: the
+   // parser never checks whether the reference's target actually exists as a declared
+   // identifier (an unmatched reference is a Resolver-phase concern, resolved to `null`, not a
+   // parse error) — "identifier" here would wrongly suggest that check happens at parse time.
+   ANVL_ERR_VARS_INVALID_VARREF = 5010,
    ANVL_ERR_VARS_UNTERMINATED_INTERP = 5011,        // $"…{ref" missing closing '}'
    ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF = 5012, // '${' missing closing '}'
 

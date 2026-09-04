@@ -55,7 +55,14 @@ static module_document setup_aml_doc(const char *fixture_name, module_context *o
 }
 
 /* ---------------------------------------------------------------------- *
- * AML00 — tuple assignment (f06_tuple.anvl)
+ * AML00 — tuple assignment, including a nested tuple element (f06_tuple.anvl)
+ * Commentary: `nested`'s middle element is itself a tuple — the case this
+ * fixture's own comment block always promised ("nested elements") but
+ * couldn't deliver until array/tuple elements accepted any value, not
+ * just scalars (parse_collection now calls parse_value_body per element,
+ * not parse_scalar_value — see notes/document-body-parse.md). AMP's
+ * scalar-only element restriction (AMP20) is unaffected — this is purely
+ * an AML capability.
  * ---------------------------------------------------------------------- */
 static void test_aml00_tuple_assign(void) {
    module_context ctx = NULL;
@@ -68,16 +75,51 @@ static void test_aml00_tuple_assign(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "AML00: parse body returns OK");
-   TestBit.is_equal_int(1, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
-                        "AML00: one statement captured");
+   TestBit.is_equal_int(3, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML00: three statements captured");
 
+   // coords := (10, 20); — numeric elements
    anvl_statement stmt = NULL;
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
-   TestBit.is_not_null(stmt, "AML00: statement retrieved");
+   TestBit.is_not_null(stmt, "AML00: 'coords' statement retrieved");
    if (stmt && stmt->value) {
-      TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value->type, "AML00: value is TUPLE");
+      TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value->type,
+                           "AML00: coords value is TUPLE");
       TestBit.is_equal_int(2, (long long)List.size(stmt->value->collection.items),
-                           "AML00: tuple has two elements");
+                           "AML00: coords tuple has two elements");
+   }
+
+   // mixed := (1, "two", true); — mixed scalar elements
+   stmt = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML00: 'mixed' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(3, (long long)List.size(stmt->value->collection.items),
+                           "AML00: mixed tuple has three elements");
+      anvl_value elem = NULL;
+      List.get(stmt->value->collection.items, 1, (object *)&elem);
+      if (elem) {
+         TestBit.is_equal_int(ANVL_VALUE_STRING, (long long)elem->type,
+                              "AML00: mixed tuple's second element is STRING");
+      }
+   }
+
+   // nested := (1, (2, 3), 4); — a tuple element, nested inside a tuple
+   stmt = NULL;
+   FArray.get(doc->body, 2, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML00: 'nested' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(3, (long long)List.size(stmt->value->collection.items),
+                           "AML00: nested tuple has three elements");
+      anvl_value elem = NULL;
+      List.get(stmt->value->collection.items, 1, (object *)&elem);
+      TestBit.is_not_null(elem, "AML00: nested tuple's middle element retrieved");
+      if (elem) {
+         TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)elem->type,
+                              "AML00: nested tuple's middle element is itself a TUPLE");
+         TestBit.is_equal_int(2, (long long)List.size(elem->collection.items),
+                              "AML00: the nested tuple has two elements");
+      }
    }
 
    mod_ctx_dispose(ctx);
@@ -456,6 +498,71 @@ static void test_aml12_attributes_on_assign(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * AML13 — nested collections: array-of-arrays and object-as-tuple-element
+ * (body_nested_collections.anvl)
+ * Commentary: the other two nesting combinations AML00's tuple-in-tuple
+ * doesn't cover — an array element that is itself an array, and a tuple
+ * element that is itself an object. All three together (this one plus
+ * AML00) exercise every collection-in-collection pairing parse_collection
+ * (via parse_value_body) now supports.
+ * ---------------------------------------------------------------------- */
+static void test_aml13_nested_collections(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_aml_doc("body_nested_collections.anvl", &ctx);
+   TestBit.is_not_null(doc, "AML13: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "AML13: parse body returns OK");
+   TestBit.is_equal_int(2, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML13: two statements captured");
+
+   // grid := [[1, 2, 3], [4, 5, 6]];
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML13: 'grid' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_ARRAY, (long long)stmt->value->type,
+                           "AML13: grid value is ARRAY");
+      TestBit.is_equal_int(2, (long long)List.size(stmt->value->collection.items),
+                           "AML13: grid has two elements");
+      anvl_value row = NULL;
+      List.get(stmt->value->collection.items, 0, (object *)&row);
+      TestBit.is_not_null(row, "AML13: grid's first row retrieved");
+      if (row) {
+         TestBit.is_equal_int(ANVL_VALUE_ARRAY, (long long)row->type,
+                              "AML13: grid's first row is itself an ARRAY");
+         TestBit.is_equal_int(3, (long long)List.size(row->collection.items),
+                              "AML13: grid's first row has three elements");
+      }
+   }
+
+   // player := (Aria, { health := 100; stamina := 50; }, warrior);
+   stmt = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML13: 'player' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_TUPLE, (long long)stmt->value->type,
+                           "AML13: player value is TUPLE");
+      TestBit.is_equal_int(3, (long long)List.size(stmt->value->collection.items),
+                           "AML13: player has three elements");
+      anvl_value middle = NULL;
+      List.get(stmt->value->collection.items, 1, (object *)&middle);
+      TestBit.is_not_null(middle, "AML13: player's middle element retrieved");
+      if (middle) {
+         TestBit.is_equal_int(ANVL_VALUE_OBJECT, (long long)middle->type,
+                              "AML13: player's middle element is an OBJECT");
+         TestBit.is_equal_int(2, (long long)List.size(middle->object.statements),
+                              "AML13: the nested object has two statements");
+      }
+   }
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -477,6 +584,7 @@ int main(void) {
    TestBit.run_ex("AML11_import_and_static_reference", NULL, test_aml11_import_and_static_reference,
                   th);
    TestBit.run_ex("AML12_attributes_on_assign", NULL, test_aml12_attributes_on_assign, th);
+   TestBit.run_ex("AML13_nested_collections", NULL, test_aml13_nested_collections, th);
 
    return TestBit.report();
 }
