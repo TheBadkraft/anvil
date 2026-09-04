@@ -117,6 +117,8 @@ typedef struct sc_slotarray_i {
      *        automatically.
      * @param sa The slotarray to query
      * @return An sc_queryable yielding `const object *` per element
+     * @warning Do not add/remove_at on sa while the returned queryable is
+     *          in use — see the INVARIANT note in query.h.
      */
     sc_queryable (*as_queryable)(slotarray);
 } sc_slotarray_i;
