@@ -32,27 +32,17 @@
 #include <stdint.h>
 
 /* ----------------------------------------------------------------- *
- * Module Interface                                                  *
- * ----------------------------------------------------------------- */
-typedef struct anvl_mod_i {
-   bool (*parse)(AnvlMod mod);
-} anvl_mod_i;
-extern const anvl_mod_i Module;
-
-/* ----------------------------------------------------------------- *
  * Anvil Interface                                                   *
+ * ----------------------------------------------------------------- *
+ * Retired: the old Module/AnvlMod-based load/parse/dispose surface  *
+ * this file used to declare (unimplemented stub, only ever referenced *
+ * by the already-disabled test_fixtures.c) — superseded by the real  *
+ * public ABI in anvil_types.h/anvil_flat.h (anvil_load, anvil_dispose, *
+ * anvil_has_errors, anvil_get_error). See notes/public-api.md.        *
+ * get_version stays here — genuinely implemented, and test_version.c  *
+ * (which runs after every test suite) depends on it.                 *
  * ----------------------------------------------------------------- */
 typedef struct anvl_i {
-   AnvlMod (*load)(const char *filepath);
-   // AnvlMod (*read)(const char *source, usize len);
-   void (*dispose)(AnvlMod mod);
-   const char *(*get_root_path)(AnvlMod mod);
-   // void (*cleanup)(void);
-   // Error handling - from root error state can be queried across multiple source objects
-   bool (*has_errors)(AnvlMod mod);
-   // const anvl_error_state *(*error_get)(void);
-   void (*error_clear)(AnvlMod mod);
-   // Version
    const char *(*get_version)(void);
 } anvl_i;
 extern const anvl_i Anvl;
