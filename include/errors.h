@@ -92,6 +92,10 @@ typedef enum {
    ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050,
    ANVL_ERR_RESOLVER_MISSING_BASE = 4051,
    ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS = 4052,
+   // Two top-level statements (in the same document, or across merged imports) declare the
+   // same name — ambiguous for both '$identifier' VarRef and 'base' lookup purposes, so this
+   // is a hard error regardless of where the collision originates. See notes/resolution-phase.md.
+   ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER = 4053,
 
    // Vars Errors (41xx)
    ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101,

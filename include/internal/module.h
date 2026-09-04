@@ -47,6 +47,12 @@ struct anvl_mod_ctx_t {
                          // own the pointed-to nodes (the arena does) — see "Arena node iteration".
    list values;          // index of every anvl_value allocated via Source.new_node; same non-owning
                          // relationship to the arena as `statements` above.
+   map identifiers;      // top-level statement name -> anvl_statement, built once by
+                         // mod_resolve_context from every document's own doc->body (not the
+                         // flat `statements` index above, which also includes nested
+                         // statements). Shared by '$identifier' VarRef and 'base'/inheritance
+                         // lookup alike. NULL until mod_resolve_context runs. See
+                         // notes/resolution-phase.md.
 };
 
 typedef enum {
@@ -124,7 +130,14 @@ typedef struct anvl_value_t {
          list statements; // object: list of anvl_doc_statement pointers
       } object;
       struct {
-         anvl_slice target; // identifier following '$', sigil excluded
+         anvl_slice target;  // identifier following '$', sigil excluded
+         struct anvl_value_t *resolved; // set by Resolution; NULL until resolved, and stays NULL for a
+                              // missing target, a reference cycle, or a target that names an
+                              // anonymous (OBJECT_BLOCK) statement — none of those are parse-
+                              // or resolve-time errors for a VarRef. Aliases the target's
+                              // existing value node directly (safe: every anvl_value in a
+                              // module_context shares one arena, disposed as a single block —
+                              // see notes/resolution-phase.md "VarRef resolution").
       } varref;
    };
 } anvl_value_t;
@@ -286,6 +299,27 @@ anvl_result mod_ctx_create_arena(module_context ctx, usize size, anvl_err_code *
  * yet implemented — stub for RED-state testing.
  */
 usize mod_ctx_arena_size_hint(usize summed_source_length);
+/**
+ * @brief Resolve '$identifier' VarRefs and validate 'base' targets across every document in
+ * the context.
+ * @param ctx The module context to resolve. Every document in `ctx->docs` must already have
+ * been through a successful `doc_parse_body` — Resolution is phase 4, run once, after every
+ * body in the import graph has parsed; document order does not matter.
+ * @param[out] out_err_code Pointer to the error code if resolution fails.
+ * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
+ * @details Builds `ctx->identifiers` (every document's top-level statements, by name) first;
+ * a duplicate top-level name anywhere in the context is a hard error
+ * (`ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER`) and stops resolution immediately. Then, for every
+ * statement in the context (any nesting depth) with a non-empty `base`: a target missing from
+ * `ctx->identifiers` is `ANVL_ERR_RESOLVER_MISSING_BASE`; a target that names an anonymous
+ * (`ANVL_STMT_OBJECT_BLOCK`) statement is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (anonymous
+ * objects are immutable and cannot be inherited from). Finally, for every `ANVL_VALUE_VARREF`
+ * in the context (any nesting depth), chases its target to a final concrete value, setting
+ * `.varref.resolved` — a missing target, a reference cycle, or a target naming an anonymous
+ * statement are not errors, just leave `.resolved` `NULL`. See notes/resolution-phase.md for
+ * the full design.
+ */
+anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code);
 /**
  * @brief Clear all documents from the module context.
  * @param docs List of documents to clear.

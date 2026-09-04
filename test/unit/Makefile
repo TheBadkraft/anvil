@@ -16,6 +16,7 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/files.c \
 			 $(ANVL)/src/core/module.c \
 			 $(ANVL)/src/core/parser.c \
+			 $(ANVL)/src/core/resolver.c \
 			 $(ANVL)/src/core/source.c \
 			 $(ANVL)/src/core/source_registry.c \
 			 $(ANVL)/src/sigma/list.c \
@@ -67,7 +68,7 @@ endef
 .PHONY: all clean val build test test_release
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
 .PHONY: build_test_body_amp build_test_body_aml
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml $(UNIT_CASES)
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -76,7 +77,8 @@ all: $(BIN)/test_version \
 	$(BIN)/test_header \
 	$(BIN)/test_source \
 	$(BIN)/test_body_amp \
-	$(BIN)/test_body_aml
+	$(BIN)/test_body_aml \
+	$(BIN)/test_resolver
 # test_fixtures is disabled: it depends on the deprecated root/doc APIs that
 # were replaced by the source-hash identity model. Revive after the parser
 # is reintegrated with anvl_source.
@@ -170,6 +172,18 @@ build_test_body_aml: $(BIN)/test_body_aml
 
 test_body_aml: $(BIN)/test_version $(BIN)/test_body_aml
 	$(call run_test_bin,test_body_aml)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_resolver: test_resolver.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_resolver: $(BIN)/test_resolver
+
+test_resolver: $(BIN)/test_version $(BIN)/test_resolver
+	$(call run_test_bin,test_resolver)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

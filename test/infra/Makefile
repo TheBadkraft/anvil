@@ -27,6 +27,7 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 				 $(ANVL)/src/core/module.c \
 				 $(ANVL)/src/core/document.c \
 				 $(ANVL)/src/core/parser.c \
+				 $(ANVL)/src/core/resolver.c \
 				 $(ANVL)/src/core/source.c \
 				 $(ANVL)/src/core/source_registry.c
 

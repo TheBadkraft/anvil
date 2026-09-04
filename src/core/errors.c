@@ -90,6 +90,7 @@ static const char *error_messages[] = {
    [ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS] =
       "Cannot inherit from anonymous object (use ':=' for inheritable "
       "declarations)",
+   [ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER] = "Duplicate top-level identifier",
 
    [ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED] = "vars block is already defined",
    [ANVL_ERR_VARS_NOT_FIRST] = "vars block must appear before all statements",
@@ -201,6 +202,7 @@ static const char *error_names[] = {
    [ANVL_ERR_RESOLVER_CYCLE_DETECTED] = "ANVL_ERR_RESOLVER_CYCLE_DETECTED",
    [ANVL_ERR_RESOLVER_MISSING_BASE] = "ANVL_ERR_RESOLVER_MISSING_BASE",
    [ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS] = "ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS",
+   [ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER] = "ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER",
 
    [ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED] = "ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED",
    [ANVL_ERR_VARS_NOT_FIRST] = "ANVL_ERR_VARS_NOT_FIRST",

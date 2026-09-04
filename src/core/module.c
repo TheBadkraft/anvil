@@ -358,6 +358,15 @@ void mod_ctx_dispose(module_context ctx) {
    ctx->statements = NULL;
    ctx->values = NULL;
 
+   // identifiers' keys borrow statement-name slices (arena-owned) and its values are
+   // anvl_statement pointers (also arena-owned) — Map.dispose only releases the map's own
+   // bucket storage, nothing it points to, matching statements/values' non-owning relationship
+   // to the arena above.
+   if (ctx->identifiers) {
+      Map.dispose(ctx->identifiers);
+      ctx->identifiers = NULL;
+   }
+
    mod_ctx_dispose_arena(ctx->arena);
 
    Allocator.dispose(ctx);
