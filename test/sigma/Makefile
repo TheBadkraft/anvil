@@ -15,6 +15,8 @@ SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
              $(ANVL)/src/sigma/arrays.c \
              $(ANVL)/src/sigma/array_base.c \
              $(ANVL)/src/sigma/farray.c \
+             $(ANVL)/src/sigma/parray.c \
+             $(ANVL)/src/sigma/slotarray.c \
              $(ANVL)/src/sigma/collections.c \
              $(ANVL)/src/sigma/list.c \
              $(ANVL)/src/sigma/map.c \
