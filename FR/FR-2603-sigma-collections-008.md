@@ -4,9 +4,15 @@
 **Type:** Feature Request
 **Owner:** sigma.collections
 **Filed:** 2026-09-04
-**Status:** open
+**Status:** closed — superseded by FR-2603-sigma-collections-006
 **Requested by:** Anvil (raised during FR-2603-sigma-collections-006 review)
 **Tags:** sigma-collections, iterator, query, zero-allocation, collection
+
+---
+
+## Superseded (2026-09-04)
+
+FR-006's own review expanded to cover exactly this case, properly named and homed: `Collections.as_queryable(collection)` (see FR-006's "Resolution" section, "Producers" — dense sources) is this request's `Collections.<scan>` entry point, verbatim in intent. No separate implementation needed — closing this in favor of FR-006, which now ships it directly.
 
 ---
 
