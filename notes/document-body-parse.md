@@ -1,5 +1,7 @@
 # Document Body Parse
 
+**Status: implemented and GREEN.** Phase 3 of the document pipeline (`doc_parse_body`) is complete — the full AMP/AML statement and value grammar, arena-backed node allocation, `$identifier` VarRef parsing, nested collections, inheritance/attribute syntax. `test_body_amp.c` (31/31, 219 assertions) and `test_body_aml.c` (17/17, 139 assertions) both pass, Valgrind-clean. Kept as implementation reference below, not rewritten now that it's done — see per-section "Status" notes throughout for what shipped and why.
+
 Implementation reference for the body-parse step that follows header scanning and import loading in AML.
 
 See `notes/deferred-work.md` for anything raised here that's deferred to a later phase or still an open decision.

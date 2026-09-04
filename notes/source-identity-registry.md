@@ -2,9 +2,13 @@
 
 ## Status
 
-In progress. Transitioning from per-context namespace/doc_map identity to a
-process-wide source-hash registry where `module_document` is the document
-identity.
+**Complete.** The transition from per-context namespace/doc_map identity to a
+process-wide source-hash registry (`module_document` as the document identity)
+finished — everything under "Completed"/"Completed step 1–6" below shipped,
+and the "Next iteration" pointer at the bottom (header scanning and import
+resolution) was itself completed too, along with every phase after it (body
+parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
+`resolution-phase.md`. Kept as historical reference below, not rewritten.
 
 ## Goal
 

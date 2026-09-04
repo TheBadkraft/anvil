@@ -1,5 +1,7 @@
 # Document Header Scan
 
+**Status: implemented and GREEN.** Phase 1 of the document pipeline (`doc_scan_header`) is complete — shebang/import/module-attribute scanning, import-graph loading (`mod_load_imports`, including diamond/cycle handling), and the source-hash registry it all sits on. `test_header.c` (`HDR00`–`HDR20`), `test_source.c`, `test_registry.c`, `test_module.c`'s `CR17`–`CR22` all pass, Valgrind-clean. Kept as implementation reference below, not rewritten now that it's done — see per-section "Status" notes throughout for what shipped and why.
+
 Implementation reference for the header-scan step that precedes full body parsing in AML. Edited as the implementation evolves.
 
 See `notes/deferred-work.md` for anything raised here that's deferred to a later phase or still an open decision.
