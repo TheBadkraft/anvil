@@ -105,7 +105,8 @@ typedef enum {
    ANVL_VALUE_ARRAY,      // collection (e.g. `[1, 2, 3]`) - elements are anvl_value pointers
    ANVL_VALUE_TUPLE,      // collection (e.g. `(1, 2, 3)`) - elements are anvl_value pointers
    ANVL_VALUE_OBJECT,     // nested statement list, not key/value pairs
-   ANVL_VALUE_IDENTIFIER, // bare symbol: static reference to another statement's value
+   ANVL_VALUE_IDENTIFIER, // bare symbol: an ordinary literal string (e.g. `name := David;`) - no implicit resolution
+   ANVL_VALUE_VARREF,     // `$identifier`: static, resolve-once reference - see notes/document-body-parse.md
 } anvl_value_type;
 
 typedef struct anvl_value_t {
@@ -122,6 +123,9 @@ typedef struct anvl_value_t {
       struct {
          list statements; // object: list of anvl_doc_statement pointers
       } object;
+      struct {
+         anvl_slice target; // identifier following '$', sigil excluded
+      } varref;
    };
 } anvl_value_t;
 typedef anvl_value_t *anvl_value;

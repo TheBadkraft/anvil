@@ -111,6 +111,7 @@ static bool parse_collection(anvl_source, anvl_value *, const collection_spec_t 
 static bool parse_array(anvl_source, anvl_value *);
 static bool parse_tuple(anvl_source, anvl_value *);
 static bool parse_object_value(anvl_source, anvl_value *);
+static bool parse_varref(anvl_source, anvl_value *);
 static bool is_value_boundary(anvl_source);
 static void skip_same_line_whitespace(anvl_source);
 static void parser_set_error(anvl_source, anvl_err_code);
@@ -604,6 +605,15 @@ static bool parse_value_body(anvl_source src, anvl_value *out_value) {
       }
       return parse_object_value(src, out_value); // object already sets its own error on failure
    }
+   if (Source.peek(src) == '$') {
+      // AMP forbids a VarRef entirely — rejected on sight, same shape as every other
+      // AMP-forbidden construct in this file.
+      if (Source.dialect(src) == ANVL_DIALECT_AMP) {
+         parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+         return false;
+      }
+      return parse_varref(src, out_value); // varref already sets its own error on failure
+   }
    parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
    return false; // Not a scalar, not a collection start — genuinely not a value
 }
@@ -886,7 +896,7 @@ static bool parse_blob_literal(anvl_source src, anvl_value *out_value) {
 // identifier-start-shaped, '.', '/', or a digit — a digit only ever reaches here because
 // parse_numeric_literal (tried earlier in parse_scalar_value) already declined it, never as
 // a fresh leading-digit case of its own. '$' is deliberately not a valid leading character:
-// it's reserved for a future VarRef sigil, even though VarRef dispatch doesn't exist yet.
+// it's the VarRef sigil, dispatched separately by parse_value_body (see parse_varref below).
 static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
    char first = Source.peek(src);
    bool valid_start = Source.is_identifier_start(first) || first == ANVL_TOK_DOT || first == '/' ||
@@ -932,6 +942,49 @@ static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
    (*out_value)->text = text;
 
    return true; // Successfully parsed bare literal
+}
+// Parse a '$identifier' VarRef — a static, resolve-once reference to another statement's
+// value (see notes/document-body-parse.md "$ VarRef reinstated"). Strictly bare: no dotted
+// path, no call syntax — matching the JS reference parser's parseVarRef. Purely syntactic:
+// the parser never checks whether the target actually exists as a declared identifier, and
+// does not apply parse_identifier's keyword rejection to it either — an unmatched *or*
+// keyword-shaped target both just resolve to `null` at Resolution time, not a parse error
+// (see the ANVL_ERR_VARS_INVALID_VARREF doc comment, errors.h). AMP forbids '$' entirely —
+// checked by the caller (parse_value_body) before this is ever reached.
+static bool parse_varref(anvl_source src, anvl_value *out_value) {
+   const char *start = Source.at(src);
+   Source.consume(src, 1); // '$'
+
+   if (!Source.is_identifier_start(Source.peek(src))) {
+      parser_set_error(src, ANVL_ERR_VARS_INVALID_VARREF);
+      return false;
+   }
+
+   const char *target_start = Source.at(src);
+   Source.consume(src, 1);
+   while (Source.is_identifier_part(Source.peek(src))) {
+      Source.consume(src, 1);
+   }
+   const char *target_end = Source.at(src);
+
+   // A dotted path after an otherwise well-formed target is a distinct, common mistake worth
+   // naming precisely, rather than silently truncating to the leading segment and letting the
+   // leftover '.rest' trip a confusing, unrelated failure downstream — same rationale as the
+   // '@'/'`' check in parse_bare_literal above.
+   if (Source.peek(src) == ANVL_TOK_DOT) {
+      parser_set_error(src, ANVL_ERR_VARS_INVALID_VARREF);
+      return false;
+   }
+
+   (*out_value)->type = ANVL_VALUE_VARREF;
+   Source.init_slice(src, &(*out_value)->text);
+   (*out_value)->text.start = start;
+   (*out_value)->text.end = target_end;
+   Source.init_slice(src, &(*out_value)->varref.target);
+   (*out_value)->varref.target.start = target_start;
+   (*out_value)->varref.target.end = target_end;
+
+   return true;
 }
 // Shared skeleton for array/tuple parsing (see parse_array/parse_tuple below for the specifics
 // each one plugs in). Elements are comma-separated (trailing comma allowed), parsed via

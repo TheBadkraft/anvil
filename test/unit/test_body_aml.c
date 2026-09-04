@@ -178,10 +178,12 @@ static void test_aml02_static_value_reference(void) {
    FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&derived);
    TestBit.is_not_null(derived, "AML02: 'derived_var' statement retrieved");
    if (derived && derived->value) {
-      TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)derived->value->type,
-                           "AML02: value is IDENTIFIER");
-      TestBit.is_true(slice_equals(derived->value->text, "base_var"),
-                      "AML02: identifier text references 'base_var'");
+      TestBit.is_equal_int(ANVL_VALUE_VARREF, (long long)derived->value->type,
+                           "AML02: value is VARREF");
+      TestBit.is_true(slice_equals(derived->value->text, "$base_var"),
+                      "AML02: full text is '$base_var'");
+      TestBit.is_true(slice_equals(derived->value->varref.target, "base_var"),
+                      "AML02: target references 'base_var'");
    }
 
    mod_ctx_dispose(ctx);
@@ -563,6 +565,110 @@ static void test_aml13_nested_collections(void) {
 
    mod_ctx_dispose(ctx);
 }
+/* ---------------------------------------------------------------------- *
+ * AML14 — '$identifier' VarRef: as a statement's own value, and nested
+ * inside an array element (body_varref.anvl)
+ * ---------------------------------------------------------------------- */
+static void test_aml14_varref_value(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_aml_doc("body_varref.anvl", &ctx);
+   TestBit.is_not_null(doc, "AML14: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_OK, res, "AML14: parse body returns OK");
+   TestBit.is_equal_int(3, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
+                        "AML14: three statements captured");
+
+   // alias := $name;
+   anvl_statement stmt = NULL;
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML14: 'alias' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_VARREF, (long long)stmt->value->type,
+                           "AML14: alias value is VARREF");
+      TestBit.is_true(slice_equals(stmt->value->text, "$name"),
+                      "AML14: alias full text is '$name'");
+      TestBit.is_true(slice_equals(stmt->value->varref.target, "name"),
+                      "AML14: alias target is 'name'");
+   }
+
+   // wrapped := [$name, "static"];
+   stmt = NULL;
+   FArray.get(doc->body, 2, sizeof(anvl_statement), (object *)&stmt);
+   TestBit.is_not_null(stmt, "AML14: 'wrapped' statement retrieved");
+   if (stmt && stmt->value) {
+      TestBit.is_equal_int(ANVL_VALUE_ARRAY, (long long)stmt->value->type,
+                           "AML14: wrapped value is ARRAY");
+      anvl_value elem = NULL;
+      List.get(stmt->value->collection.items, 0, (object *)&elem);
+      TestBit.is_not_null(elem, "AML14: wrapped's first element retrieved");
+      if (elem) {
+         TestBit.is_equal_int(ANVL_VALUE_VARREF, (long long)elem->type,
+                              "AML14: wrapped's first element is VARREF");
+         TestBit.is_true(slice_equals(elem->varref.target, "name"),
+                         "AML14: wrapped's first element targets 'name'");
+      }
+   }
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
+ * AML15 — malformed '$' with no identifier following it (nothing, or
+ * whitespace before the identifier) — ANVL_ERR_VARS_INVALID_VARREF
+ * ---------------------------------------------------------------------- */
+static void test_aml15_varref_missing_target_rejected(void) {
+   const char *buffers[2] = {
+      "#!aml\n"
+      "bad := $;\n",
+      "#!aml\n"
+      "bad := $ name;\n",
+   };
+
+   for (usize i = 0; i < 2; i++) {
+      module_context ctx = NULL;
+      module_document doc = setup_amp_doc(buffers[i], &ctx);
+      TestBit.is_not_null(doc, "AML15: document loaded");
+      if (!doc) {
+         continue;
+      }
+
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      anvl_result res = doc_parse_body(doc, &err_code);
+      TestBit.is_equal_int(ANVL_RES_ERR, res, "AML15: parse body returns ERR");
+      TestBit.is_true(doc_has_errors(doc), "AML15: document reports an error");
+      TestBit.is_equal_int(ANVL_ERR_VARS_INVALID_VARREF, err_code,
+                           "AML15: err_code reports INVALID_VARREF");
+
+      mod_ctx_dispose(ctx);
+   }
+}
+/* ---------------------------------------------------------------------- *
+ * AML16 — dotted-path '$identifier.rest' rejected; AML has no dotted-path
+ * VarRefs, strictly bare only — ANVL_ERR_VARS_INVALID_VARREF
+ * ---------------------------------------------------------------------- */
+static void test_aml16_varref_dotted_path_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "bad := $name.sub;\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "AML16: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "AML16: parse body returns ERR");
+   TestBit.is_true(doc_has_errors(doc), "AML16: document reports an error");
+   TestBit.is_equal_int(ANVL_ERR_VARS_INVALID_VARREF, err_code,
+                        "AML16: err_code reports INVALID_VARREF");
+
+   mod_ctx_dispose(ctx);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -585,6 +691,11 @@ int main(void) {
                   th);
    TestBit.run_ex("AML12_attributes_on_assign", NULL, test_aml12_attributes_on_assign, th);
    TestBit.run_ex("AML13_nested_collections", NULL, test_aml13_nested_collections, th);
+   TestBit.run_ex("AML14_varref_value", NULL, test_aml14_varref_value, th);
+   TestBit.run_ex("AML15_varref_missing_target_rejected", NULL,
+                  test_aml15_varref_missing_target_rejected, th);
+   TestBit.run_ex("AML16_varref_dotted_path_rejected", NULL,
+                  test_aml16_varref_dotted_path_rejected, th);
 
    return TestBit.report();
 }

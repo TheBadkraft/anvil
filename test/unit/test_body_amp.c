@@ -1043,6 +1043,37 @@ static void test_amp24_bare_literal_rejects_at_and_backtick(void) {
       mod_ctx_dispose(ctx);
    }
 }
+/* ---------------------------------------------------------------------- *
+ * AMP25 — '$identifier' VarRef rejected entirely in AMP, at both the
+ * top-level value position and nested as an array element — matching
+ * every other AMP-forbidden construct (base/attributes/object).
+ * ---------------------------------------------------------------------- */
+static void test_amp25_varref_rejected(void) {
+   const char *buffers[2] = {
+      "#!amp\n"
+      "alias := $name;\n",
+      "#!amp\n"
+      "wrapped := [$name];\n",
+   };
+
+   for (usize i = 0; i < 2; i++) {
+      module_context ctx = NULL;
+      module_document doc = setup_amp_doc(buffers[i], &ctx);
+      TestBit.is_not_null(doc, "AMP25: document loaded");
+      if (!doc) {
+         continue;
+      }
+
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      anvl_result res = doc_parse_body(doc, &err_code);
+      TestBit.is_equal_int(ANVL_RES_ERR, res, "AMP25: parse body returns ERR");
+      TestBit.is_true(doc_has_errors(doc), "AMP25: document reports an error");
+      TestBit.is_equal_int(ANVL_ERR_PARSER_UNEXPECTED_TOKEN, err_code,
+                           "AMP25: err_code reports UNEXPECTED_TOKEN");
+
+      mod_ctx_dispose(ctx);
+   }
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -1096,6 +1127,7 @@ int main(void) {
                   test_amp23_second_decimal_point_declines_to_bare, th);
    TestBit.run_ex("AMP24_bare_literal_rejects_at_and_backtick", NULL,
                   test_amp24_bare_literal_rejects_at_and_backtick, th);
+   TestBit.run_ex("AMP25_varref_rejected", NULL, test_amp25_varref_rejected, th);
 
    return TestBit.report();
 }
