@@ -370,6 +370,12 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
       if (Source.peek(src) == '=') {
          Source.consume(src, 1);
          Source.skip_whitespace_and_comments(src);
+         if (Source.peek(src) == '$') {
+            parser_set_error(src, ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE);
+            Allocator.dispose(attr);
+            dispose_attribute_list(attrs);
+            return false;
+         }
          const char *value_start = Source.at(src);
          bool in_string = false;
          while (!Source.is_eof(src)) {

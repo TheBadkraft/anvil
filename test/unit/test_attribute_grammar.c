@@ -217,39 +217,43 @@ static void test_atg_m10_hyphenated_value_accepted(void) {
    }
    mod_ctx_dispose(ctx);
 }
-/* ATG_M11 — a '$identifier' in a module attribute's value is captured as raw
- * text, never dispatched to parse_varref (that dispatch only happens inside
- * parse_value_body for statement values, src/core/parser.c:608) and never
- * touched by mod_resolve_context (which only walks doc->body, never
- * doc->header->attributes). Runs the full pipeline, including resolution of
- * the real 'var' statement elsewhere in the same document, to prove the
- * attribute's '$var' stays raw even once resolution has something to find. */
-static void test_atg_m11_dollar_identifier_value_is_raw_text(void) {
+/* ATG_M11 — a module attribute value that leads with '$' is a hard error, not
+ * silently-accepted literal text. Attribute values have no VarRef mechanism
+ * (see the resolved sub-question in notes/public-api.md) and a caller who
+ * writes '$var' expecting a live reference should never get back the
+ * literal 4-byte string instead — that's a decided policy call, not a
+ * parser accident. Matches parse_value_body's own dispatch point
+ * (src/core/parser.c:608), which checks the leading byte the same way. */
+static void test_atg_m11_dollar_prefixed_value_rejected(void) {
    module_context ctx = NULL;
-   module_document doc =
-      setup_registered_doc("@[key=$var]\nvar := \"hello\";\n", &ctx);
+   module_document doc = setup_registered_doc("@[key=$var]\nname := test\n", &ctx);
    TestBit.is_not_null(doc, "ATG_M11: registered document allocated");
    if (!doc) {
       return;
    }
    anvl_err_code err_code = ANVL_ERR_NONE;
-   TestBit.is_equal_int(ANVL_RES_OK, doc_scan_header(doc, &err_code),
-                        "ATG_M11: '$var' value accepted by header scan");
-   usize size_hint = 0;
-   (void)mod_load_imports(ctx, doc, &size_hint, &err_code);
-   usize capacity = mod_ctx_arena_size_hint(size_hint);
-   mod_ctx_create_arena(ctx, capacity, &err_code);
-   TestBit.is_equal_int(ANVL_RES_OK, doc_parse_body(doc, &err_code),
-                        "ATG_M11: body parses ('var' statement present)");
-   TestBit.is_equal_int(ANVL_RES_OK, mod_resolve_context(ctx, &err_code),
-                        "ATG_M11: resolution runs successfully over the document");
-   anvl_attribute attr = NULL;
-   List.get(doc->header->attributes, 0, (object *)&attr);
-   TestBit.is_not_null(attr, "ATG_M11: attribute retrieved");
-   if (attr) {
-      TestBit.is_true(slice_equals(attr->value, "$var"),
-                      "ATG_M11: value text is the raw, unresolved '$var'");
+   TestBit.is_equal_int(ANVL_RES_ERR, doc_scan_header(doc, &err_code),
+                        "ATG_M11: '$var' value rejected");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE, err_code,
+                        "ATG_M11: err_code is VARREF_NOT_ALLOWED_IN_ATTRIBUTE");
+   mod_ctx_dispose(ctx);
+}
+/* ATG_M12 — same rejection applies even when '$' is followed by a digit
+ * rather than an identifier ('$5', not just '$var') — the rule is "no
+ * leading '$', full stop", not "only reject things that look like a
+ * plausible VarRef". */
+static void test_atg_m12_dollar_digit_value_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_registered_doc("@[price=$5]\nname := test\n", &ctx);
+   TestBit.is_not_null(doc, "ATG_M12: registered document allocated");
+   if (!doc) {
+      return;
    }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_ERR, doc_scan_header(doc, &err_code),
+                        "ATG_M12: '$5' value rejected");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE, err_code,
+                        "ATG_M12: err_code is VARREF_NOT_ALLOWED_IN_ATTRIBUTE");
    mod_ctx_dispose(ctx);
 }
 
@@ -409,35 +413,35 @@ static void test_atg_s10_hyphenated_value_accepted(void) {
    }
    mod_ctx_dispose(ctx);
 }
-/* ATG_S11 — same as ATG_M11, at statement level: a '$identifier' in a
- * statement attribute's value is raw text, not a VarRef — parse_attribute_list
- * never dispatches to parse_varref, and mod_resolve_context never walks
- * stmt->attributes. */
-static void test_atg_s11_dollar_identifier_value_is_raw_text(void) {
+/* ATG_S11 — same as ATG_M11, at statement level: a '$'-prefixed statement
+ * attribute value is a hard error, not silently-accepted literal text. */
+static void test_atg_s11_dollar_prefixed_value_rejected(void) {
    module_context ctx = NULL;
-   module_document doc =
-      setup_attr_stmt_doc("server @[key=$var] := \"prod-1\";\nvar := \"hello\";\n", &ctx);
+   module_document doc = setup_attr_stmt_doc("server @[key=$var] := \"prod-1\";\n", &ctx);
    TestBit.is_not_null(doc, "ATG_S11: document loaded");
    if (!doc) {
       return;
    }
    anvl_err_code err_code = ANVL_ERR_NONE;
-   TestBit.is_equal_int(ANVL_RES_OK, doc_parse_body(doc, &err_code),
-                        "ATG_S11: '$var' value accepted by attribute-list parsing");
-   TestBit.is_equal_int(ANVL_RES_OK, mod_resolve_context(ctx, &err_code),
-                        "ATG_S11: resolution runs successfully over the document");
-   anvl_statement stmt = NULL;
-   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
-   TestBit.is_not_null(stmt, "ATG_S11: 'server' statement retrieved");
-   if (stmt && stmt->attributes) {
-      anvl_attribute attr = NULL;
-      List.get(stmt->attributes, 0, (object *)&attr);
-      TestBit.is_not_null(attr, "ATG_S11: attribute retrieved");
-      if (attr) {
-         TestBit.is_true(slice_equals(attr->value, "$var"),
-                         "ATG_S11: value text is the raw, unresolved '$var'");
-      }
+   TestBit.is_equal_int(ANVL_RES_ERR, doc_parse_body(doc, &err_code),
+                        "ATG_S11: '$var' value rejected");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE, err_code,
+                        "ATG_S11: err_code is VARREF_NOT_ALLOWED_IN_ATTRIBUTE");
+   mod_ctx_dispose(ctx);
+}
+/* ATG_S12 — same as ATG_M12, at statement level: '$5' rejected too. */
+static void test_atg_s12_dollar_digit_value_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_attr_stmt_doc("server @[price=$5] := \"prod-1\";\n", &ctx);
+   TestBit.is_not_null(doc, "ATG_S12: document loaded");
+   if (!doc) {
+      return;
    }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_ERR, doc_parse_body(doc, &err_code),
+                        "ATG_S12: '$5' value rejected");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE, err_code,
+                        "ATG_S12: err_code is VARREF_NOT_ALLOWED_IN_ATTRIBUTE");
    mod_ctx_dispose(ctx);
 }
 
@@ -457,8 +461,10 @@ int main(void) {
    TestBit.run_ex("ATG_M09_single_char_key_accepted", NULL, test_atg_m09_single_char_key_accepted, th);
    TestBit.run_ex("ATG_M10_hyphenated_value_accepted", NULL,
                   test_atg_m10_hyphenated_value_accepted, th);
-   TestBit.run_ex("ATG_M11_dollar_identifier_value_is_raw_text", NULL,
-                  test_atg_m11_dollar_identifier_value_is_raw_text, th);
+   TestBit.run_ex("ATG_M11_dollar_prefixed_value_rejected", NULL,
+                  test_atg_m11_dollar_prefixed_value_rejected, th);
+   TestBit.run_ex("ATG_M12_dollar_digit_value_rejected", NULL,
+                  test_atg_m12_dollar_digit_value_rejected, th);
 
    TestBit.run_ex("ATG_S01_baseline_identifier_key", NULL, test_atg_s01_baseline_identifier_key, th);
    TestBit.run_ex("ATG_S02_leading_underscore_key", NULL, test_atg_s02_leading_underscore_key, th);
@@ -472,8 +478,10 @@ int main(void) {
    TestBit.run_ex("ATG_S09_single_char_key_accepted", NULL, test_atg_s09_single_char_key_accepted, th);
    TestBit.run_ex("ATG_S10_hyphenated_value_accepted", NULL,
                   test_atg_s10_hyphenated_value_accepted, th);
-   TestBit.run_ex("ATG_S11_dollar_identifier_value_is_raw_text", NULL,
-                  test_atg_s11_dollar_identifier_value_is_raw_text, th);
+   TestBit.run_ex("ATG_S11_dollar_prefixed_value_rejected", NULL,
+                  test_atg_s11_dollar_prefixed_value_rejected, th);
+   TestBit.run_ex("ATG_S12_dollar_digit_value_rejected", NULL,
+                  test_atg_s12_dollar_digit_value_rejected, th);
 
    return TestBit.report();
 }

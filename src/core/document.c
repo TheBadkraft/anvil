@@ -318,6 +318,11 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                Allocator.dispose(attr);
                return false;
             }
+            if (Source.peek(src) == '$') {
+               *err_code = ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE;
+               Allocator.dispose(attr);
+               return false;
+            }
             usize value_start = Source.position(src);
             bool in_string = false;
             while (!Source.is_eof(src)) {
