@@ -22,6 +22,7 @@
 #include "anvil.h"
 #include "anvil_flat.h"
 #include "internal/module.h"
+#include "internal/parser.h"
 #include "internal/source.h"
 // ----------------
 #include <sigma/allocator.h>
@@ -34,6 +35,7 @@ struct anvil_document_t {
    module_context ctx;
    module_document root; // NULL once disposed, or if never successfully registered
    anvil_err_code error; // ANVIL_OK if the whole pipeline succeeded
+   anvl_value fragment_value; // set only by anvil_parse_value_fragment; NULL otherwise
 };
 
 // Shared by anvil_load/anvil_load_buffer - identical pipeline regardless of where the root
@@ -64,6 +66,7 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    handle->ctx = ctx;
    handle->root = doc;
    handle->error = ANVIL_OK;
+   handle->fragment_value = NULL; // load_common's documents are never fragments
 
    if (ANVL_RES_OK != doc_load_source(doc, origin, source, length, &err_code)) {
       // Never registered with ctx - mod_ctx_dispose won't reach it, so dispose it directly
@@ -129,6 +132,62 @@ anvil_document anvil_load(const char *filepath) {
 
 anvil_document anvil_load_buffer(const char *source, size_t length) {
    return load_common(ANVL_SOURCE_FROM_BUFFER, source, length, "<buffer>");
+}
+
+anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   module_context ctx = NULL;
+   if (ANVL_RES_OK != mod_ctx_initialize(NULL, &ctx, &err_code) || !ctx) {
+      return NULL; // truly foundational failure - nothing to hand back
+   }
+
+   module_document doc = NULL;
+   if (ANVL_RES_OK != doc_initialize(&doc, &err_code) || !doc) {
+      mod_ctx_dispose(ctx);
+      return NULL;
+   }
+
+   struct anvil_document_t *handle = Allocator.alloc(sizeof(struct anvil_document_t));
+   if (!handle) {
+      doc_dispose(doc);
+      mod_ctx_dispose(ctx);
+      return NULL;
+   }
+   handle->ctx = ctx;
+   handle->root = doc;
+   handle->error = ANVIL_OK;
+   handle->fragment_value = NULL;
+
+   if (ANVL_RES_OK != doc_load_source(doc, ANVL_SOURCE_FROM_BUFFER, text, length, &err_code)) {
+      doc_dispose(doc);
+      handle->root = NULL;
+      handle->error = ANVIL_ERR_IO;
+      return handle;
+   }
+
+   if (ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, "<fragment>", &err_code)) {
+      doc_dispose(doc);
+      handle->root = NULL;
+      handle->error = ANVIL_ERR_IO;
+      return handle;
+   }
+
+   // No header, no imports — a fragment is just the value text itself.
+   usize capacity = mod_ctx_arena_size_hint(length);
+   if (ANVL_RES_OK != mod_ctx_create_arena(ctx, capacity, &err_code)) {
+      handle->error = ANVIL_ERR_MEMORY;
+      return handle;
+   }
+
+   anvl_value value = NULL;
+   if (ANVL_RES_OK != anvl_parse_value_fragment(doc, &value, &err_code)) {
+      handle->error = ANVIL_ERR_SYNTAX;
+      return handle;
+   }
+
+   handle->fragment_value = value;
+   return handle;
 }
 
 void anvil_dispose(anvil_document doc) {
@@ -346,6 +405,13 @@ anvil_statement anvil_value_get_statement(anvil_value val, size_t index) {
    anvl_statement stmt = NULL;
    List.get(v->object.statements, index, (object *)&stmt);
    return (anvil_statement)stmt;
+}
+
+anvil_value anvil_document_get_fragment_value(anvil_document doc) {
+   if (!doc) {
+      return NULL;
+   }
+   return (anvil_value)doc->fragment_value;
 }
 
 size_t anvil_document_get_attribute_count(anvil_document doc) {

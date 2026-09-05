@@ -26,6 +26,7 @@ const anvil_i Anvil = {
    .has_errors = anvil_has_errors,
    .get_error = anvil_get_error,
    .get_version = anvil_get_version,
+   .parse_value_fragment = anvil_parse_value_fragment,
 };
 
 const anvil_statement_i Statement = {
@@ -41,6 +42,7 @@ const anvil_document_i Document = {
    .get_attribute_count = anvil_document_get_attribute_count,
    .get_attribute = anvil_document_get_attribute,
    .find_attribute = anvil_document_find_attribute,
+   .get_fragment_value = anvil_document_get_fragment_value,
 };
 
 const anvil_attribute_i Attribute = {

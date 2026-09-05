@@ -40,6 +40,8 @@ static void test_vt01_anvil_matches_flat(void) {
    TestBit.is_true(Anvil.get_error == anvil_get_error, "VT01: Anvil.get_error is anvil_get_error");
    TestBit.is_true(Anvil.get_version == anvil_get_version,
                    "VT01: Anvil.get_version is anvil_get_version");
+   TestBit.is_true(Anvil.parse_value_fragment == anvil_parse_value_fragment,
+                   "VT01: Anvil.parse_value_fragment is anvil_parse_value_fragment");
 }
 /* ---------------------------------------------------------------------- *
  * VT02 — every Statement vtable field is pointer-identical to its flat
@@ -83,6 +85,8 @@ static void test_vt05_document_matches_flat(void) {
                    "VT05: Document.get_attribute is anvil_document_get_attribute");
    TestBit.is_true(Document.find_attribute == anvil_document_find_attribute,
                    "VT05: Document.find_attribute is anvil_document_find_attribute");
+   TestBit.is_true(Document.get_fragment_value == anvil_document_get_fragment_value,
+                   "VT05: Document.get_fragment_value is anvil_document_get_fragment_value");
 }
 /* ---------------------------------------------------------------------- *
  * VT06 — every Attribute vtable field is pointer-identical to its flat
@@ -113,6 +117,16 @@ static void test_vt04_vtable_only_smoke_test(void) {
                         "VT04: 'name' is ANVIL_VALUE_IDENTIFIER, via the vtable");
 
    Anvil.dispose(doc);
+
+   anvil_document fragment = Anvil.parse_value_fragment("42", 2);
+   TestBit.is_not_null(fragment, "VT04: fragment document allocated via the vtable");
+   if (fragment) {
+      TestBit.is_false(Anvil.has_errors(fragment), "VT04: fragment has no errors, via the vtable");
+      anvil_value fragment_val = Document.get_fragment_value(fragment);
+      TestBit.is_equal_int(ANVIL_VALUE_NUMERIC, Value.get_type(fragment_val),
+                           "VT04: fragment value is ANVIL_VALUE_NUMERIC, via the vtable");
+      Anvil.dispose(fragment);
+   }
 }
 
 /* ---------------------------------------------------------------------- *

@@ -55,5 +55,21 @@ void anvl_parser_clear_hook(void);
  * Internal Parser Functions
  * ----------------------------------------------------------------- */
 anvl_result anvl_parse(anvl_source);
+/**
+ * @brief Parse a single, standalone value expression ("Value Fragment") from
+ * `doc`'s source — no enclosing document/statement context, no VarRef
+ * support at any nesting depth (there is no identifier map here to resolve
+ * one against). `doc` must already be registered with a context that has an
+ * arena (mirrors doc_parse_body's own precondition). A trailing ';' is
+ * tolerated but never required; any other trailing content after the value
+ * is a hard error.
+ * @param doc The (unregistered-header, arena-ready) document whose source
+ * holds the fragment text.
+ * @param out_value Set to the parsed value on success, untouched on failure.
+ * @param out_err_code Set to the failure's error code, or ANVL_ERR_NONE on
+ * success.
+ */
+anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value,
+                                      anvl_err_code *out_err_code);
 void anvl_cleanup(void);
 anvl_err_code anvl_get_error(void);

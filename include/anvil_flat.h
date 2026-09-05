@@ -48,6 +48,23 @@ anvil_document anvil_load(const char *filepath);
 anvil_document anvil_load_buffer(const char *source, size_t length);
 
 /**
+ * @brief Parse a single, standalone value expression (a "Value Fragment")
+ * with no enclosing document/statement context — no header, no imports, no
+ * top-level statements. Unlike anvil_load/anvil_load_buffer, a '$identifier'
+ * VarRef is never supported here, at any nesting depth: there is no
+ * identifier map to resolve one against outside a real document.
+ * @param text The fragment source text. Not required to be NUL-terminated;
+ * exactly `length` bytes are read. A trailing ';' is tolerated but never
+ * required; any other trailing content after the value is an error.
+ * @param length Length of `text` in bytes.
+ * @return Same contract as anvil_load: a non-NULL handle for every failure
+ * category (check anvil_has_errors()/anvil_get_error()), NULL only if the
+ * handle itself could not be allocated. Use
+ * anvil_document_get_fragment_value() to retrieve the parsed value.
+ */
+anvil_document anvil_parse_value_fragment(const char *text, size_t length);
+
+/**
  * @brief Release a document and everything it owns (every imported
  * document, the shared arena, all recorded errors).
  * @param doc The document to dispose. Safe to call with NULL (no-op).
@@ -156,6 +173,14 @@ anvil_value anvil_value_get_element(anvil_value val, size_t index);
  * out of bounds.
  */
 anvil_statement anvil_value_get_statement(anvil_value val, size_t index);
+
+/**
+ * @brief The value parsed by anvil_parse_value_fragment.
+ * @param doc The document to read. NULL, a document from anvil_load/
+ * anvil_load_buffer (never a fragment), or a fragment that failed to parse
+ * all return NULL.
+ */
+anvil_value anvil_document_get_fragment_value(anvil_document doc);
 
 /**
  * @brief Module-level (`doc->header`) attribute count.

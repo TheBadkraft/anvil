@@ -160,6 +160,92 @@ anvl_result anvl_parse(anvl_source source) {
 error:
    return ANVL_RES_ERR;
 }
+// parser_set_error's own call into Source.set_error clobbers parser.err_code back to
+// ANVL_ERR_NONE as a side effect (that out-param reports whether *recording* the error
+// succeeded, not the error itself — see source_set_error, src/core/source.c) — the same reason
+// doc_parse_body (src/core/document.c) reads the real code back from doc->context->errors
+// instead of trusting parser.err_code after a failure. Mirrors that exact pattern.
+static anvl_err_code last_context_error(module_document doc) {
+   if (!doc || !doc->context) {
+      return ANVL_ERR_PARSER_INITIALIZATION_FAILED;
+   }
+   usize count = List.size(doc->context->errors);
+   if (count == 0) {
+      return ANVL_ERR_PARSER_INITIALIZATION_FAILED;
+   }
+   anvl_error last = anvl_error_get(doc->context->errors, count - 1);
+   return last ? last->code : ANVL_ERR_PARSER_INITIALIZATION_FAILED;
+}
+// Parse a single, standalone value expression ("Value Fragment") — see internal/parser.h for
+// the full contract. Reuses parse_value_body completely unchanged, so every existing grammar
+// rule (empty collections, tuple arity, AMP's scalar-only element rule, AMP's object ban,
+// unterminated strings, ...) is inherited for free — no second, divergent copy of that
+// validation to keep in sync. Deliberately bypasses parser_init/parser.state_map entirely:
+// those exist to track concurrent whole-document parses, which a single value expression has
+// no need of.
+anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value,
+                                      anvl_err_code *out_err_code) {
+   if (!doc || !doc->source || !doc->context || !out_value) {
+      if (out_err_code) {
+         *out_err_code = ANVL_ERR_INVALID_ARGUMENT;
+      }
+      return ANVL_RES_ERR;
+   }
+
+   anvl_source src = doc->source;
+   Source.skip_whitespace_and_comments(src);
+
+   anvl_value value = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
+   if (!value) {
+      if (out_err_code) {
+         *out_err_code = parser.err_code;
+      }
+      return ANVL_RES_ERR;
+   }
+
+   if (!parse_value_body(src, &value)) {
+      if (out_err_code) {
+         *out_err_code = last_context_error(doc);
+      }
+      return ANVL_RES_ERR;
+   }
+
+   Source.skip_whitespace_and_comments(src);
+   if (Source.peek(src) == ANVL_TOK_STMT_TERMINATOR) {
+      Source.consume(src, 1); // tolerated, never required — a fragment isn't a statement
+      Source.skip_whitespace_and_comments(src);
+   }
+   if (!Source.is_eof(src)) {
+      parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+      if (out_err_code) {
+         *out_err_code = last_context_error(doc);
+      }
+      return ANVL_RES_ERR;
+   }
+
+   // No VarRef support at any nesting depth: rather than a hand-rolled recursive walk of the
+   // value tree, reuse the flat doc->context->values index — every value node allocated during
+   // this parse, at any depth, lands there via Source.new_node (same mechanism module.c's own
+   // disposal pass relies on to reach every nested value without recursion).
+   usize value_count = List.size(doc->context->values);
+   for (usize i = 0; i < value_count; i++) {
+      anvl_value v = NULL;
+      List.get(doc->context->values, i, (object *)&v);
+      if (v && v->type == ANVL_VALUE_VARREF) {
+         parser_set_error(src, ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_FRAGMENT);
+         if (out_err_code) {
+            *out_err_code = last_context_error(doc);
+         }
+         return ANVL_RES_ERR;
+      }
+   }
+
+   *out_value = value;
+   if (out_err_code) {
+      *out_err_code = ANVL_ERR_NONE;
+   }
+   return ANVL_RES_OK;
+}
 // Clean up the parser state and free any allocated resources
 void anvl_cleanup(void) {
    if (!parser.is_initialized) {

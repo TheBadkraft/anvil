@@ -41,6 +41,7 @@ typedef struct anvil_i {
    bool (*has_errors)(anvil_document doc);
    anvil_err_code (*get_error)(anvil_document doc);
    const char *(*get_version)(void);
+   anvil_document (*parse_value_fragment)(const char *text, size_t length);
 } anvil_i;
 extern const anvil_i Anvil;
 
@@ -58,6 +59,7 @@ typedef struct anvil_document_i {
    size_t (*get_attribute_count)(anvil_document doc);
    anvil_attribute (*get_attribute)(anvil_document doc, size_t index);
    anvil_attribute (*find_attribute)(anvil_document doc, const char *key);
+   anvil_value (*get_fragment_value)(anvil_document doc);
 } anvil_document_i;
 extern const anvil_document_i Document;
 
