@@ -1,11 +1,15 @@
 # Dialect Ownership Matrix and Parsing Policy
 
-Status: active policy reference for parser and language-surface refactors.
+Status: active policy reference for parser and language-surface refactors. Predates the current
+rebuilt architecture in places — the ownership rows below (`vars`, `using`, var-ref, interpolation)
+are under active reconsideration as part of AnvilScript (ASL) design; see `notes/anvilscript-design.md`
+for the current state of that work. The default-dialect policy below (AML, not ASL) is confirmed
+current and does not depend on that design settling.
 
 ## Core Policy
 
 - Explicit dialect capability checks are required for dialect-owned features.
-- If no shebang or other dialect clue is present, dialect defaults to the least restrictive mode: ASL.
+- If no shebang or other dialect clue is present, dialect defaults to **AML** (pivoted from the pre-rebuild stance of defaulting to ASL — ASL must now be declared explicitly via shebang `#!asl` or a `.asl` file extension). This matches the current implementation (`src/core/files.c`, `src/core/source.c`).
 - AML keeps module-definition composition features: inheritance and anonymous blocks.
 - Mentions of AMP+ should be minimal in core docs and code comments.
 - AMP+ is treated as a constrained extension profile of AMP for government-use contexts.
@@ -33,8 +37,8 @@ Status: active policy reference for parser and language-surface refactors.
 ## Dialect Resolution Order
 
 1. Shebang if present.
-2. Other explicit source-level clue(s), if policy defines them.
-3. Default to ASL when unresolved.
+2. Other explicit source-level clue(s), if policy defines them (e.g. file extension — `.aml`/`.anvl`, `.amp`, `.asl`).
+3. Default to AML when unresolved.
 
 ## Notes For Current Refactor
 
