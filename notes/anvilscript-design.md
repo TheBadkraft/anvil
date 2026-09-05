@@ -46,29 +46,56 @@ Forks resolved during initial design conversations.
 11. **Built-in distribution** — Built-in function libraries are distributed as source files (e.g., `math.asl`) so the core library does not carry scripting features that object-model-only consumers do not need. Pre-compiled `.anvlo` components may be supported later.
 12. **Namespace model (initial)** — Namespaces are initially file-name-based (the imported module's file name is the namespace). A future `namespace` keyword (C#-style) is possible but not part of MVP.
 
+## Variable scope and mutability
+
+Proposed model, pending confirmation.
+
+| Construct | Scope | Mutability | Notes |
+|-----------|-------|------------|-------|
+| `vars { x := 1; }` | Module global | Immutable | Header construct. |
+| `var x = 1;` at top level | Module global | Mutable | Parser fails fast on duplicate top-level identifiers. |
+| `var x = 1;` in function | Block-scoped | Mutable | C/C#/Java-like. |
+| Function parameter | Function-local | Mutable copy | Pass-by-value of handle/reference; copy-on-write for containers. |
+| Function name binding | Module global | Immutable | Functions are first-class values but function-name bindings are not variables. |
+| Delegate variable | Per declaration | Mutable | `var fn = foo; fn = bar;` |
+
+Inside function bodies, assignment uses `=` (e.g., `var x = 1;`). Top-level object declarations continue to use `:=` and inheritance clauses as in AML.
+
+## Function semantics
+
+- **Declaration**: `foo (a, b, c) => { ... };` binds `foo` as an immutable function in the module namespace.
+- **First-class value**: Functions can be assigned to variables as delegates: `var fn = foo;`.
+- **Dynamic resolution**: The `$` sigil resolves a name to its current value, just like dynamic var-refs. `$foo` retrieves the function value; `$foo(1, 2, 3)` calls it. `foo` alone is a literal identifier/string.
+- **Qualified calls**: `$math.abs(-5)` resolves `math` as a namespace/module and `abs` as a function within it. If `math` is imported and `abs` is unambiguous in the current scope, `$abs(-5)` may also be valid.
+- **Inheritance**: Follows AML semantics for object/block declarations. `bar : foo` is invalid when `foo` is a function because functions are immutable and not object bases.
+- **Anonymous blocks**: Supported in ASL (this contradicts the current dialect ownership matrix, which marks them AML-only; the matrix must be updated).
+
+## Calling convention
+
+### ASL calls ASL
+
+Function call is an expression. Arguments evaluate left-to-right, bind to parameters, body executes, and a value returns.
+
+### Host calls ASL
+
+Support both convenience and handle-based APIs:
+
+- **By name**: `anvil_call(doc, "foo", args, arg_count, &result)`
+- **By handle**: `anvil_function fn = anvil_function_find(doc, "foo"); anvil_function_invoke(fn, args, arg_count, &result);`
+
+Arguments and returns use `anvil_value`. Exact arity matching in MVP; varargs and optional parameters deferred. Errors returned via out-parameter or distinct ASL error value type (TBD).
+
 ## Open questions
 
 Unresolved or explicitly TBD. These are inputs to the detailed specification, not blockers to starting it.
 
-1. **Function declaration representation** — Two-layer representation:
-   - **Parse-time value**: a new union member in `anvl_value_t` (or equivalent) holding parameter slices and the function body slice, so the function is visible to the resolver and public API.
-   - **Runtime AST**: a pointer inside that same `func` member referencing the evaluator's AST, built lazily or eagerly after parse. Zero-copy framing is not guaranteed.
-   One candidate under discussion:
-   ```c
-   typedef struct anvl_asl_func_t {
-      list params;              // anvl_slice* parameter names
-      anvl_slice body;          // source span inside { ... }
-      struct asl_ast_node *ast; // NULL until parsed for eval
-   } anvl_asl_func_t;
-   ```
-2. **Built-in function registry** — Built-ins are loaded from source modules (e.g., `import "math";`). The registry is likely a Sigma `map` of module name → (function name → function descriptor). Host callbacks can inject descriptors into the registry. Open: are built-in modules shipped on disk, embedded as resources, or both?
-3. **Variable scope and mutability** — Are top-level `vars` constants truly immutable? Are function parameters pass-by-value or reference? Is there nested scope or only global + function-local?
-4. **ASL type system** — Proposed: `var` as a weak-type keyword; otherwise TBD. How are ASL-specific types (closures, error values) represented?
-5. **Calling convention** — How are ASL functions invoked from host code? Opaque function handle + `anvil_call(doc, name, args, count)` style API?
-6. **Error handling** — The existing 5101–5105 ASL error codes likely need a broader revamp/rework. Type errors, undefined functions, arity mismatches, etc., are not yet modeled.
-7. **Dialect gating updates** — The ownership matrix and source default-dialect logic must be updated to reflect that ASL is no longer the default and to finalize module-attribute ownership.
-8. **Specification format** — Produce a grammar + semantics document (likely in `notes/` or `docs/`) before implementation.
-9. **Dialect name and file extension** — The current "ASL" / "AnvilScript" / `.asl` naming may change. "Anvil Script Language" is redundant, and `.asl` is not yet entrenched. Decide before the first public release.
+1. **Function declaration representation** — Exact C structure for the parse-time value and the runtime AST pointer.
+2. **Built-in function registry** — Sigma `map` of module name → (function name → descriptor). How are modules shipped/discovered?
+3. **ASL type system** — Proposed: `var` as a weak-type keyword; otherwise TBD. How are ASL-specific types (closures, error values) represented?
+4. **Error handling** — The existing 5101–5105 ASL error codes likely need a broader revamp/rework. Type errors, undefined functions, arity mismatches, etc., are not yet modeled.
+5. **Dialect gating updates** — The ownership matrix and source default-dialect logic must be updated to reflect that ASL is no longer the default, to allow anonymous blocks in ASL, and to finalize module-attribute ownership.
+6. **Specification format** — Produce a grammar + semantics document (likely in `notes/` or `docs/`) before implementation.
+7. **Dialect name and file extension** — "ASL" / "AnvilScript" / `.asl` may change. Leading candidate: `.anvs` (avoids clash with `.meta.anvl` schema files). Decide before first public release.
 
 ## Related notes
 
