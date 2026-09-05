@@ -212,6 +212,9 @@ typedef struct sc_map_i {
     *        Skips empty and tombstone slots automatically.
     * @param m The map to query
     * @return An sc_queryable yielding `const map_entry *` per element
+    * @warning Do not set/remove on m while the returned queryable is in
+    *          use — same rule as `create_iterator` above, and see the
+    *          INVARIANT note in query.h.
     *
     * Example:
     * @code
@@ -230,6 +233,8 @@ typedef struct sc_map_i {
     *        Skips empty and tombstone slots automatically.
     * @param m The map to query
     * @return An sc_queryable yielding `const sc_key_view *` per element
+    * @warning Do not set/remove on m while the returned queryable is in
+    *          use — see the INVARIANT note in query.h.
     */
    sc_queryable (*keys)(map m);
 
@@ -237,6 +242,8 @@ typedef struct sc_map_i {
     * @brief Produce a heapless queryable over just the map's values.
     *        Skips empty and tombstone slots automatically.
     * @param m The map to query
+    * @warning Do not set/remove on m while the returned queryable is in
+    *          use — see the INVARIANT note in query.h.
     * @return An sc_queryable yielding `const addr *` per element
     */
    sc_queryable (*values)(map m);

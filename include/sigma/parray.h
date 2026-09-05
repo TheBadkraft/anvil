@@ -127,6 +127,8 @@ typedef struct sc_parray_i {
      *        Query.next/Query.first — no allocation, no collection view.
      * @param arr The array to query
      * @return An sc_queryable ready to scan
+     * @warning Do not mutate arr while the returned queryable is in use —
+     *          see the INVARIANT note in query.h.
      */
     sc_queryable (*as_queryable)(parray);
 } sc_parray_i;

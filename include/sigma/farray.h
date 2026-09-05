@@ -128,6 +128,8 @@ typedef struct sc_farray_i {
      * @param arr The array to query
      * @param stride Size of each element in the array
      * @return An sc_queryable ready to scan
+     * @warning Do not mutate arr while the returned queryable is in use —
+     *          see the INVARIANT note in query.h.
      */
     sc_queryable (*as_queryable)(farray, usize);
 } sc_farray_i;

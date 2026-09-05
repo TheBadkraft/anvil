@@ -31,6 +31,22 @@
  *        element at a time, caller-driven; Query.first is a convenience that
  *        stops at the first element satisfying a predicate. See
  *        FR-2603-sigma-collections-006 for the full design rationale.
+ *
+ * INVARIANT — do not mutate a source while it is in a queryable state:
+ *        sc_queryable is a live view, not a snapshot — it holds a raw
+ *        pointer/index position into the source's own storage, taken at
+ *        `as_queryable`/`keys`/`values` time. Any operation that can change
+ *        that storage's shape (add/append/insert/remove/set/clear/resize/
+ *        grow, on the same farray/parray/collection/list/map/slotarray) once
+ *        a queryable over it exists and is still being pulled from is
+ *        undefined: a dense source's buffer may have been reallocated out
+ *        from under the queryable's saved pointer; a sparse source's slot
+ *        layout may have shifted under its saved index. Finish pulling from
+ *        a queryable (or simply stop using it) before mutating its source;
+ *        construct a fresh one afterward to scan again. This is the same
+ *        rule this library's `Iterator`/`SparseIterator` already require
+ *        (see e.g. `Map.create_iterator`'s own doc comment) — Query does not
+ *        relax it, and currently has no runtime check that enforces it.
  */
 #pragma once
 
@@ -58,6 +74,10 @@ typedef bool (*sc_query_advance_fn)(struct sc_queryable *self, const void **out_
  * Produced by a collection type's own `as_queryable` (or `keys`/`values`, for
  * Map) — never constructed by hand. Safe to pass by value; `Query.next`
  * mutates it in place via the caller's own storage.
+ *
+ * @warning A live view into `source`, not a snapshot — do not mutate
+ *          `source` while a queryable over it is still in use. See the
+ *          INVARIANT note at the top of this file.
  */
 typedef struct sc_queryable {
    void *source;                 /**< The underlying handle (farray/parray/collection/map/slotarray) */
@@ -91,6 +111,8 @@ typedef struct sc_query_i {
     *        undefined if this call returns false.
     * @param out_index Optional; receives the yielded element's index.
     * @return true if an element was yielded; false if exhausted.
+    * @warning Do not mutate q's source between calls — see the INVARIANT
+    *          note at the top of this file.
     */
    bool (*next)(sc_queryable *q, const void **out_element, usize *out_index);
    /**
@@ -105,6 +127,8 @@ typedef struct sc_query_i {
     * @param out_index Optional; receives the matching element's index.
     * @return true if a match was found; false if the source was exhausted
     *         with no match.
+    * @warning `pred` must not mutate q's source — see the INVARIANT note at
+    *          the top of this file.
     */
    bool (*first)(sc_queryable q, sc_predicate_fn pred, void *userdata, usize *out_index);
 } sc_query_i;
