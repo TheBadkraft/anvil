@@ -56,11 +56,39 @@ New fixture `anvil_accessors.anvl` covers every scalar/collection kind plus a Va
 
 **Vtable layer — landed.** `include/anvil_vtable.h` (types + `extern const anvil_i Anvil`/`anvil_statement_i Statement`/`anvil_value_i Value`) and `src/core/anvil_vtable.c` (each field assigned directly to its `anvil_flat.c` counterpart — a one-line literal per group, nothing else). Followed RED-first properly this time: the first stub populated every vtable field with `{0}` (all-`NULL`), which compiled fine but **segfaulted** rather than failing cleanly — `test_anvil_vtable.c`'s end-to-end smoke test called through a null function pointer. Not a genuine RED state per the established discipline ("must build and run, fail on assertions, not crash"), so the stub was corrected to point every field at a small safe placeholder function (mirroring how a stubbed *function* already gets a safe default body) before treating it as RED. New test file `test/unit/test_anvil_vtable.c` (`VT01`–`VT04`, 17 assertions) — pointer-identity checks per group plus one smoke test using only vtable-style calls.
 
+## Bindings — organization and sequencing
+
+**Resolved — question 3 of the founding framing (audience sequencing) and question 3's "popular ABIs first" open item.** Node/JS is first, driven by a real, waiting consumer: `../flywire/` (a schema-aware binary data-transfer protocol) currently vendors a copy of `anvil.js`'s CJS build directly into `src/anvl/anvl-browser.js`, and that vendoring's own comment already states the intent — *"the native C binding / WASM path remains the longer-term migration target, deferred."* `anvil.js` itself is to be deprecated immediately once a real Node binding exists.
+
+**Each binding gets its own repo**, `anvil.<lang>` (matching `anvil.js`/`anvil.net`'s existing naming and the `sigma.*` sibling-repo convention) — repo/package names follow each ecosystem's own norms (npm, PyPI, NuGet, CRAN, vcpkg/Conan), while the **marketing moniker stays uniform**: Anvil.C (this repo, the native parser), Anvil.CPP, Anvil.JS, Anvil.Py, Anvil.R, Anvil.CS.
+
+**Binding tests stay in each binding's own repo**, written in that ecosystem's native test idiom (Jest, pytest, xUnit, Catch2, testthat) — scoped to the marshaling/wrapper layer only (handle lifecycle, type conversion, GC-safety). Parse correctness is never re-tested there — this repo's own suite already owns that, and a binding is *just* a thin layer over `anvil_flat.h`/`anvil_vtable.h`, so its own tests should prove nothing more than "the wrapper calls through correctly and doesn't leak/corrupt across the FFI boundary."
+
+**Docs live with the code** — each binding repo owns its own install/quickstart/API-reference docs, with the anvldata.com site aggregating/rendering them rather than maintaining a separate, driftable copy. The website rework itself (moniker-consistent framing, Anvil.C front and center) is real and wanted but sequenced *after* the Node/JS work, not blocking it.
+
+**Node/JS binding tech: N-API first, WASM second.** A native N-API addon (direct FFI-speed access to a compiled `libanvil`, matching flywire's actual context — server-side Node, not a browser) lands first; a WASM build follows for the browser use case `flywire-client.js` already anticipates (`window.anvl`) but — per that file's own comment — has "not been exercised yet, revisit when browser-side FlyWire code is actually built."
+
+### What flywire's real usage revealed — three gaps to close before the binding work starts
+
+Investigated `../flywire/`'s actual call sites (`src/table.js`, `src/schema-registry.js`, `src/anvl/index.js`) rather than assuming. The real, minimal surface flywire depends on:
+
+```js
+anvl.parse(source)        // full document parse — reads @[schema]-attributed .meta.anvl files
+anvl.parseRawValue(text)  // standalone value decode — no VarRef support (anvil.js's own
+                          // parseRawValueCore: "no registry here for a VarRef to resolve against")
+anvl.lastError()          // error retrieval
+```
+
+Three things Anvil Native doesn't have yet, confirmed as the next slices (in this order, each RED-first) before the Node binding repo starts:
+
+1. **Buffer-based load.** `anvil_load` only takes a filepath today; a Node binding needs to parse a JS string directly. Small — `doc_load_source` already supports `ANVL_SOURCE_FROM_BUFFER` internally, `anvil_load` just never exposed a path to it.
+2. **Module/document attributes.** `@[schema]`-style header-level attributes (`doc->header->attributes`) have no public accessor — only body statements/values were ever exposed.
+3. **Standalone value parsing.** A genuinely separate entry point from `anvil_load` — parsing one raw value expression with no enclosing document/statement context (and, matching `anvil.js`'s own precedent, no VarRef support, since there's no identifier map to resolve against outside a real document).
+
 ## Open questions
 
 - Anonymous (`OBJECT_BLOCK`) statement field traversal — `anvil_statement_get_value` returns NULL for one today (it genuinely has no `.value`, only `.body`); nobody's asked for this traversal yet, so it stays out of scope until they do.
 - What the API deliberately does *not* expose (question 2 of the founding framing) — not yet worked through in concrete terms beyond "no raw structs" (decision 2 above already answers part of this).
-- Should we maintain popular ABIs first - C++, .Net, Python, and Node? Building a community to take up the call to add new paradigm support?
 
 ## Related notes
 
