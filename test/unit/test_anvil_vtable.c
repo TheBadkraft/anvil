@@ -87,6 +87,26 @@ static void test_vt05_document_matches_flat(void) {
                    "VT05: Document.find_attribute is anvil_document_find_attribute");
    TestBit.is_true(Document.get_fragment_value == anvil_document_get_fragment_value,
                    "VT05: Document.get_fragment_value is anvil_document_get_fragment_value");
+   TestBit.is_true(Document.get_statement_count == anvil_document_get_statement_count,
+                   "VT05: Document.get_statement_count is anvil_document_get_statement_count");
+   TestBit.is_true(Document.get_statement == anvil_document_get_statement,
+                   "VT05: Document.get_statement is anvil_document_get_statement");
+   TestBit.is_true(Document.get_error == anvil_document_get_error,
+                   "VT05: Document.get_error is anvil_document_get_error");
+}
+/* ---------------------------------------------------------------------- *
+ * VT07 — every Error vtable field is pointer-identical to its flat
+ * counterpart
+ * ---------------------------------------------------------------------- */
+static void test_vt07_error_matches_flat(void) {
+   TestBit.is_true(Error.get_category == anvil_error_get_category,
+                   "VT07: Error.get_category is anvil_error_get_category");
+   TestBit.is_true(Error.get_message == anvil_error_get_message,
+                   "VT07: Error.get_message is anvil_error_get_message");
+   TestBit.is_true(Error.get_line == anvil_error_get_line,
+                   "VT07: Error.get_line is anvil_error_get_line");
+   TestBit.is_true(Error.get_column == anvil_error_get_column,
+                   "VT07: Error.get_column is anvil_error_get_column");
 }
 /* ---------------------------------------------------------------------- *
  * VT06 — every Attribute vtable field is pointer-identical to its flat
@@ -139,6 +159,7 @@ int main(void) {
    TestBit.run_ex("VT04_vtable_only_smoke_test", NULL, test_vt04_vtable_only_smoke_test, th);
    TestBit.run_ex("VT05_document_matches_flat", NULL, test_vt05_document_matches_flat, th);
    TestBit.run_ex("VT06_attribute_matches_flat", NULL, test_vt06_attribute_matches_flat, th);
+   TestBit.run_ex("VT07_error_matches_flat", NULL, test_vt07_error_matches_flat, th);
 
    return TestBit.report();
 }

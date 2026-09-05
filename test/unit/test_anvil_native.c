@@ -580,6 +580,122 @@ static void test_anv26_attribute_null_safety(void) {
    TestBit.is_equal_int(0, (long long)anvil_attribute_get_value(NULL, NULL, 0),
                         "ANV26: attribute_get_value(NULL, ...) is 0");
 }
+/* ---------------------------------------------------------------------- *
+ * ANV27 — a document's top-level statements are enumerable by position,
+ * in declaration order (f01_bare_literal.anvl: 'val' then 'name')
+ * ---------------------------------------------------------------------- */
+static void test_anv27_document_statement_enumeration(void) {
+   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl"));
+   TestBit.is_not_null(doc, "ANV27: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_equal_int(2, (long long)anvil_document_get_statement_count(doc),
+                        "ANV27: two top-level statements");
+
+   anvil_statement first = anvil_document_get_statement(doc, 0);
+   TestBit.is_not_null(first, "ANV27: statement 0 retrieved");
+   if (first) {
+      char name[8] = {0};
+      anvil_statement_get_name(first, name, sizeof(name));
+      TestBit.is_true(strcmp(name, "val") == 0, "ANV27: statement 0 is 'val'");
+   }
+
+   anvil_statement second = anvil_document_get_statement(doc, 1);
+   TestBit.is_not_null(second, "ANV27: statement 1 retrieved");
+   if (second) {
+      char name[8] = {0};
+      anvil_statement_get_name(second, name, sizeof(name));
+      TestBit.is_true(strcmp(name, "name") == 0, "ANV27: statement 1 is 'name'");
+   }
+
+   TestBit.is_null(anvil_document_get_statement(doc, 2),
+                   "ANV27: out-of-bounds index is NULL");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV28 — statement enumeration is safe on NULL/failed documents
+ * ---------------------------------------------------------------------- */
+static void test_anv28_statement_enumeration_null_safety(void) {
+   TestBit.is_equal_int(0, (long long)anvil_document_get_statement_count(NULL),
+                        "ANV28: get_statement_count(NULL) is 0");
+   TestBit.is_null(anvil_document_get_statement(NULL, 0),
+                   "ANV28: get_statement(NULL, ...) is NULL");
+
+   anvil_document failed = anvil_load(fixture_path("body_err_unterminated_block.anvl"));
+   TestBit.is_not_null(failed, "ANV28: failed-parse document handle still returned");
+   if (failed) {
+      TestBit.is_equal_int(0, (long long)anvil_document_get_statement_count(failed),
+                           "ANV28: a document that never finished body parse has 0 statements");
+      anvil_dispose(failed);
+   }
+}
+/* ---------------------------------------------------------------------- *
+ * ANV29 — a syntax error's diagnostic detail carries a real message and a
+ * real (non-zero) source position, beyond the stable ANVIL_ERR_SYNTAX
+ * category alone
+ * ---------------------------------------------------------------------- */
+static void test_anv29_error_detail_syntax(void) {
+   anvil_document doc = anvil_load(fixture_path("body_err_unterminated_block.anvl"));
+   TestBit.is_not_null(doc, "ANV29: document handle returned despite the error");
+   if (!doc) {
+      return;
+   }
+   anvil_error err = anvil_document_get_error(doc);
+   TestBit.is_not_null(err, "ANV29: error detail present");
+   if (err) {
+      TestBit.is_equal_int(ANVIL_ERR_SYNTAX, anvil_error_get_category(err),
+                           "ANV29: error category matches anvil_get_error(doc)");
+      char msg[128] = {0};
+      size_t len = anvil_error_get_message(err, msg, sizeof(msg));
+      TestBit.is_true(len > 0, "ANV29: message is non-empty");
+      TestBit.is_true(anvil_error_get_line(err) > 0, "ANV29: line is a real (non-zero) position");
+      TestBit.is_true(anvil_error_get_column(err) > 0,
+                      "ANV29: column is a real (non-zero) position");
+   }
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV30 — an I/O failure has no meaningful source position: the error
+ * detail is either absent, or reports 0/0 rather than a stale/bogus value
+ * ---------------------------------------------------------------------- */
+static void test_anv30_error_detail_io_has_no_position(void) {
+   anvil_document doc = anvil_load(fixture_path("anvil_nonexistent_file_xyz.anvl"));
+   TestBit.is_not_null(doc, "ANV30: document handle returned despite the error");
+   if (!doc) {
+      return;
+   }
+   anvil_error err = anvil_document_get_error(doc);
+   if (err) {
+      TestBit.is_equal_int(0, (long long)anvil_error_get_line(err),
+                           "ANV30: I/O failure has no meaningful line");
+      TestBit.is_equal_int(0, (long long)anvil_error_get_column(err),
+                           "ANV30: I/O failure has no meaningful column");
+   } else {
+      TestBit.is_true(true, "ANV30: no error detail at all is also an acceptable outcome for I/O");
+   }
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV31 — a clean document has no error detail; NULL handles are safe
+ * ---------------------------------------------------------------------- */
+static void test_anv31_error_detail_null_safety(void) {
+   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl"));
+   TestBit.is_not_null(doc, "ANV31: document loaded");
+   if (doc) {
+      TestBit.is_null(anvil_document_get_error(doc), "ANV31: clean document has no error detail");
+      anvil_dispose(doc);
+   }
+
+   TestBit.is_null(anvil_document_get_error(NULL), "ANV31: get_error(NULL) is NULL");
+   TestBit.is_equal_int(ANVIL_OK, anvil_error_get_category(NULL),
+                        "ANV31: get_category(NULL) is ANVIL_OK");
+   TestBit.is_equal_int(0, (long long)anvil_error_get_message(NULL, NULL, 0),
+                        "ANV31: get_message(NULL, ...) is 0");
+   TestBit.is_equal_int(0, (long long)anvil_error_get_line(NULL), "ANV31: get_line(NULL) is 0");
+   TestBit.is_equal_int(0, (long long)anvil_error_get_column(NULL), "ANV31: get_column(NULL) is 0");
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -616,6 +732,14 @@ int main(void) {
    TestBit.run_ex("ANV25_statement_attribute_enumeration", NULL,
                   test_anv25_statement_attribute_enumeration, th);
    TestBit.run_ex("ANV26_attribute_null_safety", NULL, test_anv26_attribute_null_safety, th);
+   TestBit.run_ex("ANV27_document_statement_enumeration", NULL,
+                  test_anv27_document_statement_enumeration, th);
+   TestBit.run_ex("ANV28_statement_enumeration_null_safety", NULL,
+                  test_anv28_statement_enumeration_null_safety, th);
+   TestBit.run_ex("ANV29_error_detail_syntax", NULL, test_anv29_error_detail_syntax, th);
+   TestBit.run_ex("ANV30_error_detail_io_has_no_position", NULL,
+                  test_anv30_error_detail_io_has_no_position, th);
+   TestBit.run_ex("ANV31_error_detail_null_safety", NULL, test_anv31_error_detail_null_safety, th);
 
    return TestBit.report();
 }

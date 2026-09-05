@@ -60,6 +60,20 @@ typedef struct anvil_value_t *anvil_value;
 typedef struct anvil_attribute_t *anvil_attribute;
 
 /**
+ * @brief Opaque handle to the diagnostic detail behind a document's
+ * recorded error, if any — richer than the stable anvil_err_code category
+ * alone (a specific message, plus source line/column), pushed the moment
+ * the pipeline phase that produced anvil_get_error()'s category actually
+ * failed. Deliberately does not expose the specific internal anvl_err_code
+ * number itself, only its static message text — internal code churn still
+ * can never become a public ABI break through this handle.
+ *
+ * Lifetime is tied to the anvil_document it came from — never valid after
+ * that document is disposed.
+ */
+typedef struct anvil_error_t *anvil_error;
+
+/**
  * @brief Stable public value-kind enum.
  *
  * Mirrors the internal anvl_value_type categories a caller can actually do

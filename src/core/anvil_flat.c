@@ -26,6 +26,7 @@
 #include "internal/source.h"
 // ----------------
 #include <sigma/allocator.h>
+#include <sigma/farray.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <stddef.h>
@@ -36,7 +37,43 @@ struct anvil_document_t {
    module_document root; // NULL once disposed, or if never successfully registered
    anvil_err_code error; // ANVIL_OK if the whole pipeline succeeded
    anvl_value fragment_value; // set only by anvil_parse_value_fragment; NULL otherwise
+   anvil_error error_detail; // NULL until a phase fails; see make_error_detail
 };
+
+struct anvil_error_t {
+   anvil_err_code category;
+   const char *message; // static message text; NULL if nothing was recorded internally
+   usize line;
+   usize column;
+};
+
+// Builds the diagnostic-detail object for a just-failed pipeline phase. Reads the single
+// recorded internal error (anvl_error_set is first-error-wins, so there is never more than one)
+// for its specific message/line/column, if the phase ever reached internal recording at all (an
+// I/O failure, for instance, never does — doc_load_source's own failure has no source position
+// to record). Always allocates, even when nothing internal was recorded, so every failure
+// category consistently has a detail object to query (message/line/column simply read as
+// empty/0 in that case) rather than some categories having one and others not.
+static anvil_error make_error_detail(module_context ctx, anvil_err_code category) {
+   struct anvil_error_t *detail = Allocator.alloc(sizeof(struct anvil_error_t));
+   if (!detail) {
+      return NULL;
+   }
+   detail->category = category;
+   detail->message = NULL;
+   detail->line = 0;
+   detail->column = 0;
+
+   if (ctx && ctx->errors && List.size(ctx->errors) > 0) {
+      anvl_error recorded = anvl_error_get(ctx->errors, 0);
+      if (recorded) {
+         detail->message = recorded->message;
+         detail->line = recorded->line;
+         detail->column = recorded->column;
+      }
+   }
+   return (anvil_error)detail;
+}
 
 // Shared by anvil_load/anvil_load_buffer - identical pipeline regardless of where the root
 // document's source comes from. `register_label` is the symbolic name registered for the root
@@ -67,6 +104,7 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    handle->root = doc;
    handle->error = ANVIL_OK;
    handle->fragment_value = NULL; // load_common's documents are never fragments
+   handle->error_detail = NULL;
 
    if (ANVL_RES_OK != doc_load_source(doc, origin, source, length, &err_code)) {
       // Never registered with ctx - mod_ctx_dispose won't reach it, so dispose it directly
@@ -74,6 +112,7 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IO);
       return handle;
    }
 
@@ -81,11 +120,13 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IO);
       return handle;
    }
 
    if (ANVL_RES_OK != doc_scan_header(doc, &err_code)) {
       handle->error = ANVIL_ERR_HEADER;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_HEADER);
       return handle;
    }
 
@@ -96,12 +137,14 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
       // ANVIL_ERR_IMPORT ("something went wrong resolving the import graph") is the more
       // accurate category from this caller's perspective, not ANVIL_ERR_HEADER.
       handle->error = ANVIL_ERR_IMPORT;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IMPORT);
       return handle;
    }
 
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    if (ANVL_RES_OK != mod_ctx_create_arena(ctx, capacity, &err_code)) {
       handle->error = ANVIL_ERR_MEMORY;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_MEMORY);
       return handle;
    }
 
@@ -114,12 +157,14 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
       }
       if (ANVL_RES_OK != doc_parse_body(d, &err_code)) {
          handle->error = ANVIL_ERR_SYNTAX;
+         handle->error_detail = make_error_detail(ctx, ANVIL_ERR_SYNTAX);
          return handle;
       }
    }
 
    if (ANVL_RES_OK != mod_resolve_context(ctx, &err_code)) {
       handle->error = ANVIL_ERR_RESOLVE;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_RESOLVE);
       return handle;
    }
 
@@ -158,11 +203,13 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
    handle->root = doc;
    handle->error = ANVIL_OK;
    handle->fragment_value = NULL;
+   handle->error_detail = NULL;
 
    if (ANVL_RES_OK != doc_load_source(doc, ANVL_SOURCE_FROM_BUFFER, text, length, &err_code)) {
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IO);
       return handle;
    }
 
@@ -170,6 +217,7 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IO);
       return handle;
    }
 
@@ -177,12 +225,14 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
    usize capacity = mod_ctx_arena_size_hint(length);
    if (ANVL_RES_OK != mod_ctx_create_arena(ctx, capacity, &err_code)) {
       handle->error = ANVIL_ERR_MEMORY;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_MEMORY);
       return handle;
    }
 
    anvl_value value = NULL;
    if (ANVL_RES_OK != anvl_parse_value_fragment(doc, &value, &err_code)) {
       handle->error = ANVIL_ERR_SYNTAX;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_SYNTAX);
       return handle;
    }
 
@@ -195,6 +245,8 @@ void anvil_dispose(anvil_document doc) {
       return;
    }
    mod_ctx_dispose(doc->ctx); // disposes every registered document too (root included, once registered)
+   Allocator.dispose(doc->error_detail); // a dedicated wrapper struct (see make_error_detail), not
+                                          // arena-owned or ctx-owned — disposed here explicitly
    Allocator.dispose(doc);
 }
 
@@ -225,6 +277,64 @@ anvil_statement anvil_statement_get(anvil_document doc, const char *name) {
       return NULL;
    }
    return (anvil_statement)(anvl_statement)val;
+}
+
+size_t anvil_document_get_statement_count(anvil_document doc) {
+   if (!doc || !doc->root || !doc->root->body) {
+      return 0;
+   }
+   int count = FArray.capacity(doc->root->body, sizeof(anvl_statement));
+   return count > 0 ? (size_t)count : 0;
+}
+
+anvil_statement anvil_document_get_statement(anvil_document doc, size_t index) {
+   if (!doc || !doc->root || !doc->root->body) {
+      return NULL;
+   }
+   int count = FArray.capacity(doc->root->body, sizeof(anvl_statement));
+   if (count <= 0 || index >= (size_t)count) {
+      return NULL;
+   }
+   anvl_statement stmt = NULL;
+   FArray.get(doc->root->body, index, sizeof(anvl_statement), (object *)&stmt);
+   return (anvil_statement)stmt;
+}
+
+// Forward declaration — defined below, shared by every buffer-supplied accessor; needed here
+// too for anvil_error_get_message.
+static size_t copy_to_buffer(const char *src, size_t src_len, char *buf, size_t buflen);
+
+anvil_error anvil_document_get_error(anvil_document doc) {
+   if (!doc) {
+      return NULL;
+   }
+   return doc->error_detail;
+}
+
+anvil_err_code anvil_error_get_category(anvil_error err) {
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   if (!e) {
+      return ANVIL_OK;
+   }
+   return e->category;
+}
+
+size_t anvil_error_get_message(anvil_error err, char *buf, size_t buflen) {
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   if (!e || !e->message) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   return copy_to_buffer(e->message, strlen(e->message), buf, buflen);
+}
+
+size_t anvil_error_get_line(anvil_error err) {
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   return e ? (size_t)e->line : 0;
+}
+
+size_t anvil_error_get_column(anvil_error err) {
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   return e ? (size_t)e->column : 0;
 }
 
 anvil_value anvil_statement_get_value(anvil_statement stmt) {

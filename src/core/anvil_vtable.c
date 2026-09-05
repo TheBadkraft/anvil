@@ -43,11 +43,21 @@ const anvil_document_i Document = {
    .get_attribute = anvil_document_get_attribute,
    .find_attribute = anvil_document_find_attribute,
    .get_fragment_value = anvil_document_get_fragment_value,
+   .get_statement_count = anvil_document_get_statement_count,
+   .get_statement = anvil_document_get_statement,
+   .get_error = anvil_document_get_error,
 };
 
 const anvil_attribute_i Attribute = {
    .get_key = anvil_attribute_get_key,
    .get_value = anvil_attribute_get_value,
+};
+
+const anvil_error_i Error = {
+   .get_category = anvil_error_get_category,
+   .get_message = anvil_error_get_message,
+   .get_line = anvil_error_get_line,
+   .get_column = anvil_error_get_column,
 };
 
 const anvil_value_i Value = {

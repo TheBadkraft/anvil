@@ -91,6 +91,44 @@ anvil_err_code anvil_get_error(anvil_document doc);
 const char *anvil_get_version(void);
 
 /**
+ * @brief The diagnostic detail behind this document's recorded error, if
+ * any — richer than anvil_get_error()'s stable category alone.
+ * @param doc The document to check. NULL, or a document with no recorded
+ * error, returns NULL.
+ */
+anvil_error anvil_document_get_error(anvil_document doc);
+
+/**
+ * @brief Same category anvil_get_error(doc) would report — provided here
+ * too so a caller holding only the anvil_error handle never needs the
+ * document back to know it.
+ * @param err The error to check. NULL returns ANVIL_OK.
+ */
+anvil_err_code anvil_error_get_category(anvil_error err);
+
+/**
+ * @brief A specific, human-readable message for this error, copied into a
+ * caller-supplied buffer. Same buffer-sizing convention as
+ * anvil_statement_get_name. Empty (returns 0) when the failure category has
+ * no meaningful message beyond its category (e.g. ANVIL_ERR_IO).
+ * @param err The error to read. NULL writes nothing and returns 0.
+ */
+size_t anvil_error_get_message(anvil_error err, char *buf, size_t buflen);
+
+/**
+ * @brief The 1-based source line this error was recorded at.
+ * @param err The error to check. NULL, or a category with no meaningful
+ * source position (e.g. ANVIL_ERR_IO), returns 0.
+ */
+size_t anvil_error_get_line(anvil_error err);
+
+/**
+ * @brief The 1-based source column this error was recorded at, same
+ * contract as anvil_error_get_line.
+ */
+size_t anvil_error_get_column(anvil_error err);
+
+/**
  * @brief Look up a top-level statement by name.
  * @param doc The document to search.
  * @param name The statement's declared name.
@@ -98,6 +136,23 @@ const char *anvil_get_version(void);
  * load, or no top-level statement has that name.
  */
 anvil_statement anvil_statement_get(anvil_document doc, const char *name);
+
+/**
+ * @brief The number of top-level statements in this document's own body
+ * (never counting nested/imported documents' own statements separately).
+ * @param doc The document to check. NULL, or a document that never reached
+ * a successful body parse, returns 0.
+ */
+size_t anvil_document_get_statement_count(anvil_document doc);
+
+/**
+ * @brief The top-level statement at `index`, in declaration order.
+ * @param doc The document to index.
+ * @param index Zero-based statement index.
+ * @return The statement handle, or NULL if doc is NULL or index is out of
+ * bounds.
+ */
+anvil_statement anvil_document_get_statement(anvil_document doc, size_t index);
 
 /**
  * @brief A statement's own value.
