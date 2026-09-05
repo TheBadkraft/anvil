@@ -74,7 +74,7 @@ Investigated `../flywire/`'s actual call sites (`src/table.js`, `src/schema-regi
 
 ```js
 anvl.parse(source)        // full document parse — reads @[schema]-attributed .meta.anvl files
-anvl.parseRawValue(text)  // standalone value decode — no VarRef support (anvil.js's own
+anvl.parseRawValue(text)  // Value Fragment decode — no VarRef support (anvil.js's own
                           // parseRawValueCore: "no registry here for a VarRef to resolve against")
 anvl.lastError()          // error retrieval
 ```
@@ -87,13 +87,19 @@ Three things Anvil Native doesn't have yet, confirmed as the next slices (in thi
    Two new vtable groups fell out of this mechanically, following the naming law precisely (`anvil_document_*` → `Document`, `anvil_attribute_*` → `Attribute`) rather than overloading the existing `Anvil`/`Statement` groups — `Statement` also gained its 3 new attribute fields directly. `test/unit/test_anvil_native.c` `ANV22`–`ANV26` (26 assertions) plus `test_anvil_vtable.c` `VT05`/`VT06` (new groups) + 3 new `VT02` assertions. Full regression green, Valgrind-clean.
 
    **Found along the way — a real, previously-untested grammar gap, not a bug in this new code.** `f09_doc_attributes.anvl` (a pre-existing fixture, confirmed never actually used by any test before this) has attribute keys with hyphens/dots/colons (`@[doc-level]`, `@[hasDot.Notation, hasColon:Separator]`) — but `header_scan_attributes` (`src/core/document.c`) scans attribute keys with `Source.is_identifier_part` (alpha/digit/underscore only), not the more permissive `is_bare_literal_part` (which does allow `-`/`.`/`:`/`$`). So this fixture's header scan actually fails partway through (`ANVL_ERR_PARSER_UNEXPECTED_TOKEN`) once it hits the hyphen — never previously caught since nothing exercised it. Sidestepped for this slice with a new, clean fixture (`anvil_doc_attributes.anvl`, identifier-safe keys only) rather than deciding the grammar question unilaterally. **Open**, not resolved: should attribute keys be as permissive as bare literals (matching the evident intent of the orphaned fixture's naming), or is identifier-only correct and the fixture simply stale/aspirational? Not blocking — flywire's own actual need (`@[schema]`) is a plain identifier either way.
-3. **Standalone value parsing.** A genuinely separate entry point from `anvil_load` — parsing one raw value expression with no enclosing document/statement context (and, matching `anvil.js`'s own precedent, no VarRef support, since there's no identifier map to resolve against outside a real document).
+3. **Value Fragment parsing** (correct term, clarifying the earlier "standalone value" placeholder). A genuinely separate entry point from `anvil_load` — parsing one raw value expression with no enclosing document/statement context (and, matching `anvil.js`'s own precedent, no VarRef support, since there's no identifier map to resolve against outside a real document).
 
 ## Open questions
 
 - Anonymous (`OBJECT_BLOCK`) statement field traversal — `anvil_statement_get_value` returns NULL for one today (it genuinely has no `.value`, only `.body`); nobody's asked for this traversal yet, so it stays out of scope until they do.
 - What the API deliberately does *not* expose (question 2 of the founding framing) — not yet worked through in concrete terms beyond "no raw structs" (decision 2 above already answers part of this).
 - **Attribute key character set** — should `header_scan_attributes`/statement-attribute scanning accept hyphens/dots/colons in keys (matching `is_bare_literal_part`'s permissiveness), or is identifier-only (`is_identifier_part`) correct? `f09_doc_attributes.anvl` assumes the former and has never actually passed a real test either way — see "Implementation" above.
+
+   Pushback on the framing above: rather than loosening keys toward `is_bare_literal_part`, the lean is the other direction — that permissiveness is "too permissive... for attributes identifiers," and keys might want to end up *stricter*, not looser, though undecided pending real usage data. `test/unit/test_attribute_grammar.c` (`ATG_M01`–`ATG_M10`, `ATG_S01`–`ATG_S10`, 20 cases / 56 assertions, all currently passing) was added purely to characterize today's behavior before any decision, at both module- and statement-level side by side (confirmed byte-for-byte identical grammar between `header_scan_attributes` and `parse_attribute_list`). Findings locked in as proven invariants:
+   - Keys accept alpha/digit/underscore, never a leading digit (`is_identifier_start` excludes digits — a bare `1bad` key fails immediately with `ANVL_ERR_PARSER_INVALID_IDENTIFIER`, before any content is consumed).
+   - A leading underscore is accepted (`_leading`); case is not discriminated (`CamelCase` passes); a single-character key is accepted (`x`).
+   - A hyphen, dot, colon, or slash anywhere in a key is rejected — but not with a clean "invalid character" error: the key scan silently truncates at the bad byte (e.g. `has-hyphen` captures a key of just `has`), then the leftover byte fails to match `=`/`,`/`]` and the whole attribute list aborts with `ANVL_ERR_PARSER_UNEXPECTED_TOKEN`. This truncate-then-fail shape is itself worth keeping in mind if keys are ever tightened or loosened — it means today's rejection is a side effect of the part-scan loop, not a deliberate character-class check with its own error code.
+   - Values are unaffected by any of this and stay fully permissive today — a hyphenated value (`key=has-hyphen-value`) round-trips verbatim at both module- and statement-level. This is the asymmetry the "values might want to be stricter" lean would have to reckon with: values are currently *more* permissive than keys, the opposite of the stated preference.
 
 ## Related notes
 

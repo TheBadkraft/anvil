@@ -70,7 +70,7 @@ endef
 .PHONY: all clean val build test test_release
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
 .PHONY: build_test_body_amp build_test_body_aml
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable $(UNIT_CASES)
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -82,7 +82,8 @@ all: $(BIN)/test_version \
 	$(BIN)/test_body_aml \
 	$(BIN)/test_resolver \
 	$(BIN)/test_anvil_native \
-	$(BIN)/test_anvil_vtable
+	$(BIN)/test_anvil_vtable \
+	$(BIN)/test_attribute_grammar
 # test_fixtures is disabled: it depends on the deprecated root/doc APIs that
 # were replaced by the source-hash identity model. Revive after the parser
 # is reintegrated with anvl_source.
@@ -212,6 +213,18 @@ build_test_anvil_vtable: $(BIN)/test_anvil_vtable
 
 test_anvil_vtable: $(BIN)/test_version $(BIN)/test_anvil_vtable
 	$(call run_test_bin,test_anvil_vtable)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_attribute_grammar: test_attribute_grammar.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_attribute_grammar: $(BIN)/test_attribute_grammar
+
+test_attribute_grammar: $(BIN)/test_version $(BIN)/test_attribute_grammar
+	$(call run_test_bin,test_attribute_grammar)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi
