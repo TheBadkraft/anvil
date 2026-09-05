@@ -36,6 +36,7 @@
 
 typedef struct anvil_i {
    anvil_document (*load)(const char *filepath);
+   anvil_document (*load_buffer)(const char *source, size_t length);
    void (*dispose)(anvil_document doc);
    bool (*has_errors)(anvil_document doc);
    anvil_err_code (*get_error)(anvil_document doc);

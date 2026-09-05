@@ -36,7 +36,12 @@ struct anvil_document_t {
    anvil_err_code error; // ANVIL_OK if the whole pipeline succeeded
 };
 
-anvil_document anvil_load(const char *filepath) {
+// Shared by anvil_load/anvil_load_buffer - identical pipeline regardless of where the root
+// document's source comes from. `register_label` is the symbolic name registered for the root
+// document (the real filepath for a file load; a fixed placeholder for a buffer load, which
+// has no real path of its own).
+static anvil_document load_common(anvl_source_origin origin, const char *source, size_t length,
+                                  const char *register_label) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    module_context ctx = NULL;
@@ -60,7 +65,7 @@ anvil_document anvil_load(const char *filepath) {
    handle->root = doc;
    handle->error = ANVIL_OK;
 
-   if (ANVL_RES_OK != doc_load_source(doc, ANVL_SOURCE_FROM_FILE, filepath, 0, &err_code)) {
+   if (ANVL_RES_OK != doc_load_source(doc, origin, source, length, &err_code)) {
       // Never registered with ctx - mod_ctx_dispose won't reach it, so dispose it directly
       // here to avoid a leak, and clear the handle's reference to it.
       doc_dispose(doc);
@@ -69,7 +74,7 @@ anvil_document anvil_load(const char *filepath) {
       return handle;
    }
 
-   if (ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, filepath, &err_code)) {
+   if (ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, register_label, &err_code)) {
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;
@@ -116,6 +121,14 @@ anvil_document anvil_load(const char *filepath) {
    }
 
    return handle;
+}
+
+anvil_document anvil_load(const char *filepath) {
+   return load_common(ANVL_SOURCE_FROM_FILE, filepath, 0, filepath);
+}
+
+anvil_document anvil_load_buffer(const char *source, size_t length) {
+   return load_common(ANVL_SOURCE_FROM_BUFFER, source, length, "<buffer>");
 }
 
 void anvil_dispose(anvil_document doc) {

@@ -386,6 +386,74 @@ static void test_anv17_accessor_null_safety(void) {
    TestBit.is_null(anvil_value_get_statement(NULL, 0),
                    "ANV17: value_get_statement(NULL, ...) is NULL");
 }
+/* ---------------------------------------------------------------------- *
+ * ANV18 — anvil_load_buffer parses a clean in-memory document identically
+ * to a file load
+ * ---------------------------------------------------------------------- */
+static void test_anv18_load_buffer_clean(void) {
+   const char *src = "#!aml\n\nname := David;\n";
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(doc, "ANV18: document loaded from a buffer");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "ANV18: no errors");
+
+   anvil_statement name = anvil_statement_get(doc, "name");
+   TestBit.is_not_null(name, "ANV18: 'name' statement found");
+   anvil_value name_val = anvil_statement_get_value(name);
+   TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, anvil_value_get_type(name_val),
+                        "ANV18: 'name' is ANVIL_VALUE_IDENTIFIER");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV19 — anvil_load_buffer reports ANVIL_ERR_SYNTAX for a body syntax
+ * error, same categorization as the file-based path
+ * ---------------------------------------------------------------------- */
+static void test_anv19_load_buffer_syntax_error(void) {
+   const char *src = "#!aml\n\nlabel {\n   field := 1;\n";
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(doc, "ANV19: document handle still returned despite the error");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(anvil_has_errors(doc), "ANV19: errors recorded");
+   TestBit.is_equal_int(ANVIL_ERR_SYNTAX, anvil_get_error(doc),
+                        "ANV19: error category is ANVIL_ERR_SYNTAX");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV20 — anvil_load_buffer(NULL, 0) is safe and reports an error, not a
+ * crash
+ * ---------------------------------------------------------------------- */
+static void test_anv20_load_buffer_null_source(void) {
+   anvil_document doc = anvil_load_buffer(NULL, 0);
+   TestBit.is_not_null(doc, "ANV20: document handle still returned for a NULL buffer");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(anvil_has_errors(doc), "ANV20: errors recorded");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV21 — anvil_load_buffer honors `length` exactly, not a NUL terminator
+ * ---------------------------------------------------------------------- */
+static void test_anv21_load_buffer_respects_length(void) {
+   const char *src = "#!aml\n\nname := David;\nJUNK JUNK JUNK THIS IS NOT VALID {{{";
+   size_t valid_len = strlen("#!aml\n\nname := David;\n");
+   anvil_document doc = anvil_load_buffer(src, valid_len);
+   TestBit.is_not_null(doc, "ANV21: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc),
+                    "ANV21: no errors — the trailing junk past `length` was never read");
+
+   anvil_dispose(doc);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -410,6 +478,11 @@ int main(void) {
                   th);
    TestBit.run_ex("ANV16_buffer_sizing_convention", NULL, test_anv16_buffer_sizing_convention, th);
    TestBit.run_ex("ANV17_accessor_null_safety", NULL, test_anv17_accessor_null_safety, th);
+   TestBit.run_ex("ANV18_load_buffer_clean", NULL, test_anv18_load_buffer_clean, th);
+   TestBit.run_ex("ANV19_load_buffer_syntax_error", NULL, test_anv19_load_buffer_syntax_error, th);
+   TestBit.run_ex("ANV20_load_buffer_null_source", NULL, test_anv20_load_buffer_null_source, th);
+   TestBit.run_ex("ANV21_load_buffer_respects_length", NULL, test_anv21_load_buffer_respects_length,
+                  th);
 
    return TestBit.report();
 }

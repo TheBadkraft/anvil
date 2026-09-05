@@ -36,6 +36,18 @@
 anvil_document anvil_load(const char *filepath);
 
 /**
+ * @brief Load, scan, import, parse, and resolve a document from an in-memory
+ * buffer, rather than a file path — otherwise identical to anvil_load.
+ * @param source The source text. Not required to be NUL-terminated; exactly
+ * `length` bytes are read, and nothing beyond it.
+ * @param length Length of `source` in bytes.
+ * @return Same contract as anvil_load: a non-NULL handle for every failure
+ * category (check anvil_has_errors()/anvil_get_error()), NULL only if the
+ * handle itself could not be allocated.
+ */
+anvil_document anvil_load_buffer(const char *source, size_t length);
+
+/**
  * @brief Release a document and everything it owns (every imported
  * document, the shared arena, all recorded errors).
  * @param doc The document to dispose. Safe to call with NULL (no-op).

@@ -21,6 +21,7 @@
 
 const anvil_i Anvil = {
    .load = anvil_load,
+   .load_buffer = anvil_load_buffer,
    .dispose = anvil_dispose,
    .has_errors = anvil_has_errors,
    .get_error = anvil_get_error,

@@ -33,6 +33,7 @@ static void th(void) {
  * ---------------------------------------------------------------------- */
 static void test_vt01_anvil_matches_flat(void) {
    TestBit.is_true(Anvil.load == anvil_load, "VT01: Anvil.load is anvil_load");
+   TestBit.is_true(Anvil.load_buffer == anvil_load_buffer, "VT01: Anvil.load_buffer is anvil_load_buffer");
    TestBit.is_true(Anvil.dispose == anvil_dispose, "VT01: Anvil.dispose is anvil_dispose");
    TestBit.is_true(Anvil.has_errors == anvil_has_errors,
                    "VT01: Anvil.has_errors is anvil_has_errors");
