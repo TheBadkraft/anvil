@@ -109,6 +109,8 @@ typedef struct sc_collections_i {
     *        elements, for Query.next/Query.first.
     * @param coll The collection to query
     * @return An sc_queryable ready to scan
+    * @warning Do not mutate coll while the returned queryable is in use —
+    *          see the INVARIANT note in query.h.
     */
    sc_queryable (*as_queryable)(collection coll);
 } sc_collections_i;

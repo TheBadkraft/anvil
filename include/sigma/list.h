@@ -124,6 +124,9 @@ typedef struct sc_list_i {
     *        collection, for Query.next/Query.first — O(1), no allocation.
     * @param lst The list to query
     * @return An sc_queryable ready to scan
+    * @warning Do not mutate lst (append/insert/remove/set/clear/prepend)
+    *          while the returned queryable is in use — see the INVARIANT
+    *          note in query.h.
     */
    sc_queryable (*as_queryable)(list);
 } sc_list_i;
