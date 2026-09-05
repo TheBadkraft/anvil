@@ -1,0 +1,15 @@
+#!aml
+
+flag := true;
+count := 42;
+greeting := "hello\nworld";
+tag := @date`2026-01-01`;
+word := bareword;
+items := [1, 2, 3];
+pair := (10, 20);
+config := {
+   host := localhost;
+   port := 8080;
+};
+alias_count := $count;
+alias_config := $config;
