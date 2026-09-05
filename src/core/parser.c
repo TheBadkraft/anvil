@@ -818,6 +818,10 @@ static bool parse_string_literal(anvl_source src, anvl_value *out_value) {
       return false; // Unterminated string literal
    }
 
+   // Capture the end position before consuming the closing quote itself, not after -
+   // otherwise .text would include the closing quote as a trailing byte.
+   const char *end = Source.at(src);
+
    // Consume the closing quote
    Source.consume(src, 1);
 
@@ -825,7 +829,7 @@ static bool parse_string_literal(anvl_source src, anvl_value *out_value) {
    (*out_value)->type = ANVL_VALUE_STRING;
    Source.init_slice(src, &(*out_value)->text);
    (*out_value)->text.start = start;
-   (*out_value)->text.end = Source.at(src);
+   (*out_value)->text.end = end;
 
    return true; // Successfully parsed string literal
 }
@@ -877,6 +881,10 @@ static bool parse_blob_literal(anvl_source src, anvl_value *out_value) {
       return false; // Unterminated blob literal
    }
 
+   // Capture the end position before consuming the closing backtick itself, not after -
+   // otherwise .text would include the closing backtick as a trailing byte.
+   const char *end = Source.at(src);
+
    // Consume the closing backtick
    Source.consume(src, 1);
 
@@ -884,7 +892,7 @@ static bool parse_blob_literal(anvl_source src, anvl_value *out_value) {
    (*out_value)->type = ANVL_VALUE_BLOB;
    Source.init_slice(src, &(*out_value)->text);
    (*out_value)->text.start = start;
-   (*out_value)->text.end = Source.at(src);
+   (*out_value)->text.end = end;
    Source.init_slice(src, &(*out_value)->blob.tag);
    (*out_value)->blob.tag.start = tag_start;
    (*out_value)->blob.tag.end = tag_end;

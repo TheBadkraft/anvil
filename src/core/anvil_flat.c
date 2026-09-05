@@ -22,10 +22,13 @@
 #include "anvil.h"
 #include "anvil_flat.h"
 #include "internal/module.h"
+#include "internal/source.h"
 // ----------------
 #include <sigma/allocator.h>
 #include <sigma/list.h>
+#include <sigma/map.h>
 #include <stddef.h>
+#include <string.h>
 
 struct anvil_document_t {
    module_context ctx;
@@ -139,4 +142,195 @@ anvil_err_code anvil_get_error(anvil_document doc) {
 
 const char *anvil_get_version(void) {
    return Anvl.get_version();
+}
+
+anvil_statement anvil_statement_get(anvil_document doc, const char *name) {
+   if (!doc || !doc->ctx || !doc->ctx->identifiers || !name) {
+      return NULL;
+   }
+   addr val = 0;
+   if (!Map.get(doc->ctx->identifiers, name, strlen(name), &val)) {
+      return NULL;
+   }
+   return (anvil_statement)(anvl_statement)val;
+}
+
+anvil_value anvil_statement_get_value(anvil_statement stmt) {
+   anvl_statement s = (anvl_statement)stmt;
+   if (!s || s->kind != ANVL_STMT_ASSIGN) {
+      return NULL; // anonymous OBJECT_BLOCK has no value of its own - only a body
+   }
+   return (anvil_value)s->value;
+}
+
+// Copies up to buflen-1 bytes from [src, src+src_len) into buf, NUL-terminating - shared by
+// every buffer-supplied accessor. Always returns src_len itself (the full, untruncated
+// length), regardless of whether buf/buflen was big enough to hold it - matches snprintf's
+// convention (call once with buf NULL/buflen 0 to size a buffer).
+static size_t copy_to_buffer(const char *src, size_t src_len, char *buf, size_t buflen) {
+   if (buf && buflen > 0) {
+      size_t n = src_len < buflen - 1 ? src_len : buflen - 1;
+      if (n > 0) {
+         memcpy(buf, src, n);
+      }
+      buf[n] = '\0';
+   }
+   return src_len;
+}
+
+size_t anvil_statement_get_name(anvil_statement stmt, char *buf, size_t buflen) {
+   anvl_statement s = (anvl_statement)stmt;
+   if (!s) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   return copy_to_buffer(s->name.start, (size_t)Source.slice_length(s->name), buf, buflen);
+}
+
+// Follows a resolved VarRef to its (already-flattened, by the resolver) final concrete
+// value. Returns NULL for an unresolved VarRef (missing target, cycle) - callers translate
+// that to ANVIL_VALUE_NULL / an empty/zero result, matching VarRef's overall "unresolved is
+// not an error" policy.
+static anvl_value deref_varref(anvl_value v) {
+   if (v && v->type == ANVL_VALUE_VARREF) {
+      return v->varref.resolved;
+   }
+   return v;
+}
+
+anvil_value_type anvil_value_get_type(anvil_value val) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v) {
+      return ANVIL_VALUE_NULL;
+   }
+   switch (v->type) {
+   case ANVL_VALUE_BOOL:
+      return ANVIL_VALUE_BOOL;
+   case ANVL_VALUE_NUMERIC:
+      return ANVIL_VALUE_NUMERIC;
+   case ANVL_VALUE_STRING:
+      return ANVIL_VALUE_STRING;
+   case ANVL_VALUE_BLOB:
+      return ANVIL_VALUE_BLOB;
+   case ANVL_VALUE_IDENTIFIER:
+      return ANVIL_VALUE_IDENTIFIER;
+   case ANVL_VALUE_ARRAY:
+      return ANVIL_VALUE_ARRAY;
+   case ANVL_VALUE_TUPLE:
+      return ANVIL_VALUE_TUPLE;
+   case ANVL_VALUE_OBJECT:
+      return ANVIL_VALUE_OBJECT;
+   case ANVL_VALUE_NULL:
+   case ANVL_VALUE_NONE:
+   case ANVL_VALUE_VARREF:
+   default:
+      return ANVIL_VALUE_NULL;
+   }
+}
+
+// Resolves the minimal, deterministic escape set (\n \t \r \\ \") into out_buf (capacity
+// out_cap), or just computes and returns the resolved length if out_buf is NULL - one
+// function serves both the length-query and the actual-copy call, matching
+// anvil_value_get_text's two-call buffer-sizing convention. An unrecognized escape (backslash
+// followed by anything else) passes both characters through unchanged - never ambiguous,
+// never silently drops data.
+static size_t resolve_string_escapes(const char *raw, size_t raw_len, char *out_buf,
+                                     size_t out_cap) {
+   size_t out_len = 0;
+   for (size_t i = 0; i < raw_len; i++) {
+      char c = raw[i];
+      char resolved = c;
+      bool is_escape = false;
+      if (c == '\\' && i + 1 < raw_len) {
+         switch (raw[i + 1]) {
+         case 'n':
+            resolved = '\n';
+            is_escape = true;
+            break;
+         case 't':
+            resolved = '\t';
+            is_escape = true;
+            break;
+         case 'r':
+            resolved = '\r';
+            is_escape = true;
+            break;
+         case '\\':
+            resolved = '\\';
+            is_escape = true;
+            break;
+         case '"':
+            resolved = '"';
+            is_escape = true;
+            break;
+         default:
+            break; // unrecognized - fall through, keep '\' as its own output byte
+         }
+      }
+      if (out_buf && out_len < out_cap) {
+         out_buf[out_len] = resolved;
+      }
+      out_len++;
+      if (is_escape) {
+         i++; // consume the escaped character too
+      }
+   }
+   return out_len;
+}
+
+size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   usize raw_len = Source.slice_length(v->text);
+   if (v->type != ANVL_VALUE_STRING) {
+      return copy_to_buffer(v->text.start, (size_t)raw_len, buf, buflen);
+   }
+   size_t needed = resolve_string_escapes(v->text.start, (size_t)raw_len, NULL, 0);
+   if (buf && buflen > 0) {
+      resolve_string_escapes(v->text.start, (size_t)raw_len, buf, buflen - 1);
+      size_t term_at = needed < buflen - 1 ? needed : buflen - 1;
+      buf[term_at] = '\0';
+   }
+   return needed;
+}
+
+size_t anvil_value_get_count(anvil_value val) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v) {
+      return 0;
+   }
+   if (v->type == ANVL_VALUE_ARRAY || v->type == ANVL_VALUE_TUPLE) {
+      return (size_t)List.size(v->collection.items);
+   }
+   if (v->type == ANVL_VALUE_OBJECT) {
+      return (size_t)List.size(v->object.statements);
+   }
+   return 0;
+}
+
+anvil_value anvil_value_get_element(anvil_value val, size_t index) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || (v->type != ANVL_VALUE_ARRAY && v->type != ANVL_VALUE_TUPLE)) {
+      return NULL;
+   }
+   if (index >= (size_t)List.size(v->collection.items)) {
+      return NULL;
+   }
+   anvl_value elem = NULL;
+   List.get(v->collection.items, index, (object *)&elem);
+   return (anvil_value)elem;
+}
+
+anvil_statement anvil_value_get_statement(anvil_value val, size_t index) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || v->type != ANVL_VALUE_OBJECT) {
+      return NULL;
+   }
+   if (index >= (size_t)List.size(v->object.statements)) {
+      return NULL;
+   }
+   anvl_statement stmt = NULL;
+   List.get(v->object.statements, index, (object *)&stmt);
+   return (anvil_statement)stmt;
 }

@@ -31,6 +31,46 @@
 typedef struct anvil_document_t *anvil_document;
 
 /**
+ * @brief Opaque handle to one statement (a declared name and what it's
+ * assigned, or an anonymous OBJECT_BLOCK's namespace).
+ *
+ * Lifetime is tied to the anvil_document it came from — never valid after
+ * that document is disposed.
+ */
+typedef struct anvil_statement_t *anvil_statement;
+
+/**
+ * @brief Opaque handle to one value.
+ *
+ * Lifetime is tied to the anvil_document it came from — never valid after
+ * that document is disposed. A resolved `$identifier` VarRef is always
+ * transparent here: every accessor reports the target's own type/content,
+ * never a distinct "this was a reference" type — see anvil_value_get_type.
+ */
+typedef struct anvil_value_t *anvil_value;
+
+/**
+ * @brief Stable public value-kind enum.
+ *
+ * Mirrors the internal anvl_value_type categories a caller can actually do
+ * something useful with. Two are deliberately absent: VARREF (transparent —
+ * see anvil_value, above — an unresolved reference just reports as
+ * ANVIL_VALUE_NULL) and the internal NONE placeholder (never a real parsed
+ * value's type).
+ */
+typedef enum {
+   ANVIL_VALUE_NULL = 0,
+   ANVIL_VALUE_BOOL,
+   ANVIL_VALUE_NUMERIC,
+   ANVIL_VALUE_STRING,
+   ANVIL_VALUE_BLOB,
+   ANVIL_VALUE_IDENTIFIER,
+   ANVIL_VALUE_ARRAY,
+   ANVIL_VALUE_TUPLE,
+   ANVIL_VALUE_OBJECT,
+} anvil_value_type;
+
+/**
  * @brief Stable, deliberately small public error category.
  *
  * One category per document-pipeline phase, plus the cross-cutting
