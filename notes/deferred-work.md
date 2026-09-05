@@ -16,6 +16,10 @@ Single index of everything intentionally deferred to a later phase, or left as a
 
 Import-graph processing order (topological sort) is **not** on this list — it was considered and resolved as unnecessary; see `document-header-scan.md` § *Import-graph processing order — resolved as unnecessary* and `notes/resolution-phase.md` § *Why document processing order doesn't matter*.
 
+## Deferred to native schema & opt-in typing
+
+**Design thread captured, sequenced after the Node-binding-prep work — see `notes/native-schema.md`.** Native schema (a `@[schema]`-attributed document declaring another document's required shape — already-reserved but unused error codes exist in `errors.h`'s Schema Errors 46xx block) and opt-in strong typing (custom type declarations, importable via `import "types.anvl";`, e.g. a `VIN` type) are meant to eventually replace `../flywire/`'s own ad-hoc schema handling. Real prior art exists in `anvil.bak/src/schema/schema.c` (671 lines, pre-rebuild) worth reviewing when this picks up. One concrete link already acted on: the Node-binding-prep gap #2 module-attributes accessor is being built generically so the eventual schema resolver can reuse it for `@[schema]` detection.
+
 ## Deferred to compilation (`anvilc` / `.anvlo`)
 
 - The entire `.anvlo` object format — concept stage only, no implementation. `anvlo-compilation.md` lists its own open questions (format, versioning, source retention, import representation, body IR, error handling, build tooling, linking, cross-platform).
