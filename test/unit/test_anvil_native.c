@@ -454,6 +454,132 @@ static void test_anv21_load_buffer_respects_length(void) {
 
    anvil_dispose(doc);
 }
+/* ---------------------------------------------------------------------- *
+ * ANV22 — module-level attribute enumeration (anvil_doc_attributes.anvl:
+ * @[doc_level] @[is_mixed=true] @[has_var_refs] — 3 attributes, first a
+ * flag, second key=value, across 3 separate @[...] blocks)
+ * ---------------------------------------------------------------------- */
+static void test_anv22_document_attribute_enumeration(void) {
+   anvil_document doc = anvil_load(fixture_path("anvil_doc_attributes.anvl"));
+   TestBit.is_not_null(doc, "ANV22: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "ANV22: no errors");
+   TestBit.is_equal_int(3, (long long)anvil_document_get_attribute_count(doc),
+                        "ANV22: 3 module-level attributes");
+
+   anvil_attribute first = anvil_document_get_attribute(doc, 0);
+   TestBit.is_not_null(first, "ANV22: first attribute retrieved");
+   char buf[64] = {0};
+   anvil_attribute_get_key(first, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("doc_level", buf), "ANV22: first attribute key is 'doc_level'");
+   TestBit.is_equal_int(0, (long long)anvil_attribute_get_value(first, buf, sizeof(buf)),
+                        "ANV22: first attribute is a flag (no value)");
+
+   anvil_attribute second = anvil_document_get_attribute(doc, 1);
+   TestBit.is_not_null(second, "ANV22: second attribute retrieved");
+   anvil_attribute_get_key(second, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("is_mixed", buf), "ANV22: second attribute key is 'is_mixed'");
+   anvil_attribute_get_value(second, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("true", buf), "ANV22: second attribute value is 'true'");
+
+   TestBit.is_null(anvil_document_get_attribute(doc, 3),
+                   "ANV22: index 3 is out of bounds (only 3 attributes, 0-2)");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV23 — module-level attribute lookup by key
+ * ---------------------------------------------------------------------- */
+static void test_anv23_document_find_attribute(void) {
+   anvil_document doc = anvil_load(fixture_path("anvil_doc_attributes.anvl"));
+   TestBit.is_not_null(doc, "ANV23: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_attribute found = anvil_document_find_attribute(doc, "is_mixed");
+   TestBit.is_not_null(found, "ANV23: 'is_mixed' found by key");
+   char buf[64] = {0};
+   anvil_attribute_get_value(found, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("true", buf), "ANV23: 'is_mixed' value is 'true'");
+
+   TestBit.is_null(anvil_document_find_attribute(doc, "nonexistent"),
+                   "ANV23: a nonexistent key is not found");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV24 — a document with no module-level attributes reports 0
+ * ---------------------------------------------------------------------- */
+static void test_anv24_document_no_attributes(void) {
+   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl"));
+   TestBit.is_not_null(doc, "ANV24: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_equal_int(0, (long long)anvil_document_get_attribute_count(doc),
+                        "ANV24: 0 module-level attributes");
+   TestBit.is_null(anvil_document_find_attribute(doc, "anything"),
+                   "ANV24: find_attribute on an attribute-less document is NULL");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV25 — statement-level attribute enumeration and lookup
+ * (body_assign_attrs.anvl: server @[active, env=production] := "prod-1";)
+ * ---------------------------------------------------------------------- */
+static void test_anv25_statement_attribute_enumeration(void) {
+   anvil_document doc = anvil_load(fixture_path("body_assign_attrs.anvl"));
+   TestBit.is_not_null(doc, "ANV25: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_statement server = anvil_statement_get(doc, "server");
+   TestBit.is_not_null(server, "ANV25: 'server' statement found");
+   TestBit.is_equal_int(2, (long long)anvil_statement_get_attribute_count(server),
+                        "ANV25: 2 statement-level attributes");
+
+   anvil_attribute first = anvil_statement_get_attribute(server, 0);
+   char buf[64] = {0};
+   anvil_attribute_get_key(first, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("active", buf), "ANV25: first attribute key is 'active'");
+   TestBit.is_equal_int(0, (long long)anvil_attribute_get_value(first, buf, sizeof(buf)),
+                        "ANV25: 'active' is a flag (no value)");
+
+   anvil_attribute env = anvil_statement_find_attribute(server, "env");
+   TestBit.is_not_null(env, "ANV25: 'env' found by key");
+   anvil_attribute_get_value(env, buf, sizeof(buf));
+   TestBit.is_true(0 == strcmp("production", buf), "ANV25: 'env' value is 'production'");
+
+   TestBit.is_null(anvil_statement_find_attribute(server, "nonexistent"),
+                   "ANV25: a nonexistent key is not found");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV26 — NULL safety across every attribute accessor
+ * ---------------------------------------------------------------------- */
+static void test_anv26_attribute_null_safety(void) {
+   TestBit.is_equal_int(0, (long long)anvil_document_get_attribute_count(NULL),
+                        "ANV26: document_get_attribute_count(NULL) is 0");
+   TestBit.is_null(anvil_document_get_attribute(NULL, 0),
+                   "ANV26: document_get_attribute(NULL, ...) is NULL");
+   TestBit.is_null(anvil_document_find_attribute(NULL, "x"),
+                   "ANV26: document_find_attribute(NULL, ...) is NULL");
+   TestBit.is_equal_int(0, (long long)anvil_statement_get_attribute_count(NULL),
+                        "ANV26: statement_get_attribute_count(NULL) is 0");
+   TestBit.is_null(anvil_statement_get_attribute(NULL, 0),
+                   "ANV26: statement_get_attribute(NULL, ...) is NULL");
+   TestBit.is_null(anvil_statement_find_attribute(NULL, "x"),
+                   "ANV26: statement_find_attribute(NULL, ...) is NULL");
+   TestBit.is_equal_int(0, (long long)anvil_attribute_get_key(NULL, NULL, 0),
+                        "ANV26: attribute_get_key(NULL, ...) is 0");
+   TestBit.is_equal_int(0, (long long)anvil_attribute_get_value(NULL, NULL, 0),
+                        "ANV26: attribute_get_value(NULL, ...) is 0");
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -483,6 +609,13 @@ int main(void) {
    TestBit.run_ex("ANV20_load_buffer_null_source", NULL, test_anv20_load_buffer_null_source, th);
    TestBit.run_ex("ANV21_load_buffer_respects_length", NULL, test_anv21_load_buffer_respects_length,
                   th);
+   TestBit.run_ex("ANV22_document_attribute_enumeration", NULL,
+                  test_anv22_document_attribute_enumeration, th);
+   TestBit.run_ex("ANV23_document_find_attribute", NULL, test_anv23_document_find_attribute, th);
+   TestBit.run_ex("ANV24_document_no_attributes", NULL, test_anv24_document_no_attributes, th);
+   TestBit.run_ex("ANV25_statement_attribute_enumeration", NULL,
+                  test_anv25_statement_attribute_enumeration, th);
+   TestBit.run_ex("ANV26_attribute_null_safety", NULL, test_anv26_attribute_null_safety, th);
 
    return TestBit.report();
 }

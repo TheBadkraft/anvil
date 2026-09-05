@@ -51,6 +51,12 @@ static void test_vt02_statement_matches_flat(void) {
                    "VT02: Statement.get_value is anvil_statement_get_value");
    TestBit.is_true(Statement.get_name == anvil_statement_get_name,
                    "VT02: Statement.get_name is anvil_statement_get_name");
+   TestBit.is_true(Statement.get_attribute_count == anvil_statement_get_attribute_count,
+                   "VT02: Statement.get_attribute_count is anvil_statement_get_attribute_count");
+   TestBit.is_true(Statement.get_attribute == anvil_statement_get_attribute,
+                   "VT02: Statement.get_attribute is anvil_statement_get_attribute");
+   TestBit.is_true(Statement.find_attribute == anvil_statement_find_attribute,
+                   "VT02: Statement.find_attribute is anvil_statement_find_attribute");
 }
 /* ---------------------------------------------------------------------- *
  * VT03 — every Value vtable field is pointer-identical to its flat
@@ -65,6 +71,28 @@ static void test_vt03_value_matches_flat(void) {
                    "VT03: Value.get_element is anvil_value_get_element");
    TestBit.is_true(Value.get_statement == anvil_value_get_statement,
                    "VT03: Value.get_statement is anvil_value_get_statement");
+}
+/* ---------------------------------------------------------------------- *
+ * VT05 — every Document vtable field is pointer-identical to its flat
+ * counterpart
+ * ---------------------------------------------------------------------- */
+static void test_vt05_document_matches_flat(void) {
+   TestBit.is_true(Document.get_attribute_count == anvil_document_get_attribute_count,
+                   "VT05: Document.get_attribute_count is anvil_document_get_attribute_count");
+   TestBit.is_true(Document.get_attribute == anvil_document_get_attribute,
+                   "VT05: Document.get_attribute is anvil_document_get_attribute");
+   TestBit.is_true(Document.find_attribute == anvil_document_find_attribute,
+                   "VT05: Document.find_attribute is anvil_document_find_attribute");
+}
+/* ---------------------------------------------------------------------- *
+ * VT06 — every Attribute vtable field is pointer-identical to its flat
+ * counterpart
+ * ---------------------------------------------------------------------- */
+static void test_vt06_attribute_matches_flat(void) {
+   TestBit.is_true(Attribute.get_key == anvil_attribute_get_key,
+                   "VT06: Attribute.get_key is anvil_attribute_get_key");
+   TestBit.is_true(Attribute.get_value == anvil_attribute_get_value,
+                   "VT06: Attribute.get_value is anvil_attribute_get_value");
 }
 /* ---------------------------------------------------------------------- *
  * VT04 — end-to-end smoke test using only the vtable, never a flat
@@ -95,6 +123,8 @@ int main(void) {
    TestBit.run_ex("VT02_statement_matches_flat", NULL, test_vt02_statement_matches_flat, th);
    TestBit.run_ex("VT03_value_matches_flat", NULL, test_vt03_value_matches_flat, th);
    TestBit.run_ex("VT04_vtable_only_smoke_test", NULL, test_vt04_vtable_only_smoke_test, th);
+   TestBit.run_ex("VT05_document_matches_flat", NULL, test_vt05_document_matches_flat, th);
+   TestBit.run_ex("VT06_attribute_matches_flat", NULL, test_vt06_attribute_matches_flat, th);
 
    return TestBit.report();
 }

@@ -347,3 +347,89 @@ anvil_statement anvil_value_get_statement(anvil_value val, size_t index) {
    List.get(v->object.statements, index, (object *)&stmt);
    return (anvil_statement)stmt;
 }
+
+size_t anvil_document_get_attribute_count(anvil_document doc) {
+   if (!doc || !doc->root || !doc->root->header) {
+      return 0;
+   }
+   return (size_t)List.size(doc->root->header->attributes);
+}
+
+anvil_attribute anvil_document_get_attribute(anvil_document doc, size_t index) {
+   if (!doc || !doc->root || !doc->root->header) {
+      return NULL;
+   }
+   list attrs = doc->root->header->attributes;
+   if (index >= (size_t)List.size(attrs)) {
+      return NULL;
+   }
+   anvl_attribute attr = NULL;
+   List.get(attrs, index, (object *)&attr);
+   return (anvil_attribute)attr;
+}
+
+anvil_attribute anvil_document_find_attribute(anvil_document doc, const char *key) {
+   if (!doc || !doc->root || !doc->root->header || !key) {
+      return NULL;
+   }
+   list attrs = doc->root->header->attributes;
+   usize count = List.size(attrs);
+   for (usize i = 0; i < count; i++) {
+      anvl_attribute attr = NULL;
+      List.get(attrs, i, (object *)&attr);
+      if (attr && Source.slice_equals(attr->key, key)) {
+         return (anvil_attribute)attr;
+      }
+   }
+   return NULL;
+}
+
+size_t anvil_statement_get_attribute_count(anvil_statement stmt) {
+   anvl_statement s = (anvl_statement)stmt;
+   if (!s) {
+      return 0;
+   }
+   return (size_t)List.size(s->attributes);
+}
+
+anvil_attribute anvil_statement_get_attribute(anvil_statement stmt, size_t index) {
+   anvl_statement s = (anvl_statement)stmt;
+   if (!s || index >= (size_t)List.size(s->attributes)) {
+      return NULL;
+   }
+   anvl_attribute attr = NULL;
+   List.get(s->attributes, index, (object *)&attr);
+   return (anvil_attribute)attr;
+}
+
+anvil_attribute anvil_statement_find_attribute(anvil_statement stmt, const char *key) {
+   anvl_statement s = (anvl_statement)stmt;
+   if (!s || !key) {
+      return NULL;
+   }
+   usize count = List.size(s->attributes);
+   for (usize i = 0; i < count; i++) {
+      anvl_attribute attr = NULL;
+      List.get(s->attributes, i, (object *)&attr);
+      if (attr && Source.slice_equals(attr->key, key)) {
+         return (anvil_attribute)attr;
+      }
+   }
+   return NULL;
+}
+
+size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen) {
+   anvl_attribute a = (anvl_attribute)attr;
+   if (!a) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   return copy_to_buffer(a->key.start, (size_t)Source.slice_length(a->key), buf, buflen);
+}
+
+size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen) {
+   anvl_attribute a = (anvl_attribute)attr;
+   if (!a) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   return copy_to_buffer(a->value.start, (size_t)Source.slice_length(a->value), buf, buflen);
+}

@@ -1,0 +1,7 @@
+#!aml
+
+@[doc_level]
+@[is_mixed=true]
+@[has_var_refs]
+
+name := David;

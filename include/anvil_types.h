@@ -50,6 +50,16 @@ typedef struct anvil_statement_t *anvil_statement;
 typedef struct anvil_value_t *anvil_value;
 
 /**
+ * @brief Opaque handle to one `@[key]`/`@[key=value]` attribute, attached
+ * either to a document's header (module-level) or to an individual
+ * statement.
+ *
+ * Lifetime is tied to the anvil_document it came from — never valid after
+ * that document is disposed.
+ */
+typedef struct anvil_attribute_t *anvil_attribute;
+
+/**
  * @brief Stable public value-kind enum.
  *
  * Mirrors the internal anvl_value_type categories a caller can actually do

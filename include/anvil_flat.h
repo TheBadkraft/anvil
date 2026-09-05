@@ -156,3 +156,64 @@ anvil_value anvil_value_get_element(anvil_value val, size_t index);
  * out of bounds.
  */
 anvil_statement anvil_value_get_statement(anvil_value val, size_t index);
+
+/**
+ * @brief Module-level (`doc->header`) attribute count.
+ * @param doc The document to check. NULL returns 0.
+ */
+size_t anvil_document_get_attribute_count(anvil_document doc);
+
+/**
+ * @brief The module-level attribute at `index`.
+ * @param doc The document to index.
+ * @param index Zero-based attribute index.
+ * @return The attribute handle, or NULL if doc is NULL or index is out of
+ * bounds.
+ */
+anvil_attribute anvil_document_get_attribute(anvil_document doc, size_t index);
+
+/**
+ * @brief The module-level attribute named `key`, if any.
+ * @param doc The document to search.
+ * @param key The attribute's key.
+ * @return The attribute handle, or NULL if not found.
+ */
+anvil_attribute anvil_document_find_attribute(anvil_document doc, const char *key);
+
+/**
+ * @brief A statement's own `@[...]` attribute count.
+ * @param stmt The statement to check. NULL returns 0.
+ */
+size_t anvil_statement_get_attribute_count(anvil_statement stmt);
+
+/**
+ * @brief The statement attribute at `index`.
+ * @param stmt The statement to index.
+ * @param index Zero-based attribute index.
+ * @return The attribute handle, or NULL if stmt is NULL or index is out of
+ * bounds.
+ */
+anvil_attribute anvil_statement_get_attribute(anvil_statement stmt, size_t index);
+
+/**
+ * @brief The statement attribute named `key`, if any.
+ * @param stmt The statement to search.
+ * @param key The attribute's key.
+ * @return The attribute handle, or NULL if not found.
+ */
+anvil_attribute anvil_statement_find_attribute(anvil_statement stmt, const char *key);
+
+/**
+ * @brief An attribute's key, copied into a caller-supplied buffer. Same
+ * buffer-sizing convention as anvil_statement_get_name.
+ * @param attr The attribute to read. NULL writes nothing and returns 0.
+ */
+size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen);
+
+/**
+ * @brief An attribute's value, copied into a caller-supplied buffer. Same
+ * buffer-sizing convention as anvil_statement_get_name. A flag attribute
+ * (`@[active]`, no `=value`) has no value — returns 0.
+ * @param attr The attribute to read. NULL writes nothing and returns 0.
+ */
+size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen);
