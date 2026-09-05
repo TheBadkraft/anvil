@@ -20,13 +20,16 @@ Reading order and status for everything in `notes/`, reconstructed from git hist
 - **`deferred-work.md`** — created partway through this iteration specifically because open questions and deferred items scattered across the notes above were getting lost between iterations ("we don't go back into old iteration notes to suggest future work — it will get lost"). Single always-checked-first index since.
 - **`resolution-phase.md`** — split out of `document-body-parse.md` today (2026-08-22), once Resolution was recognized as its own future iteration rather than a sub-topic of body-parse. Not started yet.
 
+### Iteration 4 — AnvilScript (ASL) design (2026-09-05)
+- **`anvilscript-design.md`** — design-only, no implementation; a prior ASL implementation (v0.4.0-alpha) existed but predates the current architecture and has since been removed from the tree. Collects the ASL-relevant fragments already decided elsewhere (`docs/dialect-ownership-matrix.md`, fixture comments, `build.anvl`), the five items moved here from `deferred-work.md`'s former ASL section, and the founding framing questions the design conversation is starting from.
+
 ## Status key
 
 - **Active** — the live design record for the current iteration; still being edited.
 - **Reference** — phase is functionally complete, but the file is still amended when directly relevant work surfaces (not a closed/frozen document).
 - **Historical / partially superseded** — kept for background context; specific corrected claims are tracked in `deferred-work.md` § *Superseded notes* rather than rewritten in place.
 - **Index** — cross-cutting, not tied to one iteration (`deferred-work.md`, this file).
-- **Not started** — design-only, no implementation (`anvlo-compilation.md`, `resolution-phase.md`).
+- **Not started** — design-only, no implementation (`anvlo-compilation.md`, `resolution-phase.md`, `anvilscript-design.md`).
 
 ## Miscellaneous
 

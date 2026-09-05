@@ -4,11 +4,7 @@ Single index of everything intentionally deferred to a later phase, or left as a
 
 ## Deferred to AnvilScript (ASL) design
 
-- `using` declarations — `document-header-scan.md`.
-- `vars` blocks — classify as header or body construct once ASL design begins — `document-header-scan.md`, `document-body-parse.md`.
-- Namespace keyword, if AML ever adds one — `document-header-scan.md`.
-- Interpolation and dynamic var-refs (`${...}`, `$"..."`) — AML/AMP have neither; entirely ASL's domain — `document-body-parse.md`.
-- `:=`-optional exceptions, if AnvilScript ever needs one — `document-body-parse.md`.
+**Design has begun — see `notes/anvilscript-design.md`.** The five items previously listed here (`using` declarations, `vars` blocks' header-vs-body classification, a namespace keyword, interpolation/dynamic var-refs, `:=`-optional exceptions) now live in that note's "Open questions," alongside new questions raised by starting the design (ASL's own value/AST representation, control-flow/function scope, module-attribute ownership). Nothing is resolved yet — this section stays here as a pointer rather than being deleted, since the underlying items are still outstanding, just tracked in their new owning doc now.
 
 ## Deferred to Resolution phase (phase 4)
 
