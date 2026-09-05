@@ -43,8 +43,11 @@ Forks resolved during initial design conversations.
 8. **AML first-class citizenship** — AML scalars, objects, and collections are first-class types in ASL. ASL functions can return AML values.
 9. **Cross-language callability** — Both directions: host bindings invoke ASL functions, and ASL can register/host callbacks.
 10. **Default dialect** — Change from ASL to AML. ASL must be declared explicitly via shebang (`#!asl`) or file extension (`.asl`).
-11. **Built-in distribution** — Built-in function libraries are distributed as source files (e.g., `math.asl`) so the core library does not carry scripting features that object-model-only consumers do not need. Pre-compiled `.anvlo` components may be supported later.
+11. **Built-in distribution** — Built-in function libraries are distributed as downloadable source files (e.g., `math.anvs`) so the core library does not carry scripting features that object-model-only consumers do not need. Pre-compiled `.anvlo` components may be supported later.
 12. **Namespace model (initial)** — Namespaces are initially file-name-based (the imported module's file name is the namespace). A future `namespace` keyword (C#-style) is possible but not part of MVP.
+13. **Error handling** — Context-local error state. Each `anvil_document` / evaluation context carries a last-error field; host code checks after a call. ASL functions may also return error values for in-language handling. The existing 5101–5105 codes are a starting point and will be expanded as the runtime grows.
+14. **Parser technology** — AnvilScript uses the same hand-written parser approach as the rest of Anvil Native (recursive-descent / Pratt-style), producing a dedicated runtime AST for function bodies. No external parser generator.
+15. **Dialect name and extension** — Name: **AnvilScript** (abbreviated **ASL**). File extension: `.anvs`.
 
 ## Variable scope and mutability
 
@@ -89,13 +92,131 @@ Arguments and returns use `anvil_value`. Exact arity matching in MVP; varargs an
 
 Unresolved or explicitly TBD. These are inputs to the detailed specification, not blockers to starting it.
 
-1. **Function declaration representation** — Exact C structure for the parse-time value and the runtime AST pointer.
-2. **Built-in function registry** — Sigma `map` of module name → (function name → descriptor). How are modules shipped/discovered?
-3. **ASL type system** — Proposed: `var` as a weak-type keyword; otherwise TBD. How are ASL-specific types (closures, error values) represented?
-4. **Error handling** — The existing 5101–5105 ASL error codes likely need a broader revamp/rework. Type errors, undefined functions, arity mismatches, etc., are not yet modeled.
-5. **Dialect gating updates** — The ownership matrix and source default-dialect logic must be updated to reflect that ASL is no longer the default, to allow anonymous blocks in ASL, and to finalize module-attribute ownership.
-6. **Specification format** — Produce a grammar + semantics document (likely in `notes/` or `docs/`) before implementation.
-7. **Dialect name and file extension** — "ASL" / "AnvilScript" / `.asl` may change. Leading candidate: `.anvs` (avoids clash with `.meta.anvl` schema files). Decide before first public release.
+1. **Function declaration representation** — Proposed C structure (pending final review):
+   ```c
+   // Forward declaration; defined in ASL runtime headers.
+   struct asl_ast_node;
+
+   typedef struct anvl_asl_func_t {
+      list params;              // list of anvl_slice* parameter names
+      anvl_slice body;          // source span inside { ... }
+      struct asl_ast_node *ast; // NULL until lazily parsed for eval
+   } anvl_asl_func_t;
+   ```
+   A new statement kind `ANVL_STMT_FUNCTION` and value type `ANVL_VALUE_FUNCTION` are added. The function name lives in `anvl_statement_t.name`; the value holds parameters, body slice, and a lazy runtime AST pointer. The runtime AST is likely allocated from the module's bump arena (TBD).
+2. **ASL type system** — Proposed: `var` as a weak-type keyword; otherwise TBD. How are ASL-specific types (closures, error values) represented?
+3. **Specification format** — Produce a grammar + semantics document before implementation. EBNF recommended. Initially append to this doc or create `notes/anvilscript-grammar.md`; split if it grows.
+
+## MVP Grammar (EBNF)
+
+This grammar covers the AnvilScript MVP: top-level declarations, function declarations with C-family bodies, control flow, expressions, dynamic var-refs, and interpolation. It intentionally does not cover closures, namespaces beyond file-name imports, or `.anvlo` pre-compilation.
+
+```ebnf
+(* === Document === *)
+document          = shebang? , header , body ;
+shebang           = "#!asl" ;
+
+header            = { attribute } , { import_decl } , { using_decl } , [ vars_block ] ;
+attribute         = "@" , "[" , { attribute_entry } , "]" ;
+attribute_entry   = identifier , "=" , value , ";" ;
+import_decl       = "import" , string_literal , ";" ;
+using_decl        = "using" , string_literal , ";" ;
+vars_block        = "vars" , "{" , { var_const } , "}" ;
+var_const         = identifier , ":=" , value , ";" ;
+
+body              = { top_level_stmt } ;
+top_level_stmt    = assignment
+                  | object_block
+                  | anonymous_block
+                  | function_decl
+                  | expr_stmt ;
+
+(* === Top-level statements === *)
+assignment        = identifier , ":=" , value , ";" ;
+object_block      = identifier , [ ":" , identifier ] , [ "@" , "[" , { attribute_entry } , "]" ] , ( "{" , body , "}" | ":=" , "{" , body , "}" ) ;
+anonymous_block   = [ ":" , identifier ] , "{" , body , "}" ;
+function_decl     = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
+param_list        = identifier , { "," , identifier } ;
+expr_stmt         = expr , ";" ;
+
+(* === Function-body statements === *)
+stmt_list         = { stmt } ;
+stmt              = var_decl
+                  | assignment_stmt
+                  | if_stmt
+                  | for_stmt
+                  | while_stmt
+                  | break_stmt
+                  | continue_stmt
+                  | return_stmt
+                  | expr_stmt ;
+
+var_decl          = "var" , identifier , "=" , expr , ";" ;
+assignment_stmt   = identifier , "=" , expr , ";" ;
+if_stmt           = "if" , "(" , expr , ")" , "{" , stmt_list , "}" , [ "else" , "{" , stmt_list , "}" ] ;
+for_stmt          = "for" , "(" , [ var_decl | assignment_stmt | expr_stmt ] , ";" , [ expr ] , ";" , [ expr ] , ")" , "{" , stmt_list , "}" ;
+while_stmt        = "while" , "(" , expr , ")" , "{" , stmt_list , "}" ;
+break_stmt        = "break" , ";" ;
+continue_stmt     = "continue" , ";" ;
+return_stmt       = "return" , [ expr ] , ";" ;
+
+(* === Expressions === *)
+expr              = logical_or ;
+logical_or        = logical_and , { "||" , logical_and } ;
+logical_and       = equality , { "&&" , equality } ;
+equality          = comparison , { ( "==" | "!=" ) , comparison } ;
+comparison        = additive , { ( "<" | ">" | "<=" | ">=" ) , additive } ;
+additive          = multiplicative , { ( "+" | "-" ) , multiplicative } ;
+multiplicative    = unary , { ( "*" | "/" | "%" ) , unary } ;
+unary             = ( "-" | "+" | "!" ) , unary | call ;
+call              = dynamic_ref , [ "(" , [ arg_list ] , ")" ] ;
+arg_list          = expr , { "," , expr } ;
+
+primary           = literal
+                  | identifier
+                  | "(" , expr , ")"
+                  | interpolated_string ;
+
+(* Dynamic references use the $ sigil *)
+dynamic_ref       = "$" , qualified_name ;
+qualified_name    = identifier , { "." , identifier } ;
+
+(* === Values (AML-compatible) === *)
+value             = literal
+                  | array
+                  | tuple
+                  | object_literal
+                  | dynamic_ref ;
+
+array             = "[" , [ value , { "," , value } ] , "]" ;
+tuple             = "(" , value , { "," , value } , ")" ;
+object_literal    = "{" , { object_entry } , "}" ;
+object_entry      = identifier , ":=" , value , ";" ;
+
+(* === Literals === *)
+literal           = numeric_literal
+                  | string_literal
+                  | bool_literal
+                  | "null" ;
+
+numeric_literal   = decimal | integer ;
+string_literal    = '"' , { string_char } , '"' ;
+interpolated_string = '$' , '"' , { interpolation_text | "{" , expr , "}" } , '"' ;
+bool_literal      = "true" | "false" ;
+
+(* === Lexical === *)
+identifier        = alpha , { alpha | digit | "_" } ;
+alpha             = "a" ... "z" | "A" ... "Z" ;
+digit             = "0" ... "9" ;
+```
+
+### Notes on the grammar
+
+- `object_block` uses the same `:=` / bare `{ ... }` distinction as AML for mutable/inheritable vs. immutable objects.
+- Inside function bodies, assignment is `=` and local declaration is `var ... = ...`; top-level declarations use `:=`.
+- Function calls require the `$` sigil: `$foo(1, 2, 3)`. A bare `foo(...)` is a syntax error.
+- Dynamic var-refs use the same `$name` / `$module.name` syntax as function calls without the argument list.
+- `dynamic_ref` may appear as a `value` (e.g., in top-level `:=` assignments) as well as in expressions.
 
 ## Related notes
 
