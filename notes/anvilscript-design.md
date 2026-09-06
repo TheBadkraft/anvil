@@ -109,35 +109,14 @@ Unresolved or explicitly TBD. These are inputs to the detailed specification, no
 
 ## MVP Grammar (EBNF)
 
-This grammar covers the AnvilScript MVP: top-level declarations, function declarations with C-family bodies, control flow, expressions, dynamic var-refs, and interpolation. It intentionally does not cover closures, namespaces beyond file-name imports, or `.anvlo` pre-compilation.
+This EBNF describes only the **AnvilScript function-body scripting language**. Top-level `#!asl` document structure (imports, `using`, `vars`, object blocks, attributes) is parsed by the existing ANVL parser and is not repeated here. The AnvilScript Engine activates only when a function declaration is encountered; if none are present, the source is effectively AML with ASL dialect capabilities (`$` var-refs, interpolation, `vars`, `using`) and no scripting runtime is needed.
+
+The function declaration *signature* is shown only to introduce the `{ ... }` body boundary; the rest of the grammar covers statements and expressions inside that body.
 
 ```ebnf
-(* === Document === *)
-document          = shebang? , header , body ;
-shebang           = "#!asl" ;
-
-header            = { attribute } , { import_decl } , { using_decl } , [ vars_block ] ;
-attribute         = "@" , "[" , { attribute_entry } , "]" ;
-attribute_entry   = identifier , "=" , value , ";" ;
-import_decl       = "import" , string_literal , ";" ;
-using_decl        = "using" , string_literal , ";" ;
-vars_block        = "vars" , "{" , { var_const } , "}" ;
-var_const         = identifier , ":=" , value , ";" ;
-
-body              = { top_level_stmt } ;
-top_level_stmt    = assignment
-                  | object_block
-                  | anonymous_block
-                  | function_decl
-                  | expr_stmt ;
-
-(* === Top-level statements === *)
-assignment        = identifier , ":=" , value , ";" ;
-object_block      = identifier , [ ":" , identifier ] , [ "@" , "[" , { attribute_entry } , "]" ] , ( "{" , body , "}" | ":=" , "{" , body , "}" ) ;
-anonymous_block   = [ ":" , identifier ] , "{" , body , "}" ;
+(* === Function declaration boundary (parsed by ANVL parser) === *)
 function_decl     = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
 param_list        = identifier , { "," , identifier } ;
-expr_stmt         = expr , ";" ;
 
 (* === Function-body statements === *)
 stmt_list         = { stmt } ;
@@ -159,6 +138,7 @@ while_stmt        = "while" , "(" , expr , ")" , "{" , stmt_list , "}" ;
 break_stmt        = "break" , ";" ;
 continue_stmt     = "continue" , ";" ;
 return_stmt       = "return" , [ expr ] , ";" ;
+expr_stmt         = expr , ";" ;
 
 (* === Expressions === *)
 expr              = logical_or ;
@@ -168,28 +148,26 @@ equality          = comparison , { ( "==" | "!=" ) , comparison } ;
 comparison        = additive , { ( "<" | ">" | "<=" | ">=" ) , additive } ;
 additive          = multiplicative , { ( "+" | "-" ) , multiplicative } ;
 multiplicative    = unary , { ( "*" | "/" | "%" ) , unary } ;
-unary             = ( "-" | "+" | "!" ) , unary | call ;
-call              = dynamic_ref , [ "(" , [ arg_list ] , ")" ] ;
+unary             = ( "-" | "+" | "!" ) , unary | postfix ;
+postfix           = primary , [ "(" , [ arg_list ] , ")" ]
+                  | qualified_call ;
+qualified_call    = qualified_name , "(" , [ arg_list ] , ")" ;
+qualified_name    = identifier , "." , identifier , { "." , identifier } ;
 arg_list          = expr , { "," , expr } ;
 
-primary           = literal
+primary           = value
                   | identifier
                   | "(" , expr , ")"
                   | interpolated_string ;
 
-(* Dynamic references use the $ sigil *)
-dynamic_ref       = "$" , qualified_name ;
-qualified_name    = identifier , { "." , identifier } ;
+interpolated_string = '$' , '"' , { interpolation_text | "{" , expr , "}" } , '"' ;
 
-(* === Values (AML-compatible) === *)
+(* === Values (AML-compatible literals and collections) === *)
 value             = literal
                   | array
-                  | tuple
-                  | object_literal
-                  | dynamic_ref ;
+                  | object_literal ;
 
 array             = "[" , [ value , { "," , value } ] , "]" ;
-tuple             = "(" , value , { "," , value } , ")" ;
 object_literal    = "{" , { object_entry } , "}" ;
 object_entry      = identifier , ":=" , value , ";" ;
 
@@ -199,9 +177,10 @@ literal           = numeric_literal
                   | bool_literal
                   | "null" ;
 
-numeric_literal   = decimal | integer ;
+numeric_literal   = integer | decimal ;
+integer           = digit , { digit } ;
+decimal           = integer , "." , integer ;
 string_literal    = '"' , { string_char } , '"' ;
-interpolated_string = '$' , '"' , { interpolation_text | "{" , expr , "}" } , '"' ;
 bool_literal      = "true" | "false" ;
 
 (* === Lexical === *)
@@ -212,11 +191,14 @@ digit             = "0" ... "9" ;
 
 ### Notes on the grammar
 
-- `object_block` uses the same `:=` / bare `{ ... }` distinction as AML for mutable/inheritable vs. immutable objects.
-- Inside function bodies, assignment is `=` and local declaration is `var ... = ...`; top-level declarations use `:=`.
-- Function calls require the `$` sigil: `$foo(1, 2, 3)`. A bare `foo(...)` is a syntax error.
-- Dynamic var-refs use the same `$name` / `$module.name` syntax as function calls without the argument list.
-- `dynamic_ref` may appear as a `value` (e.g., in top-level `:=` assignments) as well as in expressions.
+- This grammar describes only what appears inside `function_decl` bodies. The surrounding ANVL document grammar handles `#!asl`, imports, `using`, `vars`, object blocks, attributes, and the function signature itself.
+- Inside function bodies, bare identifiers are variable/function references. The `$` sigil appears **only** in string interpolation (`$"...{var}..."`); it is not used for var-refs or function calls inside function bodies.
+- Assignment is `=` and local declaration is `var ... = ...`. Object literal entries retain ANVL's `:=` because they construct AML values, not execute assignments.
+- Function calls may be bare (`foo(1, 2, 3)`) or qualified (`math.abs(-5)`). Whether an unqualified call resolves is an engine/dispatch question; the grammar allows both forms. Member access without a call (e.g., `math.abs` as a value) is not in MVP.
+- From the top-level ANVL layer, dynamic calls and var-refs use the `$` sigil. Unqualified dynamic refs are `$foo`; qualified ones are `$math.abs(-5)`.
+- AML-compatible `value` literals (scalars, arrays, objects) are first-class expressions inside function bodies.
+- Tuples are omitted from MVP because `(x)` is ambiguous with grouping. Revisit if needed.
+- `string_char` and `interpolation_text` are left to the lexical specification.
 
 ## Related notes
 
