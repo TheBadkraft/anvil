@@ -29,6 +29,7 @@
 #include <sigma/farray.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
+#include <sigma/query.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -279,25 +280,37 @@ anvil_statement anvil_statement_get(anvil_document doc, const char *name) {
    return (anvil_statement)(anvl_statement)val;
 }
 
-size_t anvil_document_get_statement_count(anvil_document doc) {
+struct anvil_statement_iterator_t {
+   sc_queryable q;
+};
+
+anvil_statement_iterator anvil_document_get_statements(anvil_document doc) {
    if (!doc || !doc->root || !doc->root->body) {
-      return 0;
+      return NULL;
    }
-   int count = FArray.capacity(doc->root->body, sizeof(anvl_statement));
-   return count > 0 ? (size_t)count : 0;
+   struct anvil_statement_iterator_t *it = Allocator.alloc(sizeof(struct anvil_statement_iterator_t));
+   if (!it) {
+      return NULL;
+   }
+   it->q = FArray.as_queryable(doc->root->body, sizeof(anvl_statement));
+   return (anvil_statement_iterator)it;
 }
 
-anvil_statement anvil_document_get_statement(anvil_document doc, size_t index) {
-   if (!doc || !doc->root || !doc->root->body) {
-      return NULL;
+bool anvil_statement_iterator_next(anvil_statement_iterator it, anvil_statement *out_stmt) {
+   struct anvil_statement_iterator_t *i = (struct anvil_statement_iterator_t *)it;
+   if (!i || !out_stmt) {
+      return false;
    }
-   int count = FArray.capacity(doc->root->body, sizeof(anvl_statement));
-   if (count <= 0 || index >= (size_t)count) {
-      return NULL;
+   const void *element = NULL;
+   if (!Query.next(&i->q, &element, NULL)) {
+      return false;
    }
-   anvl_statement stmt = NULL;
-   FArray.get(doc->root->body, index, sizeof(anvl_statement), (object *)&stmt);
-   return (anvil_statement)stmt;
+   *out_stmt = (anvil_statement)(*(anvl_statement *)element);
+   return true;
+}
+
+void anvil_statement_iterator_dispose(anvil_statement_iterator it) {
+   Allocator.dispose(it);
 }
 
 // Forward declaration — defined below, shared by every buffer-supplied accessor; needed here

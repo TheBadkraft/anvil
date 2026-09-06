@@ -131,6 +131,14 @@ static void test_amp00b_import_rejected_as_identifier(void) {
    TestBit.is_true(doc_has_errors(doc), "AMP00b: document reports an error");
    TestBit.is_equal_int(ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD, err_code,
                         "AMP00b: err_code reports IDENTIFIER_IS_KEYWORD");
+   // parser_set_error's own call into Source.set_error clobbers parser.err_code back to
+   // ANVL_ERR_NONE as a side effect (that out-param reports whether *recording* the error
+   // succeeded, not the error itself) unless parser_set_error reasserts the real code last.
+   // AMP00c already proves the success case (parser.err_code correctly ANVL_ERR_NONE); this is
+   // the matching failure-case proof that the global mirrors doc_parse_body's own out-param
+   // rather than reading back as ANVL_ERR_NONE on every real failure.
+   TestBit.is_equal_int(ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD, anvl_get_error(),
+                        "AMP00b: parser state error code also reports IDENTIFIER_IS_KEYWORD");
 
    mod_ctx_dispose(ctx);
 }

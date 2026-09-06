@@ -30,7 +30,8 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/sigma/farray.c \
           $(ANVL)/src/sigma/memory.c \
           $(ANVL)/src/sigma/strings.c \
-			 $(ANVL)/src/sigma/collections.c
+			 $(ANVL)/src/sigma/collections.c \
+			 $(ANVL)/src/sigma/query.c
 
 TEST_HELPER  = $(ANVL)/test/utilities/helpers.c
 TEST_DEBUG   = $(ANVL)/test/utilities/debug.c

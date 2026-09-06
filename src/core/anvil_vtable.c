@@ -43,9 +43,13 @@ const anvil_document_i Document = {
    .get_attribute = anvil_document_get_attribute,
    .find_attribute = anvil_document_find_attribute,
    .get_fragment_value = anvil_document_get_fragment_value,
-   .get_statement_count = anvil_document_get_statement_count,
-   .get_statement = anvil_document_get_statement,
+   .get_statements = anvil_document_get_statements,
    .get_error = anvil_document_get_error,
+};
+
+const anvil_statement_iterator_i StatementIterator = {
+   .next = anvil_statement_iterator_next,
+   .dispose = anvil_statement_iterator_dispose,
 };
 
 const anvil_attribute_i Attribute = {

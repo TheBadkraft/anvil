@@ -138,21 +138,35 @@ size_t anvil_error_get_column(anvil_error err);
 anvil_statement anvil_statement_get(anvil_document doc, const char *name);
 
 /**
- * @brief The number of top-level statements in this document's own body
- * (never counting nested/imported documents' own statements separately).
- * @param doc The document to check. NULL, or a document that never reached
- * a successful body parse, returns 0.
+ * @brief A heapless cursor over this document's own top-level statements, in
+ * declaration order (never descending into nested/imported documents' own
+ * statements) — backed by Sigma's Query/sc_queryable mechanism over
+ * `module_document->body` (an farray), not a hand-rolled scan.
+ * @param doc The document to iterate. A document whose body parse failed
+ * partway still has a real (if partial or empty) body to iterate — the
+ * pipeline freezes whatever was captured before the failure rather than
+ * discarding it — so this only returns NULL for `doc` itself being NULL or
+ * never having reached body-parsing at all, never for a mid-parse failure.
+ * @return The iterator handle, or NULL as described above. Dispose with
+ * anvil_statement_iterator_dispose once done — never valid after `doc`
+ * itself is disposed.
  */
-size_t anvil_document_get_statement_count(anvil_document doc);
+anvil_statement_iterator anvil_document_get_statements(anvil_document doc);
 
 /**
- * @brief The top-level statement at `index`, in declaration order.
- * @param doc The document to index.
- * @param index Zero-based statement index.
- * @return The statement handle, or NULL if doc is NULL or index is out of
- * bounds.
+ * @brief Pull the next statement from an iterator, in order.
+ * @param it The iterator to advance (mutated in place).
+ * @param out_stmt Set to the next statement on success; untouched otherwise.
+ * @return true if a statement was yielded; false once exhausted, or if
+ * it/out_stmt is NULL.
  */
-anvil_statement anvil_document_get_statement(anvil_document doc, size_t index);
+bool anvil_statement_iterator_next(anvil_statement_iterator it, anvil_statement *out_stmt);
+
+/**
+ * @brief Release an iterator. Safe to call with NULL (no-op). Does not
+ * affect the document it was created from.
+ */
+void anvil_statement_iterator_dispose(anvil_statement_iterator it);
 
 /**
  * @brief A statement's own value.

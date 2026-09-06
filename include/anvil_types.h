@@ -40,6 +40,17 @@ typedef struct anvil_document_t *anvil_document;
 typedef struct anvil_statement_t *anvil_statement;
 
 /**
+ * @brief Opaque, heapless-scan cursor over a document's own top-level
+ * statements — see anvil_document_get_statements/anvil_statement_iterator_next.
+ *
+ * Owns only its own scan position, never the statements it yields (those
+ * follow anvil_statement's own lifetime, tied to the anvil_document). Never
+ * valid after that document is disposed. Dispose with
+ * anvil_statement_iterator_dispose once done.
+ */
+typedef struct anvil_statement_iterator_t *anvil_statement_iterator;
+
+/**
  * @brief Opaque handle to one value.
  *
  * Lifetime is tied to the anvil_document it came from — never valid after

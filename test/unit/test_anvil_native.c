@@ -581,53 +581,70 @@ static void test_anv26_attribute_null_safety(void) {
                         "ANV26: attribute_get_value(NULL, ...) is 0");
 }
 /* ---------------------------------------------------------------------- *
- * ANV27 — a document's top-level statements are enumerable by position,
- * in declaration order (f01_bare_literal.anvl: 'val' then 'name')
+ * ANV27 — a document's top-level statements are visitable, in order, via
+ * a heapless iterator (f01_bare_literal.anvl: 'val' then 'name')
  * ---------------------------------------------------------------------- */
-static void test_anv27_document_statement_enumeration(void) {
+static void test_anv27_document_statement_iteration(void) {
    anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl"));
    TestBit.is_not_null(doc, "ANV27: document loaded");
    if (!doc) {
       return;
    }
-   TestBit.is_equal_int(2, (long long)anvil_document_get_statement_count(doc),
-                        "ANV27: two top-level statements");
+   anvil_statement_iterator it = anvil_document_get_statements(doc);
+   TestBit.is_not_null(it, "ANV27: iterator created");
+   if (it) {
+      anvil_statement stmt = NULL;
 
-   anvil_statement first = anvil_document_get_statement(doc, 0);
-   TestBit.is_not_null(first, "ANV27: statement 0 retrieved");
-   if (first) {
-      char name[8] = {0};
-      anvil_statement_get_name(first, name, sizeof(name));
-      TestBit.is_true(strcmp(name, "val") == 0, "ANV27: statement 0 is 'val'");
+      TestBit.is_true(anvil_statement_iterator_next(it, &stmt), "ANV27: first next succeeds");
+      if (stmt) {
+         char name[8] = {0};
+         anvil_statement_get_name(stmt, name, sizeof(name));
+         TestBit.is_true(strcmp(name, "val") == 0, "ANV27: first statement is 'val'");
+      }
+
+      stmt = NULL;
+      TestBit.is_true(anvil_statement_iterator_next(it, &stmt), "ANV27: second next succeeds");
+      if (stmt) {
+         char name[8] = {0};
+         anvil_statement_get_name(stmt, name, sizeof(name));
+         TestBit.is_true(strcmp(name, "name") == 0, "ANV27: second statement is 'name'");
+      }
+
+      TestBit.is_false(anvil_statement_iterator_next(it, &stmt),
+                       "ANV27: third next exhausts the iterator");
+
+      anvil_statement_iterator_dispose(it);
    }
-
-   anvil_statement second = anvil_document_get_statement(doc, 1);
-   TestBit.is_not_null(second, "ANV27: statement 1 retrieved");
-   if (second) {
-      char name[8] = {0};
-      anvil_statement_get_name(second, name, sizeof(name));
-      TestBit.is_true(strcmp(name, "name") == 0, "ANV27: statement 1 is 'name'");
-   }
-
-   TestBit.is_null(anvil_document_get_statement(doc, 2),
-                   "ANV27: out-of-bounds index is NULL");
-
    anvil_dispose(doc);
 }
 /* ---------------------------------------------------------------------- *
- * ANV28 — statement enumeration is safe on NULL/failed documents
+ * ANV28 — statement iteration is safe on NULL/failed documents, and
+ * dispose(NULL) is a no-op
  * ---------------------------------------------------------------------- */
-static void test_anv28_statement_enumeration_null_safety(void) {
-   TestBit.is_equal_int(0, (long long)anvil_document_get_statement_count(NULL),
-                        "ANV28: get_statement_count(NULL) is 0");
-   TestBit.is_null(anvil_document_get_statement(NULL, 0),
-                   "ANV28: get_statement(NULL, ...) is NULL");
+static void test_anv28_statement_iteration_null_safety(void) {
+   TestBit.is_null(anvil_document_get_statements(NULL), "ANV28: get_statements(NULL) is NULL");
+   TestBit.is_false(anvil_statement_iterator_next(NULL, NULL),
+                    "ANV28: iterator_next(NULL, NULL) is false");
+   anvil_statement_iterator_dispose(NULL); // must not crash
 
+   // doc->body is frozen on both success AND failure (partial results stay inspectable —
+   // see source_finish_body/parse_source's own design) — so a failed parse still gets a real,
+   // usable iterator here, just one that immediately exhausts if nothing was captured before
+   // the failure, matching that same "partial results, not silently dropped" philosophy rather
+   // than reporting NULL for an entirely different reason (NULL is reserved for "no document" /
+   // "never reached a successful body parse at all", e.g. a document that never got as far as
+   // doc_parse_body).
    anvil_document failed = anvil_load(fixture_path("body_err_unterminated_block.anvl"));
    TestBit.is_not_null(failed, "ANV28: failed-parse document handle still returned");
    if (failed) {
-      TestBit.is_equal_int(0, (long long)anvil_document_get_statement_count(failed),
-                           "ANV28: a document that never finished body parse has 0 statements");
+      anvil_statement_iterator it = anvil_document_get_statements(failed);
+      TestBit.is_not_null(it, "ANV28: a failed parse still yields a usable (empty) iterator");
+      if (it) {
+         anvil_statement stmt = NULL;
+         TestBit.is_false(anvil_statement_iterator_next(it, &stmt),
+                          "ANV28: the failed document's body captured no statements");
+         anvil_statement_iterator_dispose(it);
+      }
       anvil_dispose(failed);
    }
 }
@@ -732,10 +749,10 @@ int main(void) {
    TestBit.run_ex("ANV25_statement_attribute_enumeration", NULL,
                   test_anv25_statement_attribute_enumeration, th);
    TestBit.run_ex("ANV26_attribute_null_safety", NULL, test_anv26_attribute_null_safety, th);
-   TestBit.run_ex("ANV27_document_statement_enumeration", NULL,
-                  test_anv27_document_statement_enumeration, th);
-   TestBit.run_ex("ANV28_statement_enumeration_null_safety", NULL,
-                  test_anv28_statement_enumeration_null_safety, th);
+   TestBit.run_ex("ANV27_document_statement_iteration", NULL,
+                  test_anv27_document_statement_iteration, th);
+   TestBit.run_ex("ANV28_statement_iteration_null_safety", NULL,
+                  test_anv28_statement_iteration_null_safety, th);
    TestBit.run_ex("ANV29_error_detail_syntax", NULL, test_anv29_error_detail_syntax, th);
    TestBit.run_ex("ANV30_error_detail_io_has_no_position", NULL,
                   test_anv30_error_detail_io_has_no_position, th);

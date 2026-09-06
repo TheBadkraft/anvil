@@ -351,8 +351,12 @@ static bool parse_source(context ctx) {
          parser_set_error(ctx->src, ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS);
          ctx->end = Time.now(); // Record the end time even on failure, for accurate instrumentation
          // Freeze whatever was already accumulated before this failure — partial
-         // results stay inspectable on doc->body, not silently dropped.
-         Source.finish_body(ctx->src, ctx->statements, &parser.err_code);
+         // results stay inspectable on doc->body, not silently dropped. A throwaway out-param
+         // here, not &parser.err_code — finish_body's own out-param reports whether *this*
+         // bookkeeping call succeeded, which it does even after a real parse failure, and would
+         // otherwise clobber the real code parser_set_error just recorded above.
+         anvl_err_code finish_err_code = ANVL_ERR_NONE;
+         Source.finish_body(ctx->src, ctx->statements, &finish_err_code);
          ctx->statements = NULL; // ownership transferred to finish_body regardless of its result
          return false;
       }
@@ -360,7 +364,10 @@ static bool parse_source(context ctx) {
       anvl_statement stmt = NULL;
       if (!parse_statement(ctx->src, &stmt)) {
          ctx->end = Time.now(); // Record the end time even on failure, for accurate instrumentation
-         Source.finish_body(ctx->src, ctx->statements, &parser.err_code);
+         // Same reasoning as the shebang branch above — preserve parse_statement's own recorded
+         // error rather than letting finish_body's unrelated bookkeeping result overwrite it.
+         anvl_err_code finish_err_code = ANVL_ERR_NONE;
+         Source.finish_body(ctx->src, ctx->statements, &finish_err_code);
          ctx->statements = NULL;
          return false;
       }
@@ -1229,11 +1236,32 @@ static bool parse_object_value(anvl_source src, anvl_value *out_value) {
 }
 // Parse an error and record it in the source's error state
 static void parser_set_error(anvl_source src, anvl_err_code code) {
-   parser.err_code = code;
-   // Optionally log the error with source position information
+   // Captured *before* Source.set_error runs — its own out-param reports whether *recording*
+   // the error succeeded (ANVL_ERR_NONE on success, including a first-error-wins no-op inside
+   // anvl_error_set), not the error itself, so the call below always leaves parser.err_code as
+   // ANVL_ERR_NONE as a side effect, regardless of what's being recorded or whether this is the
+   // first call or a later one. `prior` is what lets this function tell those cases apart and
+   // decide what parser.err_code should actually end up holding.
+   anvl_err_code prior = parser.err_code;
+   bool already_recorded = prior != ANVL_ERR_NONE;
+
    usize line = Source.line(src);
    usize col = Source.column(src);
    const char *err_msg = anvl_error_code_message(code);
 
    Source.set_error(src, code, line, col, err_msg, &parser.err_code);
+
+   // First-error-wins, mirroring anvl_error_set's own protection for ctx->errors (see its
+   // comment) — parser.err_code has no such protection of its own otherwise. Without this, a
+   // later, more generic fallback error from an outer caller (e.g. parse_statement's
+   // ANVL_ERR_PARSER_EXPECTED_IDENTIFIER, called unconditionally whenever parse_identifier
+   // returns false, for *any* reason) would silently overwrite a more specific one an inner
+   // callee already recorded moments earlier (e.g. parse_identifier's own
+   // ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD) — even though ctx->errors itself already protects
+   // the *recorded* error from exactly that, parser.err_code was quietly drifting out of sync
+   // with it. Restoring `prior` here, not just declining to overwrite it with `code`, matters:
+   // the Source.set_error call above still resets parser.err_code to ANVL_ERR_NONE as a side
+   // effect on *every* call, first or not, so the first-recorded value has to be put back
+   // explicitly, not merely left alone.
+   parser.err_code = already_recorded ? prior : code;
 }
