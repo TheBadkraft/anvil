@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Download ANVL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/oml">OML</a>
+      <a href="/docs">Docs</a>
+      <a href="/sandbox">Sandbox</a>
+      <a href="/download" class="active">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <h1>Download</h1>
+    <p class="lede">
+      Three build formats, all produced from the same source. Pick the one
+      that matches how you're consuming it.
+    </p>
+
+    <h2>Browser — plain &lt;script&gt; tag</h2>
+    <div class="card">
+      <div class="dl-row">
+        <div>
+          <strong>anvl.global.js</strong> — minified IIFE, no build step needed.
+          Exposes a global <code>Anvl</code> object.
+        </div>
+        <a class="btn secondary" href="/assets/dist/anvl.global.js">Download</a>
+      </div>
+      <pre><code>&lt;script src="anvl.global.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const node = Anvl.parse('#!aml\nfoo := 1;');
+  console.log(node.get('foo').asInt());
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <h2>ES Modules — bundlers &amp; modern browsers</h2>
+    <div class="card">
+      <div class="dl-row">
+        <div><strong>anvl.esm.js</strong> — for <code>import</code>, bundlers, or
+          <code>&lt;script type="module"&gt;</code>.</div>
+        <a class="btn secondary" href="/assets/dist/anvl.esm.js">Download</a>
+      </div>
+      <pre><code>import { parse, write } from './anvl.esm.js';
+
+const node = parse('#!aml\nfoo := 1;');
+console.log(node.get('foo').asInt());</code></pre>
+    </div>
+
+    <h2>CommonJS — Node <code>require()</code></h2>
+    <div class="card">
+      <div class="dl-row">
+        <div><strong>anvl.cjs</strong> — for Node projects using <code>require()</code>.</div>
+        <a class="btn secondary" href="/assets/dist/anvl.cjs">Download</a>
+      </div>
+      <pre><code>const { parse, write } = require('./anvl.cjs');
+
+const node = parse('#!aml\nfoo := 1;');
+console.log(node.get('foo').asInt());</code></pre>
+    </div>
+
+    <p class="lede" style="margin-top: 32px; font-size: 15px;">
+      Full API reference is in the <a href="/docs">docs</a>. This is
+      alpha software — the format is fully documented, but expect the API
+      surface to keep moving.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+  <script>document.getElementById('version').textContent = window.ANVL_VERSION || '__VERSION__';</script>
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "anvldata-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "anvldata.com — moved here from anvil.js/site (2026-09-06), since Anvil.C is now the de facto reference implementation. Content still reflects the pre-move anvil.js-centric site; see notes/deferred-work.md for the planned rewrite.",
+  "scripts": {
+    "build:site": "node scripts/build-site.js",
+    "site:dev": "wrangler dev",
+    "site:deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.126.0"
+  }
+}

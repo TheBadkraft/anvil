@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>ANVL Sandbox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/oml">OML</a>
+      <a href="/docs">Docs</a>
+      <a href="/sandbox" class="active">Sandbox</a>
+      <a href="/download">Download</a>
+    </nav>
+  </header>
+
+  <main class="wide">
+    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <h1>Sandbox</h1>
+    <p class="lede">
+      This runs the real <code>anvl.global.js</code> bundle, in your browser,
+      against whatever you type below — nothing is sent to a server.
+    </p>
+
+    <div class="cta-row" style="margin-bottom: 8px;">
+      <button class="btn primary" id="parseBtn">Parse</button>
+      <label style="display:flex; align-items:center; gap:6px; color: var(--text-dim); font-size: 14px;">
+        <input type="checkbox" id="minifyToggle" /> minify output
+      </label>
+      <select id="exampleSelect" class="btn secondary" style="background: var(--bg-raised); color: var(--text);">
+        <option value="">Load an example…</option>
+        <option value="object">AML — object with attributes</option>
+        <option value="varref">AML — $ references</option>
+        <option value="inheritance">AML — inheritance</option>
+        <option value="amp">AMP — restricted messaging</option>
+        <option value="amp-error">AMP — forbidden construct (error demo)</option>
+      </select>
+    </div>
+
+    <div class="sandbox-grid">
+      <div>
+        <h4 style="color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Source
+        </h4>
+        <textarea id="source" class="editor" spellcheck="false">#!aml
+server @[env = production] := {
+    host := localhost;
+    port := 8080;
+    tags := [edge, cache];
+};
+
+base_var    := 42;
+derived_var := $base_var;</textarea>
+      </div>
+      <div>
+        <div class="panel" id="statusPanel">
+          <h4>Status</h4>
+          <div id="statusText">Click Parse to run.</div>
+        </div>
+        <div style="height: 16px;"></div>
+        <div class="panel">
+          <h4>Structure (root node)</h4>
+          <div id="treeOut" class="tree"></div>
+        </div>
+        <div style="height: 16px;"></div>
+        <div class="panel">
+          <h4>Re-serialized output (write())</h4>
+          <pre id="writeOut" style="margin:0; background:none; border:none; padding:0; width:80ch; max-width:100%; overflow-x:auto; white-space:pre;"></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+  <script>document.getElementById('version').textContent = window.ANVL_VERSION || '__VERSION__';</script>
+  <script src="/assets/dist/anvl.global.js"></script>
+  <script>
+    const EXAMPLES = {
+      object: `#!aml
+server @[env = production] := {
+    host := localhost;
+    port := 8080;
+    tags := [edge, cache];
+};`,
+      varref: `#!aml
+base_var    := 42;
+derived_var := $base_var;
+missing_ref := $does_not_exist;`,
+      inheritance: `#!aml
+Base := { a := 1; };
+Child : Base := { b := 2; };`,
+      amp: `#!amp
+status := ok;
+code   := 200;
+tags   := [alpha, beta, gamma];
+point  := (10, 20);`,
+      'amp-error': `#!amp
+bad := { x := 1; };`,
+    };
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function previewValue(node) {
+      switch (node.kind) {
+        case 'string':
+        case 'bare': return node.asString();
+        case 'int': return node.asInt();
+        case 'float': return node.asFloat();
+        case 'bool': return node.asBool();
+        case 'null': return null;
+        case 'hex': return '#' + node.asString();
+        default: return node.asString();
+      }
+    }
+
+    function renderNode(node) {
+      if (!node) return '<span class="val">null</span>';
+      const t = node.type;
+      if (t === 'scalar') {
+        return `<span class="kind">${node.kind}</span><span class="val">${escapeHtml(JSON.stringify(previewValue(node)))}</span>`;
+      }
+      if (t === 'blob') {
+        return `<span class="kind">blob${node.hasAttribute && node.hasAttribute('tag') ? '' : ''}</span><code>${escapeHtml(node.asString())}</code>`;
+      }
+      if (t === 'object') {
+        const rows = node.keys().map((k) => `<li><strong>${escapeHtml(k)}</strong>: ${renderNode(node.get(k))}</li>`).join('');
+        return `<span class="kind">object</span><ul>${rows || '<li><em>(empty)</em></li>'}</ul>`;
+      }
+      if (t === 'array' || t === 'tuple') {
+        const rows = [];
+        for (let i = 0; i < node.count; i++) rows.push(`<li>[${i}] ${renderNode(node.at(i))}</li>`);
+        return `<span class="kind">${t}</span><ul>${rows.join('') || '<li><em>(empty)</em></li>'}</ul>`;
+      }
+      return '<span class="val">?</span>';
+    }
+
+    function run() {
+      const source = document.getElementById('source').value;
+      const minify = document.getElementById('minifyToggle').checked;
+      const statusEl = document.getElementById('statusText');
+      const treeEl = document.getElementById('treeOut');
+      const writeEl = document.getElementById('writeOut');
+
+      const node = Anvl.parse(source);
+      if (!node) {
+        const err = Anvl.lastError();
+        statusEl.innerHTML = `<span class="status-err">Parse failed [${err.code}] at ${err.line}:${err.column}</span><br>${escapeHtml(err.message)}`;
+        treeEl.innerHTML = '';
+        writeEl.textContent = '';
+        return;
+      }
+
+      statusEl.innerHTML = `<span class="status-ok">Parsed OK</span> — root type: <code>${node.type}</code>${node.type === 'scalar' ? `, kind: <code>${node.kind}</code>` : ''}`;
+      treeEl.innerHTML = renderNode(node);
+      writeEl.textContent = Anvl.write(node, { minify });
+    }
+
+    document.getElementById('parseBtn').addEventListener('click', run);
+    document.getElementById('minifyToggle').addEventListener('change', run);
+    document.getElementById('exampleSelect').addEventListener('change', (e) => {
+      const key = e.target.value;
+      if (key && EXAMPLES[key]) {
+        document.getElementById('source').value = EXAMPLES[key];
+        run();
+      }
+    });
+
+    run();
+  </script>
+</body>
+
+</html>

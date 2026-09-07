@@ -16,12 +16,52 @@ Import-graph processing order (topological sort) is **not** on this list — it 
 
 **Design thread captured, sequenced after the Node-binding-prep work — see `notes/native-schema.md`.** Native schema (a `@[schema]`-attributed document declaring another document's required shape — already-reserved but unused error codes exist in `errors.h`'s Schema Errors 46xx block) and opt-in strong typing (custom type declarations, importable via `import "types.anvl";`, e.g. a `VIN` type) are meant to eventually replace `../flywire/`'s own ad-hoc schema handling. Real prior art exists in `anvil.bak/src/schema/schema.c` (671 lines, pre-rebuild) worth reviewing when this picks up. One concrete link already acted on: the Node-binding-prep gap #2 module-attributes accessor is being built generically so the eventual schema resolver can reuse it for `@[schema]` detection.
 
+## Deferred — anvldata.com site: hosting, deploy, and content rewrite
+
+**File-level move done (2026-09-06), everything else still open.** `site/` moved from
+`anvil.js/` to `anvil/site/` — Anvil.C is now the de facto reference implementation, so the
+website belongs with it, not with the pure-JS parser being deprecated. `anvil/site/`'s own
+`wrangler.toml`/`package.json`/`scripts/build-site.js` were relocated and path-adjusted enough to
+be structurally coherent in the new location, but **nothing has been rebuilt or redeployed** —
+the live `anvldata.com` domain still serves whatever was last deployed from `anvil.js`'s
+Cloudflare Worker, untouched by this move. `anvil.js/package.json`'s `build:site`/`site:dev`/
+`site:deploy` scripts and its `wrangler` devDependency were removed (its own `build`/`test`
+scripts are untouched and still pass, 145/145).
+
+Three separate open items, deliberately not decided yet:
+
+1. **Where should the site actually be hosted going forward?** Currently Cloudflare
+   Workers/Pages (`wrangler.toml`, custom domain routing for `anvldata.com`/`www.anvldata.com`).
+   Raised as an open question: keep Cloudflare, or move hosting to the Linode instance instead
+   (which already hosts `anvl-js.git`'s bare repo and mirrors several project checkouts under
+   `~/projects/`)? Not decided — needs its own discussion before any redeploy happens.
+2. **The live cutover itself** — actually pointing `anvldata.com` at whatever hosting answer #1
+   lands on, from the new `anvil/site/` location — is a deliberate, separate, later step
+   regardless of hosting choice, not something to bundle into a routine commit.
+3. **The content rewrite** — `anvil/site/`'s pages/docs/downloads still reflect the pre-move,
+   anvil.js-centric site (its own `Quick-Start.md`/`API-Reference.md`/dist bundles, `anvl-js`
+   branding). The plan (repo owner, verbatim intent): keep the site's existing *format* (layout,
+   design, build mechanics) but replace the *content* to center Anvil.C as the reference
+   implementation, consolidating knowledge bases from every binding repo (`anvil.node`'s own
+   `wiki/` already exists as a first example of the per-binding knowledge-base pattern to pull
+   from) rather than one JS-parser-specific doc set. `scripts/build-site.js` is currently stale
+   for this reason — it still copies from a `wiki/`+`dist/` shape that doesn't exist in `anvil/`
+   — and needs real rework as part of this pass, not a quick patch.
+4. **Website comparison content, flagged for later, not urgent**: FlyWire's own recorded metrics
+   (`../flywire/docs/FLYWIRE_TASKS.md`, `FLYWIRE_TESTING_AND_METRICS.md` — e.g. the real, already-
+   measured `Table.decode()` vs `JSON.parse()` numbers) are worth mining for the rewritten site's
+   eventual comparisons-with-JSON content, once the content rewrite actually starts — FlyWire
+   already outperforms conventional JSON practice in real, recorded ways even on the *old* pure-JS
+   parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the comparison.
+
 ## Deferred to compilation (`anvilc` / `.anvlo`)
 
 - The entire `.anvlo` object format — concept stage only, no implementation. `anvlo-compilation.md` lists its own open questions (format, versioning, source retention, import representation, body IR, error handling, build tooling, linking, cross-platform).
 - Body compaction — a separate compile phase; the parse layer stays zero-copy. `document-header-scan.md`.
 
 ## Future feature ideas (not scheduled to any phase)
+
+- **AnvilScript: `yield` construct for cooperative suspension**: AnvilScript's arena-backed function stack (see `notes/anvilscript-design.md` § "Arena-backed function stack" and `FR-2603-sigma-collections-011`) is designed with lightweight `mark`/`restore` cursors that can record a statement-location bookmark. A future `yield` keyword would allow a function to suspend execution at a statement boundary, return a value to the caller, and resume later by restoring the stack mark and continuing from the saved location. This is explicitly deferred until after the MVP runtime is working; the stack design should not preclude it.
 
 - **Import a dynamically-built, file-less source (in-memory "virtual" import target)**: today `import_load_child` (`src/core/module.c`) only ever resolves an import via `doc_load_source(..., ANVL_SOURCE_FROM_FILE, ...)` — there's no way for a document built at runtime via `Source.from_buffer` (no real file behind it) to be the target of another document's `import "...";`. Raised as a design exercise: a dev builds an ANVL source on the fly (e.g. shared base-object definitions), and wants a second, separately-authored stream source to `import` it, with no OOP builder-class API to lean on (that doesn't exist yet).
   - What already works with zero code changes: `doc_load_source(doc, ANVL_SOURCE_FROM_BUFFER, ...)` loads the in-memory source, and `mod_ctx_register_doc(ctx, doc, filepath, ...)` accepts *any* string as `filepath` — nothing requires it to be a real path. A dev can register a buffer-built document under a chosen symbolic name into the same `module_context` the importer will use.

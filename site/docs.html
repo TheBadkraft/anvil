@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>ANVL Docs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/oml">OML</a>
+      <a href="/docs" class="active">Docs</a>
+      <a href="/sandbox">Sandbox</a>
+      <a href="/download">Download</a>
+    </nav>
+  </header>
+
+  <main class="wide">
+    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <div class="docs-layout">
+      <nav class="docs-nav">
+        <a href="#README.md" data-path="README.md">Overview</a>
+        <a href="#Quick-Start.md" data-path="Quick-Start.md">Quick Start</a>
+        <a href="#AML-Guide.md" data-path="AML-Guide.md">AML Guide</a>
+        <a href="#AMP-Guide.md" data-path="AMP-Guide.md">AMP Guide</a>
+        <a href="#API-Reference.md" data-path="API-Reference.md">API Reference</a>
+        <a href="#How-To.md" data-path="How-To.md">How-To</a>
+        <a href="#Error-Codes.md" data-path="Error-Codes.md">Error Codes</a>
+      </nav>
+      <article class="docs-content" id="content">Loading…</article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+  <script>document.getElementById('version').textContent = window.ANVL_VERSION || '__VERSION__';</script>
+  <script>
+    function resolvePath(base, rel) {
+      if (rel.startsWith('/')) return rel.slice(1);
+      const baseDir = base.includes('/') ? base.slice(0, base.lastIndexOf('/')) : '';
+      const parts = (baseDir ? baseDir + '/' + rel : rel).split('/');
+      const out = [];
+      for (const p of parts) {
+        if (p === '.' || p === '') continue;
+        if (p === '..') out.pop();
+        else out.push(p);
+      }
+      return out.join('/');
+    }
+
+    // marked doesn't add id attributes to headings by default (that changed
+    // a few versions back), so cross-file anchor links have nothing to
+    // scroll to unless we assign our own GitHub-style slugs.
+    function slugify(text) {
+      return text.toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    async function load(rawPath) {
+      // rawPath may carry a "#anchor" suffix (e.g. "AML-Guide.md#scalars")
+      // -- split it off before treating the rest as a file to fetch.
+      const hashIndex = rawPath.indexOf('#');
+      const path = hashIndex === -1 ? rawPath : rawPath.slice(0, hashIndex);
+      const anchor = hashIndex === -1 ? null : rawPath.slice(hashIndex + 1);
+
+      const content = document.getElementById('content');
+      content.textContent = 'Loading…';
+      try {
+        const res = await fetch('/assets/docs/' + path, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        const text = await res.text();
+        content.innerHTML = marked.parse(text);
+
+        content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
+          if (!h.id) h.id = slugify(h.textContent);
+        });
+
+        content.querySelectorAll('a[href*=".md"]').forEach((a) => {
+          const href = a.getAttribute('href');
+          if (/^https?:\/\//.test(href)) return;
+          const fragIndex = href.indexOf('#');
+          const hrefPath = fragIndex === -1 ? href : href.slice(0, fragIndex);
+          const hrefFrag = fragIndex === -1 ? '' : href.slice(fragIndex);
+          const target = resolvePath(path, hrefPath).replace(/^wiki\//, '');
+          a.setAttribute('href', '#' + target + hrefFrag);
+        });
+
+        document.querySelectorAll('.docs-nav a').forEach((a) => {
+          a.classList.toggle('active', a.dataset.path === path);
+        });
+        document.title = path.replace('.md', '') + ' — ANVL Docs';
+
+        if (anchor) {
+          document.getElementById(anchor)?.scrollIntoView();
+        } else {
+          content.scrollIntoView();
+        }
+      } catch (err) {
+        content.innerHTML = '<p style="color:#f36c6c">Failed to load ' + path + ': ' + err.message + '</p>';
+      }
+    }
+
+    function currentPath() {
+      return decodeURIComponent(location.hash.slice(1)) || 'README.md';
+    }
+
+    window.addEventListener('hashchange', () => load(currentPath()));
+    load(currentPath());
+  </script>
+</body>
+
+</html>

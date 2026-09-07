@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>What is OML? — ANVL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/oml" class="active">OML</a>
+      <a href="/docs">Docs</a>
+      <a href="/sandbox">Sandbox</a>
+      <a href="/download">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="pill">data modelling</div>
+    <h1>What is OML?</h1>
+    <p class="lede">
+      <strong>OML</strong> — Object Modelling Language — isn't a specific
+      format. It's a category: any language or notation whose job is to
+      describe structured object data as text. JSON is one. YAML is one.
+      XML with a schema is one. Protocol Buffers' <code>.proto</code>
+      files are one. AML — ANVL's own modelling dialect — is one too.
+    </p>
+    <p class="lede">
+      What separates a good OML from an adequate one isn't feature count.
+      It's whether the shapes it gives you already match how you think
+      about objects in whatever language you're actually working in — or
+      whether you have to translate.
+    </p>
+
+    <h2>The impedance mismatch problem</h2>
+    <p>
+      Every general-purpose language already has native ways to represent
+      structured data: a record/dict/map/struct for keyed data, a list or
+      array for ordered sequences, some flavor of typed literal for
+      scalars. An OML's job is to describe that same shape in text — and
+      the friction shows up exactly where the OML's model and the
+      language's native model don't line up.
+    </p>
+    <p>
+      JSON gets the basics right (objects, arrays, a handful of scalar
+      types) and that's most of why it won — almost nothing needs
+      translating. But it stops there: no comments, no way to say "this
+      value is the same as that one," no way to say "this shape extends
+      that shape," no metadata channel separate from the data itself.
+      Protocol Buffers goes the opposite direction — rich modelling
+      (messages, enums, oneofs) but only reachable through a schema
+      compiler and generated code, which is its own kind of impedance
+      mismatch: you're not writing your language's native objects anymore,
+      you're writing what the generator handed you.
+    </p>
+
+    <h2>How AML approaches it</h2>
+    <p>
+      AML's bet: keep the JSON-level shapes that already need no
+      translation (objects, arrays, scalars), then add the handful of
+      things config/data authors actually reach for — by naming them after
+      concepts that already exist in essentially every mainstream
+      language's own type system, not ANVL-specific inventions.
+    </p>
+    <table>
+      <tr><th>AML construct</th><th>Maps onto</th><th>Already familiar from</th></tr>
+      <tr>
+        <td>Object — <code>{ ... }</code></td>
+        <td>A record / dict / map / struct</td>
+        <td>Every language has one</td>
+      </tr>
+      <tr>
+        <td>Array — <code>[ ... ]</code></td>
+        <td>An ordered sequence</td>
+        <td>Every language has one</td>
+      </tr>
+      <tr>
+        <td>Tuple — <code>( ... )</code></td>
+        <td>A fixed-arity, heterogeneous group</td>
+        <td>Python tuples, C# <code>ValueTuple</code>, Rust tuples, Go multi-return</td>
+      </tr>
+      <tr>
+        <td>Inheritance — <code>Child : Base := { ... }</code></td>
+        <td>A base/derived class relationship</td>
+        <td>JS <code>extends</code>, Python subclassing, C# <code>: Base</code>, Java <code>extends</code></td>
+      </tr>
+      <tr>
+        <td>Attributes — <code>@[key=value]</code></td>
+        <td>Metadata attached to a field, separate from its value</td>
+        <td>Java annotations, Python decorators, C# attributes, Go struct tags</td>
+      </tr>
+      <tr>
+        <td><code>$identifier</code> VarRef</td>
+        <td>A named reference to a value defined once</td>
+        <td>A variable or named constant, in any language</td>
+      </tr>
+    </table>
+    <p>
+      None of that requires a schema compiler, a generated-code step, or
+      learning ANVL's own mental model from scratch. If you already think
+      in terms of records, base classes, and annotations — and you
+      probably do, in whatever language brought you here — AML's shapes
+      are ones you already have names for.
+    </p>
+
+    <h2>Where AMP fits</h2>
+    <p>
+      AML is deliberately the permissive half. ANVL's other dialect, AMP,
+      is the restricted one — scalars and flat arrays/tuples of them, no
+      nesting, no objects, no inheritance, no references, enforced at parse
+      time rather than by convention. It exists for exactly the situations
+      an OML's flexibility becomes a liability: message payloads, where you
+      want a guarantee that structure can't silently grow arbitrary depth.
+      See the <a href="/docs#AMP-Guide.md">AMP Guide</a> for the full
+      constraint list.
+    </p>
+
+    <div class="cta-row">
+      <a class="btn primary" href="/sandbox">See AML's shapes in the sandbox →</a>
+      <a class="btn secondary" href="/docs#AML-Guide.md">Read the full AML Guide</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+</body>
+
+</html>
