@@ -329,9 +329,9 @@ A future `try-catch` mechanism is not for everyday error handling; it is a tool 
 The ASL runtime reuses Sigma collections where they fit naturally:
 
 - **AST child arrays** — contiguous arrays of pointers/structs; homogeneous traversals use the HPS `Query` iterator.
-- **Variable stores** — per-scope ordered collections of value handles. `list` is a natural fit; once FR-007 (per-instance allocator override) lands, variable stores can be bound directly to the module arena, eliminating manual disposal passes.
+- **Variable stores** — per-scope ordered collections of value handles. `list` is a natural fit, now arena-bindable via FR-007's per-instance allocator override.
 - **Function registry** — `map` for module-level name → function descriptor lookups.
-- **Call stack** — a dedicated **arena-backed stack** (see below). `PArray` is the natural substrate; the missing piece is explicit push/pop stack semantics plus the per-instance allocator override from FR-007.
+- **Call stack** — a dedicated **arena-backed stack** via the new `Stack` collection from FR-011.
 
 ### Arena-backed function stack
 
@@ -344,15 +344,13 @@ The ScriptEngine uses a single stack per evaluation context for the mechanics of
 
 This keeps argument/return lifetime trivial and avoids per-call heap allocations. Because the stack is backed by an arena allocator, the whole stack is reclaimed in bulk when the evaluation context is disposed.
 
-Sigma has no dedicated stack collection today, but `PArray` already provides dense ordered pointer storage. The ScriptEngine needs:
+FR-011 delivered a dedicated `Stack` collection backed by `collection` (which itself carries FR-007's allocator override). The ScriptEngine uses it for:
 
-- `push` / `pop` / `peek` semantics on top of a `PArray`-like backing store.
-- Per-instance allocator override (extension of FR-007 to `PArray`) so the stack can be arena-bound.
-- A lightweight `mark` / `restore` cursor so the engine can record statement-location bookmarks for possible future `yield`-style cooperative suspension.
+- `push` / `pop` / `peek` semantics.
+- Arena-bound storage: `Stack.new_with_allocator` binds the stack to the module/context arena.
+- A lightweight `mark` / `restore` cursor for possible future `yield`-style cooperative suspension.
 
-See FR-2603-sigma-collections-011 for the full Sigma-side request.
-
-**FR-007 impact on AnvilScript:** Without per-instance allocator override, every ASL execution context must manually dispose the lists/collections allocated for variables, frames, and parser scratch space. With FR-007, the runtime can allocate all transient collections against the module/context arena and abandon them in bulk on teardown. Because AnvilScript is expected to allocate many short-lived collections per function call, FR-007 should be treated as a high-priority dependency rather than a generic convenience.
+**FR-007 impact on AnvilScript:** With per-instance allocator override now available, the runtime can allocate variable stores, AST child arrays, parser scratch space, and the call stack against the module/context arena and abandon them in bulk on teardown. This eliminates manual disposal passes for short-lived collections.
 
 ## Function registry
 
@@ -495,7 +493,7 @@ See `notes/anvilscript-theoretical-sketches.md` for concrete `.anvs` source exam
 
 ### Implementation backing
 
-Most `array`/`string` operations are natural host callbacks wrapping Sigma collection functions. `list` and `dict` can also be host-backed using Sigma `list` and `map` (once FR-007 is available, arena-bound), or they can be pure AnvilScript structures. For MVP, host-backed is simpler and validates the registry model.
+Most `array`/`string` operations are natural host callbacks wrapping Sigma collection functions. `list` and `dict` can be host-backed using Sigma `list` and `map` (arena-bound via FR-007), or they can be pure AnvilScript structures. For MVP, host-backed is simpler and validates the registry model.
 
 ### Extension methods
 
@@ -679,7 +677,75 @@ If closures are supported, a frame may outlive its function call until no closur
 
 This thread is high priority but does not have to be the very next topic.
 
-### 6. Source position metadata
+## Bytecode instruction set
+
+The instruction set is part of the language execution semantics. The VM and compiler implement it mechanically.
+
+### Value and local operations
+
+```c
+OP_NULL          // push null
+OP_TRUE          // push true
+OP_FALSE         // push false
+OP_CONST idx     // push constants[idx]
+OP_LOAD_LOCAL n  // push local slot n
+OP_STORE_LOCAL n // pop into local slot n
+OP_POP           // discard top of stack
+OP_DUP           // duplicate top of stack
+```
+
+### Arithmetic and comparison
+
+```c
+OP_NEGATE
+OP_NOT
+OP_ADD
+OP_SUBTRACT
+OP_MULTIPLY
+OP_DIVIDE
+OP_MODULO
+OP_EQUAL
+OP_NOT_EQUAL
+OP_LESS
+OP_GREATER
+OP_LESS_EQUAL
+OP_GREATER_EQUAL
+```
+
+### Control flow
+
+```c
+OP_JUMP offset              // relative jump
+OP_JUMP_IF_FALSE offset     // pop; jump if falsy
+OP_JUMP_IF_TRUE offset      // pop; jump if truthy
+```
+
+### Functions and calls
+
+```c
+OP_CALL arity               // resolve callee; invoke with arity arguments
+OP_RETURN                   // return top of stack (or null) to caller
+OP_HOST_CALL idx arity      // call host callback constants[idx] with arity arguments
+```
+
+`OP_CALL` is used for both ASL and registered functions when the callee is a runtime value. `OP_HOST_CALL` is an optimization for callees known at compile time to be host callbacks.
+
+### Collections
+
+```c
+OP_ARRAY_INIT n             // build array from top n stack values
+OP_TUPLE_INIT n             // build tuple from top n stack values
+OP_OBJECT_INIT n            // build object from top n*2 key/value pairs
+OP_INTERPOLATED n           // build string from n segments
+```
+
+### Conventions
+
+- The instruction stream is a flat byte array.
+- Multi-byte operands (`idx`, `offset`, `arity`, `n`) are stored little-endian in 32-bit slots unless compact encoding is needed.
+- Source-span metadata is stored separately and indexed by instruction offset.
+
+## Source position metadata
 
 The source already knows its position. When the ANVL parser hands a function body to the ScriptEngine, it should pass:
 
@@ -699,4 +765,5 @@ As the design hardens, build a separate or embedded knowledge base that tracks l
 - `notes/document-header-scan.md`, `notes/document-body-parse.md` — where several of the open questions above were first raised, from the AML side.
 - `notes/deferred-work.md` — the previous home for this design's open questions; now points here.
 - `notes/anvilscript-theoretical-sketches.md` — concrete-but-speculative examples of built-in modules, extension methods, host bindings, and `.anvlo` compilation.
+- `notes/anvilscript-scriptengine-design.md` — concrete mechanical design for the parser, compiler, VM, and ScriptEngine boundaries.
 - `docs/changelog.md` `[v0.4.0-alpha]` — historical record of the removed prior-art ASL implementation.
