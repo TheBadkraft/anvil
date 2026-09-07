@@ -164,18 +164,62 @@ collection collection_new(usize capacity, usize stride) {
   coll->stride = stride;
   coll->length = 0;
   coll->owns_buffer = true;
+  coll->alloc_use = NULL;
 
   return coll;
 }
+
+// create a new collection bound to a caller-supplied allocator-use
+// (FR-2603-sigma-collections-007). use == NULL is identical to collection_new;
+// use != NULL allocates the bucket through `use` instead of the global
+// Allocator, and binds the instance so collection_grow/collection_dispose
+// route through it too.
+collection collection_new_with_allocator(usize capacity, usize stride, sc_alloc_use_t *use) {
+  if (!use) {
+    return collection_new(capacity, stride);
+  }
+
+  struct sc_collection *coll = Allocator.alloc(sizeof(struct sc_collection));
+  if (!coll) {
+    return NULL;
+  }
+
+  void *bucket = NULL;
+  if (capacity > 0) {
+    if (stride > SIZE_MAX / capacity) {
+      Allocator.dispose(coll);
+      return NULL;
+    }
+    bucket = use->alloc(stride * capacity);
+    if (!bucket) {
+      Allocator.dispose(coll);
+      return NULL;
+    }
+  }
+
+  coll->array.handle[0] = 'P';
+  coll->array.handle[1] = '\0';
+  coll->array.bucket = bucket;
+  coll->array.end = (char *)bucket + stride * capacity;
+  coll->stride = stride;
+  coll->length = 0;
+  coll->owns_buffer = true;
+  coll->alloc_use = use;
+
+  return coll;
+}
+
 // dispose of the collection
 void collection_dispose(collection coll) {
   if (!coll) {
     return;
   }
 
-  if (coll->owns_buffer && coll->array.bucket) {
+  if (coll->owns_buffer && coll->array.bucket && !coll->alloc_use) {
     Allocator.dispose(coll->array.bucket);
   }
+  // when coll->alloc_use is set, the bound allocator (arena) owns
+  // reclaiming coll->array.bucket as a whole, at its own disposal time.
   Allocator.dispose(coll);
 }
 // get the Collections library version string
@@ -200,13 +244,20 @@ int collection_grow(collection coll) {
   } else {
     new_capacity = current_capacity * 2;
   }
-  void *new_buffer = Allocator.alloc(coll->stride * new_capacity);
+  void *new_buffer = coll->alloc_use
+      ? coll->alloc_use->alloc(coll->stride * new_capacity)
+      : Allocator.alloc(coll->stride * new_capacity);
   if (!new_buffer) {
     return ERR;
   }
 
   memcpy(new_buffer, coll->array.bucket, coll->stride * current_capacity);
-  Allocator.dispose(coll->array.bucket);
+  if (!coll->alloc_use) {
+    Allocator.dispose(coll->array.bucket);
+  }
+  // when coll->alloc_use is set (arena-backed), the old buffer is orphaned
+  // instead of disposed — a bump/arena allocator can't free one specific
+  // prior allocation, only bulk-release the whole arena.
   coll->array.bucket = new_buffer;
   coll->array.end = (char *)new_buffer + coll->stride * new_capacity;
   return OK;
@@ -314,6 +365,7 @@ const sc_collections_i Collections = {
     .count = collection_get_count,
     .create_iterator = collection_create_iterator,
     .create_view = collection_create_view,
+    .create_with_allocator = collection_new_with_allocator,
     .dispose = collection_dispose,
     .version = collection_get_version,
     .as_queryable = collection_as_queryable,

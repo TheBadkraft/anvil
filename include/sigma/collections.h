@@ -90,6 +90,17 @@ typedef struct sc_collections_i {
     */
    collection (*create_view)(void *array, usize stride, usize length, bool owns_buffer);
    /**
+    * @brief Create a new collection bound to a caller-supplied allocator-use
+    *        (FR-2603-sigma-collections-007). The instance grows/orphans
+    *        through `use` instead of the global Allocator/Application facade.
+    * @param capacity Initial collection capacity
+    * @param stride Size of each element in the collection
+    * @param use Allocator-use to bind this instance to, or NULL to behave
+    *            exactly like the global-Allocator-backed path
+    * @return New collection instance, or NULL on failure
+    */
+   collection (*create_with_allocator)(usize capacity, usize stride, sc_alloc_use_t *use);
+   /**
     * @brief Dispose of the collection and free its resources.
     * @param coll The collection to dispose
     */
