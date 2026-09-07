@@ -89,6 +89,8 @@ static void test_vt05_document_matches_flat(void) {
                    "VT05: Document.get_fragment_value is anvil_document_get_fragment_value");
    TestBit.is_true(Document.get_statements == anvil_document_get_statements,
                    "VT05: Document.get_statements is anvil_document_get_statements");
+   TestBit.is_true(Document.get_imports == anvil_document_get_imports,
+                   "VT05: Document.get_imports is anvil_document_get_imports");
    TestBit.is_true(Document.get_error == anvil_document_get_error,
                    "VT05: Document.get_error is anvil_document_get_error");
 }
@@ -101,6 +103,16 @@ static void test_vt08_statement_iterator_matches_flat(void) {
                    "VT08: StatementIterator.next is anvil_statement_iterator_next");
    TestBit.is_true(StatementIterator.dispose == anvil_statement_iterator_dispose,
                    "VT08: StatementIterator.dispose is anvil_statement_iterator_dispose");
+}
+/* ---------------------------------------------------------------------- *
+ * VT09 — every DocumentIterator vtable field is pointer-identical to its
+ * flat counterpart
+ * ---------------------------------------------------------------------- */
+static void test_vt09_document_iterator_matches_flat(void) {
+   TestBit.is_true(DocumentIterator.next == anvil_document_iterator_next,
+                   "VT09: DocumentIterator.next is anvil_document_iterator_next");
+   TestBit.is_true(DocumentIterator.dispose == anvil_document_iterator_dispose,
+                   "VT09: DocumentIterator.dispose is anvil_document_iterator_dispose");
 }
 /* ---------------------------------------------------------------------- *
  * VT07 — every Error vtable field is pointer-identical to its flat
@@ -170,6 +182,8 @@ int main(void) {
    TestBit.run_ex("VT07_error_matches_flat", NULL, test_vt07_error_matches_flat, th);
    TestBit.run_ex("VT08_statement_iterator_matches_flat", NULL,
                   test_vt08_statement_iterator_matches_flat, th);
+   TestBit.run_ex("VT09_document_iterator_matches_flat", NULL,
+                  test_vt09_document_iterator_matches_flat, th);
 
    return TestBit.report();
 }

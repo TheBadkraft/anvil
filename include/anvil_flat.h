@@ -169,11 +169,50 @@ bool anvil_statement_iterator_next(anvil_statement_iterator it, anvil_statement 
 void anvil_statement_iterator_dispose(anvil_statement_iterator it);
 
 /**
+ * @brief A heapless cursor over this document's own direct imports
+ * (`import "...";`), in declaration order — never the whole transitive
+ * import graph; call this again on a yielded document to walk further.
+ * Backed by Sigma's Query/sc_queryable mechanism over
+ * `module_document->header->imports`, not a hand-rolled scan.
+ * @param doc The document to iterate.
+ * @return The iterator handle, or NULL if doc is NULL or invalid. A document
+ * with zero imports still yields a real, immediately-exhausted iterator, not
+ * NULL — NULL is reserved for `doc` itself being unusable. Dispose with
+ * anvil_document_iterator_dispose once done — never valid after `doc` itself
+ * is disposed.
+ */
+anvil_document_iterator anvil_document_get_imports(anvil_document doc);
+
+/**
+ * @brief Pull the next imported document from an iterator, in order.
+ * @param it The iterator to advance (mutated in place).
+ * @param out_doc Set to the next document on success; untouched otherwise.
+ * The yielded handle is a real, fully usable anvil_document — every other
+ * accessor works on it normally — but it shares its underlying parse context
+ * with the document anvil_document_get_imports was called on. Dispose it
+ * with anvil_dispose once done, same as any other anvil_document (see
+ * anvil_document_iterator's own doc comment for why that's safe here).
+ * @return true if a document was yielded; false once exhausted, or if
+ * it/out_doc is NULL.
+ */
+bool anvil_document_iterator_next(anvil_document_iterator it, anvil_document *out_doc);
+
+/**
+ * @brief Release an iterator. Safe to call with NULL (no-op). Does not
+ * affect the document it was created from, or any document it yielded
+ * (disposed or not) — those follow their own, separate anvil_dispose calls.
+ */
+void anvil_document_iterator_dispose(anvil_document_iterator it);
+
+/**
  * @brief A statement's own value.
  * @param stmt The statement to read.
- * @return The value handle, or NULL if stmt is NULL or is an anonymous
- * OBJECT_BLOCK (which has no value of its own — only a body; not yet a
- * supported traversal, see notes/public-api.md).
+ * @return The value handle, or NULL if stmt is NULL. A bare anonymous
+ * OBJECT_BLOCK statement ('ident { ... };') reports an ANVIL_VALUE_OBJECT
+ * value here exactly like an ASSIGN statement with an object value
+ * ('ident := { ... };') would — the two forms are indistinguishable through
+ * this accessor, matching how they're already treated identically
+ * everywhere else (base/attributes/inheritance).
  */
 anvil_value anvil_statement_get_value(anvil_statement stmt);
 

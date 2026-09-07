@@ -61,6 +61,7 @@ typedef struct anvil_document_i {
    anvil_attribute (*find_attribute)(anvil_document doc, const char *key);
    anvil_value (*get_fragment_value)(anvil_document doc);
    anvil_statement_iterator (*get_statements)(anvil_document doc);
+   anvil_document_iterator (*get_imports)(anvil_document doc);
    anvil_error (*get_error)(anvil_document doc);
 } anvil_document_i;
 extern const anvil_document_i Document;
@@ -70,6 +71,12 @@ typedef struct anvil_statement_iterator_i {
    void (*dispose)(anvil_statement_iterator it);
 } anvil_statement_iterator_i;
 extern const anvil_statement_iterator_i StatementIterator;
+
+typedef struct anvil_document_iterator_i {
+   bool (*next)(anvil_document_iterator it, anvil_document *out_doc);
+   void (*dispose)(anvil_document_iterator it);
+} anvil_document_iterator_i;
+extern const anvil_document_iterator_i DocumentIterator;
 
 typedef struct anvil_attribute_i {
    size_t (*get_key)(anvil_attribute attr, char *buf, size_t buflen);

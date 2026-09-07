@@ -39,6 +39,10 @@ struct anvil_document_t {
    anvil_err_code error; // ANVIL_OK if the whole pipeline succeeded
    anvl_value fragment_value; // set only by anvil_parse_value_fragment; NULL otherwise
    anvil_error error_detail; // NULL until a phase fails; see make_error_detail
+   bool owns_ctx; // true for every anvil_load*/parse_value_fragment handle (anvil_dispose tears
+                  // down ctx); false for a handle synthesized by anvil_document_iterator_next —
+                  // that handle shares its owning document's ctx, so anvil_dispose on it must
+                  // only free the small handle itself, never the shared context.
 };
 
 struct anvil_error_t {
@@ -106,6 +110,7 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    handle->error = ANVIL_OK;
    handle->fragment_value = NULL; // load_common's documents are never fragments
    handle->error_detail = NULL;
+   handle->owns_ctx = true;
 
    if (ANVL_RES_OK != doc_load_source(doc, origin, source, length, &err_code)) {
       // Never registered with ctx - mod_ctx_dispose won't reach it, so dispose it directly
@@ -205,6 +210,7 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
    handle->error = ANVIL_OK;
    handle->fragment_value = NULL;
    handle->error_detail = NULL;
+   handle->owns_ctx = true;
 
    if (ANVL_RES_OK != doc_load_source(doc, ANVL_SOURCE_FROM_BUFFER, text, length, &err_code)) {
       doc_dispose(doc);
@@ -243,6 +249,13 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
 
 void anvil_dispose(anvil_document doc) {
    if (!doc) {
+      return;
+   }
+   if (!doc->owns_ctx) {
+      // A handle synthesized by anvil_document_iterator_next — shares its owning document's
+      // ctx, so disposing it here must only free this small handle, never the shared context
+      // the caller's real (owning) document handle still needs. Harmless no-op beyond that.
+      Allocator.dispose(doc);
       return;
    }
    mod_ctx_dispose(doc->ctx); // disposes every registered document too (root included, once registered)
@@ -313,6 +326,60 @@ void anvil_statement_iterator_dispose(anvil_statement_iterator it) {
    Allocator.dispose(it);
 }
 
+struct anvil_document_iterator_t {
+   module_context ctx;
+   sc_queryable q;
+};
+
+anvil_document_iterator anvil_document_get_imports(anvil_document doc) {
+   if (!doc || !doc->root || !doc->root->header) {
+      return NULL;
+   }
+   struct anvil_document_iterator_t *it =
+      Allocator.alloc(sizeof(struct anvil_document_iterator_t));
+   if (!it) {
+      return NULL;
+   }
+   it->ctx = doc->ctx;
+   it->q = List.as_queryable(doc->root->header->imports);
+   return (anvil_document_iterator)it;
+}
+
+// Each call allocates a fresh handle — the iterator itself never tracks or frees them (see
+// anvil_document_iterator's own doc comment: each yielded handle is the caller's to dispose,
+// same as any other anvil_document, safe because owns_ctx=false makes that a small, harmless
+// free rather than tearing down the shared context).
+bool anvil_document_iterator_next(anvil_document_iterator it, anvil_document *out_doc) {
+   struct anvil_document_iterator_t *i = (struct anvil_document_iterator_t *)it;
+   if (!i || !out_doc) {
+      return false;
+   }
+   const void *element = NULL;
+   while (Query.next(&i->q, &element, NULL)) {
+      anvl_import imp = *(anvl_import *)element;
+      if (!imp || !imp->resolved) {
+         continue; // skip a broken/unresolved entry rather than yielding a bad handle
+      }
+      struct anvil_document_t *handle = Allocator.alloc(sizeof(struct anvil_document_t));
+      if (!handle) {
+         return false;
+      }
+      handle->ctx = i->ctx;
+      handle->root = imp->resolved;
+      handle->error = ANVIL_OK;
+      handle->fragment_value = NULL;
+      handle->error_detail = NULL;
+      handle->owns_ctx = false; // shares i->ctx — anvil_dispose on this handle must not tear it down
+      *out_doc = (anvil_document)handle;
+      return true;
+   }
+   return false;
+}
+
+void anvil_document_iterator_dispose(anvil_document_iterator it) {
+   Allocator.dispose(it); // frees only the scan cursor — never touches any handle it yielded
+}
+
 // Forward declaration — defined below, shared by every buffer-supplied accessor; needed here
 // too for anvil_error_get_message.
 static size_t copy_to_buffer(const char *src, size_t src_len, char *buf, size_t buflen);
@@ -352,10 +419,11 @@ size_t anvil_error_get_column(anvil_error err) {
 
 anvil_value anvil_statement_get_value(anvil_statement stmt) {
    anvl_statement s = (anvl_statement)stmt;
-   if (!s || s->kind != ANVL_STMT_ASSIGN) {
-      return NULL; // anonymous OBJECT_BLOCK has no value of its own - only a body
+   if (!s) {
+      return NULL;
    }
-   return (anvil_value)s->value;
+   return (anvil_value)s->value; // OBJECT_BLOCK synthesizes its own OBJECT value at parse
+                                  // time (parser.c) — populated for both statement kinds now
 }
 
 // Copies up to buflen-1 bytes from [src, src+src_len) into buf, NUL-terminating - shared by

@@ -51,6 +51,27 @@ typedef struct anvil_statement_t *anvil_statement;
 typedef struct anvil_statement_iterator_t *anvil_statement_iterator;
 
 /**
+ * @brief Opaque, heapless-scan cursor over a document's own direct imports
+ * (`import "...";`, not the whole transitive graph) — see
+ * anvil_document_get_imports/anvil_document_iterator_next.
+ *
+ * Owns only its own scan position, never the documents it yields — those are
+ * the caller's own responsibility. A yielded anvil_document is a real, fully
+ * usable handle (anvil_document_get_statements, anvil_document_get_attribute*,
+ * etc. all work on it normally) but does not own the underlying parse
+ * context — it shares that with the document anvil_document_get_imports was
+ * called on. Dispose each yielded handle with anvil_dispose once done with
+ * it, same as any other anvil_document — safe, since disposing one of these
+ * only frees the small handle itself and never touches the shared context
+ * (so disposing a yielded handle is fine even while the owning document, or
+ * other handles sharing its context, are still in use). Never valid after
+ * the owning document is disposed. Dispose the iterator itself with
+ * anvil_document_iterator_dispose once done — this does not affect any
+ * document handle it already yielded, disposed or not.
+ */
+typedef struct anvil_document_iterator_t *anvil_document_iterator;
+
+/**
  * @brief Opaque handle to one value.
  *
  * Lifetime is tied to the anvil_document it came from — never valid after

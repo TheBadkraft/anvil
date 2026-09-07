@@ -715,6 +715,163 @@ static void test_anv31_error_detail_null_safety(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * ANV32 — a document's direct imports are visitable via a heapless
+ * iterator (f13_import.anvl imports f01_bare_literal.anvl), and the
+ * yielded handle is a fully usable anvil_document in its own right
+ * ---------------------------------------------------------------------- */
+static void test_anv32_document_import_iteration(void) {
+   anvil_document doc = anvil_load(fixture_path("f13_import.anvl"));
+   TestBit.is_not_null(doc, "ANV32: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_document_iterator it = anvil_document_get_imports(doc);
+   TestBit.is_not_null(it, "ANV32: import iterator created");
+   if (it) {
+      anvil_document imported = NULL;
+      TestBit.is_true(anvil_document_iterator_next(it, &imported), "ANV32: first next succeeds");
+      if (imported) {
+         anvil_statement_iterator sit = anvil_document_get_statements(imported);
+         TestBit.is_not_null(sit, "ANV32: imported document's own statements are visitable");
+         if (sit) {
+            anvil_statement stmt = NULL;
+            TestBit.is_true(anvil_statement_iterator_next(sit, &stmt),
+                            "ANV32: imported doc's first statement");
+            if (stmt) {
+               char name[8] = {0};
+               anvil_statement_get_name(stmt, name, sizeof(name));
+               TestBit.is_true(strcmp(name, "val") == 0,
+                               "ANV32: imported doc's first statement is 'val'");
+            }
+            stmt = NULL;
+            TestBit.is_true(anvil_statement_iterator_next(sit, &stmt),
+                            "ANV32: imported doc's second statement");
+            if (stmt) {
+               char name[8] = {0};
+               anvil_statement_get_name(stmt, name, sizeof(name));
+               TestBit.is_true(strcmp(name, "name") == 0,
+                               "ANV32: imported doc's second statement is 'name'");
+            }
+            anvil_statement_iterator_dispose(sit);
+         }
+         anvil_dispose(imported); // caller's own responsibility — safe, shares owner's context
+      }
+
+      imported = NULL;
+      TestBit.is_false(anvil_document_iterator_next(it, &imported),
+                       "ANV32: second next exhausts the iterator (one direct import)");
+
+      anvil_document_iterator_dispose(it);
+   }
+
+   // The importing document's own top-level statements are unaffected — still just 'alias'.
+   anvil_statement_iterator root_it = anvil_document_get_statements(doc);
+   TestBit.is_not_null(root_it, "ANV32: root document's own statements still visitable");
+   if (root_it) {
+      anvil_statement stmt = NULL;
+      TestBit.is_true(anvil_statement_iterator_next(root_it, &stmt), "ANV32: root's first statement");
+      if (stmt) {
+         char name[8] = {0};
+         anvil_statement_get_name(stmt, name, sizeof(name));
+         TestBit.is_true(strcmp(name, "alias") == 0, "ANV32: root's own statement is 'alias'");
+      }
+      anvil_statement_iterator_dispose(root_it);
+   }
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV33 — import iteration is safe on NULL, a document with zero direct
+ * imports still yields a real (immediately-exhausted) iterator, and
+ * disposing an imported-document handle is a harmless no-op
+ * ---------------------------------------------------------------------- */
+static void test_anv33_import_iteration_null_safety(void) {
+   TestBit.is_null(anvil_document_get_imports(NULL), "ANV33: get_imports(NULL) is NULL");
+   TestBit.is_false(anvil_document_iterator_next(NULL, NULL),
+                    "ANV33: iterator_next(NULL, NULL) is false");
+   anvil_document_iterator_dispose(NULL); // must not crash
+
+   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl")); // has zero imports
+   TestBit.is_not_null(doc, "ANV33: document with no imports loaded");
+   if (doc) {
+      anvil_document_iterator it = anvil_document_get_imports(doc);
+      TestBit.is_not_null(it, "ANV33: a document with zero imports still yields a usable iterator");
+      if (it) {
+         anvil_document imported = NULL;
+         TestBit.is_false(anvil_document_iterator_next(it, &imported),
+                          "ANV33: zero direct imports means immediate exhaustion");
+         anvil_document_iterator_dispose(it);
+      }
+      anvil_dispose(doc);
+   }
+
+   // Disposing a yielded imported-document handle directly must be a harmless no-op — it must
+   // never tear down the shared context the owning document (still in use below) depends on.
+   anvil_document owner = anvil_load(fixture_path("f13_import.anvl"));
+   TestBit.is_not_null(owner, "ANV33: owning document loaded");
+   if (owner) {
+      anvil_document_iterator it = anvil_document_get_imports(owner);
+      if (it) {
+         anvil_document imported = NULL;
+         if (anvil_document_iterator_next(it, &imported) && imported) {
+            anvil_dispose(imported); // must not corrupt owner's shared context
+         }
+         anvil_document_iterator_dispose(it);
+      }
+      TestBit.is_false(anvil_has_errors(owner),
+                       "ANV33: owner's context survives disposing an imported handle directly");
+      anvil_dispose(owner);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV34 — anvil_statement_get_value now works for a bare OBJECT_BLOCK
+ * statement ('label { ... };'), not just ASSIGN-with-object-value
+ * ('label := { ... };') — the two forms are indistinguishable through
+ * this accessor, matching their already-equal internal treatment
+ * everywhere else (base/attributes/inheritance)
+ * ---------------------------------------------------------------------- */
+static void test_anv34_object_block_get_value(void) {
+   anvil_document doc = anvil_load(fixture_path("body_block_namespace.anvl"));
+   TestBit.is_not_null(doc, "ANV34: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_statement label = anvil_statement_get(doc, "label");
+   TestBit.is_not_null(label, "ANV34: 'label' statement found");
+   if (label) {
+      anvil_value val = anvil_statement_get_value(label);
+      TestBit.is_not_null(val, "ANV34: OBJECT_BLOCK statement now has a value");
+      if (val) {
+         TestBit.is_equal_int(ANVIL_VALUE_OBJECT, anvil_value_get_type(val),
+                              "ANV34: value kind is OBJECT");
+         TestBit.is_equal_int(2, (long long)anvil_value_get_count(val),
+                              "ANV34: two nested fields");
+
+         anvil_statement field0 = anvil_value_get_statement(val, 0);
+         TestBit.is_not_null(field0, "ANV34: first nested field retrieved");
+         if (field0) {
+            char name[8] = {0};
+            anvil_statement_get_name(field0, name, sizeof(name));
+            TestBit.is_true(strcmp(name, "field") == 0, "ANV34: first field is 'field'");
+         }
+
+         anvil_statement field1 = anvil_value_get_statement(val, 1);
+         TestBit.is_not_null(field1, "ANV34: second nested field retrieved");
+         if (field1) {
+            char name[8] = {0};
+            anvil_statement_get_name(field1, name, sizeof(name));
+            TestBit.is_true(strcmp(name, "other") == 0, "ANV34: second field is 'other'");
+         }
+      }
+   }
+
+   anvil_dispose(doc);
+}
+
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -757,6 +914,10 @@ int main(void) {
    TestBit.run_ex("ANV30_error_detail_io_has_no_position", NULL,
                   test_anv30_error_detail_io_has_no_position, th);
    TestBit.run_ex("ANV31_error_detail_null_safety", NULL, test_anv31_error_detail_null_safety, th);
+   TestBit.run_ex("ANV32_document_import_iteration", NULL, test_anv32_document_import_iteration, th);
+   TestBit.run_ex("ANV33_import_iteration_null_safety", NULL,
+                  test_anv33_import_iteration_null_safety, th);
+   TestBit.run_ex("ANV34_object_block_get_value", NULL, test_anv34_object_block_get_value, th);
 
    return TestBit.report();
 }

@@ -348,7 +348,15 @@ void mod_ctx_dispose(module_context ctx) {
       // value. Its member statements are already indexed flatly in ctx->statements (any
       // nesting depth), same as array/object values' items are in ctx->values, so this is
       // just releasing the list container, not walking into it again.
-      if (stmt->body) {
+      //
+      // OBJECT_BLOCK also synthesizes its own OBJECT-kind .value aliasing this same .body
+      // list (parser.c, so anvil_statement_get_value works uniformly for both statement
+      // forms — see notes/public-api.md), and the value-tree pass above already disposes
+      // that same list via .value->object.statements — disposing it again here would
+      // double-free. Skip whenever .value was synthesized (the normal case); the direct
+      // dispose below is now only a defensive fallback for an OBJECT_BLOCK statement that
+      // somehow never got its value synthesized.
+      if (stmt->body && !(stmt->kind == ANVL_STMT_OBJECT_BLOCK && stmt->value)) {
          List.dispose(stmt->body);
       }
    }

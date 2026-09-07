@@ -628,9 +628,28 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
          return false;
       }
       (*out_stmt)->kind = ANVL_STMT_OBJECT_BLOCK;
+      const char *body_start = Source.at(src);
       if (!parse_statement_list(src, &(*out_stmt)->body)) {
          return false; // parse_statement_list already set its own error
       }
+
+      // Synthesize a real OBJECT-kind value aliasing the same body list, so a bare
+      // OBJECT_BLOCK statement ('ident { ... };') and an ASSIGN statement with an object
+      // value ('ident := { ... };') are indistinguishable through anvil_statement_get_value
+      // — see notes/public-api.md's OBJECT_BLOCK-traversal entry. Aliases .body, never
+      // copies it — same "alias, don't copy" reasoning already used for inheritance merging
+      // and resolver.c's own own_fields().
+      (*out_stmt)->value = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
+      if (!(*out_stmt)->value) {
+         parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+         return false;
+      }
+      (*out_stmt)->value->type = ANVL_VALUE_OBJECT;
+      Source.init_slice(src, &(*out_stmt)->value->text);
+      (*out_stmt)->value->text.start = body_start;
+      (*out_stmt)->value->text.end = Source.at(src);
+      (*out_stmt)->value->object.statements = (*out_stmt)->body;
+
       // - end of statement terminator ';' is still required after the closing '}'
       skip_same_line_whitespace(src);
       if (Source.peek(src) != ANVL_TOK_STMT_TERMINATOR) {
