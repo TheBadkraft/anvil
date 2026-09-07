@@ -20,6 +20,7 @@ SIGMA_SRCS = $(ANVL)/src/sigma/strings.c \
              $(ANVL)/src/sigma/slotarray.c \
              $(ANVL)/src/sigma/collections.c \
              $(ANVL)/src/sigma/list.c \
+             $(ANVL)/src/sigma/stack.c \
              $(ANVL)/src/sigma/map.c \
              $(ANVL)/src/sigma/math.c \
              $(ANVL)/src/sigma/time.c
@@ -49,8 +50,9 @@ endef
 .PHONY: all clean val build test
 .PHONY: build_test_list build_test_map build_test_math build_test_strings
 .PHONY: build_test_query build_test_farray build_test_parray build_test_collections build_test_slotarray
+.PHONY: build_test_stack
 .PHONY: test_list test_map test_math test_strings $(UNIT_CASES)
-.PHONY: test_query test_farray test_parray test_collections test_slotarray
+.PHONY: test_query test_farray test_parray test_collections test_slotarray test_stack
 
 all: $(BIN)/test_list \
      $(BIN)/test_map \
@@ -60,7 +62,8 @@ all: $(BIN)/test_list \
      $(BIN)/test_farray \
      $(BIN)/test_parray \
      $(BIN)/test_collections \
-     $(BIN)/test_slotarray
+     $(BIN)/test_slotarray \
+     $(BIN)/test_stack
 
 $(BIN)/test_list: test_list.c $(SIGMA_SRCS) $(TESTBIT_SRC)
 	@mkdir -p $(BIN)
@@ -142,6 +145,15 @@ build_test_slotarray: $(BIN)/test_slotarray
 
 test_slotarray: $(BIN)/test_slotarray
 	$(call run_test_bin,test_slotarray)
+
+$(BIN)/test_stack: test_stack.c $(SIGMA_SRCS) $(TESTBIT_SRC)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_stack: $(BIN)/test_stack
+
+test_stack: $(BIN)/test_stack
+	$(call run_test_bin,test_stack)
 
 # Shorthand aliases: make list [val|build] -> make test_list [val|build]
 $(UNIT_CASES): %: test_%
