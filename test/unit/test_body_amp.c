@@ -31,8 +31,9 @@
 // ----------------
 #include "../utilities/debug.h"
 #include "../utilities/helpers.h"
-#include <sigma/collections.h>
+#include <sigma/farray.h>
 #include <sigma/list.h>
+#include <sigma/query.h>
 #include <sigma/types.h>
 
 static void th(void) {
@@ -557,24 +558,23 @@ static void test_amp06_multiple_statements_in_order(void) {
    TestBit.is_equal_int(3, (long long)FArray.capacity(doc->body, sizeof(anvl_statement)),
                         "AMP06: three statements captured");
 
-   // Showcase: Sigma's generic Iterator over a non-owning collection view of
-   // doc->body (an farray), instead of manual FArray.get(doc->body, i, ...)
-   // indexing. FArray.as_collection wraps Collections.create_view(..., false) —
-   // "false" means the view never owns/copies the farray's backing storage, so
-   // disposing it below only frees the small view/iterator wrappers themselves.
-   collection view = FArray.as_collection(doc->body, sizeof(anvl_statement));
-   iterator it = Collections.create_iterator(view);
-   TestBit.is_not_null(it, "AMP06: iterator created");
+   // Showcase: Sigma's heapless, predicated-scan Query/sc_queryable (HPS) over doc->body (an
+   // farray) directly, instead of Sigma's older generic Iterator — that required a heap-
+   // allocated collection *view* plus a heap-allocated iterator object just to walk a read-only
+   // array (see notes/deferred-work.md's FR-2603-sigma-collections-006 entry). as_queryable
+   // produces a small value-type cursor (no allocation at all); Query.next pulls one element at
+   // a time directly off doc->body's own backing storage.
+   sc_queryable q = FArray.as_queryable(doc->body, sizeof(anvl_statement));
 
    const char *expected_names[3] = {"first", "second", "third"};
    usize idx = 0;
+   const void *element = NULL;
 
-   while (Iterator.next(it)) {
-      void *slot = Iterator.current(it);
-      TestBit.is_not_null(slot, "AMP06: iterator slot is non-null");
-      if (slot && idx < 3) {
-         anvl_statement stmt = *(anvl_statement *)slot;
-         TestBit.is_not_null(stmt, "AMP06: statement retrieved via iterator");
+   while (Query.next(&q, &element, NULL)) {
+      TestBit.is_not_null(element, "AMP06: queryable slot is non-null");
+      if (element && idx < 3) {
+         anvl_statement stmt = *(anvl_statement *)element;
+         TestBit.is_not_null(stmt, "AMP06: statement retrieved via Query.next");
          if (stmt) {
             TestBit.is_true(slice_equals(stmt->name, expected_names[idx]),
                             "AMP06: statement name matches expected order");
@@ -582,10 +582,7 @@ static void test_amp06_multiple_statements_in_order(void) {
       }
       idx++;
    }
-   TestBit.is_equal_int(3, (long long)idx, "AMP06: iterator visited all three statements");
-
-   Iterator.dispose(it);
-   Collections.dispose(view);
+   TestBit.is_equal_int(3, (long long)idx, "AMP06: Query visited all three statements");
 
    mod_ctx_dispose(ctx);
 }

@@ -36,15 +36,18 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 TEST_HELPER  = $(ANVL)/test/utilities/helpers.c
 TEST_DEBUG   = $(ANVL)/test/utilities/debug.c
 
-RESOLVER_SRCS = $(ANVL)/src/resolver/resolver.c
-VARS_SRCS     = $(ANVL)/src/vars/vars.c
-
-DEFAULT_LIB = $(ANVIL_SRCS) $(RESOLVER_SRCS) $(VARS_SRCS)
-
 TESTBIT_SRC = $(TESTBIT)/src/testbit.c
 
-SCHEMA_SRCS   = $(ANVL)/src/schema/schema.c
-SCHEMA_LIB    = $(DEFAULT_LIB) $(SCHEMA_SRCS)
+# Opt-in modules not part of ANVIL_SRCS by default, each built entirely on the public flat API
+# (anvil_flat.h), no core parser/resolver changes — see notes/native-schema.md.
+#
+# anvil_types.c is part of ANVL proper, just opt-in — usable without schema.c, a sibling of
+# core/ and sigma/ under src/, not nested under src/schema/. schema.c (not yet built) is the
+# actual add-on layered on top of it — src/schema/ is reserved for that, and will depend on
+# TYPES_SRCS, never the reverse.
+TYPES_SRCS  = $(ANVL)/src/anvil_types.c
+TYPES_LIB   = $(ANVIL_SRCS) $(TYPES_SRCS)
+
 LIB_DEBUG     = $(ANVL)/lib/debug/libanvil.a
 LIB_RELEASE   = $(ANVL)/lib/release/libanvil.a
 
@@ -70,8 +73,8 @@ endef
 
 .PHONY: all clean val build test test_release
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
-.PHONY: build_test_body_amp build_test_body_aml
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment $(UNIT_CASES)
+.PHONY: build_test_body_amp build_test_body_aml build_test_types
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -85,7 +88,22 @@ all: $(BIN)/test_version \
 	$(BIN)/test_anvil_native \
 	$(BIN)/test_anvil_vtable \
 	$(BIN)/test_attribute_grammar \
-	$(BIN)/test_value_fragment
+	$(BIN)/test_value_fragment \
+	$(BIN)/test_types
+# test_types links src/anvil_types.c (TYPES_LIB) instead of plain ANVIL_SRCS
+# — the one binary in this suite that needs the opt-in type registry.
+$(BIN)/test_types: test_types.c $(TYPES_LIB) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_types: $(BIN)/test_types
+
+test_types: $(BIN)/test_version $(BIN)/test_types
+	$(call run_test_bin,test_types)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
 # test_fixtures is disabled: it depends on the deprecated root/doc APIs that
 # were replaced by the source-hash identity model. Revive after the parser
 # is reintegrated with anvl_source.

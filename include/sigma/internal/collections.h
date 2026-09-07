@@ -26,6 +26,7 @@
  */
 #pragma once
 
+#include <sigma/allocator.h>
 #include <sigma/internal/array_base.h>
 
 // forward declarations
@@ -42,6 +43,11 @@ struct sc_collection {
     usize stride;
     usize length;
     bool owns_buffer;
+    // FR-2603-sigma-collections-007: NULL = global Allocator/Application
+    // facade (every existing caller, unchanged behavior); non-NULL = this
+    // instance's buffer is allocated/grown/orphaned through `alloc_use`
+    // instead, and collection_dispose skips freeing the buffer.
+    sc_alloc_use_t *alloc_use;
 };
 
 // array internal functions
@@ -51,6 +57,7 @@ addr *array_get_bucket(parray arr);
 
 // collection internal functions
 collection collection_new(usize capacity, usize stride);
+collection collection_new_with_allocator(usize capacity, usize stride, sc_alloc_use_t *use);
 void collection_dispose(collection coll);
 int collection_add(collection coll, object ptr);
 int collection_grow(collection coll);

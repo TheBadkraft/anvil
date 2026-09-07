@@ -4,7 +4,7 @@
 **Type:** Feature Request
 **Owner:** sigma.collections
 **Filed:** 2026-09-06
-**Status:** open
+**Status:** implemented (2026-09-07) — see Resolution below
 **Requested by:** Anvil (AnvilScript runtime, `src/core/anvil.c`, future ASL evaluator)
 **Tags:** sigma-collections, stack, arena, parray, anvilscript
 
@@ -104,3 +104,21 @@ AnvilScript needs Sigma collections to feel native to its arena-based execution 
 
 - FR-2603-sigma-collections-007: opt-in per-instance allocator override for List/Collection.
 - `notes/anvilscript-design.md` § "Sigma collections and the ASL runtime".
+
+---
+
+## Resolution (2026-09-07)
+
+Implemented as a new `Stack`/`stack` (`stack.h`/`stack.c`), taking the FR's own stated alternative rather than adding `push`/`pop`/`peek` to `sc_parray_i` directly, and landing on `collection` rather than raw `PArray` as its foundation. Two things changed from the original request during review; this section is authoritative over "Requested Changes" for whoever reviews this.
+
+**`PArray.new_with_allocator` (item 1) was dropped, not deferred.** Investigated during review: neither `FArray` nor `PArray` have ever had a growth mechanism in this codebase — `grow` exists exactly once, on `collection` (`collection_grow`, consumed by `collection_add`), and `List` already gets its own growth purely by composing over `collection`, never by asking its backing array to grow itself. `PArray.new_with_allocator` was requested specifically to arm the stack; once the stack composes over `collection` instead of raw `parray`, that motivation is gone — a caller-supplied allocator's initial-bucket-only benefit, with no growth to protect, wasn't judged worth building speculatively. If a real consumer wants a fixed-capacity, arena-backed `PArray` on its own merits later, that's a smaller, separately-motivated FR.
+
+**Reference semantics — the actual reason `PArray` was named in the original request — come from `collection` for free.** `collection_new`/`collection_new_with_allocator` default to `array.handle[0] == 'P'` (only `FArray.to_collection` ever overrides it to `'F'`), and `collection_add`'s `'P'` branch already stores the pushed pointer by value (`memcpy(dest, &ptr, stride)`) rather than copying pointee data. So `Stack` gets exactly the pointer/reference semantics `PArray` would have given it, plus `collection`'s already-implemented, already-TDD-covered arena-aware growth (orphan-on-grow, skip-release-on-dispose, from FR-007) at zero new growth code.
+
+```c
+struct sc_stack { collection coll; };   // identical relationship List already has to collection
+```
+
+`Stack.new`/`new_with_allocator` mirror `List`'s exactly (`new_with_allocator(capacity, NULL)` == `new`). `push`/`is_empty`/`count`/`clear` are direct one-line delegations to `collection_add`/`collection_get_length`/`collection_clear`. `pop`/`peek` read the slot at `length - 1` (returning `NULL` on an empty stack, matching the FR's own proposed `object`-returning signatures); `pop` additionally truncates via `collection_set_length(length - 1)`. `mark`/`restore` are `collection_get_length`/`collection_set_length` directly — an O(1) truncate with **no zeroing of the discarded region**, matching "without allocating a separate continuation object": a real stack pointer just moves, it doesn't clear memory behind it. A `restore` to a depth greater than the current one is a no-op rather than an error.
+
+**Test coverage** — `test/sigma/test_stack.c`, this subset's `TestBit` convention: LIFO push/pop order, peek non-mutation, pop/peek-on-empty return `NULL`, `is_empty`/`count`/`clear`, `mark`/`restore` (including restoring then pushing again, proving the truncate is real and the slot is reused — not just a cosmetic count), plus the same three allocator-override tests FR-007 established the pattern for (`new_with_allocator(NULL)` == default path, growth orphans instead of releasing, dispose skips releasing when overridden), reusing FR-007's `fake_arena.h` test double as-is — no new test infrastructure needed.

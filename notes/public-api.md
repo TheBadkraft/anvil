@@ -56,6 +56,58 @@ New fixture `anvil_accessors.anvl` covers every scalar/collection kind plus a Va
 
 **Vtable layer — landed.** `include/anvil_vtable.h` (types + `extern const anvil_i Anvil`/`anvil_statement_i Statement`/`anvil_value_i Value`) and `src/core/anvil_vtable.c` (each field assigned directly to its `anvil_flat.c` counterpart — a one-line literal per group, nothing else). Followed RED-first properly this time: the first stub populated every vtable field with `{0}` (all-`NULL`), which compiled fine but **segfaulted** rather than failing cleanly — `test_anvil_vtable.c`'s end-to-end smoke test called through a null function pointer. Not a genuine RED state per the established discipline ("must build and run, fail on assertions, not crash"), so the stub was corrected to point every field at a small safe placeholder function (mirroring how a stubbed *function* already gets a safe default body) before treating it as RED. New test file `test/unit/test_anvil_vtable.c` (`VT01`–`VT04`, 17 assertions) — pointer-identity checks per group plus one smoke test using only vtable-style calls.
 
+**Document import iterator — landed, prerequisite for `notes/native-schema.md`'s types work.**
+`anvil_document_get_imports(doc) -> anvil_document_iterator`, `anvil_document_iterator_next`,
+`anvil_document_iterator_dispose` — a heapless HPS scan (`List.as_queryable` over
+`doc->root->header->imports`) over a document's own *direct* imports only, mirroring
+`anvil_statement_iterator`'s shape exactly, added because the public flat API previously only
+ever exposed the root document — `import "file.types.anvl";` already fully loads and resolves
+transitively today, but nothing let a caller reach an imported document's own statements/
+attributes from outside core. First draft here also proposed a count+index pair before being
+corrected back to an iterator — see the `anvil-prefer-sigma-hps-iterator` memory; this is the
+second time that anti-pattern surfaced, worth staying alert for a third.
+
+Real lifetime problem found and fixed before this shipped: each yielded `anvil_document` handle
+shares its owning document's `module_context` (it has to, to read anything useful), but
+`anvil_dispose` unconditionally tore down the *whole* context. A new `owns_ctx` bool on
+`struct anvil_document_t` (true for every `anvil_load*`/`parse_value_fragment` handle, false for
+one synthesized by the import iterator) makes `anvil_dispose` safe either way — true does the
+full teardown exactly as before, false only frees the small handle itself. First implementation
+attempt had the iterator itself track and free every handle it ever yielded, *in addition to*
+documenting that a caller could safely dispose one directly — those two ownership models
+collide: a test that disposed a yielded handle directly, then disposed the iterator, hit a
+genuine double-free (caught immediately, not silently). Resolved by picking one model instead of
+two: the iterator never tracks yielded handles at all; each one is the caller's own to dispose
+via ordinary `anvil_dispose`, same as any other document, safe because of the `owns_ctx` flag.
+`ANV32`/`ANV33` (`test_anvil_native.c`), `VT09` (`test_anvil_vtable.c`), Valgrind-clean, full
+13-suite regression green.
+
+**`anvil_statement_get_value` now supports anonymous OBJECT_BLOCK statements too.** Previously
+NULL for `ident { ... };` (no `:=`) — its own doc comment said so, "not yet a supported
+traversal." Raised while building `types.c`: the first `.types.anvl` fixture draft used exactly
+this form (matching FlyWire's real `.meta.anvl` shape) and silently registered nothing. Fixed at
+the source, not the accessor: `parse_statement` (`src/core/parser.c`) now synthesizes a real
+`ANVL_VALUE_OBJECT`-kind value for an OBJECT_BLOCK statement too, right after its body parses,
+`.object.statements` aliasing the exact same `list` as `.body` (never a copy) — the accessor
+itself simplified back down to `if (!s) return NULL; return s->value;`, no kind gate needed at
+all, since both statement forms now populate `.value` identically. This was already the
+resolver's own internal model (`resolver.c`'s `own_fields()` already treated `.body` and
+`.value->object.statements` as interchangeable) — the public API was the one place still treating
+them as different.
+
+**Real bug found and fixed along the way: a double-free from that same aliasing.**
+`mod_ctx_dispose` runs two independent disposal passes — one walks every registered OBJECT-kind
+*value* and disposes `.object.statements`; another walks every *statement* and disposes `.body`
+directly. Aliasing the same list into both an OBJECT_BLOCK statement's `.body` and its new
+synthesized value's `.object.statements` meant both passes now freed the identical pointer — a
+crash caught immediately by the new test (`ANV34`, `test_anvil_native.c`), not a silent
+corruption. Fixed with a one-line guard in the statement-walk pass: skip disposing `.body`
+directly whenever `stmt->kind == ANVL_STMT_OBJECT_BLOCK && stmt->value` (the value-walk pass
+already owns that dispose in the normal case), keeping the direct dispose only as a defensive
+fallback for the case where synthesis somehow didn't happen. `ANV34`, Valgrind-clean, full
+14-suite regression green (including a full backtrace confirming the crash site before the fix,
+not just its absence after).
+
 ## Bindings — organization and sequencing
 
 **Resolved — question 3 of the founding framing (audience sequencing) and question 3's "popular ABIs first" open item.** Node/JS is first, driven by a real, waiting consumer: `../flywire/` (a schema-aware binary data-transfer protocol) currently vendors a copy of `anvil.js`'s CJS build directly into `src/anvl/anvl-browser.js`, and that vendoring's own comment already states the intent — *"the native C binding / WASM path remains the longer-term migration target, deferred."* `anvil.js` itself is to be deprecated immediately once a real Node binding exists.

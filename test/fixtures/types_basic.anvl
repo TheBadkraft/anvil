@@ -1,0 +1,18 @@
+#!aml
+@[types]
+
+VIN := {
+   type := String;
+   size := 17;
+};
+
+AssetStatus := {
+   type := enum;
+   values := [ active, maintenance, out_of_service ];
+};
+
+AssetYear := {
+   type := Numeric;
+   min := 1900;
+   max := 2100;
+};

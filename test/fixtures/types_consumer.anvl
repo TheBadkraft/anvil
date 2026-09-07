@@ -1,0 +1,4 @@
+#!aml
+import "types_basic.anvl";
+
+placeholder := 1;
