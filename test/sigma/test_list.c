@@ -10,8 +10,10 @@
 #include "sigma/list.h"
 #include "sigma/query.h"
 #include "testbit.h"
+#include "fake_arena.h"
 
 static void td(void) {}
+static void td_arena(void) { fake_arena_reset(); }
 
 /* ----------------------------------------------------------------- */
 /* IL01 — List.new creates a valid list                               */
@@ -221,6 +223,70 @@ static void test_il10_list_as_queryable_next(void) {
    List.dispose(lst);
 }
 
+/* ----------------------------------------------------------------- */
+/* IL11 - new_with_allocator(NULL) behaves exactly like List.new       */
+/*        (FR-2603-sigma-collections-007)                              */
+/* ----------------------------------------------------------------- */
+static void test_il11_new_with_allocator_null_is_default_path(void) {
+   list lst = List.new_with_allocator(4, sizeof(void *), NULL);
+   TestBit.is_not_null(lst, "IL11: new_with_allocator(NULL) returns non-null");
+
+   int a = 1, b = 2;
+   List.append(lst, &a);
+   List.append(lst, &b);
+   TestBit.is_equal_int(2, (long long)List.size(lst), "IL11: size is 2 after 2 appends");
+
+   List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL12 - new_with_allocator(&use) grows through the override and      */
+/*        orphans the old buffer instead of releasing it               */
+/* ----------------------------------------------------------------- */
+static void test_il12_new_with_allocator_grow_orphans(void) {
+   fake_arena_reset();
+
+   list lst = List.new_with_allocator(2, sizeof(void *), &fake_arena_use);
+   TestBit.is_not_null(lst, "IL12: new_with_allocator(&use) returns non-null");
+   TestBit.is_true(fake_arena_alloc_calls >= 1, "IL12: initial buffer allocated through override");
+
+   int before_grow_calls = fake_arena_alloc_calls;
+   int vals[8];
+   for (int i = 0; i < 8; i++) {
+      vals[i] = i * 10;
+      List.append(lst, &vals[i]);
+   }
+
+   TestBit.is_equal_int(8, (long long)List.size(lst), "IL12: size is 8 after growing");
+   TestBit.is_true(fake_arena_alloc_calls > before_grow_calls,
+                   "IL12: growth allocated new buffer(s) through the override");
+   TestBit.is_equal_int(0, (long long)fake_arena_release_calls,
+                        "IL12: growth never released the orphaned buffer through the override");
+
+   void *out = NULL;
+   List.get(lst, 7, &out);
+   TestBit.is_equal_int(70, (long long)*(int *)out, "IL12: last element is correct after arena-backed growth");
+
+   List.dispose(lst);
+}
+
+/* ----------------------------------------------------------------- */
+/* IL13 - list_dispose skips releasing the bucket through the override */
+/*        — the bound allocator owns bulk-reclaiming it                */
+/* ----------------------------------------------------------------- */
+static void test_il13_dispose_skips_release_when_overridden(void) {
+   fake_arena_reset();
+
+   list lst = List.new_with_allocator(4, sizeof(void *), &fake_arena_use);
+   int a = 1;
+   List.append(lst, &a);
+
+   List.dispose(lst);
+
+   TestBit.is_equal_int(0, (long long)fake_arena_release_calls,
+                        "IL13: dispose never released the buffer through the override");
+}
+
 int main(void) {
    TestBit.run_ex("IL01_list_new", NULL, test_il01_list_new, td);
    TestBit.run_ex("IL02_list_append", NULL, test_il02_list_append, td);
@@ -232,6 +298,12 @@ int main(void) {
    TestBit.run_ex("IL08_list_iterator", NULL, test_il08_list_iterator, td);
    TestBit.run_ex("IL09_list_as_queryable_first", NULL, test_il09_list_as_queryable_first, td);
    TestBit.run_ex("IL10_list_as_queryable_next", NULL, test_il10_list_as_queryable_next, td);
+   TestBit.run_ex("IL11_new_with_allocator_null_is_default_path", NULL,
+                  test_il11_new_with_allocator_null_is_default_path, td);
+   TestBit.run_ex("IL12_new_with_allocator_grow_orphans", NULL,
+                  test_il12_new_with_allocator_grow_orphans, td_arena);
+   TestBit.run_ex("IL13_dispose_skips_release_when_overridden", NULL,
+                  test_il13_dispose_skips_release_when_overridden, td_arena);
 
    return TestBit.report();
 }

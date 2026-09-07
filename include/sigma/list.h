@@ -47,6 +47,16 @@ typedef struct sc_list_i {
     */
    list (*new)(usize, usize);
    /**
+    * @brief Create a new list bound to a caller-supplied allocator-use
+    *        (FR-2603-sigma-collections-007). The instance grows/orphans
+    *        through `use` instead of the global Allocator/Application
+    *        facade; NULL behaves exactly like `List.new`.
+    * @param capacity Initial list capacity
+    * @param elem_size Size of each element in the list
+    * @param use Allocator-use to bind this instance to, or NULL
+    */
+   list (*new_with_allocator)(usize capacity, usize elem_size, sc_alloc_use_t *use);
+   /**
     * @brief Dispose of the list and free associated resources.
     * @param lst The list to dispose of
     */

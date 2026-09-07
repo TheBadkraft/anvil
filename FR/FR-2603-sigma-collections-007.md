@@ -4,7 +4,7 @@
 **Type:** Feature Request
 **Owner:** sigma.collections
 **Filed:** 2026-09-04
-**Status:** open
+**Status:** implemented (2026-09-07) — `List`/`Collection` per-instance allocator override (`create_with_allocator`/`new_with_allocator`, orphan-on-grow, skip-release-on-dispose), TDD-covered against a `fake_arena.h` test double; `chore/fr-007-fr-011-arena-collections` branch, awaiting merge/review by the regular anvil agent
 **Requested by:** Anvil (downstream consumer — `anvil/src/core/module.c`, `parser.c`)
 **Tags:** sigma-collections, allocator, arena, list, collection
 
