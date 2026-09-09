@@ -2,4 +2,6 @@
 @[schema, table=assets]
 
 asset_id := { type := Numeric; required := true; };
-name := { type := String; };
+name := { type := String; size := 20; };
+year := { type := Numeric; min := 1900; max := 2100; };
+status := { type := enum; values := [ active, maintenance, out_of_service ]; };

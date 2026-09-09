@@ -515,9 +515,43 @@ the public flat API and `anvil_type_registry.h` — no core parser/resolver chan
 rule (a `type :=` naming nothing recognized) is silently left with no kind to check against,
 not reported as an error of the schema itself — no error-reporting design exists yet for a
 malformed *schema* (as opposed to a data document failing to satisfy a well-formed one).
-Constraint checks (`size`/`min`/`max`/`values` membership) are the natural next slice, following
-the exact same "kind now, constraints later" sequencing `anvil_types.c` already used
-successfully — not started yet.
+
+## Implemented — `schema.c` constraint checking (`size`/`min`/`max`/`values`), with type inheritance
+
+Extends the first slice: `SCH08`–`SCH12` (`test/unit/test_schema.c`), Valgrind-clean, full
+15-suite regression green. A field's `size` (String — a maximum-length bound, not exact-width;
+FlyWire's own `varchar(n)` mapping is the dominant real case), `min`/`max` (Numeric — inclusive
+range), and `values` (membership, quoting-agnostic like kind-matching itself) are read in the
+same single pass over a field's nested statements as `type`/`required`, mirroring
+`anvil_types.c`'s own constraint-reading shape closely (a local `strtoll`-based numeric reader
+and a values-array reader, deliberately duplicated rather than shared, since schema.c and
+types.c are independent modules by design).
+
+**Constraint inheritance, implemented as designed**: if a field's `type :=` resolves to a
+custom `types.X` type that has its own `size`/`min`/`max`/`values`, those apply automatically
+when the field doesn't declare its own — and the field's own inline declaration always wins,
+never merged, exactly per the earlier "inline field constraints" decision. Verified directly:
+a field referencing `types.VIN` (which declares `size := 17;`) inherits that bound with no
+inline `size` of its own; a sibling field referencing the same type but *also* declaring its
+own `size := 25;` uses 25, not 17.
+
+**Two real bugs found and fixed while building the inheritance test, neither in the constraint
+logic itself**:
+
+1. The test fixture (`schema_with_custom_type.anvl`) originally wrote `@[schema, ...]` *before*
+   `import "...";` — a genuine header-ordering violation (`shebang → imports → attributes →
+   body`, per `document-header-scan.md`'s own scanning rules), not a schema.c bug at all. Caught
+   immediately as a real parse error (`ANVIL_ERR_HEADER`, "Unexpected token"), not a silent
+   misparse.
+2. **A real, load-bearing gap in `schema.c` itself**: `read_field_rule` was passing a `type :=`
+   field's raw text (e.g. the literal string `"types.VIN"`) straight into `anvil_type_resolve`
+   without ever stripping the `types.` prefix first. `anvil_type_resolve`/`anvil_type_registry_find`
+   look up entries by their *bare* declared name (`"VIN"`, not `"types.VIN"`) — the `types.`
+   spelling is purely a source-level convention for how a person *writes* a reference, never
+   something the registry's own lookup understood. This was silently broken from the first
+   slice onward: `schema_basic.anvl` never used a `types.X` reference (only bare native names),
+   so nothing exercised this path until the inheritance tests did. Fixed with a small
+   `strip_types_prefix` helper in `schema.c`, applied before every `anvil_type_resolve` call.
 
 ## Open questions (not yet worked through)
 

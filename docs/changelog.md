@@ -72,16 +72,27 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   JSON Schema are). `README.md` rewritten to match current reality; three stale
   `docs/maintainers/` planning documents removed (predated the rebuild, actively contradicted
   current design decisions).
-- **AnvilSchema — first phase** (`src/schema/schema.c`, the actual add-on layered on top of
-  `anvil_types.c`): `anvil_schema_load` (gated on `@[schema]`, every top-level statement a field
-  rule), `anvil_schema_validate` checking required-field presence, type-kind mismatches, and
-  undeclared data fields — collecting every violation in one pass, never fail-fast. Constraint
-  checks (`size`/`min`/`max`/`values`) are the natural next slice.
+- **AnvilSchema** (`src/schema/schema.c`, the actual add-on layered on top of `anvil_types.c`):
+  `anvil_schema_load` (gated on `@[schema]`, every top-level statement a field rule),
+  `anvil_schema_validate` checking required-field presence, type-kind mismatches, undeclared
+  data fields, and full constraint checking (`size`/`min`/`max`/`values`) — including
+  inheriting a constraint from a resolved `types.X` custom type when a field doesn't declare its
+  own, field-level always overriding rather than merging. Collects every violation in one pass,
+  never fail-fast.
+
+### Fixed
+
+- **`schema.c` never stripped the `types.` namespace prefix before resolving a field's declared
+  type** — `type := types.VIN;`'s literal text was passed straight to `anvil_type_resolve`,
+  which looks up entries by bare name (`"VIN"`), so any field referencing a custom type silently
+  never resolved. Undetected until the constraint-inheritance tests exercised a `types.X`
+  reference for the first time; the first slice's own tests only ever used bare native names.
 
 ### Notes
 
-- Schema's first phase is implemented; constraint validation is the next slice — see
-  `notes/native-schema.md` for the full record.
+- Schema's implementation covers loading, presence, type-kind, and constraint validation with
+  inheritance. See `notes/native-schema.md` for the full record, including a second real fixture
+  bug (header ordering) caught along the way.
 
 ---
 

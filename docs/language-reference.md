@@ -135,11 +135,12 @@ resolution: [`types-reference.md`](types-reference.md).
 ## 10. Schema
 
 AnvilSchema validates a *data* document's shape against declared, type-annotated fields,
-building on the type system above — first phase implemented: `@[schema]` loading, required-field
-presence, and type-kind validation, collecting every violation in one pass rather than
-fail-fast. Constraint checks (`size`/`min`/`max`/`values`) are the natural next slice. For why
-it's designed the way it is — same parser, zero new grammar, not a bolt-on the way XSD/XSLT or
-JSON Schema are — see [`docs/schema/README.md`](schema/README.md). Full technical design record:
+building on the type system above — implemented: `@[schema]` loading, required-field presence,
+type-kind validation, and full constraint checking (`size`/`min`/`max`/`values`, inherited from
+a resolved `types.X` custom type when a field doesn't declare its own), collecting every
+violation in one pass rather than fail-fast. For why it's designed the way it is — same parser,
+zero new grammar, not a bolt-on the way XSD/XSLT or JSON Schema are — see
+[`docs/schema/README.md`](schema/README.md). Full technical design record:
 [`notes/native-schema.md`](../notes/native-schema.md).
 
 ## 11. AMP's Restrictions

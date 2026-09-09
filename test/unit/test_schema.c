@@ -23,6 +23,21 @@ static void th(void) {
    Registry.clear();
 }
 
+// Finds a violation by field name among all of them, so multi-violation tests don't depend on
+// collection order.
+static anvil_schema_violation find_violation(anvil_schema schema, const char *field_name) {
+   size_t count = anvil_schema_get_violation_count(schema);
+   for (size_t i = 0; i < count; i++) {
+      anvil_schema_violation v = anvil_schema_get_violation(schema, i);
+      char field[32] = {0};
+      anvil_schema_violation_get_field(v, field, sizeof(field));
+      if (strcmp(field, field_name) == 0) {
+         return v;
+      }
+   }
+   return NULL;
+}
+
 /* ---------------------------------------------------------------------- *
  * SCH01 — a clean data document validates with zero violations
  * ---------------------------------------------------------------------- */
@@ -214,6 +229,172 @@ static void test_sch07_null_safety(void) {
       anvil_dispose(schema_doc);
    }
 }
+/* ---------------------------------------------------------------------- *
+ * SCH08 — a String field's declared `size` is a maximum-length bound
+ * ---------------------------------------------------------------------- */
+static void test_sch08_size_constraint(void) {
+   anvil_document schema_doc = anvil_load(fixture_path("schema_basic.anvl"));
+   anvil_schema schema = schema_doc ? anvil_schema_load(schema_doc) : NULL;
+   TestBit.is_not_null(schema, "SCH08: schema loaded");
+   if (schema) {
+      // 'name' declares size := 20 — six characters is well within bounds.
+      const char *ok = "#!aml\nasset_id := 1;\nname := \"widget\";\n";
+      anvil_document ok_doc = anvil_load_buffer(ok, strlen(ok));
+      if (ok_doc) {
+         TestBit.is_true(anvil_schema_validate(schema, ok_doc), "SCH08: within size passes");
+         anvil_dispose(ok_doc);
+      }
+
+      const char *too_long = "#!aml\nasset_id := 1;\nname := \"this name is definitely over twenty characters\";\n";
+      anvil_document long_doc = anvil_load_buffer(too_long, strlen(too_long));
+      if (long_doc) {
+         TestBit.is_false(anvil_schema_validate(schema, long_doc), "SCH08: over size fails");
+         TestBit.is_not_null(find_violation(schema, "name"), "SCH08: violation names 'name'");
+         anvil_dispose(long_doc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (schema_doc) {
+      anvil_dispose(schema_doc);
+   }
+}
+/* ---------------------------------------------------------------------- *
+ * SCH09 — a Numeric field's declared `min`/`max` bound its legal range
+ * ---------------------------------------------------------------------- */
+static void test_sch09_min_max_constraint(void) {
+   anvil_document schema_doc = anvil_load(fixture_path("schema_basic.anvl"));
+   anvil_schema schema = schema_doc ? anvil_schema_load(schema_doc) : NULL;
+   TestBit.is_not_null(schema, "SCH09: schema loaded");
+   if (schema) {
+      // 'year' declares min := 1900; max := 2100;
+      const char *ok = "#!aml\nasset_id := 1;\nyear := 2020;\n";
+      anvil_document ok_doc = anvil_load_buffer(ok, strlen(ok));
+      if (ok_doc) {
+         TestBit.is_true(anvil_schema_validate(schema, ok_doc), "SCH09: within range passes");
+         anvil_dispose(ok_doc);
+      }
+
+      const char *too_high = "#!aml\nasset_id := 1;\nyear := 2200;\n";
+      anvil_document high_doc = anvil_load_buffer(too_high, strlen(too_high));
+      if (high_doc) {
+         TestBit.is_false(anvil_schema_validate(schema, high_doc), "SCH09: above max fails");
+         TestBit.is_not_null(find_violation(schema, "year"), "SCH09: violation names 'year'");
+         anvil_dispose(high_doc);
+      }
+
+      const char *too_low = "#!aml\nasset_id := 1;\nyear := 1899;\n";
+      anvil_document low_doc = anvil_load_buffer(too_low, strlen(too_low));
+      if (low_doc) {
+         TestBit.is_false(anvil_schema_validate(schema, low_doc), "SCH09: below min fails");
+         anvil_dispose(low_doc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (schema_doc) {
+      anvil_dispose(schema_doc);
+   }
+}
+/* ---------------------------------------------------------------------- *
+ * SCH10 — an enum field's declared `values` are a membership constraint
+ * ---------------------------------------------------------------------- */
+static void test_sch10_values_constraint(void) {
+   anvil_document schema_doc = anvil_load(fixture_path("schema_basic.anvl"));
+   anvil_schema schema = schema_doc ? anvil_schema_load(schema_doc) : NULL;
+   TestBit.is_not_null(schema, "SCH10: schema loaded");
+   if (schema) {
+      // 'status' declares values := [ active, maintenance, out_of_service ];
+      const char *ok = "#!aml\nasset_id := 1;\nstatus := active;\n";
+      anvil_document ok_doc = anvil_load_buffer(ok, strlen(ok));
+      if (ok_doc) {
+         TestBit.is_true(anvil_schema_validate(schema, ok_doc), "SCH10: a legal member passes");
+         anvil_dispose(ok_doc);
+      }
+
+      // FlyWire's own real convention (quoted strings) must work identically to the bare form.
+      const char *ok_quoted = "#!aml\nasset_id := 1;\nstatus := \"maintenance\";\n";
+      anvil_document ok_quoted_doc = anvil_load_buffer(ok_quoted, strlen(ok_quoted));
+      if (ok_quoted_doc) {
+         TestBit.is_true(anvil_schema_validate(schema, ok_quoted_doc),
+                         "SCH10: a quoted legal member also passes");
+         anvil_dispose(ok_quoted_doc);
+      }
+
+      const char *bad = "#!aml\nasset_id := 1;\nstatus := scrapped;\n";
+      anvil_document bad_doc = anvil_load_buffer(bad, strlen(bad));
+      if (bad_doc) {
+         TestBit.is_false(anvil_schema_validate(schema, bad_doc), "SCH10: a non-member fails");
+         TestBit.is_not_null(find_violation(schema, "status"), "SCH10: violation names 'status'");
+         anvil_dispose(bad_doc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (schema_doc) {
+      anvil_dispose(schema_doc);
+   }
+}
+/* ---------------------------------------------------------------------- *
+ * SCH11 — a constraint inherited from a resolved custom type (no inline
+ * override) is enforced using the type's own declared value
+ * ---------------------------------------------------------------------- */
+static void test_sch11_constraint_inherited_from_type(void) {
+   anvil_document schema_doc = anvil_load(fixture_path("schema_with_custom_type.anvl"));
+   TestBit.is_not_null(schema_doc, "SCH11: schema document loaded");
+   if (!schema_doc) {
+      return;
+   }
+   anvil_schema schema = anvil_schema_load(schema_doc);
+   TestBit.is_not_null(schema, "SCH11: schema loaded");
+   if (schema) {
+      // 'vin' declares type := types.VIN; with no inline size — VIN itself declares size := 17.
+      const char *within = "#!aml\nvin := \"12345678901234567\";\n"; // 17 digits, verified
+      anvil_document within_doc = anvil_load_buffer(within, strlen(within));
+      if (within_doc) {
+         TestBit.is_true(anvil_schema_validate(schema, within_doc),
+                         "SCH11: exactly at the inherited size passes");
+         anvil_dispose(within_doc);
+      }
+
+      const char *over = "#!aml\nvin := \"1234567890123456789\";\n"; // 19 digits, verified
+      anvil_document over_doc = anvil_load_buffer(over, strlen(over));
+      if (over_doc) {
+         TestBit.is_false(anvil_schema_validate(schema, over_doc),
+                          "SCH11: over the inherited size fails");
+         TestBit.is_not_null(find_violation(schema, "vin"), "SCH11: violation names 'vin'");
+         anvil_dispose(over_doc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   anvil_dispose(schema_doc);
+}
+/* ---------------------------------------------------------------------- *
+ * SCH12 — a field's own inline constraint overrides the resolved type's
+ * constraint, rather than being merged with it
+ * ---------------------------------------------------------------------- */
+static void test_sch12_inline_constraint_overrides_type(void) {
+   anvil_document schema_doc = anvil_load(fixture_path("schema_with_custom_type.anvl"));
+   TestBit.is_not_null(schema_doc, "SCH12: schema document loaded");
+   if (!schema_doc) {
+      return;
+   }
+   anvil_schema schema = anvil_schema_load(schema_doc);
+   TestBit.is_not_null(schema, "SCH12: schema loaded");
+   if (schema) {
+      // 'vin_override' declares type := types.VIN; size := 25; — the field's own 25 should win
+      // over VIN's own 17. A 20-character value would fail against VIN's size alone, but
+      // should pass here. 'vin' (required) also needs a legal value, or its own missing-field
+      // violation would mask what this test is actually checking.
+      const char *twenty_chars =
+         "#!aml\nvin := \"12345678901234567\";\nvin_override := \"12345678901234567890\";\n";
+      anvil_document doc = anvil_load_buffer(twenty_chars, strlen(twenty_chars));
+      if (doc) {
+         TestBit.is_true(anvil_schema_validate(schema, doc),
+                         "SCH12: the field's own override size (25) is used, not VIN's (17)");
+         anvil_dispose(doc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   anvil_dispose(schema_doc);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -227,6 +408,13 @@ int main(void) {
    TestBit.run_ex("SCH05_unknown_field", NULL, test_sch05_unknown_field, th);
    TestBit.run_ex("SCH06_collects_all_violations", NULL, test_sch06_collects_all_violations, th);
    TestBit.run_ex("SCH07_null_safety", NULL, test_sch07_null_safety, th);
+   TestBit.run_ex("SCH08_size_constraint", NULL, test_sch08_size_constraint, th);
+   TestBit.run_ex("SCH09_min_max_constraint", NULL, test_sch09_min_max_constraint, th);
+   TestBit.run_ex("SCH10_values_constraint", NULL, test_sch10_values_constraint, th);
+   TestBit.run_ex("SCH11_constraint_inherited_from_type", NULL,
+                  test_sch11_constraint_inherited_from_type, th);
+   TestBit.run_ex("SCH12_inline_constraint_overrides_type", NULL,
+                  test_sch12_inline_constraint_overrides_type, th);
 
    return TestBit.report();
 }

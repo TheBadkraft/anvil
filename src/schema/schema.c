@@ -23,6 +23,7 @@
 #include <sigma/allocator.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define ANVIL_SCHEMA_NAME_MAX 65
@@ -33,7 +34,78 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   bool has_size;
+   long long size;
+   bool has_min;
+   long long min;
+   bool has_max;
+   long long max;
+   list values; // list of individually-allocated char* labels; NULL if no values constraint
+                // (own inline declaration or inherited from a resolved custom type)
 };
+
+// A `type :=` field's text names either a bare native/enum kind ("Numeric", "enum") or a
+// types.X custom type ("types.VIN") — anvil_type_resolve itself has no idea about the "types."
+// namespace prefix (that's purely a source-level convention for *writing* a reference; the
+// registry stores and looks up everything by bare name), so this is schema.c's own job before
+// ever calling it.
+static const char *strip_types_prefix(const char *text) {
+   const char *prefix = "types.";
+   size_t prefix_len = 6;
+   if (strncmp(text, prefix, prefix_len) == 0) {
+      return text + prefix_len;
+   }
+   return text;
+}
+
+// Mirrors anvil_types.c's own strtoll-based numeric reader — there's no numeric accessor on
+// anvil_value, so every consumer reads the raw text itself.
+static long long read_numeric(anvil_value val) {
+   char text[32] = {0};
+   anvil_value_get_text(val, text, sizeof(text));
+   return strtoll(text, NULL, 10);
+}
+
+// Mirrors anvil_types.c's own values-array reader — bare identifiers or quoted strings both
+// read the same way through anvil_value_get_text regardless of which spelling was used.
+static list read_values_list(anvil_value val) {
+   if (!val || anvil_value_get_type(val) != ANVIL_VALUE_ARRAY) {
+      return NULL;
+   }
+   size_t count = anvil_value_get_count(val);
+   list values = List.new(count > 0 ? count : 1, sizeof(char *));
+   for (size_t i = 0; i < count; i++) {
+      anvil_value elem = anvil_value_get_element(val, i);
+      size_t len = anvil_value_get_text(elem, NULL, 0);
+      char *label = Allocator.alloc(len + 1);
+      if (!label) {
+         continue;
+      }
+      anvil_value_get_text(elem, label, len + 1);
+      List.append(values, label);
+   }
+   return values;
+}
+
+// Copies one type_def's own value labels into a fresh list, for inheriting an enum type's
+// values onto a field that didn't declare its own inline values.
+static list copy_values_from_type(anvil_type_def def) {
+   size_t count = anvil_type_def_get_value_count(def);
+   if (count == 0) {
+      return NULL;
+   }
+   list values = List.new(count, sizeof(char *));
+   for (size_t i = 0; i < count; i++) {
+      size_t len = anvil_type_def_get_value(def, i, NULL, 0);
+      char *label = Allocator.alloc(len + 1);
+      if (!label) {
+         continue;
+      }
+      anvil_type_def_get_value(def, i, label, len + 1);
+      List.append(values, label);
+   }
+   return values;
+}
 
 struct anvil_schema_violation_t {
    char field[ANVIL_SCHEMA_NAME_MAX];
@@ -55,7 +127,15 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
    field->has_kind = false;
    field->kind = ANVIL_TYPE_UNKNOWN;
    field->required = false;
+   field->has_size = false;
+   field->has_min = false;
+   field->has_max = false;
+   field->values = NULL;
 
+   anvil_type_def resolved = NULL;
+
+   // First pass: read exactly what the field itself declares, inline — never consulting the
+   // resolved type yet. Constraint inheritance (below) only fills in what this pass left unset.
    size_t count = anvil_value_get_count(obj_val);
    for (size_t i = 0; i < count; i++) {
       anvil_statement fstmt = anvil_value_get_statement(obj_val, i);
@@ -66,10 +146,10 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
       if (strcmp(fname, "type") == 0) {
          char text[64] = {0};
          anvil_value_get_text(fval, text, sizeof(text));
-         anvil_type_def def = anvil_type_resolve(types, text);
-         if (def) {
+         resolved = anvil_type_resolve(types, strip_types_prefix(text));
+         if (resolved) {
             field->has_kind = true;
-            field->kind = anvil_type_def_get_kind(def);
+            field->kind = anvil_type_def_get_kind(resolved);
          }
          // An unrecognized type name is silently left with no kind to check against — same
          // deferred-validation-error reasoning as anvil_types.c's own malformed-declaration
@@ -79,6 +159,36 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          char text[8] = {0};
          anvil_value_get_text(fval, text, sizeof(text));
          field->required = (strcmp(text, "true") == 0);
+      } else if (strcmp(fname, "size") == 0) {
+         field->has_size = true;
+         field->size = read_numeric(fval);
+      } else if (strcmp(fname, "min") == 0) {
+         field->has_min = true;
+         field->min = read_numeric(fval);
+      } else if (strcmp(fname, "max") == 0) {
+         field->has_max = true;
+         field->max = read_numeric(fval);
+      } else if (strcmp(fname, "values") == 0) {
+         field->values = read_values_list(fval);
+      }
+   }
+
+   // Constraint inheritance: whatever the field didn't declare inline falls back to the
+   // resolved type's own constraint, if any — the field's own inline declaration always wins,
+   // never merged with the type's (see notes/native-schema.md's "inline field constraints"
+   // decision).
+   if (resolved) {
+      if (!field->has_size) {
+         field->has_size = anvil_type_def_get_size(resolved, &field->size);
+      }
+      if (!field->has_min) {
+         field->has_min = anvil_type_def_get_min(resolved, &field->min);
+      }
+      if (!field->has_max) {
+         field->has_max = anvil_type_def_get_max(resolved, &field->max);
+      }
+      if (!field->values) {
+         field->values = copy_values_from_type(resolved);
       }
    }
 }
@@ -141,6 +251,19 @@ static void dispose_violations(list violations) {
    List.dispose(violations);
 }
 
+static void dispose_field_values(list values) {
+   if (!values) {
+      return;
+   }
+   usize n = List.size(values);
+   for (usize i = 0; i < n; i++) {
+      char *label = NULL;
+      List.get(values, i, (object *)&label);
+      Allocator.dispose(label);
+   }
+   List.dispose(values);
+}
+
 void anvil_schema_dispose(anvil_schema schema) {
    struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
    if (!s) {
@@ -152,6 +275,9 @@ void anvil_schema_dispose(anvil_schema schema) {
       for (usize i = 0; i < n; i++) {
          struct anvil_schema_field_t *f = NULL;
          List.get(s->fields, i, (object *)&f);
+         if (f) {
+            dispose_field_values(f->values);
+         }
          Allocator.dispose(f);
       }
       List.dispose(s->fields);
@@ -232,12 +358,46 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
          continue;
       }
 
-      if (field->has_kind) {
-         anvil_value data_val = anvil_statement_get_value(data_stmt);
-         anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
-         if (!kind_matches(field->kind, actual)) {
+      anvil_value data_val = anvil_statement_get_value(data_stmt);
+      anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
+
+      if (field->has_kind && !kind_matches(field->kind, actual)) {
+         add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                       "field value does not match the declared type");
+         continue; // a value of the wrong kind can't be meaningfully checked against
+                   // size/min/max/values too — one violation, not a confusing pile of them
+      }
+
+      if (field->has_size && data_val) {
+         size_t len = anvil_value_get_text(data_val, NULL, 0);
+         if ((long long)len > field->size) {
             add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
-                          "field value does not match the declared type");
+                          "field value exceeds the declared size");
+         }
+      }
+      if ((field->has_min || field->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
+         long long value = read_numeric(data_val);
+         if ((field->has_min && value < field->min) || (field->has_max && value > field->max)) {
+            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                          "field value is outside the declared min/max range");
+         }
+      }
+      if (field->values && data_val) {
+         char text[128] = {0};
+         anvil_value_get_text(data_val, text, sizeof(text));
+         bool member = false;
+         usize value_count = List.size(field->values);
+         for (usize vi = 0; vi < value_count; vi++) {
+            char *label = NULL;
+            List.get(field->values, vi, (object *)&label);
+            if (label && strcmp(label, text) == 0) {
+               member = true;
+               break;
+            }
+         }
+         if (!member) {
+            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                          "field value is not one of the declared values");
          }
       }
    }
