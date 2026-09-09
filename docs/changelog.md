@@ -2,10 +2,81 @@
 
 All notable changes to the Anvil project are documented in this file.
 
-**Milestone note:** the source-identity / header-scan milestone is wrapped with the import loader implemented and HDR11–HDR15 passing. Body-parser readiness is the next discussion topic.
+**Milestone note:** body parse, resolution, and the first full public API pass are all complete
+(see `[Unreleased]` below). The opt-in type system has landed; schema (`@[schema]`) is the
+current active design/implementation effort.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [Unreleased] — (2026-08-17 – 2026-09-08)
+
+Three and a half weeks with no changelog entry, spanning a lot of real, substantial work. The
+early part of this window (body-parse through the first public-API pass) is summarized at
+milestone grain rather than reconstructed commit-by-commit — treat it as restructuring and
+refactoring on top of the v0.7.0-alpha foundation below, not an itemized account. The back half
+(native schema/opt-in types onward) is current work, documented in full.
+
+### Added — Body parse, resolution, and the public API (mid-to-late August)
+
+- **AML/AMP body grammar complete** — statements (assignment and bare-block form), all value
+  kinds (scalars, blobs, arrays, tuples, objects, `$identifier` VarRef), inheritance
+  (`base`/field-merging), and statement/module attributes (`@[...]`), with AMP's own restricted
+  subset enforced throughout. Arena-backed node allocation; `doc->body` accumulate-then-freeze.
+- **Resolution phase complete** (`src/core/resolver.c`) — global identifier map, `$identifier`
+  VarRef resolution, `base`/anonymous-object legality checks, full field-merging inheritance
+  (transitive chains, cycle detection).
+- **Public API (Anvil Native ABI) — first full pass**: `anvil_load`/`anvil_load_buffer`/
+  `anvil_dispose`/`anvil_has_errors`/`anvil_get_error`; statement/value accessors; the
+  `anvil_vtable.h` convenience layer (pointer-identical to its flat counterparts); module- and
+  statement-level attribute accessors; document-level statement enumeration; Value Fragment
+  parsing (`anvil_parse_value_fragment`); detailed error diagnostics (message/line/column beyond
+  the stable category alone).
+- **AnvilScript (ASL) design work begun** — see `notes/anvilscript-design.md`,
+  `notes/anvilscript-scriptengine-design.md`. Design only; nothing implemented.
+- **Sigma FR-2603-sigma-collections-006** — heapless, predicated-scan `Query`/`sc_queryable`
+  (HPS) iterator, replacing hand-rolled scans across the vendored Sigma subset.
+
+### Fixed
+
+- **`parser_set_error` silently clobbering a more specific error code** with a later, more
+  generic one from an outer caller — `parser.err_code` had no first-error-wins protection of its
+  own, unlike `ctx->errors`. Fixed to mirror `anvl_error_set`'s existing guarantee.
+
+### Changed
+
+- **anvldata.com's site** relocated from `anvil.js` to `anvil/site/` — Anvil.C is now the de
+  facto reference implementation. File move only; hosting/deploy/content rewrite still open (see
+  `notes/deferred-work.md`).
+
+### Added — Native schema foundation & opt-in types (current)
+
+- **Document import iterator** (`anvil_document_get_imports`/`anvil_document_iterator_*`) —
+  closes the gap where the public API could load and resolve an import graph but never expose an
+  imported document's own statements/attributes from outside core.
+- **`anvil_statement_get_value` now supports anonymous `OBJECT_BLOCK` statements** (`ident { ... };`,
+  not just `ident := { ... };`) — both forms are now indistinguishable through the accessor,
+  matching how they're already treated identically everywhere else.
+- **Opt-in type registry — full first phase** (`src/anvil_types.c`, part of ANVL proper, not an
+  add-on): `@[types]`-gated loading, the six native primitives + `enum`, constraint fields
+  (`size`/`min`/`max`/`values`), cross-file `types.X` resolution via a document's own imports
+  (`anvil_type_registry_load_from_imports`), and `anvil_type_resolve` — one function resolving
+  any type reference (native, `enum`, or custom) to a uniform, queryable handle.
+- **Sigma FR-2603-sigma-collections-007 + 011** — opt-in per-instance allocator override for
+  `List`/`Collection`, and an arena-backed `Stack` built on top of it for the eventual AnvilScript
+  runtime. Implemented by the Sigma team in the `sigma.anvil` worktree, merged in.
+- **`docs/` knowledge base** — `getting-started.md`, `language-reference.md`, `types-reference.md`,
+  and `schema/README.md` (AnvilSchema's introduction — why it isn't a bolt-on the way XSD/XSLT or
+  JSON Schema are). `README.md` rewritten to match current reality; three stale
+  `docs/maintainers/` planning documents removed (predated the rebuild, actively contradicted
+  current design decisions).
+
+### Notes
+
+- Schema (`@[schema]`, validating a data document's shape) is still design-only —
+  `notes/native-schema.md` has the full record. `schema.c` itself hasn't been started.
 
 ---
 
@@ -660,27 +731,21 @@ Documentation:
 
 ## Future Releases
 
-### Planned for v0.2.0
+*(The "Planned for v0.2.0" list that used to live here was from long before the current
+module-context rebuild and no longer reflects reality — removed rather than left misleading.
+Current direction:)*
 
-- Streaming parser support for large files
-- Error recovery with checkpoint system
-- String materialization cache
-- LLVM AST materialization option
-- Dialect-specific validators
-- Performance profiling and optimization
-
-### Future Considerations
-
-- Incremental parsing support
-- IDE integration features
-- Advanced error messages with suggestions
-- Custom dialect support
-- Bytecode compilation target
+- **Schema** (`@[schema]`) — active design/implementation effort; see `notes/native-schema.md`
+  and `docs/schema/README.md`.
+- **AnvilScript (ASL)** — design stage; see `notes/anvilscript-design.md`.
+- A real, packaged library build (static and shared), enabling schema/AnvilScript as genuinely
+  separate, linkable add-ons.
 
 ---
 
-**For detailed technical information, see:**
-- Architecture: docs/PARSER_ARCHITECTURE.md
-- Quick reference: docs/PARSER_QUICK_REF.md
-- Test mapping: docs/TEST_COVERAGE_MAP.md
-- Language spec: docs/ANVIL_SPEC_DRAFT.md
+**For more, see:**
+- [`README.md`](../README.md) — project overview and current status
+- [`docs/language-reference.md`](language-reference.md) — the full language reference
+- [`docs/getting-started.md`](getting-started.md) — practical C API walkthrough
+- [`docs/types-reference.md`](types-reference.md) — the opt-in type system
+- [`notes/`](../notes/) — design-thread records for active work
