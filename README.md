@@ -28,7 +28,7 @@ reflects what's real and verified today, not what's planned.
 | **Resolution** — `$identifier` VarRef, `base`/inheritance, field-merging | ✅ Complete |
 | **Public C API** — `anvil_flat.h` (flat) + `anvil_vtable.h` (vtable) | ✅ Complete |
 | **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented, first phase |
-| **Schema** (`@[schema]`, validating a document's shape) | 🔧 Actively being designed — not implemented yet |
+| **AnvilSchema** (`@[schema]`, validating a document's shape) | ✅ Implemented, first phase |
 | **ASL** (`#!asl`) — embedded scripting | 📝 Design only — nothing implemented |
 
 ## The Case for Anvil
@@ -135,8 +135,8 @@ linkable add-on) is on the near-term roadmap.
 - [`docs/types-reference.md`](docs/types-reference.md) — the opt-in type system: how to define
   types, the native primitive vocabulary, enums, cross-file resolution.
 - [`docs/schema/README.md`](docs/schema/README.md) — why AnvilSchema exists, and why it isn't a
-  bolt-on the way XSD/XSLT or JSON Schema are. Not implemented yet — this is the introduction,
-  written ahead of the code because the *why* doesn't change once `schema.c` lands.
+  bolt-on the way XSD/XSLT or JSON Schema are. `schema.c`'s first phase is now implemented — the
+  *why* was written before the code because it doesn't change once the code lands, and it hasn't.
 - [`docs/dialect-ownership-matrix.md`](docs/dialect-ownership-matrix.md) — which dialect owns
   which language feature.
 - [`notes/`](notes/) — design-thread records for anyone picking up active work; not user-facing,

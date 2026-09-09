@@ -1,0 +1,5 @@
+#!aml
+@[schema, table=assets]
+
+asset_id := { type := Numeric; required := true; };
+name := { type := String; };

@@ -477,6 +477,48 @@ different story altogether" — explicitly flagged as separate from the DBMS-bri
 question above, not yet defined. Not guessed at here; revisit when there's a concrete need in
 front of it rather than speculating now.
 
+## Implemented — `schema.c` first slice: GREEN
+
+`anvil_schema_load(doc)` / `anvil_schema_dispose` / `anvil_schema_validate(schema, data_doc)` /
+`anvil_schema_get_violation_count`/`get_violation` / `anvil_schema_violation_get_category`/
+`get_field`/`get_message` — `src/schema/schema.c`, `include/anvil_schema.h`, built entirely on
+the public flat API and `anvil_type_registry.h` — no core parser/resolver changes. `SCH01`–`SCH07`
+(`test/unit/test_schema.c`), Valgrind-clean, full 15-suite regression green.
+
+- **Loading**: `anvil_schema_load` rejects any document lacking `@[schema]` (returns NULL, not
+  an empty schema) and walks every top-level statement via `anvil_document_get_statements`,
+  treating each as a field rule — same "no exceptions" pattern as `anvil_types.c`'s own
+  `@[types]` handling. A field's `type :=` (if present) is resolved via `anvil_type_resolve`
+  against a type registry built from the schema document's own imports
+  (`anvil_type_registry_load_from_imports`) — `@[schema]` never implies `types.` access on its
+  own, matching the decided semantics exactly; only the resolved *kind* is copied out, so the
+  registry itself doesn't need to outlive the load call. A field with no recognized `type :=`
+  (including none at all — a FlyWire-style `pooled` field) is still registered, just with
+  nothing to type-check; its `required :=` is still read and enforced either way.
+- **Validation collects everything, never fail-fast** (the decided policy): one pass checks
+  every schema field's presence (`required`) and, where a value exists, its kind against the
+  field's resolved type; a second pass over the data document's own statements catches anything
+  not declared in the schema at all. All three violation categories reuse the reserved 46xx
+  block's *numeric values* as a namespace nod (`ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED` = 4604,
+  `_TYPE_MISMATCH` = 4605, `_UNKNOWN_FIELD` = 4606) via schema's own, independent public enum —
+  not the internal `errors.h` symbols directly, since schema.c never includes internal headers.
+- **Kind matching is quoting-agnostic**: a resolved `String` or `enum` kind accepts either a
+  quoted STRING value or a bare IDENTIFIER value — FlyWire's own inline `values` convention uses
+  quoted strings, `anvil_types.c`'s own enum convention uses bare identifiers, and neither should
+  read as a mismatch just because of spelling.
+- **Violations belong to the schema, not a separate result object**: each `anvil_schema_validate`
+  call replaces whatever the previous call collected (matching the sketch from several rounds of
+  design conversation earlier) — disposed and rebuilt fresh each time, not accumulated across
+  calls.
+
+**Deliberately still out of scope, matching `anvil_types.c`'s own precedent**: a malformed field
+rule (a `type :=` naming nothing recognized) is silently left with no kind to check against,
+not reported as an error of the schema itself — no error-reporting design exists yet for a
+malformed *schema* (as opposed to a data document failing to satisfy a well-formed one).
+Constraint checks (`size`/`min`/`max`/`values` membership) are the natural next slice, following
+the exact same "kind now, constraints later" sequencing `anvil_types.c` already used
+successfully — not started yet.
+
 ## Open questions (not yet worked through)
 
 - The exact `schema.c`/`types.c` module boundary as reusable precedent for AnvilScript: one

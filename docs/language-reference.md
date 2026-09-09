@@ -1,8 +1,10 @@
 # ANVL Language Reference
 
-Status: **covers what's actually implemented and tested.** Schema (§10) is a placeholder —
-design-only, nothing built yet. Every code example on this page has been verified against the
-real parser (`anvil_load_buffer`), not just written to look right.
+Status: **covers what's actually implemented and tested.** Schema (§10) has landed its first
+phase — see `docs/schema/README.md` for the introduction and `notes/native-schema.md` for the
+full technical record; this page's own §10 stays a short pointer rather than duplicating either.
+Every code example on this page has been verified against the real parser
+(`anvil_load_buffer`), not just written to look right.
 
 ## 1. What ANVL Is
 
@@ -132,10 +134,12 @@ resolution: [`types-reference.md`](types-reference.md).
 
 ## 10. Schema
 
-*(Placeholder — design-only, nothing implemented yet.)* Schema will validate a *data* document's
-shape against declared, type-annotated fields, building on the type system above. For why it's
-designed the way it is — same parser, zero new grammar, not a bolt-on the way XSD/XSLT or JSON
-Schema are — see [`docs/schema/README.md`](schema/README.md). Full technical design record:
+AnvilSchema validates a *data* document's shape against declared, type-annotated fields,
+building on the type system above — first phase implemented: `@[schema]` loading, required-field
+presence, and type-kind validation, collecting every violation in one pass rather than
+fail-fast. Constraint checks (`size`/`min`/`max`/`values`) are the natural next slice. For why
+it's designed the way it is — same parser, zero new grammar, not a bolt-on the way XSD/XSLT or
+JSON Schema are — see [`docs/schema/README.md`](schema/README.md). Full technical design record:
 [`notes/native-schema.md`](../notes/native-schema.md).
 
 ## 11. AMP's Restrictions

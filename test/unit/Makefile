@@ -48,6 +48,11 @@ TESTBIT_SRC = $(TESTBIT)/src/testbit.c
 TYPES_SRCS  = $(ANVL)/src/anvil_types.c
 TYPES_LIB   = $(ANVIL_SRCS) $(TYPES_SRCS)
 
+# schema.c is the real add-on layered on top of TYPES_LIB — lives under src/schema/, reserved
+# for it. Depends on types, never the reverse.
+SCHEMA_SRCS = $(ANVL)/src/schema/schema.c
+SCHEMA_LIB  = $(TYPES_LIB) $(SCHEMA_SRCS)
+
 LIB_DEBUG     = $(ANVL)/lib/debug/libanvil.a
 LIB_RELEASE   = $(ANVL)/lib/release/libanvil.a
 
@@ -73,8 +78,8 @@ endef
 
 .PHONY: all clean val build test test_release
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
-.PHONY: build_test_body_amp build_test_body_aml build_test_types
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types $(UNIT_CASES)
+.PHONY: build_test_body_amp build_test_body_aml build_test_types build_test_schema
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types test_schema $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -89,7 +94,8 @@ all: $(BIN)/test_version \
 	$(BIN)/test_anvil_vtable \
 	$(BIN)/test_attribute_grammar \
 	$(BIN)/test_value_fragment \
-	$(BIN)/test_types
+	$(BIN)/test_types \
+	$(BIN)/test_schema
 # test_types links src/anvil_types.c (TYPES_LIB) instead of plain ANVIL_SRCS
 # — the one binary in this suite that needs the opt-in type registry.
 $(BIN)/test_types: test_types.c $(TYPES_LIB) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
@@ -100,6 +106,20 @@ build_test_types: $(BIN)/test_types
 
 test_types: $(BIN)/test_version $(BIN)/test_types
 	$(call run_test_bin,test_types)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+# test_schema links src/schema/schema.c (SCHEMA_LIB, which already includes TYPES_LIB) —
+# the one binary in this suite that needs the schema add-on.
+$(BIN)/test_schema: test_schema.c $(SCHEMA_LIB) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_schema: $(BIN)/test_schema
+
+test_schema: $(BIN)/test_version $(BIN)/test_schema
+	$(call run_test_bin,test_schema)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

@@ -1,10 +1,11 @@
 # AnvilSchema
 
-Status: **the approach below is real and already verified against the actual parser — the
-implementation itself (`schema.c`) hasn't been built yet.** Full design record:
-[`notes/native-schema.md`](../../notes/native-schema.md) (in the main repo, not user-facing).
-This page isn't that record. It's the introduction — the questions worth answering before anyone
-gets far enough into the technical detail to think to ask them.
+Status: **`schema.c`'s first phase is implemented** — `@[schema]` loading, required-field
+presence, and type-kind validation, collecting every violation in one pass. Constraint checks
+(`size`/`min`/`max`/`values`) are the natural next slice. Full design record and technical
+detail: [`notes/native-schema.md`](../../notes/native-schema.md) (in the main repo, not
+user-facing). This page isn't that record. It's the introduction — the questions worth answering
+before anyone gets far enough into the technical detail to think to ask them.
 
 ## The question nobody asks about their schema tool, until it's too late
 

@@ -72,11 +72,16 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   JSON Schema are). `README.md` rewritten to match current reality; three stale
   `docs/maintainers/` planning documents removed (predated the rebuild, actively contradicted
   current design decisions).
+- **AnvilSchema — first phase** (`src/schema/schema.c`, the actual add-on layered on top of
+  `anvil_types.c`): `anvil_schema_load` (gated on `@[schema]`, every top-level statement a field
+  rule), `anvil_schema_validate` checking required-field presence, type-kind mismatches, and
+  undeclared data fields — collecting every violation in one pass, never fail-fast. Constraint
+  checks (`size`/`min`/`max`/`values`) are the natural next slice.
 
 ### Notes
 
-- Schema (`@[schema]`, validating a data document's shape) is still design-only —
-  `notes/native-schema.md` has the full record. `schema.c` itself hasn't been started.
+- Schema's first phase is implemented; constraint validation is the next slice — see
+  `notes/native-schema.md` for the full record.
 
 ---
 
