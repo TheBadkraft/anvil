@@ -249,7 +249,11 @@ static void test_sch08_size_constraint(void) {
       anvil_document long_doc = anvil_load_buffer(too_long, strlen(too_long));
       if (long_doc) {
          TestBit.is_false(anvil_schema_validate(schema, long_doc), "SCH08: over size fails");
-         TestBit.is_not_null(find_violation(schema, "name"), "SCH08: violation names 'name'");
+         anvil_schema_violation v = find_violation(schema, "name");
+         TestBit.is_not_null(v, "SCH08: violation names 'name'");
+         TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
+                               anvil_schema_violation_get_category(v),
+                               "SCH08: category is VALIDATION_SIZE");
          anvil_dispose(long_doc);
       }
       anvil_schema_dispose(schema);
@@ -278,7 +282,11 @@ static void test_sch09_min_max_constraint(void) {
       anvil_document high_doc = anvil_load_buffer(too_high, strlen(too_high));
       if (high_doc) {
          TestBit.is_false(anvil_schema_validate(schema, high_doc), "SCH09: above max fails");
-         TestBit.is_not_null(find_violation(schema, "year"), "SCH09: violation names 'year'");
+         anvil_schema_violation v = find_violation(schema, "year");
+         TestBit.is_not_null(v, "SCH09: violation names 'year'");
+         TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
+                               anvil_schema_violation_get_category(v),
+                               "SCH09: category is VALIDATION_RANGE (above max)");
          anvil_dispose(high_doc);
       }
 
@@ -286,6 +294,10 @@ static void test_sch09_min_max_constraint(void) {
       anvil_document low_doc = anvil_load_buffer(too_low, strlen(too_low));
       if (low_doc) {
          TestBit.is_false(anvil_schema_validate(schema, low_doc), "SCH09: below min fails");
+         anvil_schema_violation lv = find_violation(schema, "year");
+         TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
+                               anvil_schema_violation_get_category(lv),
+                               "SCH09: category is VALIDATION_RANGE (below min)");
          anvil_dispose(low_doc);
       }
       anvil_schema_dispose(schema);
@@ -323,7 +335,11 @@ static void test_sch10_values_constraint(void) {
       anvil_document bad_doc = anvil_load_buffer(bad, strlen(bad));
       if (bad_doc) {
          TestBit.is_false(anvil_schema_validate(schema, bad_doc), "SCH10: a non-member fails");
-         TestBit.is_not_null(find_violation(schema, "status"), "SCH10: violation names 'status'");
+         anvil_schema_violation v = find_violation(schema, "status");
+         TestBit.is_not_null(v, "SCH10: violation names 'status'");
+         TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
+                               anvil_schema_violation_get_category(v),
+                               "SCH10: category is VALIDATION_VALUES");
          anvil_dispose(bad_doc);
       }
       anvil_schema_dispose(schema);

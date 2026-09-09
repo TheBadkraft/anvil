@@ -88,6 +88,18 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   never resolved. Undetected until the constraint-inheritance tests exercised a `types.X`
   reference for the first time; the first slice's own tests only ever used bare native names.
 
+### Changed
+
+- **`anvil_schema_err_code` gets specific categories for each constraint kind** — `size`/`min`/
+  `max`/`values` violations were being reported as `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH`
+  (the closest existing category at the time, not an accurate one — a value can be exactly the
+  right *kind* and still violate a constraint). Added `ANVIL_SCHEMA_ERR_VALIDATION_SIZE`,
+  `_RANGE`, and `_VALUES`; `TYPE_MISMATCH` now means only "wrong kind of value" again. Also drops
+  the enum's original numbering, which had nodded at the internal `errors.h` 46xx block's
+  reserved values — that block turned out to have no real call sites using it beyond its own
+  message-string tables, so the "nod" was cosmetic only and is now gone in favor of schema's own
+  independent, sequential numbering.
+
 ### Notes
 
 - Schema's implementation covers loading, presence, type-kind, and constraint validation with

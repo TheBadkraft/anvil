@@ -47,16 +47,23 @@ typedef struct anvil_schema_t *anvil_schema;
 typedef struct anvil_schema_violation_t *anvil_schema_violation;
 
 /**
- * @brief Stable violation categories. Numeric values deliberately mirror
- * the reserved "Schema Errors (46xx)" block in the core's own internal
- * errors.h — a namespace nod, not a shared enum; this is schema's own,
- * independent, public one.
+ * @brief Stable violation categories — schema's own, independent set, not
+ * tied to the core's internal errors.h numbering in any way (an earlier
+ * revision numbered these to nod at that block; the two have no real
+ * relationship, so the nod was dropped). Each distinct reason a field can
+ * fail validation gets its own specific category, rather than folding
+ * constraint failures into VALIDATION_TYPE_MISMATCH — a value can be the
+ * right kind and still violate size/range/membership, and that's a
+ * different thing than the wrong kind of value entirely.
  */
 typedef enum {
    ANVIL_SCHEMA_ERR_NONE = 0,
-   ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED = 4604,      // a required field is absent
-   ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH = 4605, // a field's value doesn't match its declared type
-   ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD = 4606, // a data field isn't declared in the schema
+   ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,      // a required field is absent
+   ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, // a field's value kind doesn't match its declared type
+   ANVIL_SCHEMA_ERR_VALIDATION_SIZE,          // a field's value exceeds its declared size
+   ANVIL_SCHEMA_ERR_VALIDATION_RANGE,         // a numeric field's value is outside its declared min/max
+   ANVIL_SCHEMA_ERR_VALIDATION_VALUES,        // a field's value isn't one of its declared values
+   ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, // a data field isn't declared in the schema
 } anvil_schema_err_code;
 
 /**

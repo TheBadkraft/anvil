@@ -498,10 +498,11 @@ the public flat API and `anvil_type_registry.h` — no core parser/resolver chan
 - **Validation collects everything, never fail-fast** (the decided policy): one pass checks
   every schema field's presence (`required`) and, where a value exists, its kind against the
   field's resolved type; a second pass over the data document's own statements catches anything
-  not declared in the schema at all. All three violation categories reuse the reserved 46xx
-  block's *numeric values* as a namespace nod (`ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED` = 4604,
-  `_TYPE_MISMATCH` = 4605, `_UNKNOWN_FIELD` = 4606) via schema's own, independent public enum —
-  not the internal `errors.h` symbols directly, since schema.c never includes internal headers.
+  not declared in the schema at all. Violation categories are `anvil_schema_err_code`, schema's
+  own independent public enum — never the internal `errors.h` symbols directly, since schema.c
+  never includes internal headers. (This slice originally numbered the three categories to nod
+  at the reserved 46xx block; that numbering was dropped later — see "Error codes: dropping the
+  46xx nod" below.)
 - **Kind matching is quoting-agnostic**: a resolved `String` or `enum` kind accepts either a
   quoted STRING value or a bare IDENTIFIER value — FlyWire's own inline `values` convention uses
   quoted strings, `anvil_types.c`'s own enum convention uses bare identifiers, and neither should
@@ -553,6 +554,38 @@ logic itself**:
    so nothing exercised this path until the inheritance tests did. Fixed with a small
    `strip_types_prefix` helper in `schema.c`, applied before every `anvil_type_resolve` call.
 
+## Error codes: dropping the 46xx nod, giving each constraint its own category
+
+The constraint-checking slice above shipped with a real wart: every constraint violation
+(`size`, `min`/`max`, `values`) was reported as `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH` —
+reusing the *only* violation category that existed at the time for anything that wasn't
+`REQUIRED` or `UNKNOWN_FIELD`, since no more specific category had been designed yet. Flagged
+directly: a value can be exactly the right kind and still violate size/range/membership, and
+that's a different failure than the value being the wrong kind entirely — `TYPE_MISMATCH` reads
+as "you sent a string where a number belonged," not "your number is out of range."
+
+Decided: schema gets its own set of specific error codes, one per distinct reason a field can
+fail, and the numeric mirroring of the internal `errors.h` 46xx block (`ANVIL_SCHEMA_ERR_
+VALIDATION_REQUIRED` = 4604, etc. — a "namespace nod, not a shared enum") is dropped entirely.
+The nod never had any real coupling to begin with: `schema.c` never includes `errors.h`, and a
+`grep` across the codebase turned up zero call sites actually using the internal `ANVL_ERR_
+SCHEMA_*` constants for anything beyond their own message-string tables in `errors.c` — that
+46xx block appears to predate the "schema is a consumer, not a core feature" pivot and is
+effectively vestigial now. `anvil_schema_err_code` now uses plain sequential values (implicit
+enum numbering, no explicit numerics) and adds two new categories:
+
+- `ANVIL_SCHEMA_ERR_VALIDATION_SIZE` — a field's value exceeds its declared `size`.
+- `ANVIL_SCHEMA_ERR_VALIDATION_RANGE` — a numeric field's value is outside its declared `min`/`max`.
+- `ANVIL_SCHEMA_ERR_VALIDATION_VALUES` — a field's value isn't one of its declared `values`.
+
+`TYPE_MISMATCH` now means only what its name says — a value's *kind* doesn't match the field's
+declared type — and is never reused for a constraint failure again. `include/anvil_schema.h`'s
+enum doc comment was updated to drop the 46xx-mirroring claim entirely. RED confirmed first
+(`SCH08`/`SCH09`/`SCH10` extended with category assertions against the new codes, run against
+the still-unchanged validate logic — 4 genuine failures, nothing else regressed), then the three
+call sites in `anvil_schema_validate` updated to GREEN (60/60 assertions, Valgrind-clean, full
+15-suite regression green).
+
 ## Open questions (not yet worked through)
 
 - The exact `schema.c`/`types.c` module boundary as reusable precedent for AnvilScript: one
@@ -566,5 +599,7 @@ logic itself**:
 - `notes/public-api.md` — the module/statement attribute accessors this design reuses directly.
 - `notes/resolution-phase.md` — `base`/inheritance semantics, relevant to the still-open
   conformance-marker question above.
-- `include/errors.h` — the already-reserved, unused Schema Errors (46xx) block.
+- `include/errors.h` — the reserved Schema Errors (46xx) block; `anvil_schema_err_code` no
+  longer mirrors it numerically (see "Error codes: dropping the 46xx nod" above) — this block
+  appears vestigial, left as-is since removing it wasn't asked for.
 - `deferred-work.md` — index entry pointing here.

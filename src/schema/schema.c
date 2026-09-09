@@ -371,14 +371,14 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
       if (field->has_size && data_val) {
          size_t len = anvil_value_get_text(data_val, NULL, 0);
          if ((long long)len > field->size) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
                           "field value exceeds the declared size");
          }
       }
       if ((field->has_min || field->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
          long long value = read_numeric(data_val);
          if ((field->has_min && value < field->min) || (field->has_max && value > field->max)) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
                           "field value is outside the declared min/max range");
          }
       }
@@ -396,7 +396,7 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
             }
          }
          if (!member) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
                           "field value is not one of the declared values");
          }
       }
