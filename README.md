@@ -29,7 +29,7 @@ reflects what's real and verified today, not what's planned.
 | **Public C API** — `anvil_flat.h` (flat) + `anvil_vtable.h` (vtable) | ✅ Complete |
 | **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented, first phase |
 | **AnvilSchema** (`@[schema]`, validating a document's shape, full constraint checking) | ✅ Implemented |
-| **Distributable library** (`lib/{debug,release}/libanvil.a`, functional/e2e tests against it) | ✅ Implemented |
+| **Distributable library** (static `.a` + shared `.so`, debug/release, functional/e2e tests against all four) | ✅ Implemented |
 | **ASL** (`#!asl`) — embedded scripting | 📝 Design only — nothing implemented, not required for "ANVL proper" |
 
 ## The Case for Anvil
@@ -92,8 +92,8 @@ anvil/
 │   ├── anvil_types.c            ← opt-in type registry — part of ANVL proper, not an add-on
 │   └── schema/schema.c          ← AnvilSchema — the real add-on, layered on top of types
 ├── lib/                         ← built by the root Makefile, not checked in — debug/release
-│   ├── debug/libanvil.a         ← full DWARF info
-│   └── release/libanvil.a       ← no debug symbols, verified via readelf
+│   ├── debug/                   ← libanvil.a + libanvil.so, full DWARF info
+│   └── release/                 ← libanvil.a + libanvil.so, no debug symbols (stripped)
 ├── test/
 │   ├── unit/                    ← TestBit-based unit suites (the supported quality gate)
 │   ├── functional/              ← links only against the built lib/, proves the artifact itself
@@ -128,7 +128,8 @@ for why, and what's still open about that choice):
 
 ```sh
 make lib            # both lib/debug/libanvil.a and lib/release/libanvil.a
-make lib-release     # release only — no debug symbols, verified via readelf
+make so             # both lib/debug/libanvil.so and lib/release/libanvil.so
+make lib-release     # release only — no debug symbols, verified via readelf/objdump
 ```
 
 Each unit-test suite is still its own Makefile target, compiling `src/*.c` directly rather than

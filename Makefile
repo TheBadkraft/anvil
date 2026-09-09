@@ -45,10 +45,13 @@ RELEASE_DIR  = lib/release
 DEBUG_OBJ    = build/debug
 RELEASE_OBJ  = build/release
 
+# -fPIC on every object (debug included) so the same object tree serves both the static
+# archive and the shared object — no separate PIC/non-PIC object trees to keep in sync.
 # Release carries no debug info at all (no -g), on top of an explicit strip pass on the
-# archive itself — belt and suspenders, so nothing slips in from a mismatched flag later.
-DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -std=$(STD) $(INCLUDE) $(DEFS)
-RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -std=$(STD) $(INCLUDE) $(DEFS)
+# archive/shared object themselves — belt and suspenders, so nothing slips in from a
+# mismatched flag later.
+DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS)
+RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS)
 
 DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS))
 RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS))
@@ -56,15 +59,24 @@ RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS))
 LIB_DEBUG   = $(DEBUG_DIR)/libanvil.a
 LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 
-.PHONY: all lib lib-debug lib-release clean
+SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
+SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-all: lib
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean
+
+all: lib so
 
 lib: lib-debug lib-release
+
+so: so-debug so-release
 
 lib-debug: $(LIB_DEBUG)
 
 lib-release: $(LIB_RELEASE)
+
+so-debug: $(SO_DEBUG)
+
+so-release: $(SO_RELEASE)
 
 $(LIB_DEBUG): $(DEBUG_OBJS)
 	@mkdir -p $(DEBUG_DIR)
@@ -73,6 +85,15 @@ $(LIB_DEBUG): $(DEBUG_OBJS)
 $(LIB_RELEASE): $(RELEASE_OBJS)
 	@mkdir -p $(RELEASE_DIR)
 	$(AR) rcs $@ $^
+	$(STRIP) --strip-debug --strip-unneeded $@
+
+$(SO_DEBUG): $(DEBUG_OBJS)
+	@mkdir -p $(DEBUG_DIR)
+	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
+
+$(SO_RELEASE): $(RELEASE_OBJS)
+	@mkdir -p $(RELEASE_DIR)
+	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
 	$(STRIP) --strip-debug --strip-unneeded $@
 
 $(DEBUG_OBJ)/%.o: src/%.c

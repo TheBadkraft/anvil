@@ -66,18 +66,38 @@ in, never link against a real artifact.
 - Confirmed by direct inspection (`readelf -S`, `nm`, `ls -la`) that the release archive carries
   no debug sections and is roughly 40% the size of the debug archive.
 
+## Shared object (`.so`) — evaluated and added
+
+Raised as an open question, then evaluated directly rather than left deferred: `make so`
+(`so-debug`/`so-release`) builds `lib/{debug,release}/libanvil.so` from the same object tree as
+the static archives — every object now compiles with `-fPIC` (debug included), so there's no
+separate PIC/non-PIC object tree to keep in sync; the static archive pays a negligible cost for
+this, nothing measurable. `gcc -shared -Wl,-soname,libanvil.so` builds each `.so`; release gets
+the same no-`-g` + explicit `strip --strip-debug --strip-unneeded` treatment as the static
+release archive, verified the same way (`objdump -h` shows 0 debug sections in the release
+`.so` vs. 8 in the debug `.so`; 262KB vs. 464KB).
+
+Verified as a real, working dynamic-link consumer, not just "it compiled": a copy of
+`test/functional/test_e2e.c` compiled and linked against `lib/release/libanvil.so` via
+`-L.../lib/release -lanvil -Wl,-rpath,...` (no static archive involved at all), confirmed via
+`ldd` that it actually resolves and loads `libanvil.so` at runtime, ran all 5/21 assertions
+GREEN, Valgrind-clean. `test/functional/Makefile` now has permanent `so-debug`/`so-release`
+targets doing exactly this against both `.so` variants, alongside the existing static
+`debug`/`release` targets — `make all` there now exercises all four combinations (static/shared
+× debug/release).
+
 ## Open questions (not yet worked through)
 
 - The bundle-vs-minimal-split packaging/DX default itself — still deferred, see
-  `notes/deferred-work.md`'s "Distribution philosophy" entry. Today's `libanvil.a` is the
-  convenience answer; the minimalist split (bare `libanvil`, standalone `libanvil_schema.a`) has
-  no build target yet.
-- No shared-object (`.so`) target exists yet — only static archives. Not raised as a blocker;
-  revisit if/when a consumer (e.g. a future non-Node/non-wasm binding) actually needs dynamic
-  linking.
-- No git tag/release cut yet — `libanvil.a` exists and works, but there's still no versioned,
+  `notes/deferred-work.md`'s "Distribution philosophy" entry. Today's `libanvil.a`/`libanvil.so`
+  are the convenience answer; the minimalist split (bare `libanvil`, standalone
+  `libanvil_schema.a`/`.so`) has no build target yet.
+- No git tag/release cut yet — the libraries exist and work, but there's still no versioned,
   citable artifact for the `anvil.node`/`anvil.wasm` bindings to depend on other than a pinned
   commit.
+- The shared object's `SONAME` is unversioned (`libanvil.so`, not `libanvil.so.0` with a
+  `libanvil.so.0.7.0` real file and symlinks) — fine for now since nothing installs this
+  system-wide yet; revisit once/if a real install path (`make install`, a package) exists.
 
 ## Related notes
 

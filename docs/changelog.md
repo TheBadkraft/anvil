@@ -126,7 +126,14 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   `$(LIB_DEBUG)`/`$(LIB_RELEASE)` from the start but nothing ever built them, so it had never
   once succeeded; also fixed a real missing link dependency (`test/utilities/debug.c`) surfaced
   by finally running it. 33/33 tests, 159/159 assertions, linked entirely against the real
-  release archive. Full technical record: `notes/distributable-library.md`.
+  release archive.
+- **Shared object (`.so`) build, evaluated and added** — `make so` builds
+  `lib/{debug,release}/libanvil.so` from the same `-fPIC` object tree the static archives use.
+  Verified as a genuine dynamic-link consumer (not just "it compiled"): a copy of the functional
+  suite linked against `libanvil.so` via `-L/-lanvil` + `rpath`, confirmed via `ldd` that it
+  actually loads the `.so` at runtime, 5/21 GREEN, Valgrind-clean. `test/functional/Makefile`
+  gained permanent `so-debug`/`so-release` targets. Full technical record:
+  `notes/distributable-library.md`.
 
 ---
 
