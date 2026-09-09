@@ -127,6 +127,8 @@ linkable add-on) is on the near-term roadmap.
 
 ## Documentation
 
+- [`docs/getting-started.md`](docs/getting-started.md) — practical, task-oriented walkthrough of
+  the C API: load a document, read what's in it, clean up.
 - [`docs/language-reference.md`](docs/language-reference.md) — the full language reference:
   dialects, document/value grammar, attributes, inheritance, imports, weak typing, errors, and
   the public C API/bindings surface.
@@ -136,9 +138,6 @@ linkable add-on) is on the near-term roadmap.
   which language feature.
 - [`notes/`](notes/) — design-thread records for anyone picking up active work; not user-facing,
   but the most current, accurate source of "why" for anything still in progress.
-
-A getting-started guide (loading a document, walking statements, reading values end to end) is
-in progress.
 
 ---
 
