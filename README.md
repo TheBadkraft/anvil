@@ -134,6 +134,9 @@ linkable add-on) is on the near-term roadmap.
   the public C API/bindings surface.
 - [`docs/types-reference.md`](docs/types-reference.md) — the opt-in type system: how to define
   types, the native primitive vocabulary, enums, cross-file resolution.
+- [`docs/schema/README.md`](docs/schema/README.md) — why AnvilSchema exists, and why it isn't a
+  bolt-on the way XSD/XSLT or JSON Schema are. Not implemented yet — this is the introduction,
+  written ahead of the code because the *why* doesn't change once `schema.c` lands.
 - [`docs/dialect-ownership-matrix.md`](docs/dialect-ownership-matrix.md) — which dialect owns
   which language feature.
 - [`notes/`](notes/) — design-thread records for anyone picking up active work; not user-facing,

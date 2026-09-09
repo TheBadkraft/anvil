@@ -133,8 +133,10 @@ resolution: [`types-reference.md`](types-reference.md).
 ## 10. Schema
 
 *(Placeholder — design-only, nothing implemented yet.)* Schema will validate a *data* document's
-shape against declared, type-annotated fields, building on the type system above. Full design
-record so far: [`notes/native-schema.md`](../notes/native-schema.md).
+shape against declared, type-annotated fields, building on the type system above. For why it's
+designed the way it is — same parser, zero new grammar, not a bolt-on the way XSD/XSLT or JSON
+Schema are — see [`docs/schema/README.md`](schema/README.md). Full technical design record:
+[`notes/native-schema.md`](../notes/native-schema.md).
 
 ## 11. AMP's Restrictions
 
