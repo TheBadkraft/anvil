@@ -64,6 +64,35 @@ static anvil_type_kind parse_type_kind(const char *text) {
    return ANVIL_TYPE_UNKNOWN;
 }
 
+// Static, always-available definitions for the six native primitives + enum — never allocated,
+// never disposed, no size/min/max/values of their own (a bare `Numeric` carries no baked-in
+// constraint). anvil_type_resolve hands out pointers to these directly; their lifetime is the
+// process's own, independent of any registry. Not const (despite never being mutated) purely to
+// avoid a const-correctness mismatch against the public, non-const anvil_type_def pointer type
+// — nothing outside this file can reach them except through read-only accessors anyway.
+static struct anvil_type_def_t NATIVE_NUMERIC = { .name = "Numeric", .kind = ANVIL_TYPE_NUMERIC };
+static struct anvil_type_def_t NATIVE_STRING  = { .name = "String",  .kind = ANVIL_TYPE_STRING };
+static struct anvil_type_def_t NATIVE_BOOL    = { .name = "Bool",    .kind = ANVIL_TYPE_BOOL };
+static struct anvil_type_def_t NATIVE_OBJECT  = { .name = "Object",  .kind = ANVIL_TYPE_OBJECT };
+static struct anvil_type_def_t NATIVE_TUPLE   = { .name = "Tuple",   .kind = ANVIL_TYPE_TUPLE };
+static struct anvil_type_def_t NATIVE_ARRAY   = { .name = "Array",   .kind = ANVIL_TYPE_ARRAY };
+static struct anvil_type_def_t NATIVE_ENUM    = { .name = "enum",    .kind = ANVIL_TYPE_ENUM };
+
+// Maps a recognized native/enum kind to its static definition — the other half of
+// parse_type_kind, shared so anvil_type_resolve doesn't duplicate the kind-to-instance mapping.
+static struct anvil_type_def_t *native_def_for_kind(anvil_type_kind kind) {
+   switch (kind) {
+   case ANVIL_TYPE_NUMERIC: return &NATIVE_NUMERIC;
+   case ANVIL_TYPE_STRING:  return &NATIVE_STRING;
+   case ANVIL_TYPE_BOOL:    return &NATIVE_BOOL;
+   case ANVIL_TYPE_OBJECT:  return &NATIVE_OBJECT;
+   case ANVIL_TYPE_TUPLE:   return &NATIVE_TUPLE;
+   case ANVIL_TYPE_ARRAY:   return &NATIVE_ARRAY;
+   case ANVIL_TYPE_ENUM:    return &NATIVE_ENUM;
+   case ANVIL_TYPE_UNKNOWN: default: return NULL;
+   }
+}
+
 // Reads a numeric field's raw text ("17", "1900") and converts it — anvil_value_get_text is
 // the only way to read a scalar's content through the public flat API; there's no numeric
 // accessor, so every consumer of a numeric field (this module included) parses it itself, same
@@ -252,6 +281,20 @@ anvil_type_def anvil_type_registry_find(anvil_type_registry reg, const char *nam
       return NULL;
    }
    return (anvil_type_def)val;
+}
+
+anvil_type_def anvil_type_resolve(anvil_type_registry reg, const char *name) {
+   if (!name) {
+      return NULL;
+   }
+   struct anvil_type_def_t *native = native_def_for_kind(parse_type_kind(name));
+   if (native) {
+      return (anvil_type_def)native;
+   }
+   if (!reg) {
+      return NULL;
+   }
+   return anvil_type_registry_find(reg, name);
 }
 
 anvil_type_kind anvil_type_def_get_kind(anvil_type_def def) {

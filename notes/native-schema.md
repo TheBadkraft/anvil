@@ -347,11 +347,10 @@ This was a genuine prerequisite tackled before the rest of `types.c`, not `types
 
 `anvil_type_registry_load(doc)` / `anvil_type_registry_load_from_imports(doc)` /
 `anvil_type_registry_dispose` / `anvil_type_registry_find(reg, name)` /
-`anvil_type_def_get_kind(def)` / `get_size`/`get_min`/`get_max` / `get_value_count`/`get_value` —
-`src/anvil_types.c`, `include/anvil_type_registry.h`, built entirely on the public flat API as
-designed, zero core changes beyond the OBJECT_BLOCK fix below (which was a real, independently
-justified gap, not scope creep). `TYP01`–`TYP07` (`test/unit/test_types.c`), Valgrind-clean, full
-14-suite regression green.
+`anvil_type_def_get_kind(def)` / `get_size`/`get_min`/`get_max` / `get_value_count`/`get_value` /
+`anvil_type_resolve` — `src/anvil_types.c`, `include/anvil_type_registry.h`, built entirely on
+the public flat API as designed, zero core changes beyond the OBJECT_BLOCK fix below (which was a
+real, independently justified gap, not scope creep).
 
 - **Loading**: `anvil_type_registry_load` rejects any document lacking `@[types]` (returns NULL,
   not an empty registry) and walks every top-level statement via `anvil_document_get_statements`,
@@ -376,6 +375,17 @@ justified gap, not scope creep). `TYP01`–`TYP07` (`test/unit/test_types.c`), V
   exactly. The loading/collecting logic is shared between both entry points (`collect_type_defs`,
   called once per source document, whether that's `doc` itself or one of its imports) rather than
   duplicated.
+- **Unified resolution**: `anvil_type_resolve(reg, name)` — one function resolving *any* type
+  reference (a bare native primitive, bare `enum`, or a registered `types.X` custom type) to the
+  same `anvil_type_def` handle, queryable through the same accessors regardless of source. `reg`
+  may be `NULL` (native/enum resolution needs no registry at all). Natives are checked first
+  always, even with a registry present, so a custom type can never accidentally shadow a reserved
+  name. Backed by seven static, always-available `anvil_type_def` instances (one per native
+  primitive + `enum`, never allocated/disposed) that `anvil_type_registry_find` itself was
+  deliberately left untouched by — same contract, same tests, this sits additively on top. This
+  is what `schema.c` will always resolve a field's `type :=` through. `TYP08`–`TYP10`.
+
+`TYP01`–`TYP10` (`test/unit/test_types.c`), Valgrind-clean, full 14-suite regression green.
 
 **Deliberately still out of scope**: a malformed type-definition statement (no `type :=`, or one
 naming nothing recognized) is silently skipped, not reported as a validation error — no
@@ -410,6 +420,62 @@ with fresh `TYPES_SRCS`/`TYPES_LIB` pointing at the real `src/anvil_types.c` (re
 `types.c`, moved out from under `src/schema/` — see "Decided — `anvil_types.c` lives directly
 under `src/`" below), and a real `$(BIN)/test_types` target — the first actual instance of an
 opt-in-module build, serving as the concrete precedent for `schema.c` and eventually AnvilScript.
+
+## Decided — schema's `int32`/`str`/`date`/`bool` vocabulary lives in adapter-specific `.types.anvl` files, not in `types.c`
+
+Real compatibility gap found while starting schema.c's sketch: FlyWire's actual, currently-
+generated `assets.meta.anvl` uses lowercase `int32`/`str`/`date` — none of which exist in
+`types.c`'s own six-primitive vocabulary (`Numeric`/`String`/`Bool`/`Object`/`Tuple`/`Array`) or
+its `enum` kind. First instinct was to hardcode these four as hidden, zero-import aliases inside
+`types.c` itself, purely for FlyWire compatibility — rejected. The repo owner's better call: each
+SQL adapter (Postgres, eventually MySQL/SQLite/etc.) gets its *own* real `.types.anvl` file
+(`postgres.types.anvl`, ...) defining `Int32`/`Str`/`Date`/`Bool` as ordinary custom types over
+the native primitives (`Int32 := { type := Numeric; };`, etc.) — needing **zero new code**, since
+`anvil_type_registry_load_from_imports` already resolves exactly this. Generalizes properly
+(MySQL's own integer-width quirks, SQLite's dynamic typing, Mongo's non-relational shape each get
+their own file instead of ANVIL guessing one lowest-common-denominator vocabulary) and keeps
+vendor-specific vocabulary out of core entirely.
+
+Consequence, faced directly rather than avoided: this means FlyWire's existing checked-in
+`.meta.anvl` files need regenerating (`type := int32;` → `import "postgres.types.anvl";` +
+`type := types.Int32;`) to work against the new `schema.c` — "zero regeneration" (the deciding
+reason for rejecting the hardcoded-alias option one round earlier) doesn't actually hold.
+Resolved as an acceptable, deliberate tradeoff: regeneration was never fully avoidable anyway — a
+new column or type in the live DB already forces a schema-gen re-run today, which is the entire
+reason `compareSchema`/drift-checking exists. `postgres.types.anvl` becomes something FlyWireSDK
+itself (repo owner's own framing — FlyWire is being considered as a real SDK product, "not just a
+protocol") would own and ship as part of its own distribution, not something Anvil Native builds
+or bundles — same "primitives, not policy" reasoning already applied everywhere else in this
+design.
+
+## Decided — inline field constraints stay a strict superset; naming is authoring guidance, not an enforced rule
+
+Raised: a schema field's inline `values := [...]` (FlyWire's real, working style — quoted
+strings, no backing type) sets a bad precedent if left unexamined — it's an undocumented,
+unnamed enum, and a future maintainer has no way to know why. Resolved: `schema.c` keeps
+accepting every inline constraint (`size`/`min`/`max`/`values`) exactly as FlyWire's real files
+already use them — nothing mechanically changes, still a strict superset, no validation-time
+rejection. The actual test isn't "enum vs. scalar" — it's whether naming the thing serves real
+reuse/abstraction, not merely "the library could represent this as a type": a one-off `min`/`max`
+used by exactly one field doesn't obviously earn a name, but an enum with real semantic members
+almost always does (an undocumented value list is a worse failure mode than an undocumented
+number range). That's a judgment call at authoring time schema.c has no way to detect
+mechanically, so it belongs in the eventual schema reference doc as guidance, not as a load/
+validate-time error.
+
+**Where a named type belongs, once you do define one**: an adapter-level `.types.anvl`
+(`postgres.types.anvl`) should stay scoped to genuine DBMS-bridging concerns — `Int32`/`Str`/
+`Date`/`Bool`, the types that answer "how do I represent this column as an Anvil native type at
+all." A business-domain enum like `AssetStatus` isn't that kind of bridge (it's specific to one
+table's own semantics) and doesn't belong crammed into the adapter file just for convenience —
+it gets its own properly-scoped definition instead.
+
+## Open — AnvilSchema's own specialized types
+
+Repo owner's own framing: "if AnvilSchema wants to introduce some specialized types, that's a
+different story altogether" — explicitly flagged as separate from the DBMS-bridging-type
+question above, not yet defined. Not guessed at here; revisit when there's a concrete need in
+front of it rather than speculating now.
 
 ## Open questions (not yet worked through)
 
