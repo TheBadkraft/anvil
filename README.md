@@ -127,6 +127,9 @@ linkable add-on) is on the near-term roadmap.
 
 ## Documentation
 
+- [`docs/language-reference.md`](docs/language-reference.md) — the full language reference:
+  dialects, document/value grammar, attributes, inheritance, imports, weak typing, errors, and
+  the public C API/bindings surface.
 - [`docs/types-reference.md`](docs/types-reference.md) — the opt-in type system: how to define
   types, the native primitive vocabulary, enums, cross-file resolution.
 - [`docs/dialect-ownership-matrix.md`](docs/dialect-ownership-matrix.md) — which dialect owns
@@ -134,7 +137,8 @@ linkable add-on) is on the near-term roadmap.
 - [`notes/`](notes/) — design-thread records for anyone picking up active work; not user-facing,
   but the most current, accurate source of "why" for anything still in progress.
 
-A full language reference and getting-started guide are in progress.
+A getting-started guide (loading a document, walking statements, reading values end to end) is
+in progress.
 
 ---
 
