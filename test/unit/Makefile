@@ -56,6 +56,14 @@ SCHEMA_LIB  = $(TYPES_LIB) $(SCHEMA_SRCS)
 LIB_DEBUG     = $(ANVL)/lib/debug/libanvil.a
 LIB_RELEASE   = $(ANVL)/lib/release/libanvil.a
 
+# Built by the root Makefile (core + types + schema bundled — see notes/deferred-work.md),
+# not compiled here — test_release links against the real artifact, not source files.
+$(LIB_DEBUG):
+	$(MAKE) -C $(ANVL) lib-debug
+
+$(LIB_RELEASE):
+	$(MAKE) -C $(ANVL) lib-release
+
 BIN = bin
 VALGRIND_LOG = $(BIN)/valgrind_test.log
 UNIT_CASES = $(patsubst test_%.c,%,$(wildcard test_*.c))
@@ -328,7 +336,7 @@ test:
 # 	@$(BIN)/test_version
 
 test_release: $(LIB_RELEASE)
-	$(CC) $(CFLAGS) test_module.c $(TEST_HELPER) $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_module
+	$(CC) $(CFLAGS) test_module.c $(TEST_HELPER) $(TEST_DEBUG) $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_module
 	$(CC) $(CFLAGS) test_version.c          $(TESTBIT_SRC) $(LIB_RELEASE) -o $(BIN)/rel_test_version
 	@echo "-- release QC --"
 	@$(BIN)/rel_test_module

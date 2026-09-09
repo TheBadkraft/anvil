@@ -3,8 +3,10 @@
 All notable changes to the Anvil project are documented in this file.
 
 **Milestone note:** body parse, resolution, and the first full public API pass are all complete
-(see `[Unreleased]` below). The opt-in type system has landed; schema (`@[schema]`) is the
-current active design/implementation effort.
+(see `[Unreleased]` below). The opt-in type system and AnvilSchema have both landed, and ANVL
+proper (core + types + schema) now builds as a real distributable library
+(`lib/{debug,release}/libanvil.a`) with a functional/end-to-end test tier proving the built
+artifact itself works — see `notes/distributable-library.md`. AnvilScript is next.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -105,6 +107,26 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
 - Schema's implementation covers loading, presence, type-kind, and constraint validation with
   inheritance. See `notes/native-schema.md` for the full record, including a second real fixture
   bug (header ordering) caught along the way.
+
+### Added — Distributable library (current)
+
+- **A real root-level `Makefile`** builds `lib/debug/libanvil.a` and `lib/release/libanvil.a` —
+  ANVL proper (core + types + schema) bundled as one archive for this milestone (the bundle-vs-
+  minimal-split packaging question stays deferred; see `notes/deferred-work.md`). Release
+  objects compile with no `-g` at all, then get an explicit `strip --strip-debug
+  --strip-unneeded` pass on the archive itself — verified directly via `readelf -S` to carry zero
+  `.debug_*` sections, at roughly 40% the size of the debug archive.
+- **`test/functional/`** — a new test tier, deliberately structured to compile only its own test
+  file and link against the *built* library (never a `src/*.c` file, never an `internal/`
+  header), proving the shipped artifact itself works for a real consumer. 5 tests (core parse,
+  AMP's restrictions, opt-in type resolution, and AnvilSchema validating both a clean and a
+  violating document), 21/21 assertions, run against both the debug and release archives,
+  Valgrind-clean on both.
+- **`test/unit`'s `test_release` target actually works now** — it referenced
+  `$(LIB_DEBUG)`/`$(LIB_RELEASE)` from the start but nothing ever built them, so it had never
+  once succeeded; also fixed a real missing link dependency (`test/utilities/debug.c`) surfaced
+  by finally running it. 33/33 tests, 159/159 assertions, linked entirely against the real
+  release archive. Full technical record: `notes/distributable-library.md`.
 
 ---
 

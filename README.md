@@ -28,8 +28,9 @@ reflects what's real and verified today, not what's planned.
 | **Resolution** — `$identifier` VarRef, `base`/inheritance, field-merging | ✅ Complete |
 | **Public C API** — `anvil_flat.h` (flat) + `anvil_vtable.h` (vtable) | ✅ Complete |
 | **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented, first phase |
-| **AnvilSchema** (`@[schema]`, validating a document's shape) | ✅ Implemented, first phase |
-| **ASL** (`#!asl`) — embedded scripting | 📝 Design only — nothing implemented |
+| **AnvilSchema** (`@[schema]`, validating a document's shape, full constraint checking) | ✅ Implemented |
+| **Distributable library** (`lib/{debug,release}/libanvil.a`, functional/e2e tests against it) | ✅ Implemented |
+| **ASL** (`#!asl`) — embedded scripting | 📝 Design only — nothing implemented, not required for "ANVL proper" |
 
 ## The Case for Anvil
 
@@ -64,8 +65,11 @@ that imports the file that defines it. Nothing about opting in changes the defau
 doesn't. See [`docs/types-reference.md`](docs/types-reference.md) for the full reference.
 
 Schema (validating a *data* document's shape against declared field types) builds on the same
-type system and is the current active design/implementation effort — see
-[`notes/native-schema.md`](notes/native-schema.md) for the design record.
+type system and is fully implemented, including constraint checking (`size`/`min`/`max`/`values`)
+and type inheritance — see [`notes/native-schema.md`](notes/native-schema.md) for the design
+record. "ANVL proper" (core + types + schema) now builds as a real static library and is the
+project's current milestone before AnvilScript starts — see
+[`notes/distributable-library.md`](notes/distributable-library.md).
 
 ---
 
@@ -85,13 +89,19 @@ anvil/
 ├── src/
 │   ├── core/                    ← parser, resolver, document, module, source, errors
 │   ├── sigma/                   ← vendored Sigma collections implementation
-│   └── anvil_types.c            ← opt-in type registry — part of ANVL proper, not an add-on
+│   ├── anvil_types.c            ← opt-in type registry — part of ANVL proper, not an add-on
+│   └── schema/schema.c          ← AnvilSchema — the real add-on, layered on top of types
+├── lib/                         ← built by the root Makefile, not checked in — debug/release
+│   ├── debug/libanvil.a         ← full DWARF info
+│   └── release/libanvil.a       ← no debug symbols, verified via readelf
 ├── test/
 │   ├── unit/                    ← TestBit-based unit suites (the supported quality gate)
+│   ├── functional/              ← links only against the built lib/, proves the artifact itself
 │   ├── sigma/                   ← Sigma-subset unit suites
 │   └── fixtures/                ← .anvl test fixtures
 ├── docs/                        ← language/API reference, user-facing docs
 ├── notes/                       ← design-thread records (internal, not user-facing)
+├── Makefile                     ← builds the real distributable library
 └── README.md
 ```
 
@@ -112,7 +122,17 @@ rather than living inside it.
 
 ## Building and Testing
 
-There is no unified top-level build yet — each test suite is its own Makefile target:
+The root `Makefile` builds the real distributable library — core + types + schema bundled into
+one static archive for now (see [`notes/distributable-library.md`](notes/distributable-library.md)
+for why, and what's still open about that choice):
+
+```sh
+make lib            # both lib/debug/libanvil.a and lib/release/libanvil.a
+make lib-release     # release only — no debug symbols, verified via readelf
+```
+
+Each unit-test suite is still its own Makefile target, compiling `src/*.c` directly rather than
+linking the library (faster iteration during TDD):
 
 ```sh
 cd test/unit
@@ -121,9 +141,17 @@ make test_anvil_native val   # build, run under Valgrind, one suite
 ```
 
 `test/unit/Makefile` lists the mandatory core sources (`ANVIL_SRCS`) plus opt-in module sources
-(e.g. `TYPES_SRCS` for `src/anvil_types.c`) per binary that needs them. A real, packaged library
-build (static and shared, with the type system bundled into core and schema as a separate,
-linkable add-on) is on the near-term roadmap.
+(e.g. `TYPES_SRCS` for `src/anvil_types.c`) per binary that needs them.
+
+`test/functional/` is different on purpose: it links only against the *built* library
+(`lib/debug/libanvil.a` or `lib/release/libanvil.a`), never a `src/*.c` file directly, to prove
+the shipped artifact itself works end to end for a real consumer:
+
+```sh
+cd test/functional
+make debug     # build the lib (if needed) and run against lib/debug/libanvil.a
+make release   # same, against the stripped lib/release/libanvil.a
+```
 
 ## Documentation
 
