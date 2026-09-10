@@ -27,7 +27,7 @@
  * Dialect: AML vs ASL vs AMP
  * ----------------------------------------------------------------------- */
 typedef enum {
-   ANVL_DIALECT_AML,   // Anvil Markup Language (full features)
+   ANVL_DIALECT_AML,   // Anvil Modelling Language (full features)
    ANVL_DIALECT_ASL,   // Anvil Script Language (future)
    ANVL_DIALECT_AMP,   // Anvil Messaging Protocol (scalars + blobs only)
    ANVL_DIALECT_ERROR, // Error state for dialect detection
