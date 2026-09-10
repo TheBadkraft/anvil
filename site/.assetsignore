@@ -1,0 +1,11 @@
+.wrangler
+.wrangler/**
+node_modules
+node_modules/**
+package.json
+package-lock.json
+wrangler.toml
+scripts
+scripts/**
+.gitignore
+.assetsignore

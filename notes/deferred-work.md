@@ -30,44 +30,56 @@ Cloudflare Worker, untouched by this move. `anvil.js/package.json`'s `build:site
 `site:deploy` scripts and its `wrangler` devDependency were removed (its own `build`/`test`
 scripts are untouched and still pass, 145/145).
 
-Three separate open items, deliberately not decided yet:
+**Hosting and cutover — resolved.** Repo owner's explicit call: keep Cloudflare
+(`wrangler.toml`, custom domain routing for `anvldata.com`/`www.anvldata.com`) and cut over now
+rather than defer further. Deployed live via `wrangler deploy` from `anvil/site/` — confirmed
+working end to end (`/`, `/download`, `/docs`, `/sandbox`, `/oml` all resolve, real distributable
+downloads verified 200 with correct content).
 
-1. **Where should the site actually be hosted going forward?** Currently Cloudflare
-   Workers/Pages (`wrangler.toml`, custom domain routing for `anvldata.com`/`www.anvldata.com`).
-   Raised as an open question: keep Cloudflare, or move hosting to the Linode instance instead
-   (which already hosts `anvl-js.git`'s bare repo and mirrors several project checkouts under
-   `~/projects/`)? Not decided — needs its own discussion before any redeploy happens.
-2. **The live cutover itself** — actually pointing `anvldata.com` at whatever hosting answer #1
-   lands on, from the new `anvil/site/` location — is a deliberate, separate, later step
-   regardless of hosting choice, not something to bundle into a routine commit.
-3. **The content rewrite — first real pass done.** A new "Bindings" section
-   (`site/assets/docs/Bindings-Guide.md`, linked from `docs.html`'s nav) consolidates
-   `anvil.node`'s own `wiki/API-Reference.md`/`Quick-Start.md` (real, accurate content, pulled
-   in per the plan below) plus a WASM-specific `ready()` section and a native-C-library section
-   — exactly the per-binding consolidation this item called for. `download.html` now serves real
-   distributables: `site/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz` (static + shared
-   `libanvil`, release/stripped, plus public headers — verified standalone, extracted to a clean
-   dir and linked against with nothing else from the repo present) and
-   `anvil-wasm-v0.8.0-rc.tar.gz` (the real Emscripten build, pulled from the Linode box).
-   `index.html`/`download.html`/`docs.html`/`sandbox.html`/`oml.html` all had their
-   `anvl-js`/"pure JS parser" framing corrected to present Anvil Native (C) as the reference
-   implementation. **Deliberately not touched**: `Quick-Start.md`/`API-Reference.md`/`How-To.md`/
-   `Error-Codes.md` are still `anvl-js`-specific (now labeled "(legacy JS)" in the nav rather than
-   silently left misleading) because `sandbox.html` genuinely still runs on `anvl.global.js` — a
-   real WASM-based sandbox rewrite is a separate, not-yet-done follow-up, not a quick patch, so
-   the old bundle/docs stay in place rather than being deleted out from under a working feature.
-   `scripts/build-site.js` is still stale (this pass added files directly rather than through it)
-   — real rework still pending. `anvil.node` has no public download yet (no GitHub presence, no
-   npm publish — repo owner: "worry about public repos later, if at all") — its guide section is
-   real and complete, just without a download link. **`docs/types-reference.md`/`docs/schema/
-   README.md`** (this repo's own language-level docs, mentioned below as ready to pull from)
-   are still not yet pulled into the site itself — next candidate for a further content pass.
-4. **Website comparison content, flagged for later, not urgent**: FlyWire's own recorded metrics
-   (`../flywire/docs/FLYWIRE_TASKS.md`, `FLYWIRE_TESTING_AND_METRICS.md` — e.g. the real, already-
-   measured `Table.decode()` vs `JSON.parse()` numbers) are worth mining for the rewritten site's
-   eventual comparisons-with-JSON content, once the content rewrite actually starts — FlyWire
-   already outperforms conventional JSON practice in real, recorded ways even on the *old* pure-JS
-   parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the comparison.
+**Real, live security-relevant bug found and fixed during that first deploy**: `wrangler.toml`'s
+`[assets] directory = "."` serves the *entire* `site/` directory as public static assets with no
+exclusions — including whatever happened to exist on disk at deploy time, not just tracked
+content. The first deploy publicly served `.wrangler/cache/wrangler-account.json` (Cloudflare
+account ID + owner email, left behind by wrangler's own local CLI state) at a real, fetchable
+URL, plus `wrangler.toml`/`package.json`/`scripts/build-site.js` as an incidental side effect of
+the same lack of exclusions. Fixed immediately: added `site/.assetsignore` (gitignore-syntax,
+Wrangler's own convention for excluding paths from the deployed asset set) excluding
+`.wrangler/`, `node_modules/`, `package.json`, `wrangler.toml`, `scripts/`, and the ignore files
+themselves; added `site/.gitignore` for `.wrangler/`/`node_modules/` too, so this can't recur via
+a future commit either. Redeployed and directly verified via `curl` that every one of those
+paths now 404s on the live domain. **Lesson for next time a static-assets Worker gets touched**:
+check what's actually in the assets directory (`ls -la`, not just `git status`) before the first
+deploy from a fresh clone/checkout, not after.
+
+**The content rewrite — first real pass done, then a follow-up cleanup pass.** A new "Bindings"
+section (`site/assets/docs/Bindings-Guide.md`, linked from `docs.html`'s nav) consolidates
+`anvil.node`'s own `wiki/API-Reference.md`/`Quick-Start.md` (real, accurate content) plus a
+WASM-specific `ready()` section and a native-C-library section — the per-binding consolidation
+this item originally called for. `download.html` serves real distributables:
+`site/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz` (static + shared `libanvil`,
+release/stripped, plus public headers — verified standalone) and `anvil-wasm-v0.8.0-rc.tar.gz`
+(the real Emscripten build, pulled from the Linode box). `anvil.node` has no public download yet
+(no GitHub presence, no npm publish — repo owner: "worry about public repos later, if at all") —
+its guide section is real and complete, just without a download link.
+
+Follow-up pass, once the repo owner confirmed nothing depends on the old bundle: removed
+`anvl.global.js`/`anvl.esm.js`/`anvl.cjs` and the JS-implementation-specific docs
+(`Quick-Start.md`/`API-Reference.md`/`How-To.md`/`Error-Codes.md`) outright rather than leaving
+them "(legacy JS)"-labeled. `sandbox.html` genuinely depended on `anvl.global.js` for its live
+parse/tree-view demo — replaced with an honest placeholder (download links + the bindings guide)
+rather than a broken page; a real WASM-based sandbox is still a separate, not-yet-done rewrite.
+Rewrote `assets/docs/README.md` (the docs "Overview") from an anvl-js project description into a
+real Anvil overview. `scripts/build-site.js` is still stale (this pass added files directly
+rather than through it) — real rework still pending. **`docs/types-reference.md`/`docs/schema/
+README.md`** (this repo's own language-level docs) are still not yet pulled into the site itself
+— next candidate for a further content pass.
+
+**Website comparison content, flagged for later, not urgent**: FlyWire's own recorded metrics
+(`../flywire/docs/FLYWIRE_TASKS.md`, `FLYWIRE_TESTING_AND_METRICS.md` — e.g. the real, already-
+measured `Table.decode()` vs `JSON.parse()` numbers) are worth mining for the site's own
+comparisons-with-JSON content (`index.html` already has a first version of this table) — FlyWire
+already outperforms conventional JSON practice in real, recorded ways even on the *old* pure-JS
+parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the comparison.
 
 ## Deferred to compilation (`anvilc` / `.anvlo`)
 

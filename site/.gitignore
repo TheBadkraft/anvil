@@ -1,0 +1,4 @@
+# Wrangler's own local state/cache -- never meant to be committed or deployed as a public
+# asset. Excluded from deploy via .assetsignore too, as defense in depth.
+.wrangler/
+node_modules/
