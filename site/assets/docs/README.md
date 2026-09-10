@@ -1,56 +1,47 @@
-# anvl-js
+# ANVL
 
 **ANVL** — *Attributed · Node · Variadic · Language*
 
-A JavaScript parser and serializer for ANVL — the AML (declarative
-modelling) and AMP (restricted messaging) dialects. Pure JavaScript, no
-native dependencies, full round-trip capability (parse → `AnvilNode` tree →
-serialize).
+A text format with two dialects — **AML** for declarative modelling and configuration, and
+**AMP** for restricted, scalar-only messaging payloads. Anvil Native, the reference
+implementation, is one C parser with no runtime dependencies; Node.js and WebAssembly bindings
+wrap it directly, so a document parses identically no matter which one reads it.
 
-> **Status:** alpha software. The AML/AMP grammar and API are stable
-> enough to build against, but the API surface may still change before a
-> 1.0 release.
+> **Status:** release-candidate software. The grammar and public API are stable enough to build
+> against, but the surface may still move before a 1.0 release.
 
 ## Quick start
 
-```js
-import { parse, write } from './src/index.js';
-
-const source = `#!aml
+```anvl
+#!aml
 server := {
-    host := localhost;
+    host := "localhost";
     port := 8080;
-};`;
-
-const node = parse(source);
-const config = node.get('server');
-config.get('host').asString(); // "localhost"
-config.get('port').asInt();    // 8080
-
-write(node); // re-serializes the full document back to ANVL source text
+};
 ```
 
-If `parse()` fails, it returns `null` instead of throwing — check
-[`lastError()`](wiki/API-Reference.md#lasterror) for details.
+```c
+#include "anvil_flat.h"
+
+anvil_document doc = anvil_load_buffer(source, source_len);
+anvil_statement stmt = anvil_statement_get(doc, "server");
+```
+
+The same document parses the same way through every binding — see [Bindings](Bindings-Guide.md)
+for the Node.js/WebAssembly/native-C equivalents of the snippet above.
 
 ## Documentation
 
-Full docs live in [`wiki/`](wiki/Home.md):
+- **[AML Guide](AML-Guide.md)** — objects, arrays, tuples, attributes, inheritance, `$` VarRefs, blobs
+- **[AMP Guide](AMP-Guide.md)** — the restricted messaging dialect and what it forbids
+- **[Bindings](Bindings-Guide.md)** — native C library, Node.js, and WebAssembly: usage guides and downloads
 
-- **[Quick Start](wiki/Quick-Start.md)** — install, first parse, first write
-- **[AML Guide](wiki/AML-Guide.md)** — objects, arrays, tuples, attributes, inheritance, `$` VarRefs, blobs
-- **[AMP Guide](wiki/AMP-Guide.md)** — the restricted messaging dialect and what it forbids
-- **[API Reference](wiki/API-Reference.md)** — every exported function and `AnvilNode` method
-- **[How-To](wiki/How-To.md)** — task-based recipes (error handling, minified output, round-tripping, iterating collections)
-- **[Error Codes](wiki/Error-Codes.md)** — full error code reference
+## Why not just JSON?
 
-## Testing
-
-```bash
-npm test          # run once
-npm run test:watch
-```
+JSON is a fine wire format. It's a rough config format — no comments, no way to reference a
+value you already defined, no restricted subset for contexts where a payload shouldn't be able
+to grow arbitrary structure. See the [home page](/) for the full comparison.
 
 ## License
 
-MIT
+Proprietary — see the [anvil repo](https://github.com/TheBadkraft/anvil) for licensing detail.

@@ -60,12 +60,11 @@ bad := (1, { x := 2; });  // AMP_OBJECT_FORBIDDEN (object takes precedence over 
 
 ## Why the distinction matters
 
-AML and AMP are parsed through **separate dispatch function trees**
-(`parseAmlValue` / `parseAmpValue` in `src/parser.js`), not one generic
-parser with dialect `if` checks sprinkled through shared code. This means a
-feature added to AML — say, a new collection type — can't accidentally
-become reachable from AMP just because it shares a code path. This
-separation is enforced deliberately, not just by convention.
+The dialect is declared once, on the shebang line, and enforced immediately from that point on
+— not inferred, not mixed, and not a runtime flag layered on top of one generic grammar. A
+feature added to AML — say, a new collection type — can't accidentally become reachable from
+AMP just because it shares a code path. This separation is enforced deliberately, not just by
+convention.
 
-See [Error Codes](Error-Codes.md) for the complete list, including the
-codes AML and AMP share (missing semicolons, empty collections, etc.).
+See the [Bindings guide](Bindings-Guide.md) for how errors surface through each binding's own
+API (`lastError()`'s `{ message, line, column }` shape).
