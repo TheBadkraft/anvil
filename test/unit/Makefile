@@ -363,4 +363,4 @@ test_release: $(LIB_RELEASE)
 	@$(BIN)/rel_test_version
 
 clean:
-	rm -f $(BIN)/*
+	rm -rf $(BIN)/*

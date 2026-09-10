@@ -59,6 +59,13 @@ dkms.conf
 build/
 bin/
 
+# Coverage reports (make coverage)
+*.gcno
+*.gcda
+coverage.info
+coverage.filtered.info
+coverage-html/
+
 # Test logs
 logs/
 

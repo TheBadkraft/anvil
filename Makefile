@@ -105,4 +105,22 @@ $(RELEASE_OBJ)/%.o: src/%.c
 	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf build lib
+	rm -rf build lib coverage.info coverage.filtered.info $(COVERAGE_DIR)
+
+# Combines test/unit's coverage (Anvil's own usage of the Sigma subset, plus core/types/schema)
+# with test/sigma's (the Sigma subset's own dedicated suites, which exercise types Anvil itself
+# never touches -- parray/slotarray/stack) into one merged picture. Neither directory alone
+# tells the true story: test/unit barely touches parray/slotarray/stack (Anvil doesn't use
+# them), and test/sigma barely touches memory.c (its suites mostly use a fake arena, not the
+# real allocator) -- each fills in what the other misses.
+.PHONY: coverage
+COVERAGE_DIR = coverage-html
+coverage:
+	$(MAKE) -C test/unit coverage
+	$(MAKE) -C test/sigma coverage
+	lcov --capture --directory test/unit/bin --directory test/sigma/bin \
+		--output-file coverage.info --rc branch_coverage=0
+	lcov --remove coverage.info '*/testbit/*' '*/test/unit/*' '*/test/sigma/*' \
+		'*/test/utilities/*' -o coverage.filtered.info
+	genhtml coverage.filtered.info --output-directory $(COVERAGE_DIR)
+	@echo "Combined coverage report: $(COVERAGE_DIR)/index.html"

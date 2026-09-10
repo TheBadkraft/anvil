@@ -31,6 +31,24 @@ BIN = bin
 VALGRIND_LOG = $(BIN)/valgrind_test.log
 UNIT_CASES = $(patsubst test_%.c,%,$(wildcard test_*.c))
 
+# Same approach as test/unit/Makefile's coverage target: gcc namespaces each source's
+# .gcno/.gcda by the binary's own name when compiling multiple sources into one -o target
+# with --coverage, so all 10 suites' coverage data coexist in bin/ without colliding.
+COVERAGE_DIR = coverage-html
+COVERAGE_INFO = $(BIN)/coverage.info
+COVERAGE_FILTERED = $(BIN)/coverage.filtered.info
+
+.PHONY: coverage
+coverage:
+	@$(MAKE) clean
+	@$(MAKE) all CFLAGS="$(CFLAGS) --coverage"
+	@echo "-- running every suite to collect coverage data --"
+	@for t in $(BIN)/test_*; do "$$t" >/dev/null 2>&1 || true; done
+	lcov --capture --directory $(BIN) --output-file $(COVERAGE_INFO) --rc branch_coverage=0
+	lcov --remove $(COVERAGE_INFO) '*/testbit/*' '*/test/sigma/*' -o $(COVERAGE_FILTERED)
+	genhtml $(COVERAGE_FILTERED) --output-directory $(BIN)/$(COVERAGE_DIR)
+	@echo "Coverage report: $(BIN)/$(COVERAGE_DIR)/index.html"
+
 define run_test_bin
 	@if [ -n "$(filter build,$(MAKECMDGOALS))" ]; then \
 		echo "-- build only: $(1) --"; \
@@ -171,4 +189,4 @@ test:
 	@:
 
 clean:
-	rm -f $(BIN)/*
+	rm -rf $(BIN)/*
