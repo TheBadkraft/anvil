@@ -157,6 +157,39 @@ make debug     # build the lib (if needed) and run against lib/debug/libanvil.a
 make release   # same, against the stripped lib/release/libanvil.a
 ```
 
+## What is Sigma?
+
+`src/sigma/` is a vendored subset of **Sigma** — a separate collections/allocator library
+(`List`, `Map`, `farray`/`parray`/`slotarray`, a `Stack`, an arena/bump allocator, a
+generic `Query` iterator, ...) that Anvil's core is built directly on top of: every growable
+list, every identifier map, every arena allocation in `src/core/` goes through Sigma, not a
+hand-rolled equivalent. It's vendored in-repo (not a separate dependency) as an R&D sandbox —
+new capability gets tried here first, against Anvil's own real usage, before it lands in the
+real, separate Sigma repos. `test/sigma/` is Sigma's own dedicated test suite, independent of
+whatever subset Anvil itself happens to exercise.
+
+## Test Coverage
+
+A manually-updated snapshot, not a CI-generated badge — this repo has no CI pipeline yet, so a
+live badge would just be one more thing to trust without a way to verify it. Regenerate anytime
+with `make coverage` (needs `gcov`, plus `lcov`/`genhtml` for the HTML report;
+`test/unit/Makefile` and `test/sigma/Makefile` also have their own `coverage` targets for a
+single directory's suites). Combined `test/unit` + `test/sigma` run, most recent regen:
+
+| | Line | Function |
+|---|---|---|
+| **Overall** (26 source files: core + types + schema + sigma) | **81.2%** | **90.9%** |
+| Core (`src/core/`) | 60–100%, mostly 80–92% | mostly 100% |
+| `anvil_types.c` / `schema/schema.c` | 92.3% / 89.0% | 100% / 100% |
+| Sigma (`src/sigma/`) | 51–100%, wide spread | 58–100%, wide spread |
+
+Sigma's spread is real and expected, not a gap to close on a schedule: `test/unit` only
+exercises the slice Anvil's core actually calls, and `test/sigma` covers real functions Anvil
+never touches at all (`parray`/`slotarray`, most of `strings.c`) — the combined number already
+reflects both suites together, which is why it's higher than either alone. Nothing here is
+enforced by CI; it'll drift out of date as new code lands until someone reruns `make coverage`
+and updates this table by hand. That's a deliberate, accepted tradeoff for now, not an oversight.
+
 ## Documentation
 
 - [`docs/getting-started.md`](docs/getting-started.md) — practical, task-oriented walkthrough of
