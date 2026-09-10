@@ -158,6 +158,118 @@ Three things Anvil Native didn't have yet, closed in this order (each RED-first)
 
    This had zero prior observable impact — the only existing caller of the parser's own `anvl_get_error()` (`test_body_amp.c`'s `AMP00c`) only ever checked the success case, where `parser.err_code` was correctly `ANVL_ERR_NONE` regardless. Caught only because a *new* caller (`anvil_parse_value_fragment`, gap #3) needed to trust `parser.err_code` directly and got `ANVL_ERR_NONE` on every real failure until this was found. `doc_parse_body`/`anvl_parse_value_fragment` already worked around the outer symptom by reading the real code back from `doc->context->errors` instead — this fix means new code no longer has to independently rediscover that workaround. New regression coverage: `test_body_amp.c` `AMP00b` (extended — now also asserts `anvl_get_error()` itself, not just `doc_parse_body`'s own out-param).
 
+### FR — FlyWire's required `anvil-node`/`anvil-wasm` surface, post-parity
+
+**ID:** FR-flywire-binding-surface-001
+**Type:** Feature Request
+**Owner:** anvil-node / anvil-wasm (one ask, identical surface — see "Why one ask, not two" below)
+**Filed:** 2026-09-10
+**Status:** open
+**Requested by:** FlyWire (`../flywire/`)
+**Tags:** bindings, anvil-node, anvil-wasm, anvlnode, surface
+
+#### Summary
+
+Both bindings just reached parity on their initial planned surface (`getVersion`/`parseRawValue`/`parse`/`lastError`, `AnvlNode`'s `has`/`get`/`hasAttribute`/`entries`/`count`/`at`/`asString`/`asBool`/`asInt`). This FR is the follow-up round of exactly the investigation that produced items 1–6 above — re-verified against FlyWire's *current* real code (it's grown substantially since that investigation: full CRUD, a write-validation taxonomy, a schema-format redesign) rather than assumed still accurate. Method: every file in FlyWire that `require()`s its ANVL dependency was grepped for every call made on it, cross-checked by hand against false positives (plain JS objects that happen to share a method name — a schema field's own `.type`/`.field` properties, `Map.get()`, etc.) — not sampled, not remembered from an earlier pass.
+
+**Net result: the currently-planned/built surface already covers everything FlyWire needs, with one real, precise exception (below).** This FR exists to (a) confirm that coverage with real, load-bearing usage samples per surface member, so it's clear this is a verified need and not a guess, and (b) name the one gap precisely enough to close it without further back-and-forth.
+
+**Why one ask, not two:** FlyWire's own repo owner's framing — a browser client's needs are the same shape as the server's (parse a schema once, decode responses the same way) — so every sample below is real, currently-exercised *server-side* Node code, and the ask is that both bindings expose the identical surface, not that this FR is scoped to Node only.
+
+#### The verified surface
+
+**3 module-level functions** — already landed on both bindings, per the Status table in each README:
+
+- `parse(text)`
+- `parseRawValue(text)`
+- `lastError()`
+
+**10 `AnvlNode` instance members** — 9 already landed; `.type` is the one gap (see below):
+
+- `.get(key)`, `.has(key)`, `.hasAttribute(key)`, `.entries()`, `.at(index)`, `.count`, `.asString()`, `.asInt()`, `.asBool()` — landed.
+- `.type` — **not confirmed landed; see "The gap" below.**
+
+**Confirmed, by the same grep, as *not* needed** — no real call site anywhere in FlyWire justifies `asFloat`, `isNull`, `keys`, `field`, `is`, `hasBase`, `baseIdentifier`, `asBuffer`, or the singular value-returning `attribute(key)` (only the boolean `hasAttribute(key)` check is ever used). Listed explicitly so silence isn't read as an oversight.
+
+#### Real usage samples — this is load-bearing code today, not a wishlist
+
+`parse()` + `hasAttribute()` — schema self-description check, `schema-registry.js`'s `loadFromText()` (the real client-side schema-fetch path, not just the server's local-file path):
+
+```js
+const root = anvl.parse(source);
+if (!root) {
+    const err = anvl.lastError();
+    throw new Error(`Failed to parse ${sourceLabel}: ${err.message}`);
+}
+if (!root.hasAttribute('schema')) {
+    throw new Error(`${sourceLabel} has no @[schema] attribute — not a *.meta.anvl schema file?`);
+}
+```
+
+`entries()` + `has()`/`get()`/`asString()`/`asInt()`/`asBool()` — the real per-field schema-parsing loop, same file, reading a generated `*.meta.anvl`'s top-level anonymous-object fields:
+
+```js
+for (const [fieldName, fieldNode] of root.entries()) {
+    if (fieldNode.has('pooled') && fieldNode.get('pooled').asBool()) {
+        type = 'pooled';
+    } else {
+        type = fieldNode.get('type').asString();
+        size = (type === 'int32' || type === 'date') ? 4 : fieldNode.get('size').asInt();
+    }
+    const required = fieldNode.has('required') && fieldNode.get('required').asBool();
+    // ...
+}
+```
+
+`at()` + `count` — reading a schema field's own `values`/`mask` array (an enum's legal values, or a bitmask's value set — both generated from a real Postgres `CHECK` constraint):
+
+```js
+if (fieldNode.has('values')) {
+    const valuesNode = fieldNode.get('values');
+    values = [];
+    for (let i = 0; i < valuesNode.count; i++) values.push(valuesNode.at(i).asString());
+}
+```
+
+`parseRawValue()` + `lastError()`'s real disambiguation contract — `table.js`'s `decode()`, and the exact reason a `null` return can't be trusted alone:
+
+```js
+decode(text, schema) {
+    const rows = anvl.parseRawValue(text);
+    if (rows === null) {
+        const err = anvl.lastError();
+        if (err) throw new Error(`Table.decode(): parse failed: ${err.message}`);
+        return []; // encode()'s own empty-table case, not a failure — a genuine ANVL null decodes to JS null too
+    }
+    return rows.map(tupleValues => { /* ... */ });
+}
+```
+
+#### The gap: `.type`
+
+`harness/server.js`'s CREATE handler dispatches single-row vs. batch insert on the request body's own shape — real, currently-shipped code, not planned:
+
+```js
+if (setNode.type === 'array') {
+    // Multi-row CREATE: set{} as an array of rows instead of one.
+    // ...
+} else {
+    // Single-row CREATE.
+}
+```
+
+`anvil.js` (the pure-JS parser both bindings are meant to deprecate) exposes this as a plain getter — `get type()`, returning `'object'`/`'array'`/`'tuple'`/`'scalar'`/`'blob'`, or `null` for an unset/invalid node — and FlyWire's code above depends on exactly that distinction (`'array'` vs. `'object'`) to know whether a request body is one row or many.
+
+**Why this wasn't already in the ask:** item 1 above (and each binding's own README) describes the investigation as covering `src/table.js`, `src/schema-registry.js`, `src/anvl/index.js` — an accurate list *at the time*, but `harness/server.js` (where CREATE, and this dispatch, actually live) didn't exist yet when that investigation happened, or wasn't in scope. Not a mistake in the original work — a real gap that opened up as FlyWire grew past that snapshot, found now by re-verifying rather than assuming the old investigation still covers current reality.
+
+**What's expected to close it:** `AnvlNode` (both bindings, identical) exposes a `.type` property (or `.getType()`/`.kind` if a property getter doesn't fit the binding's own idiom better — naming is the binding owner's call, not prescribed here) returning the same small, closed set of strings `anvil.js`'s `get type()` already returns for the *root* node and any node reachable via `.get()`/`.at()`. FlyWire's own real need only exercises `'array'` vs `'object'` at the moment, but the full set (including `'tuple'`/`'scalar'`/`'blob'`) costs nothing extra to expose uniformly, and closes exactly this kind of narrow-investigation gap from recurring on the next thing FlyWire builds.
+
+#### Non-goals — deliberately excluded from this ask
+
+- **A plain-JS-value → ANVL-text serializer** (the mirror of `parseRawValue()`, needed for safely constructing `set{}`/`where{}` request bodies client-side without hand-escaped string templating). Real gap, found in the same review — but there is no real consumer for it in FlyWire yet (no browser client exists; the one place that currently builds request text, `harness/client.js`, is test-harness code, not a production client), so per FlyWire's own standing rule against wishlist asks, it's tracked as FlyWire's own internal follow-up instead, revisited if/when a real client actually needs it.
+- **AnvilSchema / the type system** — real and implemented at the `anvil` core layer, but nothing in FlyWire's current code needs it exposed through either binding yet. Not part of this ask.
+- Everything in the "confirmed... not needed" list above.
+
 ## Open questions
 
 - Anonymous (`OBJECT_BLOCK`) statement field traversal — `anvil_statement_get_value` returns NULL for one today (it genuinely has no `.value`, only `.body`); nobody's asked for this traversal yet, so it stays out of scope until they do.
