@@ -37,7 +37,7 @@ a parse error too, not a bare string. This build doesn't do anything with
 these three words itself; they're reserved so a document written today
 doesn't break once parsed by the eventual native/WASM replacement, which
 does give them grammar meaning. `true`/`false`/`null` are different: they
-already mean something in value position (see [Scalars](#scalars) below)
+already mean something in value position (see [Scalars](AML-Guide.md#scalars) below)
 and remain perfectly valid there — only their use as an identifier is
 restricted, closing a real ambiguity rather than hedging against the
 future.

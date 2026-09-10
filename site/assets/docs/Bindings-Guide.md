@@ -7,9 +7,9 @@ one reads it. Pick the one that matches where your code runs.
 
 | | Runtime | Status |
 |---|---|---|
-| [Native library](#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
-| [WebAssembly](#webassembly) | Browser, or any JS host | Downloadable today |
-| [Node.js](#nodejs) | Node.js (N-API) | Downloadable today |
+| [Native library](Bindings-Guide.md#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
+| [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | Downloadable today |
+| [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | Downloadable today |
 
 ## Native library
 
@@ -76,7 +76,7 @@ if (!doc) {
 
 Every call after `ready()` resolves is a plain synchronous call — the async cost is paid once,
 not per parse. Everything else below (`parse()`'s return shape, `parseRawValue()`, `AnvlNode`,
-the error object) is identical to the Node binding's own API — see [Node.js](#nodejs) below for
+the error object) is identical to the Node binding's own API — see [Node.js](Bindings-Guide.md#nodejs) below for
 the full reference; only the loading step differs.
 
 ## Node.js
@@ -91,7 +91,7 @@ real source, correctly reported a real syntax error via `lastError()`.
 - Node.js with N-API support (any current LTS). Built and tested against Node 22.x — N-API's
   own ABI-stability guarantee means other recent majors should work too, but that hasn't been
   verified against older ones.
-- Linux x86_64 (glibc) only today, same as the [native library](#native-library). Other
+- Linux x86_64 (glibc) only today, same as the [native library](Bindings-Guide.md#native-library). Other
   platforms build from source (`npm install && npm run build`, needs a C2x compiler and Python 3
   for `node-gyp`) — not yet published to a package registry, so building means pointing at a
   real checkout, not `npm install anvil-node`.
@@ -117,6 +117,12 @@ if (!doc) {
 ```
 
 ### `AnvlNode` — a single, read-only facade over a parsed value
+
+**Type inspection**
+
+| Member | Returns | Notes |
+|---|---|---|
+| `.type` | `'object' \| 'array' \| 'tuple' \| 'scalar' \| 'blob' \| null` | Tells `[1,2]` (an array) apart from `(1,2)` (a tuple), or a plain string apart from a blob — distinctions `.asString()`/`.at()`/`.count` alone can't make. Identical on both bindings. |
 
 **Object navigation**
 
