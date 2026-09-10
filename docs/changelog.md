@@ -2,24 +2,30 @@
 
 All notable changes to the Anvil project are documented in this file.
 
-**Milestone note:** body parse, resolution, and the first full public API pass are all complete
-(see `[Unreleased]` below). The opt-in type system and AnvilSchema have both landed, and ANVL
-proper (core + types + schema) now builds as a real distributable library
-(`lib/{debug,release}/libanvil.a`) with a functional/end-to-end test tier proving the built
-artifact itself works — see `notes/distributable-library.md`. AnvilScript is next.
+**Milestone note:** ANVL proper (core + types + schema) is feature-complete and ships as a real
+distributable library (static and shared, debug and release — see `notes/distributable-library.md`)
+as of `v0.8.0-rc` below. AnvilScript is next — mostly bridging work between the ANVL parser and a
+separate script-engine AST parser, so AnvilScript's own grammar can evolve independently of
+ANVL's.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased] — (2026-08-17 – 2026-09-08)
+## [v0.8.0-rc] — (2026-08-17 – 2026-09-09)
 
-Three and a half weeks with no changelog entry, spanning a lot of real, substantial work. The
-early part of this window (body-parse through the first public-API pass) is summarized at
-milestone grain rather than reconstructed commit-by-commit — treat it as restructuring and
-refactoring on top of the v0.7.0-alpha foundation below, not an itemized account. The back half
-(native schema/opt-in types onward) is current work, documented in full.
+**Status:** ANVL proper (core parser + resolver, opt-in types, AnvilSchema) is feature-complete
+and builds as a real distributable library. Minor bump, not a patch: opt-in types, AnvilSchema,
+and the whole distribution/build story are new, additive surface area since `v0.7.0-alpha` — an
+`-rc` tag rather than a plain minor release since AnvilScript bridging work is still to come
+before a `v0.8.0` proper.
+
+Three and a half weeks with no changelog entry at the start of this window, spanning a lot of
+real, substantial work. The early part (body-parse through the first public-API pass) is
+summarized at milestone grain rather than reconstructed commit-by-commit — treat it as
+restructuring and refactoring on top of the v0.7.0-alpha foundation below, not an itemized
+account. Everything from native schema/opt-in types onward is current work, documented in full.
 
 ### Added — Body parse, resolution, and the public API (mid-to-late August)
 
