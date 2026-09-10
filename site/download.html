@@ -21,67 +21,67 @@
   </header>
 
   <main>
-    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <div class="pill">v<span id="version">__VERSION__</span></div>
     <h1>Download</h1>
     <p class="lede">
-      Three build formats, all produced from the same source. Pick the one
-      that matches how you're consuming it.
+      One reference implementation, in C — <a href="/docs#Bindings-Guide.md">bindings</a> wrap it
+      for other runtimes rather than reimplementing it. Pick what matches where your code runs.
     </p>
 
-    <h2>Browser — plain &lt;script&gt; tag</h2>
+    <h2>Native library — C / C++</h2>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvl.global.js</strong> — minified IIFE, no build step needed.
-          Exposes a global <code>Anvl</code> object.
+          <strong>anvil-v0.8.0-rc-linux-x86_64.tar.gz</strong> — static (<code>libanvil.a</code>)
+          and shared (<code>libanvil.so</code>) release builds, plus the public headers. Linux
+          x86_64 only today; other platforms build from source until real cross-platform CI
+          exists.
         </div>
-        <a class="btn secondary" href="/assets/dist/anvl.global.js">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz">Download</a>
       </div>
-      <pre><code>&lt;script src="anvl.global.js"&gt;&lt;/script&gt;
-&lt;script&gt;
-  const node = Anvl.parse('#!aml\nfoo := 1;');
-  console.log(node.get('foo').asInt());
-&lt;/script&gt;</code></pre>
+      <pre><code>tar -xzf anvil-v0.8.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I .../include -L .../lib -lanvil -o your_program</code></pre>
     </div>
 
-    <h2>ES Modules — bundlers &amp; modern browsers</h2>
+    <h2>WebAssembly — browser, or any JS host</h2>
     <div class="card">
       <div class="dl-row">
-        <div><strong>anvl.esm.js</strong> — for <code>import</code>, bundlers, or
-          <code>&lt;script type="module"&gt;</code>.</div>
-        <a class="btn secondary" href="/assets/dist/anvl.esm.js">Download</a>
+        <div>
+          <strong>anvil-wasm-v0.8.0-rc.tar.gz</strong> — the compiled module, its glue, and a
+          JS-facing wrapper. Module loading is async (WASM instantiation) — see the
+          <a href="/docs#Bindings-Guide.md">bindings guide</a> for the one-line difference from
+          the Node binding below.
+        </div>
+        <a class="btn secondary" href="/assets/downloads/anvil-wasm-v0.8.0-rc.tar.gz">Download</a>
       </div>
-      <pre><code>import { parse, write } from './anvl.esm.js';
-
-const node = parse('#!aml\nfoo := 1;');
-console.log(node.get('foo').asInt());</code></pre>
+      <pre><code>const anvil = require('./index.js');
+await anvil.ready();
+const doc = anvil.parse('#!aml\nfoo := 1;');
+doc.get('foo').asInt(); // 1</code></pre>
     </div>
 
-    <h2>CommonJS — Node <code>require()</code></h2>
+    <h2>Node.js — N-API</h2>
     <div class="card">
-      <div class="dl-row">
-        <div><strong>anvl.cjs</strong> — for Node projects using <code>require()</code>.</div>
-        <a class="btn secondary" href="/assets/dist/anvl.cjs">Download</a>
-      </div>
-      <pre><code>const { parse, write } = require('./anvl.cjs');
-
-const node = parse('#!aml\nfoo := 1;');
-console.log(node.get('foo').asInt());</code></pre>
+      <p style="margin: 0;">
+        Same reference implementation, same API shape as the WebAssembly binding (synchronous,
+        no <code>ready()</code> needed). Stable and in active use, but not yet packaged for
+        public download here — see the <a href="/docs#Bindings-Guide.md">bindings guide</a> for
+        the full API reference regardless.
+      </p>
     </div>
 
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
-      Full API reference is in the <a href="/docs">docs</a>. This is
-      alpha software — the format is fully documented, but expect the API
-      surface to keep moving.
+      Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>.
+      This is release-candidate software — the format and API are stable enough to build
+      against, but expect the surface to keep moving before a 1.0 release.
     </p>
   </main>
 
   <footer class="site-footer">
-    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly
+    bindings. Alpha/RC software.
   </footer>
 
   <script src="/assets/version.js"></script>
   <script>document.getElementById('version').textContent = window.ANVL_VERSION || '__VERSION__';</script>
 </body>
-
-</html>

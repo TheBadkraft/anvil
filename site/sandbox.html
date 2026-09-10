@@ -21,11 +21,13 @@
   </header>
 
   <main class="wide">
-    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <div class="pill">v<span id="version">__VERSION__</span></div>
     <h1>Sandbox</h1>
     <p class="lede">
-      This runs the real <code>anvl.global.js</code> bundle, in your browser,
-      against whatever you type below — nothing is sent to a server.
+      This runs the legacy pure-JS reference implementation (<code>anvl.global.js</code>), in
+      your browser, against whatever you type below — nothing is sent to a server. The grammar
+      it shows you is identical to <a href="/download">Anvil Native</a>'s; a WASM-based sandbox
+      running the real C parser is in progress.
     </p>
 
     <div class="cta-row" style="margin-bottom: 8px;">
@@ -77,7 +79,7 @@ derived_var := $base_var;</textarea>
   </main>
 
   <footer class="site-footer">
-    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly bindings. Alpha/RC software.
   </footer>
 
   <script src="/assets/version.js"></script>

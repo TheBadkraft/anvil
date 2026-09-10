@@ -21,22 +21,22 @@
   </header>
 
   <main>
-    <div class="pill">Alpha — v<span id="version">__VERSION__</span></div>
+    <div class="pill">v<span id="version">__VERSION__</span></div>
     <h1>A small, strict language for config and messages.</h1>
     <p class="tagline">ANVL — Attributed · Node · Variadic · Language</p>
     <p class="lede">
       ANVL is a text format with two dialects — <strong>AML</strong> for
       declarative modelling and configuration, and <strong>AMP</strong> for
-      restricted, scalar-only messaging payloads. This is the JavaScript
-      parser and serializer: pure JS, no runtime dependencies, and a
-      real, working parser you can drop into a browser with one
-      <code>&lt;script&gt;</code> tag.
+      restricted, scalar-only messaging payloads. <strong>Anvil Native</strong>,
+      the reference implementation, is a single C parser with no runtime
+      dependencies — Node.js and WebAssembly bindings wrap it directly, so a
+      document parses identically no matter which one reads it.
     </p>
 
     <div class="cta-row">
       <a class="btn primary" href="/sandbox">Try it live →</a>
       <a class="btn secondary" href="/docs">Read the docs</a>
-      <a class="btn secondary" href="/download">Download the bundle</a>
+      <a class="btn secondary" href="/download">Download</a>
     </div>
 
     <h2>Why not just JSON?</h2>
@@ -107,11 +107,13 @@
           by convention or code review. The payload can't grow arbitrary structure even by accident.</p>
       </div>
       <div class="card">
-        <h3>Round-tripping you can trust</h3>
-        <p>Most formats can't guarantee that parsing and re-serializing gives you back exactly what you started with
-          — which quietly breaks formatters, diffs, and any tooling built on top. ANVL parses to a read-only
-          <code>AnvilNode</code> tree and writes it back out — pretty-printed or minified — and re-parses to the same
-          structure, every time.</p>
+        <h3>Zero-copy, and nothing to attack</h3>
+        <p>Anvil Native's internal state is integers — byte offsets and lengths into the buffer
+          you hand it. No string is copied during parsing, and blob payloads are skipped
+          entirely: the parser records where a blob starts and how long it is, then moves on
+          without reading a single byte of its content. Under adversarial conditions — heap
+          dump, memory probe, fuzzer — the parser can't expose payload data, because it never
+          held any.</p>
       </div>
     </div>
 
@@ -128,13 +130,15 @@ var_ref    := 42;
 derived_var := $var_ref;</code></pre>
 
     <h2>Try it now</h2>
-    <p>The <a href="/sandbox">sandbox</a> runs the actual bundle in
-      your browser — paste ANVL source, parse it, and see the structure and the
-      re-serialized output, live.</p>
+    <p>The <a href="/sandbox">sandbox</a> runs live in your browser — paste ANVL source, parse
+      it, and see the structure, right now. (Currently running the legacy pure-JS reference
+      implementation while the WASM-based sandbox is still in progress — the grammar it's
+      showing you is identical either way.)</p>
   </main>
 
   <footer class="site-footer">
-    anvl-js — AML/AMP parser &amp; serializer. Alpha software.
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly
+    bindings. Alpha/RC software.
   </footer>
 
   <script src="/assets/version.js"></script>

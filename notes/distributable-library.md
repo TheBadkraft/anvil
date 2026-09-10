@@ -92,9 +92,14 @@ targets doing exactly this against both `.so` variants, alongside the existing s
   `notes/deferred-work.md`'s "Distribution philosophy" entry. Today's `libanvil.a`/`libanvil.so`
   are the convenience answer; the minimalist split (bare `libanvil`, standalone
   `libanvil_schema.a`/`.so`) has no build target yet.
-- No git tag/release cut yet — the libraries exist and work, but there's still no versioned,
-  citable artifact for the `anvil.node`/`anvil.wasm` bindings to depend on other than a pinned
-  commit.
+- **Resolved**: `v0.8.0-rc` tagged and pushed; `anvil.node`/`anvil.wasm` both bumped `vendor/anvil`
+  to that tag, rebuilt, and re-tested (21/21 and 22/22 respectively — the WASM build/test ran for
+  real on the Linode box, not just locally). A `libanvil-linux-x86_64` tarball (static + shared +
+  public headers, verified standalone) and the WASM bundle are now downloadable directly from
+  `anvldata.com` (`site/assets/downloads/`) — no GitHub Release involved; the repo owner chose
+  to host distributables directly on the site rather than as GitHub Release assets, and to leave
+  the "should `anvil.node`/`anvil.wasm` go public" question for later, if ever. See
+  `notes/deferred-work.md`'s "anvldata.com site" entry for the site-side record.
 - The shared object's `SONAME` is unversioned (`libanvil.so`, not `libanvil.so.0` with a
   `libanvil.so.0.7.0` real file and symlinks) — fine for now since nothing installs this
   system-wide yet; revisit once/if a real install path (`make install`, a package) exists.
