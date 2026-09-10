@@ -1,24 +1,25 @@
 # Anvil — The Final Data Language
 **ANVL · Version 0.8.0-rc**
 
-**Private Repository · Reference Implementation in Pure C**
+**Public Repository (Non-Open Source) · Reference Implementation in Pure C**
 
 ![ANVL Wordmark](site/images/ANVL_wordmark_light.png)
 
 **A**ttributed **N**ode **V**ariadic **L**anguage
 
-> "JSON died so ANVL could live."
-> ~ Badkraft, 2025
+> "JSON exists so ANVL could live."
 
 Anvil is not another config format. Anvil is a single language, one grammar, one parser, that
-answers three problems most stacks solve with three different tools: declarative data modeling,
-structured messaging, and (eventually) embedded scripting.
+answers three problems most stacks solve with multiple tools: 
+- declarative data modeling
+- structured messaging
+- and, embedded scripting (in design).
 
 ---
 
 ## Status, honestly
 
-This README used to claim more than the codebase actually did. Fixed now — everything below
+This README used to claim more than the codebase actually did - hypothetical, theoretical, planned. That is fixed. What is now reality — everything below
 reflects what's real and verified today, not what's planned.
 
 | Piece | Status |
@@ -43,7 +44,7 @@ reflects what's real and verified today, not what's planned.
 | **ASL** | `#!asl` | Embedded scripting and behavior automation *(design stage)* | Lua, inline eval loops |
 
 The dialect is declared on the first line and enforced immediately — no runtime modes, no flags,
-no separate parsers.
+no separate parsers (**AnvilScript** requires a separate parser to aleviate AST creation by the ANVL (Native) parser).
 
 ### The Parser Has No Attack Surface.
 
@@ -114,6 +115,8 @@ rather than living inside it.
 
 ## Core Principles
 
+Above all, we live by "Primitives Over Policy". Whenever possible, we simply provide the primitives for users to work with - tools. We don't tell users how to use them by baking policy into the code. We'll provide conventional implementation, and that's it.
+
 | Principle | Status |
 |---|---|
 | Zero-copy parsing — spans into the original buffer | ✅ Locked |
@@ -121,7 +124,9 @@ rather than living inside it.
 | Parser holds zero payload/blob data — zero attack surface | ✅ Locked |
 | No external dependencies | ✅ Locked |
 | C23 (`-std=c2x`) | ✅ Locked |
-| Strict TDD — RED before GREEN, Valgrind-clean | ✅ Practiced throughout |
+| Strict TDD | ✅ Practiced throughout |  
+
+> RED build before GREEN, then Valgrind-clean.
 
 ## Building and Testing
 

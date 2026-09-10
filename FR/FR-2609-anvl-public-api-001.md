@@ -164,7 +164,7 @@ Three things Anvil Native didn't have yet, closed in this order (each RED-first)
 **Type:** Feature Request
 **Owner:** anvil-node / anvil-wasm (one ask, identical surface — see "Why one ask, not two" below)
 **Filed:** 2026-09-10
-**Status:** open
+**Status:** closed — implemented and merged to `main` on both `anvil-node` and `anvil-wasm`
 **Requested by:** FlyWire (`../flywire/`)
 **Tags:** bindings, anvil-node, anvil-wasm, anvlnode, surface
 
@@ -269,6 +269,154 @@ if (setNode.type === 'array') {
 - **A plain-JS-value → ANVL-text serializer** (the mirror of `parseRawValue()`, needed for safely constructing `set{}`/`where{}` request bodies client-side without hand-escaped string templating). Real gap, found in the same review — but there is no real consumer for it in FlyWire yet (no browser client exists; the one place that currently builds request text, `harness/client.js`, is test-harness code, not a production client), so per FlyWire's own standing rule against wishlist asks, it's tracked as FlyWire's own internal follow-up instead, revisited if/when a real client actually needs it.
 - **AnvilSchema / the type system** — real and implemented at the `anvil` core layer, but nothing in FlyWire's current code needs it exposed through either binding yet. Not part of this ask.
 - Everything in the "confirmed... not needed" list above.
+
+### Response to FR-flywire-binding-surface-001 — `.type`, findings and chosen approach
+
+**Confirmed and re-scoped first.** An earlier, informal read of this thread assumed FlyWire had
+found real gaps in AnvilSchema/type-system exposure through the bindings. Re-checked directly
+against this FR's own text: the "Non-goals" section above is explicit — *"AnvilSchema / the type
+system — real and implemented at the anvil core layer, but nothing in FlyWire's current code
+needs it exposed through either binding yet. Not part of this ask."* FlyWire confirmed this
+directly when asked. The only actionable gap in this FR is `.type`. Everything below is scoped
+to that alone.
+
+**Why FlyWire has "been returning type all along," and why the bindings haven't.** `anvil.js`'s
+own `AnvilNode` (`src/node.js`) wraps the parser's internal AST node object directly:
+
+```js
+export class AnvilNode {
+   constructor(astNode) { this._ast = astNode; }
+   get type() { return this._ast ? this._ast.type : null; }
+```
+
+Every AST node `anvil.js`'s pure-JS parser builds already carries a `.type` field as part of its
+own shape — nothing was ever lost, because nothing ever got flattened. `anvil-node`/`anvil-wasm`
+took a different path: their native-conversion code (`AnvilValueToJs` in `anvil-node`'s
+`binding.c`, and its `anvil-wasm` counterpart) already reads Anvil Native's own
+`anvil_value_get_type()` — which distinguishes `ARRAY`/`TUPLE`/`STRING`/`BLOB` just as precisely
+as `anvil.js`'s own AST does — but only to *choose a conversion branch*, then discards the
+result. `ARRAY` and `TUPLE` both become a bare JS array; `STRING`/`BLOB`/`IDENTIFIER` all become
+a bare JS string. The distinction Anvil Native itself never loses gets thrown away one layer up,
+inside each binding's own glue code.
+
+**Why fixing the representation, not adding an inference method.** `.type` corresponds to a real
+primitive Anvil Native already computes and exposes (`anvil_value_get_type()`) — this is data,
+not behavior to invent. The alternative — a method that guesses a value's ANVL kind after the
+fact from its already-converted JS shape (`Array.isArray()`, `typeof`, some heuristic to tell a
+blob's string from an ordinary one) — would be manufacturing policy to compensate for a primitive
+that should have been passed through in the first place, and it would be genuinely unreliable for
+the exact distinctions that matter here (a converted array and a converted tuple are
+indistinguishable JS values once conversion has already thrown the tag away; no amount of
+post-hoc inspection recovers it). The fix is to stop discarding the primitive during conversion,
+then expose it as a plain, honest property — the same shape `.count` already has today, backed by
+real underlying data, not a derived guess.
+
+**One clarification worth naming explicitly: "eager conversion" and "flatten to an untagged
+value" were never actually the same decision, even though they landed together.**
+`anvil-node`'s own README documents exactly why `parse()` converts eagerly — entirely to avoid
+holding a live `anvil_document` handle across GC-uncertain timing, after a real bug surfaced
+where that collided with Anvil Native's own import-registry dedup. That reasoning has nothing to
+do with whether the *result* of eager conversion is a bare value or a lightly tagged one —
+`anvil.js`'s own AST tree is proof: also fully eager, also plain JS, zero native handles, and it
+tags every node anyway. Fixing `.type` doesn't touch eager conversion, doesn't reopen the
+GC/registry finding, and doesn't touch Anvil Native's core at all — it's entirely inside each
+binding's own existing conversion code.
+
+**Chosen shape: tag every converted value, not just the root, collapsed to the 5-value set.**
+`OBJECT → 'object'`, `ARRAY → 'array'`, `TUPLE → 'tuple'`, `BLOB → 'blob'`, everything else
+(`NULL`/`BOOL`/`NUMERIC`/`STRING`/`IDENTIFIER`) `→ 'scalar'` — matching `anvil.js`'s own
+`NodeType`/`ScalarKind` split exactly (this ask is `.type` only; the finer `ScalarKind` breakdown
+stays out of scope, unrequested). An unresolved VarRef needs no special-casing — already
+transparently `ANVIL_VALUE_NULL` by the time conversion sees it, an existing decided behavior.
+Each binding's own native-conversion layer wraps every value (at every nesting level a `.get()`/
+`.at()` can reach) as `{ type, value }` instead of a bare value — `anvil-node` via its existing
+per-value N-API object construction, `anvil-wasm` via one extra key in the JSON string it already
+builds in C. `AnvlNode`'s *existing* public methods (`.get`, `.has`, `.hasAttribute`, `.entries`,
+`.at`, `.count`, `.asString`, `.asInt`, `.asBool`) keep identical signatures and behavior on both
+bindings — this is purely additive, one new getter backed by richer internal representation.
+Building the full 5-value set costs nothing beyond building the one proven distinction — the
+collapse mapping produces all five for the same per-value cost as one, so there's no narrower
+version of this mechanism worth building instead.
+
+**What FlyWire gets — sketch against the real, already-written use case.** `harness/server.js`'s
+CREATE handler (quoted in this FR above) already assumes this API exists:
+
+```js
+if (setNode.type === 'array') {
+    // Multi-row CREATE: set{} as an array of rows instead of one.
+} else {
+    // Single-row CREATE.
+}
+```
+
+No change needed on FlyWire's side — that code already works, unmodified, once this lands. The
+full set is available for whatever comes next, not just the one case proven today:
+
+```js
+const root = anvl.parse(source);
+root.type;                          // 'object' — every *.meta.anvl document's root
+root.get('tags').type;              // 'array'  — set := [ ... ];
+root.get('coords').type;            // 'tuple'  — set := ( ... );
+root.get('label').type;             // 'scalar' — a string, number, bool, or null field
+root.get('payload').type;           // 'blob'   — an @tag`...` value
+root.get('missingField');           // null — .get() itself already reports absence this way,
+                                     // never reaching a .type call in the first place
+```
+
+Not part of this response: an implementation timeline. This is the design this FR's ask
+converges on; picking it up is a separate step.
+
+#### Closed — implemented on both bindings
+
+Picked up on branch `feat/anvlnode-type` in each repo, TDD throughout, merged to `main` on both
+`anvil-node` (`31dba3d`) and `anvil-wasm` (`8e76131`). Implementation matches the response above
+exactly — nothing changed in the design between sketch and code:
+
+- `src/binding.c` in each binding gained a second, parallel conversion path used only by
+  `parse()` (`AnvilValueToTaggedJs` in `anvil-node`; `append_anvil_value_json_tagged` in
+  `anvil-wasm`) — `AnvilValueToJs`/`append_anvil_value_json`, `parseRawValue()`'s own
+  conversion, is untouched and regression-tested to prove it.
+- `AnvlNode` (`lib/index.js`, identical on both) now holds `{ type, value }` instead of a bare
+  value; `.type` is a new getter, and `has`/`get`/`entries`/`count`/`at` read the explicit tag
+  instead of inferring shape from `Array.isArray`/`typeof`.
+- RED confirmed first on both (real assertion failures, not a build error) before any
+  implementation; GREEN after: **29/29** (`anvil-node`, Valgrind-clean, 0 errors/0 leaked) and
+  **30/30** (`anvil-wasm`, built and verified on the real Emscripten toolchain, not just
+  locally).
+
+**The practical use case this closes, restated for FlyWire directly** — `harness/server.js`'s
+CREATE handler, quoted earlier in this FR, needs no changes at all:
+
+```js
+if (setNode.type === 'array') {
+    // Multi-row CREATE: set{} as an array of rows instead of one.
+} else {
+    // Single-row CREATE.
+}
+```
+
+That code already assumed this API; it now just works. The full closed set is available for
+whatever comes next:
+
+```js
+const root = anvl.parse(source);
+root.type;                  // 'object' — every *.meta.anvl document's root
+root.get('tags').type;      // 'array'  — set := [ ... ];
+root.get('coords').type;    // 'tuple'  — set := ( ... );
+root.get('label').type;     // 'scalar' — a string, number, bool, or null field
+root.get('payload').type;   // 'blob'   — an @tag`...` value
+```
+
+Both packages are unpublished (private, no npm registry) — pick up `main` on each repo directly
+to get this.
+
+**One real, small thing FlyWire found while verifying, fixed on `main` (`anvil-wasm`
+`3b5975e`):** `anvil-wasm`'s own `package.json` ran `"test": "node --test test/"` — a trailing
+directory argument that fails outright on Node 22 (`MODULE_NOT_FOUND`; `node --test` no longer
+accepts a bare directory the way it used to). `anvil-node`'s equivalent script was already
+correct (`"node --test"`, no path). The tests themselves were never wrong — confirmed 30/30
+either way — this only broke the `npm test` wrapper silently, for anyone who ran it without
+digging into why. Now matches `anvil-node`'s form on both repos.
 
 ## Open questions
 
