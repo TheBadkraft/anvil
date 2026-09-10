@@ -9,7 +9,7 @@ one reads it. Pick the one that matches where your code runs.
 |---|---|---|
 | [Native library](#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
 | [WebAssembly](#webassembly) | Browser, or any JS host | Downloadable today |
-| [Node.js](#nodejs) | Node.js (N-API) | API stable, not yet packaged for public download |
+| [Node.js](#nodejs) | Node.js (N-API) | Downloadable today |
 
 ## Native library
 
@@ -81,23 +81,24 @@ the full reference; only the loading step differs.
 
 ## Node.js
 
-N-API bindings over the same C source — a native addon, not a from-scratch JS parser.
+**[Download anvil-node-v0.8.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz)**
+— a prebuilt N-API addon (native addon, not a from-scratch JS parser) plus its JS-facing
+wrapper. Verified standalone: extracted to a clean directory with nothing else present, parsed
+real source, correctly reported a real syntax error via `lastError()`.
 
 ### Requirements
 
-- Node.js (uses N-API — works across Node major versions without rebuilding per-version; any
-  current LTS is fine)
-- No runtime dependencies once built
-
-### Status
-
-Not yet packaged for public distribution — the API below is stable and in active use, but there's
-no download here yet. Check back, or reach out directly if you need it sooner.
-
-### Parsing your first document
+- Node.js with N-API support (any current LTS). Built and tested against Node 22.x — N-API's
+  own ABI-stability guarantee means other recent majors should work too, but that hasn't been
+  verified against older ones.
+- Linux x86_64 (glibc) only today, same as the [native library](#native-library). Other
+  platforms build from source (`npm install && npm run build`, needs a C2x compiler and Python 3
+  for `node-gyp`) — not yet published to a package registry, so building means pointing at a
+  real checkout, not `npm install anvil-node`.
+- No runtime dependencies once built.
 
 ```js
-const anvil = require('anvil-node');
+const anvil = require('./lib/index.js'); // keep lib/index.js next to build/Release/anvil_node.node
 
 const doc = anvil.parse('#!aml\nserver := { host := "localhost"; port := 8080; };');
 ```

@@ -62,12 +62,18 @@ doc.get('foo').asInt(); // 1</code></pre>
 
     <h2>Node.js — N-API</h2>
     <div class="card">
-      <p style="margin: 0;">
-        Same reference implementation, same API shape as the WebAssembly binding (synchronous,
-        no <code>ready()</code> needed). Stable and in active use, but not yet packaged for
-        public download here — see the <a href="/docs#Bindings-Guide.md">bindings guide</a> for
-        the full API reference regardless.
-      </p>
+      <div class="dl-row">
+        <div>
+          <strong>anvil-node-v0.8.0-rc-linux-x86_64.tar.gz</strong> — a prebuilt native addon
+          plus its JS wrapper. Same API shape as the WebAssembly binding above (synchronous, no
+          <code>ready()</code> needed). Linux x86_64 only today; not yet published to a package
+          registry, so other platforms build from source.
+        </div>
+        <a class="btn secondary" href="/assets/downloads/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz">Download</a>
+      </div>
+      <pre><code>const anvil = require('./lib/index.js');
+const doc = anvil.parse('#!aml\nfoo := 1;');
+doc.get('foo').asInt(); // 1</code></pre>
     </div>
 
     <p class="lede" style="margin-top: 32px; font-size: 15px;">

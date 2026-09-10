@@ -51,16 +51,20 @@ paths now 404s on the live domain. **Lesson for next time a static-assets Worker
 check what's actually in the assets directory (`ls -la`, not just `git status`) before the first
 deploy from a fresh clone/checkout, not after.
 
-**The content rewrite — first real pass done, then a follow-up cleanup pass.** A new "Bindings"
+**The content rewrite — first real pass done, then two follow-up passes.** A new "Bindings"
 section (`site/assets/docs/Bindings-Guide.md`, linked from `docs.html`'s nav) consolidates
 `anvil.node`'s own `wiki/API-Reference.md`/`Quick-Start.md` (real, accurate content) plus a
 WASM-specific `ready()` section and a native-C-library section — the per-binding consolidation
-this item originally called for. `download.html` serves real distributables:
-`site/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz` (static + shared `libanvil`,
-release/stripped, plus public headers — verified standalone) and `anvil-wasm-v0.8.0-rc.tar.gz`
-(the real Emscripten build, pulled from the Linode box). `anvil.node` has no public download yet
-(no GitHub presence, no npm publish — repo owner: "worry about public repos later, if at all") —
-its guide section is real and complete, just without a download link.
+this item originally called for. `download.html` serves real distributables, all three
+verified standalone (extracted to a clean directory with nothing else present, then actually
+run): `anvil-v0.8.0-rc-linux-x86_64.tar.gz` (static + shared `libanvil`, release/stripped, plus
+public headers), `anvil-wasm-v0.8.0-rc.tar.gz` (the real Emscripten build, pulled from the
+Linode box), and `anvil-node-v0.8.0-rc-linux-x86_64.tar.gz` (a prebuilt N-API addon, stripped,
+plus its JS wrapper — no fundamental reason this couldn't be downloadable once actually asked
+"why not," despite an earlier, overly-cautious first pass leaving it unpackaged; N-API's own
+ABI-stability guarantee means one Linux x86_64 build genuinely serves any recent Node major, the
+same shape as the native-library download). None of the three require a public GitHub repo or
+npm publish — `anvil.node`/`anvil.wasm` stay private; only the *build output* is public.
 
 Follow-up pass, once the repo owner confirmed nothing depends on the old bundle: removed
 `anvl.global.js`/`anvl.esm.js`/`anvl.cjs` and the JS-implementation-specific docs
