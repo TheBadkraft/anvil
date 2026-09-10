@@ -56,6 +56,18 @@ derived_var := $var_ref;
 
 ## Why not just JSON? *(reference table — moved below the fold)*
 
+JSON earned its win honestly — simple enough to hold in your head, human-readable, and by now
+nearly universal. Every language parses it, every API speaks it, nobody has to be taught it.
+That's real, hard-won success, and ANVL isn't here to take that away from it.
+
+But JSON was built to be a wire format — one JS object literal a browser could evaluate. Config
+files, schemas, templated builds, structured messages: all of that got handed to JSON *after*
+the fact, not designed into it from day one. No comments. No way to reference a value you
+already defined. No restricted subset for contexts where a payload shouldn't be able to grow
+arbitrary structure. It was good enough — right up until it wasn't, and by then everyone had
+already built on top of it. Nobody wants to be the one who tells the senior citizen it's time to
+retire.
+
 | | JSON | ANVL |
 |---|---|---|
 | Comments | Not allowed | `//` and `/* */` |
