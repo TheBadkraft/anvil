@@ -15,6 +15,7 @@
       <a href="/">Home</a>
       <a href="/story">Story</a>
       <a href="/oml" class="active">OML</a>
+      <a href="/amp">AMP</a>
       <a href="/docs">Docs</a>
       <a href="/sandbox">Sandbox</a>
       <a href="/download">Download</a>
@@ -109,16 +110,57 @@
       are ones you already have names for.
     </p>
 
-    <h2>Where AMP fits</h2>
+    <h2>What actually makes something an OML</h2>
     <p>
-      AML is deliberately the permissive half. ANVL's other dialect, AMP,
-      is the restricted one — scalars and flat arrays/tuples of them, no
-      nesting, no objects, no inheritance, no references, enforced at parse
-      time rather than by convention. It exists for exactly the situations
-      an OML's flexibility becomes a liability: message payloads, where you
-      want a guarantee that structure can't silently grow arbitrary depth.
-      See the <a href="/docs#AMP-Guide.md">AMP Guide</a> for the full
-      constraint list.
+      Strip away the syntax and every real OML is doing the same three things: naming a
+      <em>kind</em> of object (a class, a shape, a schema), giving it <em>attributes</em> (the
+      data a given instance carries), and describing how instances <em>relate</em> to each other
+      — composition (one object contains another) and generalization (one shape extends
+      another, inheriting its attributes). Get those three right and the concrete syntax is just
+      a detail; get them wrong and no amount of syntax fixes it.
+    </p>
+    <p>
+      <strong>UML</strong> — Unified Modeling Language, the field's own namesake — is the
+      textbook case, worth checking directly rather than taking "object modeling language" on
+      faith. A UML class diagram names a class (<code>Vehicle</code>), gives it attributes
+      (<code>vin: String</code>, <code>year: Integer</code>), and draws a generalization arrow
+      to a <code>Car</code> class that inherits them and adds its own. Composition — a
+      <code>Car</code> contains an <code>Engine</code> that doesn't exist independently of it —
+      is its own distinct relationship, drawn as a line with a diamond. None of that is prose;
+      it's a formal notation with its own semantics, which is exactly why UML earns the right to
+      call itself a modeling <em>language</em> and not just a diagramming convention. A stereotype or
+      tagged value — metadata attached to a class itself, separate from its attributes — is the
+      same idea AML's own <code>@[key=value]</code> attributes cover.
+    </p>
+    <p>
+      UML's own concrete syntax is almost always graphical — boxes, arrows, diamonds — with a
+      textual serialization (XMI) that exists mainly for tools to exchange diagrams with each
+      other, not for a person to hand-write. AML is the same three ideas, aimed the other
+      direction: a concrete syntax meant to be hand-written and read as plain text.
+    </p>
+    <table>
+      <tr><th>UML concept</th><th>AML construct</th></tr>
+      <tr>
+        <td>A class, naming a kind of object</td>
+        <td>An object statement — <code>Vehicle := { ... };</code></td>
+      </tr>
+      <tr>
+        <td>An attribute on that class</td>
+        <td>A field inside the object — <code>vin := "1FA...";</code></td>
+      </tr>
+      <tr>
+        <td>Generalization (<code>Car</code> extends <code>Vehicle</code>)</td>
+        <td>Inheritance — <code>Car : Vehicle := { ... };</code></td>
+      </tr>
+      <tr>
+        <td>A stereotype or tagged value on a class</td>
+        <td>Attributes — <code>@[key=value]</code></td>
+      </tr>
+    </table>
+    <p>
+      Same three ideas UML is judged by — naming, attributes, relationships — just written as
+      text a parser reads directly, instead of shapes a tool renders. That's the actual bar an
+      OML has to clear, and it's the same bar AML clears too.
     </p>
 
     <div class="cta-row">

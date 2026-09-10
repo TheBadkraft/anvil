@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>What is AMP? — ANVL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/story">Story</a>
+      <a href="/oml">OML</a>
+      <a href="/amp" class="active">AMP</a>
+      <a href="/docs">Docs</a>
+      <a href="/sandbox">Sandbox</a>
+      <a href="/download">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="pill">structured messaging</div>
+    <h1>What is AMP?</h1>
+    <p class="lede">
+      <strong>AMP</strong> — Anvil Messaging Protocol — isn't an OML at all, and it isn't trying
+      to be one. Where AML's whole job is describing structured object data, AMP's job is the
+      opposite: guarantee that a payload <em>can't</em> grow structure, so whatever reads it
+      never has to handle a shape it wasn't built for.
+    </p>
+    <p class="lede">
+      Same grammar as AML, same parser, same shebang-declared-dialect mechanism — just with most
+      of the permissions turned off, enforced at parse time instead of by convention.
+    </p>
+
+    <h2>A different problem than modeling</h2>
+    <p>
+      An OML's hard problem is impedance mismatch — matching the shapes a host language already
+      has. Messaging has a different hard problem entirely: a message crosses a boundary between
+      two things that don't share a codebase, don't deploy together, and don't agree in advance
+      on exactly what "the schema" is at any given moment. The sender's idea of the shape and the
+      receiver's idea of the shape can drift, quietly, the same way any two independently
+      deployed services drift — and unlike a config file, nobody's reviewing a pull request
+      before the next message goes out.
+    </p>
+    <p>
+      Most messaging formats solve this by pushing the problem elsewhere. MQTT's payload is
+      opaque bytes — whatever structure exists is a convention between sender and receiver, the
+      protocol itself enforces nothing. AMQP frames a message but leaves its body's structure to
+      whatever <code>content-type</code> says, unchecked by the broker. Protocol Buffers goes the
+      other way — real structure, real enforcement — but only by compiling a <code>.proto</code>
+      schema ahead of time; the wire format itself is just bytes a generated decoder happens to
+      know how to walk. In every case, the actual guarantee that a payload matches its shape
+      exists outside the format, if it exists at all.
+    </p>
+
+    <h2>How AMP approaches it</h2>
+    <p>
+      AMP's bet is different: put the guarantee <em>in</em> the grammar, not in a compiled schema
+      or an unenforced convention. A document that opens with <code>#!amp</code> is restricted
+      before a single statement is read — the parser rejects the constructs below outright, the
+      instant it sees them, with a dedicated error code each:
+    </p>
+    <table>
+      <tr><th>Construct</th><th>Error code</th></tr>
+      <tr>
+        <td>Objects (<code>{ ... }</code>) anywhere in value position</td>
+        <td><code>AMP_OBJECT_FORBIDDEN</code></td>
+      </tr>
+      <tr>
+        <td><code>$</code> VarRef, in any position</td>
+        <td><code>AMP_VARREF_FORBIDDEN</code></td>
+      </tr>
+      <tr>
+        <td>Attributes (<code>@[...]</code>), module-level or per-statement</td>
+        <td><code>AMP_ATTRIBUTE_FORBIDDEN</code></td>
+      </tr>
+      <tr>
+        <td>Inheritance (<code>Child : Base := ...</code>)</td>
+        <td><code>AMP_INHERITANCE_FORBIDDEN</code></td>
+      </tr>
+      <tr>
+        <td>A non-scalar element inside an array or tuple — no nesting, ever</td>
+        <td><code>AMP_ARRAY_ELEMENT_NOT_SCALAR</code></td>
+      </tr>
+    </table>
+    <p>
+      What's left is deliberately small: scalars, flat arrays and tuples of them, tagged and
+      untagged blobs, and plain <code>identifier := value;</code> assignment. Enough to carry a
+      real message; not enough to ever quietly grow a nested object three services later.
+    </p>
+
+    <h2>A look at AMP</h2>
+    <pre><code>#!amp
+status := ok;
+code   := 200;
+tags   := [alpha, beta, gamma];
+point  := (10, 20);
+raw    := `payload bytes`;</code></pre>
+    <p>
+      And the same restrictions, rejected the instant the parser sees them — not silently
+      dropped, not a warning, a hard parse error:
+    </p>
+    <pre><code>#!amp
+bad := { x := 1; };   // AMP_OBJECT_FORBIDDEN
+bad := $foo;           // AMP_VARREF_FORBIDDEN
+bad := [[1, 2]];        // AMP_ARRAY_ELEMENT_NOT_SCALAR</code></pre>
+
+    <h2>Why the distinction matters</h2>
+    <p>
+      The dialect is declared once, on the shebang line, and enforced immediately from that
+      point on — not inferred, not mixed, and not a runtime flag layered on top of one generic
+      grammar. A feature added to AML — say, a new collection type — can't accidentally become
+      reachable from AMP just because it shares a code path. This separation is enforced
+      deliberately, not just by convention, the same way every construct in the table above is.
+    </p>
+
+    <div class="cta-row">
+      <a class="btn primary" href="/docs#AMP-Guide.md">Read the full AMP Guide →</a>
+      <a class="btn secondary" href="/download">Download and try it</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly
+    bindings. v0.8.0-rc.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+</body>
+
+</html>

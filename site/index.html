@@ -15,6 +15,7 @@
       <a href="/" class="active">Home</a>
       <a href="/story">Story</a>
       <a href="/oml">OML</a>
+      <a href="/amp">AMP</a>
       <a href="/docs">Docs</a>
       <a href="/sandbox">Sandbox</a>
       <a href="/download">Download</a>
@@ -42,7 +43,7 @@
       AML and AMP are real today. AnvilScript (ASL) is still design-only — not implemented yet.
     </p>
 
-    <h2>Why we are</h2>
+    <h2>Why ANVL?</h2>
     <p class="lede">JSON exists so that ANVL could live.</p>
     <p>
       JSON was never designed — it was lifted out of a subset of JavaScript's own object
@@ -54,27 +55,36 @@
     <p>
       Anvil started from the opposite direction — out of frustration with Makefile's own DSL, a
       look at CMake that made the climb steeper instead of easier, and a JSON experiment that
-      went nowhere. What began as "can this be a config language" turned out to be an object
-      modeling language. Strip a few features back out, and it's also a stable, deterministic
+      ended before it began. What started as "can this be a config language" turned out to be an <b>Object
+        Modeling Language</b>. Restrict a few features, and it's also a stable, deterministic
       messaging protocol. Anvil's dialects aren't three separate designs bolted together —
       they're the same grammar with different amounts of it turned on.
     </p>
     <p>There's a lot more to it than a couple of paragraphs can give credit for.
-      <a href="/story">Read the full story →</a></p>
+      <a href="/story">Read the full story →</a>
+    </p>
 
-    <h2>Why you need it</h2>
+    <h2>Your Stack Needs ANVL</h2>
+    <p>
+      Anvil doesn't mince words when it comes to configuration and messaging safety. It is designed
+      to get it right, or fail fast with clear errors and information about where things went wrong. It
+      never silently assumes correctness, and doesn't depend on etiquette or implicit conventions. The
+      parser enforces very few rules around symbols and structure, leaving the rest to be explicitly
+      specified and validated by the consumer.
+    </p>
     <div class="grid-3">
       <div class="card">
         <p><strong>A bare <code>no</code> in your config silently becomes the boolean
-          <code>false</code>.</strong> YAML's own "Norway problem" doesn't announce itself — it
+            <code>false</code>.</strong> YAML's own "Norway problem" doesn't announce itself — it
           just quietly means the wrong thing until something breaks in production, maybe months
           later. ANVL's grammar never guesses: a literal is only <code>true</code>,
           <code>false</code>, or <code>null</code> if it's exactly that word. A mistake fails to
-          parse instead of silently meaning something else.</p>
+          parse instead of silently meaning something else.
+        </p>
       </div>
       <div class="card">
         <p><strong>A message schema starts as five scalar fields and quietly grows a nested
-          object.</strong> Nobody reviews that kind of drift until a downstream consumer breaks
+            object.</strong> Nobody reviews that kind of drift until a downstream consumer breaks
           on structure it was never built to handle. AMP, Anvil's restricted dialect, forbids
           objects, attributes, inheritance, and imports outright — rejected at parse time, not
           by convention or code review. The payload can't grow arbitrary structure even by
@@ -99,7 +109,15 @@ server @[env = production] := {
 
 // variables can be defined and referenced
 var_ref    := 42;
-derived_var := $var_ref;</code></pre>
+derived_var := $var_ref;
+
+/*
+  Base object fields, overrides and inheritance.
+*/
+endpoint:server {
+  host := 234.55.78.90;
+};
+</code></pre>
 
     <h2>Why not just JSON?</h2>
     <p class="lede">
@@ -117,7 +135,11 @@ derived_var := $var_ref;</code></pre>
       who tells the senior citizen it's time to retire.
     </p>
     <table>
-      <tr><th></th><th>JSON</th><th>ANVL</th></tr>
+      <tr>
+        <th></th>
+        <th>JSON</th>
+        <th>ANVL</th>
+      </tr>
       <tr>
         <td>Comments</td>
         <td>Not allowed</td>
@@ -136,7 +158,8 @@ derived_var := $var_ref;</code></pre>
       <tr>
         <td>A restricted subset for untrusted-ish payloads</td>
         <td>None — any valid JSON is valid JSON</td>
-        <td>AMP dialect: scalars and flat arrays/tuples of them, no nesting, no objects — rejected otherwise at parse time</td>
+        <td>AMP dialect: scalars and flat arrays/tuples of them, no nesting, no objects — rejected otherwise at parse
+          time</td>
       </tr>
       <tr>
         <td>Metadata attached to a field</td>
