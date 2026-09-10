@@ -15,6 +15,7 @@
  * File: src/core/source.c                                                 *
  * *********************************************************************** */
 
+#include "constants.h"
 #include "internal/files.h"
 #include "internal/source.h"
 #include "internal/source_registry.h"
@@ -400,26 +401,39 @@ static void source_parse_shebang(anvl_source src) {
    }
 
    src->has_shebang = true;
-   source_consume(src, 2); // consume '#!'
 
-   usize dialect_start = src->pos;
-   while (src->pos < src->length && data[src->pos] != '\n') {
-      source_consume(src, 1);
-   }
-   usize dialect_len = src->pos - dialect_start;
-
-   anvl_dialect dialect = ANVL_DIALECT_ERROR;
-   if (dialect_len == 3 && memcmp(data + dialect_start, "aml", 3) == 0) {
-      dialect = ANVL_DIALECT_AML;
-   } else if (dialect_len == 3 && memcmp(data + dialect_start, "amp", 3) == 0) {
-      dialect = ANVL_DIALECT_AMP;
-   } else if (dialect_len == 3 && memcmp(data + dialect_start, "asl", 3) == 0) {
-      dialect = ANVL_DIALECT_ASL;
+   // Every legal shebang is exactly ANVL_SHEBANG_LEN bytes — "#!" plus a fixed 3-letter
+   // dialect token — and that's a permanent invariant, not just true of today's three
+   // dialects: a new dialect would still fit "#!xyz". A fixed-length compare means the
+   // shebang never needs a trailing separator at all — "#!aml\n", "#!aml name := 1;", and
+   // even "#!amlname := 1;" (fully minified, zero separator) all resolve identically,
+   // since whatever follows byte 5 is simply left for the header scanner/tokenizer to read
+   // as ordinary content. This also replaces the old scan-to-newline approach, which
+   // silently produced ANVL_DIALECT_ERROR for any minified shebang lacking a newline.
+   if (src->length - src->pos < ANVL_SHEBANG_LEN) {
+      src->dialect = ANVL_DIALECT_ERROR;
+      return;
    }
 
-   src->dialect = dialect;
+   if (memcmp(data + src->pos, ANVL_SHEBANG_AML, ANVL_SHEBANG_LEN) == 0) {
+      src->dialect = ANVL_DIALECT_AML;
+   } else if (memcmp(data + src->pos, ANVL_SHEBANG_AMP, ANVL_SHEBANG_LEN) == 0) {
+      src->dialect = ANVL_DIALECT_AMP;
+   } else if (memcmp(data + src->pos, ANVL_SHEBANG_ASL, ANVL_SHEBANG_LEN) == 0) {
+      src->dialect = ANVL_DIALECT_ASL;
+   } else {
+      // An unrecognized token is a real error state, not a silent fall-through to AML —
+      // the header scanner (doc_scan_header) checks for this and reports it as a genuine
+      // header error rather than letting parsing continue under the wrong assumptions.
+      src->dialect = ANVL_DIALECT_ERROR;
+      return;
+   }
 
-   // Consume the terminating newline if present.
+   source_consume(src, ANVL_SHEBANG_LEN);
+
+   // Consume one immediately-following newline, if present, purely so the source position
+   // lands exactly where it always has for the conventional "#!aml\n" form — not required
+   // for correctness (the header scanner skips whitespace on its own either way).
    if (src->pos < src->length && data[src->pos] == '\n') {
       source_consume(src, 1);
    }

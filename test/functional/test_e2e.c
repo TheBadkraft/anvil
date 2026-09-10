@@ -139,11 +139,38 @@ static void test_fn05_schema_violations(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * FN06 - a fully minified document (no separator at all right after the
+ * shebang) parses cleanly end to end through the linked library, and an
+ * unrecognized shebang dialect is a real error, not a silent fall-through
+ * ---------------------------------------------------------------------- */
+static void test_fn06_minified_shebang(void) {
+   const char *minified = "#!amlname := 1;status := active;";
+   anvil_document doc = anvil_load_buffer(minified, strlen(minified));
+   TestBit.is_not_null(doc, "FN06: minified document loaded");
+   if (doc) {
+      TestBit.is_false(anvil_has_errors(doc), "FN06: no parse errors despite zero separator");
+      anvil_statement stmt = anvil_statement_get(doc, "name");
+      TestBit.is_not_null(stmt, "FN06: 'name' statement found");
+      anvil_dispose(doc);
+   }
+
+   const char *bad_dialect = "#!xyz\nname := 1;";
+   anvil_document bad_doc = anvil_load_buffer(bad_dialect, strlen(bad_dialect));
+   TestBit.is_not_null(bad_doc, "FN06: document handle returned for unrecognized dialect");
+   if (bad_doc) {
+      TestBit.is_true(anvil_has_errors(bad_doc),
+                      "FN06: unrecognized shebang dialect is a real error, not silent AML");
+      anvil_dispose(bad_doc);
+   }
+}
+
 int main(void) {
    TestBit.run("FN01_core_parse", test_fn01_core_parse);
    TestBit.run("FN02_amp_restrictions", test_fn02_amp_restrictions);
    TestBit.run("FN03_type_registry", test_fn03_type_registry);
    TestBit.run("FN04_schema_valid", test_fn04_schema_valid);
    TestBit.run("FN05_schema_violations", test_fn05_schema_violations);
+   TestBit.run("FN06_minified_shebang", test_fn06_minified_shebang);
    return TestBit.report();
 }

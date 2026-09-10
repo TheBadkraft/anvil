@@ -118,10 +118,10 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   `.debug_*` sections, at roughly 40% the size of the debug archive.
 - **`test/functional/`** — a new test tier, deliberately structured to compile only its own test
   file and link against the *built* library (never a `src/*.c` file, never an `internal/`
-  header), proving the shipped artifact itself works for a real consumer. 5 tests (core parse,
-  AMP's restrictions, opt-in type resolution, and AnvilSchema validating both a clean and a
-  violating document), 21/21 assertions, run against both the debug and release archives,
-  Valgrind-clean on both.
+  header), proving the shipped artifact itself works for a real consumer. 6 tests (core parse,
+  AMP's restrictions, opt-in type resolution, AnvilSchema validating both a clean and a violating
+  document, and minified-shebang parsing), 26/26 assertions, run against all four combinations
+  (static/shared × debug/release), Valgrind-clean on all four.
 - **`test/unit`'s `test_release` target actually works now** — it referenced
   `$(LIB_DEBUG)`/`$(LIB_RELEASE)` from the start but nothing ever built them, so it had never
   once succeeded; also fixed a real missing link dependency (`test/utilities/debug.c`) surfaced
@@ -131,9 +131,28 @@ refactoring on top of the v0.7.0-alpha foundation below, not an itemized account
   `lib/{debug,release}/libanvil.so` from the same `-fPIC` object tree the static archives use.
   Verified as a genuine dynamic-link consumer (not just "it compiled"): a copy of the functional
   suite linked against `libanvil.so` via `-L/-lanvil` + `rpath`, confirmed via `ldd` that it
-  actually loads the `.so` at runtime, 5/21 GREEN, Valgrind-clean. `test/functional/Makefile`
-  gained permanent `so-debug`/`so-release` targets. Full technical record:
+  actually loads the `.so` at runtime, GREEN, Valgrind-clean. `test/functional/Makefile` gained
+  permanent `so-debug`/`so-release` targets. Full technical record:
   `notes/distributable-library.md`.
+
+### Fixed — Shebang dialect resolution hardened
+
+- **Fixed-length shebang matching, replacing scan-to-newline** — every legal shebang is exactly
+  5 bytes (`"#!"` + a 3-letter dialect token), a permanent grammar invariant, so
+  `source_parse_shebang` now compares those 5 bytes directly instead of scanning to the next
+  `\n` and requiring an exact 3-byte match in between. This closes a real minification gap
+  (`"#!aml name := 1;"` and fully minified `"#!amlname := 1;"` both failed dialect resolution
+  before this fix) found while validating whether full minification was actually supported
+  anywhere — it wasn't, and never had been tested.
+- **A real, more serious bug found along the way**: an *unrecognized* shebang dialect (a typo,
+  or outright garbage after `#!`) was never checked anywhere — `doc_scan_header` only
+  special-cased `== ANVL_DIALECT_AMP`, so an invalid shebang silently fell through and was
+  treated as permissive AML with zero errors reported. Verified directly before fixing:
+  `#!xyz\nconfig := { a := 1; };` parsed clean despite naming no real dialect. Fixed with a new
+  error code (`ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT`) and an explicit check at the top of
+  `doc_scan_header`. `test_source.c` (SRC39–41), `test_header.c` (HDR21), and
+  `test/functional/test_e2e.c` (FN06) all cover this; full record in
+  `notes/document-header-scan.md`'s "Shebang parsing" section.
 
 ---
 

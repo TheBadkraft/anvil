@@ -856,6 +856,70 @@ static void test_src38_slice_equals_null_safety(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * SRC39 - shebang dialect resolves by fixed length (ANVL_SHEBANG_LEN),
+ * never by scanning for a terminating newline — so a minified document
+ * (no newline, not even a space, right after the shebang) still resolves
+ * the correct dialect, identically to the conventional "#!aml\n" form.
+ * ---------------------------------------------------------------------- */
+static void test_src39_shebang_fixed_length_no_separator_required(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   const char *conventional = "#!aml\nname := 1;";
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, conventional, strlen(conventional), &err_code);
+   TestBit.is_equal_int(ANVL_DIALECT_AML, Source.dialect(src),
+                        "SRC39: conventional '#!aml\\n' resolves to AML");
+   Source.dispose(src);
+
+   const char *space_no_newline = "#!aml name := 1;";
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, space_no_newline, strlen(space_no_newline), &err_code);
+   TestBit.is_equal_int(ANVL_DIALECT_AML, Source.dialect(src),
+                        "SRC39: '#!aml ' (space, no newline) still resolves to AML");
+   Source.dispose(src);
+
+   const char *zero_separator = "#!amlname := 1;";
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, zero_separator, strlen(zero_separator), &err_code);
+   TestBit.is_equal_int(ANVL_DIALECT_AML, Source.dialect(src),
+                        "SRC39: zero-separator '#!amlname' still resolves to AML");
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC40 - an unrecognized shebang dialect token is a real error state
+ * (ANVL_DIALECT_ERROR), not a silent fall-through to AML.
+ * ---------------------------------------------------------------------- */
+static void test_src40_shebang_invalid_dialect_is_error(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   const char *garbage = "#!xyz\nname := 1;";
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, garbage, strlen(garbage), &err_code);
+   TestBit.is_true(Source.is_shebang(src), "SRC40: still detected as a shebang");
+   TestBit.is_equal_int(ANVL_DIALECT_ERROR, Source.dialect(src),
+                        "SRC40: unrecognized dialect token is ANVL_DIALECT_ERROR");
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC41 - a shebang with fewer than ANVL_SHEBANG_LEN bytes available is
+ * an error state too, never an out-of-bounds read.
+ * ---------------------------------------------------------------------- */
+static void test_src41_shebang_too_short_is_error(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   const char *too_short = "#!am";
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, too_short, strlen(too_short), &err_code);
+   TestBit.is_true(Source.is_shebang(src), "SRC41: still detected as a shebang");
+   TestBit.is_equal_int(ANVL_DIALECT_ERROR, Source.dialect(src),
+                        "SRC41: too-short shebang is ANVL_DIALECT_ERROR, not a crash");
+   Source.dispose(src);
+}
+
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -900,6 +964,12 @@ int main(void) {
    TestBit.run_ex("SRC36_slice_equals_length_mismatch", NULL, test_src36_slice_equals_length_mismatch, ts);
    TestBit.run_ex("SRC37_slice_equals_content_mismatch", NULL, test_src37_slice_equals_content_mismatch, ts);
    TestBit.run_ex("SRC38_slice_equals_null_safety", NULL, test_src38_slice_equals_null_safety, ts);
+   TestBit.run_ex("SRC39_shebang_fixed_length_no_separator_required", NULL,
+                  test_src39_shebang_fixed_length_no_separator_required, ts);
+   TestBit.run_ex("SRC40_shebang_invalid_dialect_is_error", NULL,
+                  test_src40_shebang_invalid_dialect_is_error, ts);
+   TestBit.run_ex("SRC41_shebang_too_short_is_error", NULL, test_src41_shebang_too_short_is_error,
+                  ts);
 
    return TestBit.report();
 }
