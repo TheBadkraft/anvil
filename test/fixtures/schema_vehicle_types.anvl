@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+VIN := {
+   type := String;
+   size := 17;
+};

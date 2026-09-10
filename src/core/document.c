@@ -377,6 +377,16 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
+   // A shebang was detected at source-load time (source_parse_shebang) but its dialect
+   // token didn't match any known dialect — surfaced here as a real header error instead
+   // of silently falling through to AML-permissive behavior. Checked before anything else
+   // so it isn't shadowed by the generic "#!" repeated-shebang check below, which would
+   // otherwise fire first and report the wrong reason.
+   if (Source.is_shebang(doc->source) && Source.dialect(doc->source) == ANVL_DIALECT_ERROR) {
+      err_code = ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT;
+      goto error;
+   }
+
    if (!doc->header->imports) {
       doc->header->imports = List.new(4, list_ptr_size);
    }

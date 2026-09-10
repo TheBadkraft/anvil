@@ -56,13 +56,13 @@ Proposed model, pending confirmation.
 | Construct | Scope | Mutability | Notes |
 |-----------|-------|------------|-------|
 | `vars { x := 1; }` | Module global | Immutable | Header construct. |
-| `var x = 1;` at top level | Module global | Mutable | Parser fails fast on duplicate top-level identifiers. |
+| `x := 1;` at top level | Module global | Mutable | ANVL-style top-level assignment; parser fails fast on duplicates. |
 | `var x = 1;` in function | Block-scoped | Mutable | C/C#/Java-like. |
 | Function parameter | Function-local | Mutable copy | Pass-by-value of handle/reference; copy-on-write for containers. |
 | Function name binding | Module global | Immutable | Functions are first-class values but function-name bindings are not variables. |
 | Delegate variable | Per declaration | Mutable | `var fn = foo; fn = bar;` |
 
-Inside function bodies, assignment uses `=` (e.g., `var x = 1;`). Top-level object declarations continue to use `:=` and inheritance clauses as in AML.
+Inside function bodies, declaration uses `var ... = ...` and assignment uses `=`. Top-level ANVL declarations continue to use `:=` and inheritance clauses.
 
 ## Function semantics
 
@@ -71,7 +71,46 @@ Inside function bodies, assignment uses `=` (e.g., `var x = 1;`). Top-level obje
 - **Dynamic resolution**: The `$` sigil resolves a name to its current value, just like dynamic var-refs. `$foo` retrieves the function value; `$foo(1, 2, 3)` calls it. `foo` alone is a literal identifier/string.
 - **Qualified calls**: `$math.abs(-5)` resolves `math` as a namespace/module and `abs` as a function within it. If `math` is imported and `abs` is unambiguous in the current scope, `$abs(-5)` may also be valid.
 - **Inheritance**: Follows AML semantics for object/block declarations. `bar : foo` is invalid when `foo` is a function because functions are immutable and not object bases.
-- **Anonymous blocks**: Supported in ASL (this contradicts the current dialect ownership matrix, which marks them AML-only; the matrix must be updated).
+- **Anonymous blocks**: Supported in ASL.
+
+## Function declarations and signatures
+
+ASL function declarations use the same surface syntax at the ANVL layer:
+
+```ebnf
+function_decl = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
+param_list    = parameter , { "," , parameter } ;
+parameter     = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
+```
+
+The ANVL parser owns this production, validates parameter uniqueness, and passes the parameter names (and any default literals) to the ScriptEngine along with the body slice.
+
+**Varargs**: a final parameter may be marked as a parameter-array by following its name with `[]`. The caller packs all arguments provided for that parameter into an AML array, and the function receives the array:
+
+```anvs
+sum (args []) => {
+    if (array.length(args) == 0) { return 0; }
+    var total = array.at(args, 0);
+    var i = 1;
+    while (i < array.length(args)) {
+        total = total + array.at(args, i);
+        i = i + 1;
+    }
+    return total;
+};
+```
+
+`args` is bound to an AML array containing the collected arguments. `sum(1, 2, 3)`, `sum(1)`, and `sum()` are all valid; the function is responsible for guarding against an empty array. A parameter-array may also follow fixed parameters, as in `sum(first, args [])`.
+
+**Optional parameters**: a parameter may have a literal default:
+
+```anvs
+greet (name, greeting = "Hello") => {
+    return greeting + ", " + name + "!";
+};
+```
+
+Omitted arguments are filled from the default literal at call time. Defaults must be literals so they can be compiled into the constant table.
 
 ## Calling convention
 
@@ -86,7 +125,7 @@ Support both convenience and handle-based APIs:
 - **By name**: `anvil_call(doc, "foo", args, arg_count, &result)`
 - **By handle**: `anvil_function fn = anvil_function_find(doc, "foo"); anvil_function_invoke(fn, args, arg_count, &result);`
 
-Arguments and returns use `anvil_value`. Exact arity matching in MVP; varargs and optional parameters deferred. Errors returned via out-parameter or distinct ASL error value type (TBD).
+Arguments and returns use `anvil_value`. Exact arity is checked at call time after optional defaults and varargs are accounted for. Errors returned via out-parameter or distinct ASL error value type (TBD).
 
 ## Open questions
 
@@ -125,6 +164,11 @@ This EBNF describes only the **AnvilScript function-body scripting language**. T
 The function declaration *signature* (`foo (a, b, c) => { ... }`) is owned by the ANVL parser; the ASL runtime receives the body as a source slice plus a validated parameter list. This grammar therefore begins at the first statement inside `{ ... }`.
 
 ```ebnf
+(* === Function declaration boundary (shown for context; parsed by ANVL parser) === *)
+function_decl = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
+param_list    = parameter , { "," , parameter } ;
+parameter     = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
+
 (* === Function-body statements === *)
 stmt_list         = { stmt } ;
 stmt              = var_decl
@@ -136,6 +180,8 @@ stmt              = var_decl
                   | continue_stmt
                   | return_stmt
                   | expr_stmt ;
+
+extend_decl       = "extend" , identifier , "{" , function_decl , { function_decl } , "}" ;
 
 var_decl          = "var" , identifier , "=" , expr , ";" ;
 assignment_stmt   = identifier , "=" , expr , ";" ;
@@ -206,6 +252,8 @@ digit             = "0" ... "9" ;
 - Inside function bodies, bare identifiers are variable/function references. The `$` sigil appears **only** in string interpolation (`$"...{var}..."`); it is not used for var-refs or function calls inside function bodies.
 - Assignment is `=` and local declaration is `var ... = ...`. Object literal entries retain ANVL's `:=` because they construct AML values, not execute assignments.
 - Function calls may be bare (`foo(1, 2, 3)`) or qualified (`math.abs(-5)`). The grammar allows both forms. At runtime, an unqualified call is resolved to its fully qualified form whenever possible; the namespace prefix is required only when the name would otherwise be ambiguous. Member access without a call (e.g., `math.abs` as a value) is not in MVP.
+- Extension methods are declared with `extend type { fn (...) => { ... }; ... }` and invoked as member access (`xs.first_where(...)`).
+- Function parameters may have literal defaults (`greeting = "Hello"`). A final parameter may be marked as a parameter-array with `[]` (`args []`); the caller packs all arguments bound to that parameter into an AML array.
 - From the top-level ANVL layer, dynamic calls and var-refs use the `$` sigil. Unqualified dynamic refs are `$foo`; qualified ones are `$math.abs(-5)`.
 - AML-compatible `value` literals (scalars, arrays, tuples, objects) are first-class expressions inside function bodies.
 - Tuples require at least two elements. Use `(x, y)` or `tuple(x, y)`. Single-element tuples are not supported; `(x)` is grouping.
@@ -214,7 +262,7 @@ digit             = "0" ... "9" ;
 
 ## Runtime AST Nodes
 
-The ASL runtime parser lazily converts each function body slice into a tree of `asl_ast_node` structures. These nodes are allocated from the module's bump arena (TBD), live as long as the document, and are consumed by a tree-walk evaluator.
+The ASL runtime parser lazily converts each function body slice into a tree of `asl_ast_node` structures. These nodes are allocated from the module's bump arena (TBD), live as long as the document, and are consumed by the bytecode compiler.
 
 ### Node kinds
 
@@ -231,6 +279,7 @@ typedef enum {
     ASL_STMT_CONTINUE,
     ASL_STMT_RETURN,
     ASL_STMT_EXPR,
+    ASL_STMT_EXTEND,
 
     // Expressions
     ASL_EXPR_LITERAL,
@@ -260,6 +309,7 @@ typedef struct asl_ast_node {
         struct { asl_ast_node *init, *cond, *step, *body; } for_stmt;
         struct { asl_ast_node *cond, *body; } while_stmt;
         struct { asl_ast_node *value; } return_stmt;
+        struct { anvl_slice type_name; asl_ast_node **methods; usize count; } extend;
 
         struct { anvl_value_t *value; } literal;
         struct { anvl_slice name; } identifier;
@@ -288,7 +338,8 @@ typedef struct asl_ast_node {
       };
   } asl_interpolated_segment;
   ```
-- **Child arrays** (`block.stmts`, `call.args`, `collection.elements`, `object.values`) are contiguous arena-allocated arrays. Homogeneous traversals (e.g., find first `return` in a block) can use the Sigma HPS `Query` iterator over these arrays.
+- **Extension declarations**: `ASL_STMT_EXTEND` holds the receiver type name and an array of method declarations. Each method is parsed as an ordinary function declaration and registered into the module's extension map during compilation.
+- **Child arrays** (`block.stmts`, `call.args`, `collection.elements`, `object.values`, `extend.methods`) are contiguous arena-allocated arrays. Homogeneous traversals (e.g., find first `return` in a block) can use the Sigma HPS `Query` iterator over these arrays.
 - **Heterogeneous semantic children** (`if_stmt.cond`, `if_stmt.then_stmt`, `if_stmt.else_stmt`) use named pointers.
 
 ## Exception pipeline
@@ -377,13 +428,16 @@ typedef struct asl_func_desc {
     } impl;
 
     bool is_host;                   // true: native callback; false: ASL function
+    anvl_slice receiver_type;       // for extension methods: "array", "string", etc.
 } asl_func_desc;
 
 // Per-module registry backed by a Sigma map keyed by qualified name.
 // A secondary structure resolves unqualified names against imported namespaces.
+// A third structure resolves extension methods by receiver type.
 typedef struct asl_registry {
     map by_qualified_name;          // string -> asl_func_desc *
     map short_to_qualified;         // string -> list of asl_func_desc *
+    map extensions_by_type;         // string (type name) -> map (method name -> asl_func_desc *)
 } asl_registry;
 ```
 
@@ -392,7 +446,8 @@ typedef struct asl_registry {
 1. A qualified call (`math.abs`) looks up the exact qualified name.
 2. An unqualified call (`abs`) first checks the module's own functions, then built-ins/`using` imports.
 3. If more than one candidate exists for an unqualified name, the call is ambiguous and raises an exception.
-4. Host callbacks and ASL functions share the same lookup path; the descriptor's `is_host` flag selects the invocation mechanism.
+4. A member call (`xs.first_where(...)`) is resolved as an extension method on the receiver's type. The compiler looks up the type in `extensions_by_type`, then the method name within that type's extension map. The receiver is passed as the first argument.
+5. Host callbacks and ASL functions share the same lookup path; the descriptor's `is_host` flag selects the invocation mechanism.
 
 This is intentionally loose. The exact backing types (`map`, `list`, `parray`) and the `using` load protocol will be refined as the first built-in modules are designed.
 
@@ -525,7 +580,7 @@ var first_even = xs.first_where(x => x % 2 == 0);  // -> 2
 
 Extension methods are purely a lookup convenience. They do not add fields to AML values, do not mutate the underlying value, and are resolved at call time by the registry. The receiver is passed as an implicit first argument, so `xs.first_where(pred)` is equivalent to `array.first_where(xs, pred)` (or whatever qualified name the extension is registered under).
 
-This is theoretical and deferred past MVP, but the registry design should not prevent it.
+Extension methods are **part of MVP**. The registry must support receiver-type dispatch so that `xs.first_where(...)` resolves to the extension registered for `array`. The compiler emits the same `OP_CALL` it would for a qualified function call, with the receiver as the first argument.
 
 ### Collection type-safety
 
@@ -544,7 +599,9 @@ A future opt-in type-locking mechanism could restrict a collection to a single e
 var nums = list<numeric>.new();
 ```
 
-This is not part of MVP. If added later, it should be a declarative constraint checked at runtime (or by an optional static pass), not a mandatory part of the type system.
+This is not part of MVP.
+
+**Foundational support for post-MVP generics**: every `anvil_value` already carries a type tag, and collections store homogeneous `anvil_value` handles. A future type-locking layer can attach a constraint descriptor to a list/dict instance and validate `append`/`set` against it, without changing storage, the operand-stack discipline, or the bytecode instruction set. The foundation is present; only the syntax and constraint checker are missing.
 
 ### Built-in distribution formats
 
@@ -560,14 +617,26 @@ The same registry populates from all three sources, so callers cannot distinguis
 
 These topics are captured as active threads. They are not all next, but each must be resolved before the runtime is implemented.
 
-### 1. `using` syntax for external sources
+### 1. `using` declarations
 
-Two models on the table:
+`using` brings foreign (non-ANVL) bindings into the module's function registry. It is the ASL counterpart to `import`, which loads ANVL documents.
 
-- **URI-style prefix**: `using "csharp:MyApp.Controllers";` or `using "cpp:render/backends/gl";`. The prefix names the foreign language/runtime, and the remainder is interpreted by that runtime's resolver.
-- **Discoverable bare name**: `using "System.Core";`. The resolver searches configured repositories, paths, or registered packages and determines the source kind from metadata.
+Syntax:
 
-Both can coexist: the prefix is explicit; bare names rely on discovery. The open question is what the default resolver protocol looks like and where the discovery catalog lives.
+```anvs
+using "c:anvil.std.math";
+using "csharp:MyApp.Controllers";
+using "python:tools.logging";
+```
+
+A `using` URI has a prefix that selects a host resolver; the remainder names a bundle or package within that resolver's domain. The core library ships a `c:` resolver that loads C callback bundles; language-binding layers register their own resolvers. If no prefix is given, `c:` is the default.
+
+Semantics:
+
+- `using` does not create an ANVL document or execute foreign code at load time.
+- It populates the module function registry with qualified names (e.g., `math.abs`).
+- Resolution is lazy: names are registered immediately, but host callbacks are bound when first called or when the resolver explicitly loads the bundle.
+- `import` is for ANVL source; `using` is for foreign namespaces. This distinction keeps import-graph behavior (file paths, cycles, deduplication) separate from host callback registration.
 
 ### 2. Built-in module packaging
 
@@ -607,7 +676,16 @@ ASL starts by mirroring native ANVL types:
 
 Variables are dynamically typed in MVP. A possible future direction is opt-in strong typing declared via `type` or schema attributes.
 
-**Open string design question**: differentiate a fixed, immutable string from a mutable `char[]` buffer. One option is to keep `string` immutable and introduce a separate mutable buffer type (tentatively `text` or `buffer`) for string-building operations.
+**Strings and buffers**: `string` is an immutable, pinned value. Internally it is treated as a single opaque value: it can be hashed, shared, and used as a `dict` key without copying. Mutating a string produces a new string. For mutable byte/text building, ASL provides a separate `buffer` type:
+
+```anvs
+var b = buffer.new();
+buffer.append(b, "hello");
+buffer.append(b, " world");
+var s = buffer.to_string(b);  // -> "hello world"
+```
+
+`string` and `buffer` convert through explicit functions; there is no implicit mutation of an immutable string.
 
 ### 5. Evaluation model
 
@@ -656,13 +734,13 @@ var a = counter();  // -> 1
 var b = counter();  // -> 2
 ```
 
-Closures require each function value to carry a reference to its captured environment. In an arena-based runtime, that environment can be a small object (or a linked frame pointer) allocated from the same arena as the function value. Closures are **tentative** for MVP because they complicate the frame model; if omitted, nested functions can still be created but cannot reference outer local variables.
+Closures require each function value to carry a reference to its captured environment. In an arena-based runtime, that environment can be a small object (or a linked frame pointer) allocated from the same arena as the function value. Closures are **post-MVP**. Nested functions can still be created and returned, but they cannot reference outer local variables. Adding closures later requires function values to carry a captured-environment reference; the rest of the design (arena allocation, frame chain) does not preclude it.
 
 #### Arena stack and variable scopes
 
 The runtime uses at least two related structures during execution:
 
-1. **Operand stack** — an arena-backed stack (`PArray`-like) holding arguments, return values, and temporary expression results. It is a pure value stack: push argument values before a call, pop them into parameters, push the return value, pop it at the call site.
+1. **Operand stack** — the arena-backed `Stack` from FR-011 holding arguments, return values, and temporary expression results. It is a pure value stack: push argument values before a call, pop them into parameters, push the return value, pop it at the call site.
 
 2. **Variable frame chain** — a linked list or stack of frames, one per active function call, mapping identifiers to values. Each frame contains the function's parameters and local variables. A frame pointer links to the caller's frame for lexical scope resolution.
 
@@ -744,6 +822,54 @@ OP_INTERPOLATED n           // build string from n segments
 - The instruction stream is a flat byte array.
 - Multi-byte operands (`idx`, `offset`, `arity`, `n`) are stored little-endian in 32-bit slots unless compact encoding is needed.
 - Source-span metadata is stored separately and indexed by instruction offset.
+
+## Compilation control
+
+The ScriptEngine compiles a function body lazily, on first call. This avoids paying compilation cost for functions that are declared but never invoked. A document-level option allows eager compilation of all functions at load time:
+
+```c
+anvil_document_opts opts = {0};
+opts.asl_compile_eager = true;  // compile all function bodies after parse
+```
+
+Compiled bytecode is cached on the `anvl_asl_func_t` descriptor. Recompilation happens only if the function is mutated (not supported in MVP).
+
+## Debug and trace modes
+
+Three levels, controlled per document via options or an in-source pragma:
+
+```anvs
+#debug off;       // default: minimal error info
+#debug errors;    // include source span on every exception
+#debug trace;     // record full call-frame stack, usable by try-catch later
+```
+
+The C API equivalent:
+
+```c
+anvil_document_set_debug(doc, ASL_DEBUG_TRACE);
+```
+
+Modes:
+
+- **off** — exceptions report only the error code and message.
+- **errors** — exceptions include the source span of the failing instruction.
+- **trace** — exceptions include the source span and a frame stack (function name + span per frame). This is the mode a future `try-catch` would use to build a detailed exception report.
+
+## Bytecode versioning
+
+Bytecode blobs and `.anvlo` files begin with a header:
+
+```c
+typedef struct asl_bytecode_header {
+    uint32_t magic;        // 'ANVS' (0x414E5653)
+    uint16_t major;        // breaks compatibility on change
+    uint16_t minor;        // backward-compatible additions
+    uint32_t flags;        // e.g., debug info present
+} asl_bytecode_header;
+```
+
+The VM rejects bytecode whose major version differs from the runtime's. Minor version mismatches are accepted if the runtime's minor is >= the file's minor.
 
 ## Source position metadata
 

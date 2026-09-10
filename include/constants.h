@@ -28,10 +28,10 @@
  * Update this by script for each release                                  *
  * ----------------------------------------------------------------------- */
 #define ANVL_VERSION_MAJOR 0
-#define ANVL_VERSION_MINOR 7
+#define ANVL_VERSION_MINOR 8
 #define ANVL_VERSION_PATCH 0
-#define ANVL_VERSION_TAG "alpha"
-#define ANVL_VERSION_STR "0.7.0-alpha"
+#define ANVL_VERSION_TAG "rc"
+#define ANVL_VERSION_STR "0.8.0-rc"
 
 /* ----------------------------------------------------------------------- *
  * Constants                                                               *

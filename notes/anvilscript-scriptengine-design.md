@@ -165,7 +165,15 @@ The compiler walks the AST and emits a flat instruction stream. It is a single p
 ### Output structure
 
 ```c
+typedef struct asl_bytecode_header {
+    uint32_t magic;        // 'ANVS' (0x414E5653)
+    uint16_t major;        // breaks compatibility on change
+    uint16_t minor;        // backward-compatible additions
+    uint32_t flags;        // e.g., debug info present
+} asl_bytecode_header;
+
 typedef struct asl_bytecode {
+    asl_bytecode_header header;
     byte *code;             // instruction stream
     usize count;            // number of bytes emitted
     usize capacity;
@@ -183,7 +191,10 @@ typedef struct asl_bytecode {
 - **Statements**: emit in order; declarations reserve a local slot.
 - **Expressions**: emit in postfix/operand-stack order so the VM pushes values and operators consume them.
 - **Control flow**: `if`, `while`, `for` emit jump instructions with placeholder offsets that are patched after the branch target is known.
-- **Function calls**: emit arguments, then `OP_CALL` with arity; the VM resolves the callee at runtime.
+- **Function calls**: emit arguments, then `OP_CALL` with arity; the VM resolves the callee at runtime. Known host callbacks emit `OP_HOST_CALL`.
+- **Extension methods**: member access on a value (`xs.first_where(...)`) is compiled as a qualified call with the receiver pushed as the first argument.
+- **Varargs**: the compiler emits code to collect excess arguments into an array and bind it to the rest parameter slot.
+- **Optional parameters**: omitted arguments are filled from literal defaults stored in the constant pool during the function prologue.
 - **Variables**: local variables are referenced by slot index; globals (module-level) are referenced by name and resolved through the registry.
 
 ## ASL VM
@@ -211,7 +222,7 @@ Locals live in the operand stack at `slot_offset .. slot_offset + local_count`. 
 - `OP_LOAD_LOCAL n` pushes the value at depth `slot_offset + n`.
 - `OP_STORE_LOCAL n` pops a value into the slot at depth `slot_offset + n`.
 - Binary operators pop two values and push the result.
-- `OP_CALL` pops the callee and arguments, pushes a new frame, binds arguments to parameter slots, and begins executing the callee's bytecode.
+- `OP_CALL` pops the callee and arguments, pushes a new frame, binds arguments to parameter slots (filling defaults and packing varargs as needed), and begins executing the callee's bytecode.
 - `OP_RETURN` pops the top value (or pushes `null` if none), tears down the frame, truncates the stack back to `slot_offset`, and pushes the return value.
 
 ### Control flow
@@ -223,7 +234,13 @@ Locals live in the operand stack at `slot_offset .. slot_offset + local_count`. 
 
 ### Exception channel
 
-When the VM encounters an exception (undefined variable, arity mismatch, type error), it sets the context-local error state, records the current instruction's source span, and halts. It does not unwind the stack by default; the host can inspect the optional debug frame stack if enabled. The arena-bound operand stack is discarded along with the evaluation context.
+When the VM encounters an exception (undefined variable, arity mismatch, type error), it sets the context-local error state and records information according to the current debug mode:
+
+- **off** — error code and message only.
+- **errors** — error code, message, and the source span of the failing instruction.
+- **trace** — all of the above plus a frame stack (function name + span per frame).
+
+The VM halts after setting the error. It does not unwind the stack by default; the host inspects the error state and optional trace. The arena-bound operand stack is discarded along with the evaluation context.
 
 ## Error reporting contract
 

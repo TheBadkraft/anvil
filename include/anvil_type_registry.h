@@ -103,6 +103,28 @@ void anvil_type_registry_dispose(anvil_type_registry reg);
 anvil_type_def anvil_type_registry_find(anvil_type_registry reg, const char *name);
 
 /**
+ * @brief Resolves any type reference to one uniform, queryable handle — a
+ * bare native primitive name, the bare `enum` kind, or a registered custom
+ * type (e.g. "VIN") — regardless of source. The native/enum vocabulary
+ * (notes/native-schema.md's "Decided — native primitive set") is checked
+ * first and always available even without a registry; a name that isn't
+ * one of those falls through to anvil_type_registry_find(reg, name). This
+ * is what a schema field's `type :=` should always resolve through, so
+ * every caller reads size/min/max/values through the same accessors no
+ * matter which of those two sources actually produced the definition.
+ * @param reg The registry to fall back to for custom types, or NULL if
+ * only native/enum resolution is needed (e.g. a document with no imports).
+ * @param name The type name to resolve (e.g. "Numeric", "enum", "VIN").
+ * @return The definition handle, or NULL if name is NULL, or name is
+ * neither a native/enum name nor found in reg (including when reg is NULL
+ * and name isn't native/enum). Native/enum handles have a lifetime
+ * independent of any registry (safe to use after the registry that would
+ * otherwise have been consulted is disposed); a registry-sourced handle
+ * still follows anvil_type_registry_find's own lifetime rules.
+ */
+anvil_type_def anvil_type_resolve(anvil_type_registry reg, const char *name);
+
+/**
  * @brief A type definition's own kind.
  * @param def The definition to read. NULL returns ANVIL_TYPE_UNKNOWN.
  */

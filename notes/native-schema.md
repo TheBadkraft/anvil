@@ -347,11 +347,10 @@ This was a genuine prerequisite tackled before the rest of `types.c`, not `types
 
 `anvil_type_registry_load(doc)` / `anvil_type_registry_load_from_imports(doc)` /
 `anvil_type_registry_dispose` / `anvil_type_registry_find(reg, name)` /
-`anvil_type_def_get_kind(def)` / `get_size`/`get_min`/`get_max` / `get_value_count`/`get_value` —
-`src/anvil_types.c`, `include/anvil_type_registry.h`, built entirely on the public flat API as
-designed, zero core changes beyond the OBJECT_BLOCK fix below (which was a real, independently
-justified gap, not scope creep). `TYP01`–`TYP07` (`test/unit/test_types.c`), Valgrind-clean, full
-14-suite regression green.
+`anvil_type_def_get_kind(def)` / `get_size`/`get_min`/`get_max` / `get_value_count`/`get_value` /
+`anvil_type_resolve` — `src/anvil_types.c`, `include/anvil_type_registry.h`, built entirely on
+the public flat API as designed, zero core changes beyond the OBJECT_BLOCK fix below (which was a
+real, independently justified gap, not scope creep).
 
 - **Loading**: `anvil_type_registry_load` rejects any document lacking `@[types]` (returns NULL,
   not an empty registry) and walks every top-level statement via `anvil_document_get_statements`,
@@ -376,6 +375,17 @@ justified gap, not scope creep). `TYP01`–`TYP07` (`test/unit/test_types.c`), V
   exactly. The loading/collecting logic is shared between both entry points (`collect_type_defs`,
   called once per source document, whether that's `doc` itself or one of its imports) rather than
   duplicated.
+- **Unified resolution**: `anvil_type_resolve(reg, name)` — one function resolving *any* type
+  reference (a bare native primitive, bare `enum`, or a registered `types.X` custom type) to the
+  same `anvil_type_def` handle, queryable through the same accessors regardless of source. `reg`
+  may be `NULL` (native/enum resolution needs no registry at all). Natives are checked first
+  always, even with a registry present, so a custom type can never accidentally shadow a reserved
+  name. Backed by seven static, always-available `anvil_type_def` instances (one per native
+  primitive + `enum`, never allocated/disposed) that `anvil_type_registry_find` itself was
+  deliberately left untouched by — same contract, same tests, this sits additively on top. This
+  is what `schema.c` will always resolve a field's `type :=` through. `TYP08`–`TYP10`.
+
+`TYP01`–`TYP10` (`test/unit/test_types.c`), Valgrind-clean, full 14-suite regression green.
 
 **Deliberately still out of scope**: a malformed type-definition statement (no `type :=`, or one
 naming nothing recognized) is silently skipped, not reported as a validation error — no
@@ -411,6 +421,171 @@ with fresh `TYPES_SRCS`/`TYPES_LIB` pointing at the real `src/anvil_types.c` (re
 under `src/`" below), and a real `$(BIN)/test_types` target — the first actual instance of an
 opt-in-module build, serving as the concrete precedent for `schema.c` and eventually AnvilScript.
 
+## Decided — schema's `int32`/`str`/`date`/`bool` vocabulary lives in adapter-specific `.types.anvl` files, not in `types.c`
+
+Real compatibility gap found while starting schema.c's sketch: FlyWire's actual, currently-
+generated `assets.meta.anvl` uses lowercase `int32`/`str`/`date` — none of which exist in
+`types.c`'s own six-primitive vocabulary (`Numeric`/`String`/`Bool`/`Object`/`Tuple`/`Array`) or
+its `enum` kind. First instinct was to hardcode these four as hidden, zero-import aliases inside
+`types.c` itself, purely for FlyWire compatibility — rejected. The repo owner's better call: each
+SQL adapter (Postgres, eventually MySQL/SQLite/etc.) gets its *own* real `.types.anvl` file
+(`postgres.types.anvl`, ...) defining `Int32`/`Str`/`Date`/`Bool` as ordinary custom types over
+the native primitives (`Int32 := { type := Numeric; };`, etc.) — needing **zero new code**, since
+`anvil_type_registry_load_from_imports` already resolves exactly this. Generalizes properly
+(MySQL's own integer-width quirks, SQLite's dynamic typing, Mongo's non-relational shape each get
+their own file instead of ANVIL guessing one lowest-common-denominator vocabulary) and keeps
+vendor-specific vocabulary out of core entirely.
+
+Consequence, faced directly rather than avoided: this means FlyWire's existing checked-in
+`.meta.anvl` files need regenerating (`type := int32;` → `import "postgres.types.anvl";` +
+`type := types.Int32;`) to work against the new `schema.c` — "zero regeneration" (the deciding
+reason for rejecting the hardcoded-alias option one round earlier) doesn't actually hold.
+Resolved as an acceptable, deliberate tradeoff: regeneration was never fully avoidable anyway — a
+new column or type in the live DB already forces a schema-gen re-run today, which is the entire
+reason `compareSchema`/drift-checking exists. `postgres.types.anvl` becomes something FlyWireSDK
+itself (repo owner's own framing — FlyWire is being considered as a real SDK product, "not just a
+protocol") would own and ship as part of its own distribution, not something Anvil Native builds
+or bundles — same "primitives, not policy" reasoning already applied everywhere else in this
+design.
+
+## Decided — inline field constraints stay a strict superset; naming is authoring guidance, not an enforced rule
+
+Raised: a schema field's inline `values := [...]` (FlyWire's real, working style — quoted
+strings, no backing type) sets a bad precedent if left unexamined — it's an undocumented,
+unnamed enum, and a future maintainer has no way to know why. Resolved: `schema.c` keeps
+accepting every inline constraint (`size`/`min`/`max`/`values`) exactly as FlyWire's real files
+already use them — nothing mechanically changes, still a strict superset, no validation-time
+rejection. The actual test isn't "enum vs. scalar" — it's whether naming the thing serves real
+reuse/abstraction, not merely "the library could represent this as a type": a one-off `min`/`max`
+used by exactly one field doesn't obviously earn a name, but an enum with real semantic members
+almost always does (an undocumented value list is a worse failure mode than an undocumented
+number range). That's a judgment call at authoring time schema.c has no way to detect
+mechanically, so it belongs in the eventual schema reference doc as guidance, not as a load/
+validate-time error.
+
+**Where a named type belongs, once you do define one**: an adapter-level `.types.anvl`
+(`postgres.types.anvl`) should stay scoped to genuine DBMS-bridging concerns — `Int32`/`Str`/
+`Date`/`Bool`, the types that answer "how do I represent this column as an Anvil native type at
+all." A business-domain enum like `AssetStatus` isn't that kind of bridge (it's specific to one
+table's own semantics) and doesn't belong crammed into the adapter file just for convenience —
+it gets its own properly-scoped definition instead.
+
+## Open — AnvilSchema's own specialized types
+
+Repo owner's own framing: "if AnvilSchema wants to introduce some specialized types, that's a
+different story altogether" — explicitly flagged as separate from the DBMS-bridging-type
+question above, not yet defined. Not guessed at here; revisit when there's a concrete need in
+front of it rather than speculating now.
+
+## Implemented — `schema.c` first slice: GREEN
+
+`anvil_schema_load(doc)` / `anvil_schema_dispose` / `anvil_schema_validate(schema, data_doc)` /
+`anvil_schema_get_violation_count`/`get_violation` / `anvil_schema_violation_get_category`/
+`get_field`/`get_message` — `src/schema/schema.c`, `include/anvil_schema.h`, built entirely on
+the public flat API and `anvil_type_registry.h` — no core parser/resolver changes. `SCH01`–`SCH07`
+(`test/unit/test_schema.c`), Valgrind-clean, full 15-suite regression green.
+
+- **Loading**: `anvil_schema_load` rejects any document lacking `@[schema]` (returns NULL, not
+  an empty schema) and walks every top-level statement via `anvil_document_get_statements`,
+  treating each as a field rule — same "no exceptions" pattern as `anvil_types.c`'s own
+  `@[types]` handling. A field's `type :=` (if present) is resolved via `anvil_type_resolve`
+  against a type registry built from the schema document's own imports
+  (`anvil_type_registry_load_from_imports`) — `@[schema]` never implies `types.` access on its
+  own, matching the decided semantics exactly; only the resolved *kind* is copied out, so the
+  registry itself doesn't need to outlive the load call. A field with no recognized `type :=`
+  (including none at all — a FlyWire-style `pooled` field) is still registered, just with
+  nothing to type-check; its `required :=` is still read and enforced either way.
+- **Validation collects everything, never fail-fast** (the decided policy): one pass checks
+  every schema field's presence (`required`) and, where a value exists, its kind against the
+  field's resolved type; a second pass over the data document's own statements catches anything
+  not declared in the schema at all. Violation categories are `anvil_schema_err_code`, schema's
+  own independent public enum — never the internal `errors.h` symbols directly, since schema.c
+  never includes internal headers. (This slice originally numbered the three categories to nod
+  at the reserved 46xx block; that numbering was dropped later — see "Error codes: dropping the
+  46xx nod" below.)
+- **Kind matching is quoting-agnostic**: a resolved `String` or `enum` kind accepts either a
+  quoted STRING value or a bare IDENTIFIER value — FlyWire's own inline `values` convention uses
+  quoted strings, `anvil_types.c`'s own enum convention uses bare identifiers, and neither should
+  read as a mismatch just because of spelling.
+- **Violations belong to the schema, not a separate result object**: each `anvil_schema_validate`
+  call replaces whatever the previous call collected (matching the sketch from several rounds of
+  design conversation earlier) — disposed and rebuilt fresh each time, not accumulated across
+  calls.
+
+**Deliberately still out of scope, matching `anvil_types.c`'s own precedent**: a malformed field
+rule (a `type :=` naming nothing recognized) is silently left with no kind to check against,
+not reported as an error of the schema itself — no error-reporting design exists yet for a
+malformed *schema* (as opposed to a data document failing to satisfy a well-formed one).
+
+## Implemented — `schema.c` constraint checking (`size`/`min`/`max`/`values`), with type inheritance
+
+Extends the first slice: `SCH08`–`SCH12` (`test/unit/test_schema.c`), Valgrind-clean, full
+15-suite regression green. A field's `size` (String — a maximum-length bound, not exact-width;
+FlyWire's own `varchar(n)` mapping is the dominant real case), `min`/`max` (Numeric — inclusive
+range), and `values` (membership, quoting-agnostic like kind-matching itself) are read in the
+same single pass over a field's nested statements as `type`/`required`, mirroring
+`anvil_types.c`'s own constraint-reading shape closely (a local `strtoll`-based numeric reader
+and a values-array reader, deliberately duplicated rather than shared, since schema.c and
+types.c are independent modules by design).
+
+**Constraint inheritance, implemented as designed**: if a field's `type :=` resolves to a
+custom `types.X` type that has its own `size`/`min`/`max`/`values`, those apply automatically
+when the field doesn't declare its own — and the field's own inline declaration always wins,
+never merged, exactly per the earlier "inline field constraints" decision. Verified directly:
+a field referencing `types.VIN` (which declares `size := 17;`) inherits that bound with no
+inline `size` of its own; a sibling field referencing the same type but *also* declaring its
+own `size := 25;` uses 25, not 17.
+
+**Two real bugs found and fixed while building the inheritance test, neither in the constraint
+logic itself**:
+
+1. The test fixture (`schema_with_custom_type.anvl`) originally wrote `@[schema, ...]` *before*
+   `import "...";` — a genuine header-ordering violation (`shebang → imports → attributes →
+   body`, per `document-header-scan.md`'s own scanning rules), not a schema.c bug at all. Caught
+   immediately as a real parse error (`ANVIL_ERR_HEADER`, "Unexpected token"), not a silent
+   misparse.
+2. **A real, load-bearing gap in `schema.c` itself**: `read_field_rule` was passing a `type :=`
+   field's raw text (e.g. the literal string `"types.VIN"`) straight into `anvil_type_resolve`
+   without ever stripping the `types.` prefix first. `anvil_type_resolve`/`anvil_type_registry_find`
+   look up entries by their *bare* declared name (`"VIN"`, not `"types.VIN"`) — the `types.`
+   spelling is purely a source-level convention for how a person *writes* a reference, never
+   something the registry's own lookup understood. This was silently broken from the first
+   slice onward: `schema_basic.anvl` never used a `types.X` reference (only bare native names),
+   so nothing exercised this path until the inheritance tests did. Fixed with a small
+   `strip_types_prefix` helper in `schema.c`, applied before every `anvil_type_resolve` call.
+
+## Error codes: dropping the 46xx nod, giving each constraint its own category
+
+The constraint-checking slice above shipped with a real wart: every constraint violation
+(`size`, `min`/`max`, `values`) was reported as `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH` —
+reusing the *only* violation category that existed at the time for anything that wasn't
+`REQUIRED` or `UNKNOWN_FIELD`, since no more specific category had been designed yet. Flagged
+directly: a value can be exactly the right kind and still violate size/range/membership, and
+that's a different failure than the value being the wrong kind entirely — `TYPE_MISMATCH` reads
+as "you sent a string where a number belonged," not "your number is out of range."
+
+Decided: schema gets its own set of specific error codes, one per distinct reason a field can
+fail, and the numeric mirroring of the internal `errors.h` 46xx block (`ANVIL_SCHEMA_ERR_
+VALIDATION_REQUIRED` = 4604, etc. — a "namespace nod, not a shared enum") is dropped entirely.
+The nod never had any real coupling to begin with: `schema.c` never includes `errors.h`, and a
+`grep` across the codebase turned up zero call sites actually using the internal `ANVL_ERR_
+SCHEMA_*` constants for anything beyond their own message-string tables in `errors.c` — that
+46xx block appears to predate the "schema is a consumer, not a core feature" pivot and is
+effectively vestigial now. `anvil_schema_err_code` now uses plain sequential values (implicit
+enum numbering, no explicit numerics) and adds two new categories:
+
+- `ANVIL_SCHEMA_ERR_VALIDATION_SIZE` — a field's value exceeds its declared `size`.
+- `ANVIL_SCHEMA_ERR_VALIDATION_RANGE` — a numeric field's value is outside its declared `min`/`max`.
+- `ANVIL_SCHEMA_ERR_VALIDATION_VALUES` — a field's value isn't one of its declared `values`.
+
+`TYPE_MISMATCH` now means only what its name says — a value's *kind* doesn't match the field's
+declared type — and is never reused for a constraint failure again. `include/anvil_schema.h`'s
+enum doc comment was updated to drop the 46xx-mirroring claim entirely. RED confirmed first
+(`SCH08`/`SCH09`/`SCH10` extended with category assertions against the new codes, run against
+the still-unchanged validate logic — 4 genuine failures, nothing else regressed), then the three
+call sites in `anvil_schema_validate` updated to GREEN (60/60 assertions, Valgrind-clean, full
+15-suite regression green).
+
 ## Open questions (not yet worked through)
 
 - The exact `schema.c`/`types.c` module boundary as reusable precedent for AnvilScript: one
@@ -424,5 +599,7 @@ opt-in-module build, serving as the concrete precedent for `schema.c` and eventu
 - `notes/public-api.md` — the module/statement attribute accessors this design reuses directly.
 - `notes/resolution-phase.md` — `base`/inheritance semantics, relevant to the still-open
   conformance-marker question above.
-- `include/errors.h` — the already-reserved, unused Schema Errors (46xx) block.
+- `include/errors.h` — the reserved Schema Errors (46xx) block; `anvil_schema_err_code` no
+  longer mirrors it numerically (see "Error codes: dropping the 46xx nod" above) — this block
+  appears vestigial, left as-is since removing it wasn't asked for.
 - `deferred-work.md` — index entry pointing here.

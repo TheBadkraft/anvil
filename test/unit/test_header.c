@@ -638,6 +638,28 @@ static void test_hdr20_registry_survives_diamond_duplicate_dispose(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
+ * HDR21 — an unrecognized shebang dialect is a real header error, not a
+ * silent fall-through to AML-permissive behavior
+ * ---------------------------------------------------------------------- */
+static void test_hdr21_invalid_shebang_dialect_rejected(void) {
+   const char *buffer = "#!xyz\nname := test\n";
+   module_context ctx = NULL;
+   module_document doc = setup_registered_doc(buffer, &ctx);
+   TestBit.is_not_null(doc, "HDR21: registered document allocated");
+   if (!doc) {
+      return;
+   }
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_scan_header(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR21: scan header returns ERR for invalid dialect");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT, err_code,
+                        "HDR21: err_code is INVALID_SHEBANG_DIALECT");
+   TestBit.is_true(Source.has_errors(doc->source), "HDR21: source reports an error");
+
+   mod_ctx_dispose(ctx);
+}
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -669,6 +691,8 @@ int main(void) {
                   test_hdr19_import_loader_body_size_hint, th);
    TestBit.run_ex("HDR20_registry_survives_diamond_duplicate_dispose", NULL,
                   test_hdr20_registry_survives_diamond_duplicate_dispose, th);
+   TestBit.run_ex("HDR21_invalid_shebang_dialect_rejected", NULL,
+                  test_hdr21_invalid_shebang_dialect_rejected, th);
 
    return TestBit.report();
 }

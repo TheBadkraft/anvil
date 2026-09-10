@@ -223,6 +223,91 @@ static void test_typ07_load_from_imports_empty(void) {
       anvil_dispose(doc);
    }
 }
+/* ---------------------------------------------------------------------- *
+ * TYP08 — anvil_type_resolve resolves the native/enum vocabulary with no
+ * registry at all, and reports no constraints of their own
+ * ---------------------------------------------------------------------- */
+static void test_typ08_resolve_native(void) {
+   anvil_type_def numeric = anvil_type_resolve(NULL, "Numeric");
+   TestBit.is_not_null(numeric, "TYP08: 'Numeric' resolves with no registry");
+   if (numeric) {
+      TestBit.is_equal_int(ANVIL_TYPE_NUMERIC, anvil_type_def_get_kind(numeric),
+                           "TYP08: 'Numeric' resolves to kind Numeric");
+      long long unused = 0;
+      TestBit.is_false(anvil_type_def_get_size(numeric, &unused),
+                       "TYP08: native 'Numeric' declares no size of its own");
+   }
+
+   anvil_type_def str = anvil_type_resolve(NULL, "String");
+   TestBit.is_not_null(str, "TYP08: 'String' resolves");
+   if (str) {
+      TestBit.is_equal_int(ANVIL_TYPE_STRING, anvil_type_def_get_kind(str),
+                           "TYP08: 'String' resolves to kind String");
+   }
+
+   anvil_type_def en = anvil_type_resolve(NULL, "enum");
+   TestBit.is_not_null(en, "TYP08: bare 'enum' resolves");
+   if (en) {
+      TestBit.is_equal_int(ANVIL_TYPE_ENUM, anvil_type_def_get_kind(en),
+                           "TYP08: 'enum' resolves to kind Enum");
+      TestBit.is_equal_int(0, (long long)anvil_type_def_get_value_count(en),
+                           "TYP08: native 'enum' declares no values of its own");
+   }
+
+   TestBit.is_null(anvil_type_resolve(NULL, "NotARealType"),
+                   "TYP08: an unrecognized name with no registry is NULL");
+}
+/* ---------------------------------------------------------------------- *
+ * TYP09 — anvil_type_resolve falls through to a registry for a custom
+ * type, and native names are checked first regardless
+ * ---------------------------------------------------------------------- */
+static void test_typ09_resolve_custom_falls_through(void) {
+   anvil_document doc = anvil_load(fixture_path("types_basic.anvl"));
+   TestBit.is_not_null(doc, "TYP09: document loaded");
+   if (!doc) {
+      return;
+   }
+   anvil_type_registry reg = anvil_type_registry_load(doc);
+   TestBit.is_not_null(reg, "TYP09: registry loaded");
+   if (reg) {
+      anvil_type_def vin = anvil_type_resolve(reg, "VIN");
+      TestBit.is_not_null(vin, "TYP09: 'VIN' resolves through the registry");
+      if (vin) {
+         TestBit.is_equal_int(ANVIL_TYPE_STRING, anvil_type_def_get_kind(vin),
+                              "TYP09: 'VIN' resolves to kind String");
+         long long size = 0;
+         TestBit.is_true(anvil_type_def_get_size(vin, &size), "TYP09: 'VIN' declares a size");
+         TestBit.is_equal_int(17, size, "TYP09: 'VIN' size is 17");
+      }
+
+      anvil_type_def numeric = anvil_type_resolve(reg, "Numeric");
+      TestBit.is_not_null(numeric, "TYP09: native names still resolve with a registry present");
+      TestBit.is_equal_int(ANVIL_TYPE_NUMERIC, anvil_type_def_get_kind(numeric),
+                           "TYP09: 'Numeric' still resolves to kind Numeric, not a registry miss");
+
+      TestBit.is_null(anvil_type_resolve(reg, "NotRegistered"),
+                      "TYP09: a name that's neither native nor registered is NULL");
+
+      anvil_type_registry_dispose(reg);
+   }
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * TYP10 — anvil_type_resolve NULL safety
+ * ---------------------------------------------------------------------- */
+static void test_typ10_resolve_null_safety(void) {
+   TestBit.is_null(anvil_type_resolve(NULL, NULL), "TYP10: resolve(NULL, NULL) is NULL");
+
+   anvil_document doc = anvil_load(fixture_path("types_basic.anvl"));
+   if (doc) {
+      anvil_type_registry reg = anvil_type_registry_load(doc);
+      if (reg) {
+         TestBit.is_null(anvil_type_resolve(reg, NULL), "TYP10: resolve(reg, NULL) is NULL");
+         anvil_type_registry_dispose(reg);
+      }
+      anvil_dispose(doc);
+   }
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -236,6 +321,10 @@ int main(void) {
    TestBit.run_ex("TYP05_constraint_null_safety", NULL, test_typ05_constraint_null_safety, th);
    TestBit.run_ex("TYP06_load_from_imports", NULL, test_typ06_load_from_imports, th);
    TestBit.run_ex("TYP07_load_from_imports_empty", NULL, test_typ07_load_from_imports_empty, th);
+   TestBit.run_ex("TYP08_resolve_native", NULL, test_typ08_resolve_native, th);
+   TestBit.run_ex("TYP09_resolve_custom_falls_through", NULL,
+                  test_typ09_resolve_custom_falls_through, th);
+   TestBit.run_ex("TYP10_resolve_null_safety", NULL, test_typ10_resolve_null_safety, th);
 
    return TestBit.report();
 }
