@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>How ANVL Happened — ANVL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><img src="/images/ANVL_wordmark_dark.png" alt="ANVL" height="32" /></a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/story" class="active">Story</a>
+      <a href="/oml">OML</a>
+      <a href="/docs">Docs</a>
+      <a href="/sandbox">Sandbox</a>
+      <a href="/download">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="pill">origin story</div>
+    <h1>How ANVL Happened</h1>
+    <p class="lede">
+      Anvil didn't start as an attempt to build a language. It started as an attempt to learn
+      C — and getting blindsided by Makefile on the way in.
+    </p>
+
+    <p>
+      Makefile's syntax isn't really trying to be a language for humans. It's a
+      build-dependency DSL that happened to calcify into universal use, and learning it felt
+      like a detour before the detour: first learn C, then learn an entire second, unrelated
+      language just to compile it. The frustration wasn't "this is hard" — it was "why does
+      compiling C require fluency in something this disconnected from the problem."
+    </p>
+
+    <p>
+      CMake looked like the fix. It wasn't. It replaced one file with several, and traded one
+      DSL for the job of understanding the difference between a <code>CMakeLists.txt</code> and
+      everything else CMake expects you to track alongside it. Fewer headaches were not part of
+      the deal — just different, multiplied ones.
+    </p>
+
+    <p>
+      So: what about a build configuration in JSON? That lasted about as long as it took to
+      type the first pair of quotes. JSON has no comments, no way to define a value once and
+      reference it elsewhere, nothing resembling the variable substitution Makefile at least got
+      right. Modeling a real build — with anything like a reusable, inheritable shape — was a
+      non-starter.
+    </p>
+
+    <h2>The question changed</h2>
+    <p>
+      That's the moment the actual question changed. Not "what existing format can I bend into
+      shape" but "what would I build if I designed this properly, for how I actually think about
+      structure." One requirement was non-negotiable from the start: variable replacement. A
+      build configuration without it is just a list of things you'll be retyping forever.
+    </p>
+
+    <p>
+      From there it kept unfolding. If a top-level entry could hold something like a set of
+      paths, and another document could import it and inherit that entry — reuse it wholesale,
+      override only what's different — then nothing ever needed to be rewritten or re-looked-up
+      again. That was the moment it clicked: this wasn't a config format anymore. This was an
+      object modeling language.
+    </p>
+
+    <p>
+      A quick look around confirmed it — object modeling languages are a real, established
+      category, and UML (Universal Modeling Language) is the well-known one in that space.
+      Anvil's design didn't set out to compete with UML — it arrived at object modeling by way
+      of a build-config problem — but it belongs in the same conversation: a language for
+      modeling objects and their relationships, arrived at from a completely different
+      direction.
+    </p>
+
+    <h2>Two dialects, then a third possibility</h2>
+    <p>
+      Once the object modeling side was solid, the rest moved fast. Strip a handful of features
+      back out — no inheritance, no imports, no attributes, no nesting — and what's left is a
+      stable, deterministic messaging protocol. Not a second language — the same grammar with
+      fewer permissions turned on. That became AMP.
+    </p>
+
+    <p>
+      And once there were two dialects sharing one grammar, a third possibility opened up:
+      instead of one giant, fixed scripting language, an extensible DSL model — dialects
+      declared explicitly, enforced at the parser level, each one only as permissive as the
+      problem actually requires. That's ASL, still in the design stage.
+    </p>
+
+    <h2>Back to square one, on purpose</h2>
+    <p>
+      None of this means a build tool can be skipped entirely, either. Refuse to use one, and
+      the alternative is writing raw GCC command lines by hand — which turns into a script that
+      stitches those command lines together — which turns into wishing there were a config file
+      so the same lines didn't have to be retyped for every new project. That's the whole loop,
+      right back to square one. Makefile made that climb steeper than it needed to be. CMake
+      didn't fix it — it just moved the headache into more files. And JSON, once it was actually
+      tried, offered nothing to make the climb worth it — no comments, no reuse, no way to model
+      what a real build config needs to model. Anvil doesn't erase the learning curve. It
+      reshapes it into one that's actually productive to climb.
+    </p>
+
+    <div class="cta-row">
+      <a class="btn primary" href="/download">Download and try it →</a>
+      <a class="btn secondary" href="/docs">Read the docs</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly
+    bindings. v0.8.0-rc.
+  </footer>
+
+  <script src="/assets/version.js"></script>
+</body>
+
+</html>

@@ -3,7 +3,7 @@
 
 **Private Repository · Reference Implementation in Pure C**
 
-![ANVL Wordmark](docs/images/anvl_wordmark.png)
+![ANVL Wordmark](site/images/ANVL_wordmark_light.png)
 
 **A**ttributed **N**ode **V**ariadic **L**anguage
 
