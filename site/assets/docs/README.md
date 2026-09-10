@@ -32,6 +32,15 @@ for the Node.js/WebAssembly/native-C equivalents of the snippet above.
 
 ## Documentation
 
+- **[Getting Started](getting-started.md)** — task-oriented C API walkthrough: load a document,
+  read what's in it, clean up. Every example compiled and run against the real parser.
+- **[Language Reference](language-reference.md)** — the full grammar: dialects, statement/value
+  forms, attributes, inheritance, imports, weak typing, errors, and the public C API/bindings
+  surface.
+- **[Types](types-reference.md)** — the opt-in type system: native primitives, `enum`,
+  constraints, cross-file `types.X` resolution.
+- **[Schema](schema/README.md)** — AnvilSchema: why it isn't a bolt-on the way XSD/XSLT or JSON
+  Schema are, and what's actually implemented.
 - **[AML Guide](AML-Guide.md)** — objects, arrays, tuples, attributes, inheritance, `$` VarRefs, blobs
 - **[AMP Guide](AMP-Guide.md)** — the restricted messaging dialect and what it forbids
 - **[Bindings](Bindings-Guide.md)** — native C library, Node.js, and WebAssembly: usage guides and downloads
