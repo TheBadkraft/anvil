@@ -66,6 +66,12 @@ coverage.info
 coverage.filtered.info
 coverage-html/
 
+# wrangler dev's local Miniflare state (KV/D1/R2/observability SQLite + WAL files) --
+# deliberately kept OUTSIDE site/, which wrangler.toml's [assets] directory = "." watches for
+# live-reload. Inside site/, every write Miniflare makes to its own state gets picked up as an
+# asset change, triggering another reload, forever -- see notes/deferred-work.md.
+.wrangler-state/
+
 # Test logs
 logs/
 

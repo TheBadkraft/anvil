@@ -51,6 +51,24 @@ paths now 404s on the live domain. **Lesson for next time a static-assets Worker
 check what's actually in the assets directory (`ls -la`, not just `git status`) before the first
 deploy from a fresh clone/checkout, not after.
 
+**A second, real bug in the same family: `wrangler dev` looped forever, never actually serving a
+page.** Same root cause as the security bug above — `[assets] directory = "."` makes the dev
+server watch all of `site/` for live-reload, but `.wrangler/state/v3/...` (Miniflare's own local
+KV/D1/R2/observability state, live SQLite databases with constantly-churning WAL journal files)
+lives *inside* that same watched tree. Every write Miniflare makes to its own state — continuous
+and automatic, nothing to do with anyone's edits — gets read back as an asset change, triggering
+another reload, which touches state again, forever: `⎔ Reloading local server...` /
+`⎔ Local server updated and ready`, endlessly, never reaching `Ready on http://...`.
+`site/.assetsignore` (which already listed `.wrangler/`, added for the deploy-time leak above)
+does **not** stop this — that file only filters what gets *uploaded* on `wrangler deploy`, not
+what the *dev server's own file watcher* watches locally. Confirmed directly: pointing Miniflare's
+persisted state outside the watched tree (`wrangler dev --persist-to ../.wrangler-state`) fixed
+it immediately — exactly one startup reload, then stable. Fixed for good by baking that flag into
+`site/package.json`'s `site:dev` script and gitignoring the new `.wrangler-state/` at the repo
+root. `site/node_modules/` also didn't exist yet (every earlier `wrangler` invocation this session
+went through `npx`'s on-demand fetch, which `npm run` doesn't do) — ran `npm install` in `site/`
+so `npm run site:dev` actually works standalone, not just `npx wrangler dev` run by hand.
+
 **The content rewrite — first real pass done, then two follow-up passes.** A new "Bindings"
 section (`site/assets/docs/Bindings-Guide.md`, linked from `docs.html`'s nav) consolidates
 `anvil.node`'s own `wiki/API-Reference.md`/`Quick-Start.md` (real, accurate content) plus a
