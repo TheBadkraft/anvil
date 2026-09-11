@@ -272,9 +272,40 @@ where this lands `anvil-node` relative to `anvil.js` without you
 re-running `bench/native-backend-compare.js` against a build with this fix
 vendored in; the ~1.8x gap you measured includes marshalling costs this fix
 doesn't touch at all, so a ~22% reduction in the native parse+read cost is
-very unlikely to fully close it by itself. We'll bump `anvil-node`'s
-vendored `anvil` pin once this merges so you can re-measure against your
-real harness rather than against our C-level numbers.
+very unlikely to fully close it by itself.
+
+## We re-ran it — real end-to-end numbers, through your own harness
+
+`anvil-node`'s vendored `anvil` pin is bumped to this fix (rebuilt,
+retested 29/29). We ran `bench/native-backend-compare.js` against it
+directly, same real Postgres BULKGEN data, no changes to your code:
+
+| n | anvil-js | anvil-node (before) | anvil-node (after, this run) |
+|---:|---:|---:|---:|
+| 100 | 1.309ms | 0.118ms | 0.122ms |
+| 1,000 | 1.819ms | 0.264ms | 0.292ms |
+| 10,000 | 1.487ms | 3.061ms | 2.880ms |
+
+At n=10,000 single-call: **5.9% faster**, not the ~22% the pure-C
+full-pipeline number predicted. We also reproduced your "warmed" condition
+(one throwaway `anvl.parse()` of the identical string, then timed again)
+with a short ad hoc script against the same real data — 4 separate runs at
+n=10,000: 2.79ms, 2.90ms, 2.57ms, 2.97ms, 2.92ms (mean ~2.83ms) — against
+your original warmed baseline of **2.723ms**. That's not an improvement
+outside run-to-run noise; if anything it's flat.
+
+**Honest conclusion:** the fix is real, verified, and correct at the level
+we measured it (core string-resolution cost, ~97% faster in isolation) —
+but at the true `anvl.parse()` boundary you actually care about, its
+effect is small to negligible. That tells us something useful about where
+the real cost lives: not in escape resolution, which is what your original
+report's hypothesis pointed at, but predominantly in the N-API boundary
+itself — building the JS object graph, V8 string allocation for every
+returned value — which this fix never touched. If closing the ~1.8x gap
+further matters to you, the next place to look on our side is that
+marshalling layer, not more C-parser micro-optimization; we don't have a
+characterization of that cost yet the way we now do for the string-escape
+path.
 
 ## Real-world implication for FlyWire, stated plainly
 
