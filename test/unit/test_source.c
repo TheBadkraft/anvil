@@ -1009,6 +1009,78 @@ static void test_src46_consume_until_zero_length(void) {
 
    Source.dispose(src);
 }
+/* ---------------------------------------------------------------------- *
+ * SRC47 - content hashing processes content in 8-byte words for speed
+ * (see BR-2609-anvl-003); a difference anywhere inside a full word must
+ * still change the hash, not just differences at word boundaries.
+ * ---------------------------------------------------------------------- */
+static void test_src47_hash_distinguishes_within_a_word(void) {
+   anvl_source s1 = NULL;
+   anvl_source s2 = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&s1, &err_code);
+   Source.create(&s2, &err_code);
+
+   // exactly 8 bytes (one full word, no tail), differing only in the middle byte
+   Source.from_buffer(&s1, "AAAAAAAA", 8, &err_code);
+   Source.from_buffer(&s2, "AAAABAAA", 8, &err_code);
+
+   TestBit.is_true(Source.hash(s1) != Source.hash(s2),
+                   "SRC47: an 8-byte content differing mid-word hashes differently");
+
+   Source.dispose(s1);
+   Source.dispose(s2);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC48 - content hashing's tail loop (content not a multiple of 8 bytes)
+ * still distinguishes content that differs only in the trailing bytes
+ * ---------------------------------------------------------------------- */
+static void test_src48_hash_distinguishes_in_the_tail(void) {
+   anvl_source s1 = NULL;
+   anvl_source s2 = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+
+   Source.create(&s1, &err_code);
+   Source.create(&s2, &err_code);
+
+   // 11 bytes: one full 8-byte word plus a 3-byte tail; content differs only
+   // in the last (tail) byte.
+   Source.from_buffer(&s1, "AAAAAAAAxyz", 11, &err_code);
+   Source.from_buffer(&s2, "AAAAAAAAxyZ", 11, &err_code);
+
+   TestBit.is_true(Source.hash(s1) != Source.hash(s2),
+                   "SRC48: content differing only in the tail hashes differently");
+
+   Source.dispose(s1);
+   Source.dispose(s2);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC49 - hash is stable and reproducible across a range of lengths
+ * straddling the 8-byte word boundary (7, 8, and 9 bytes) -- same content,
+ * loaded twice, must hash identically regardless of which loop path
+ * (word-only, tail-only, or both) it exercises.
+ * ---------------------------------------------------------------------- */
+static void test_src49_hash_stable_across_word_boundary_lengths(void) {
+   const char *samples[] = {"1234567", "12345678", "123456789"};
+   for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
+      anvl_source a = NULL;
+      anvl_source b = NULL;
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      size_t len = strlen(samples[i]);
+
+      Source.create(&a, &err_code);
+      Source.create(&b, &err_code);
+      Source.from_buffer(&a, samples[i], len, &err_code);
+      Source.from_buffer(&b, samples[i], len, &err_code);
+
+      TestBit.is_equal_int((long long)Source.hash(a), (long long)Source.hash(b),
+                           "SRC49: identical content at this length hashes identically");
+
+      Source.dispose(a);
+      Source.dispose(b);
+   }
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -1069,6 +1141,12 @@ int main(void) {
                   test_src44_consume_until_tracks_newlines, ts);
    TestBit.run_ex("SRC45_consume_until_null_safety", NULL, test_src45_consume_until_null_safety, ts);
    TestBit.run_ex("SRC46_consume_until_zero_length", NULL, test_src46_consume_until_zero_length, ts);
+   TestBit.run_ex("SRC47_hash_distinguishes_within_a_word", NULL,
+                  test_src47_hash_distinguishes_within_a_word, ts);
+   TestBit.run_ex("SRC48_hash_distinguishes_in_the_tail", NULL,
+                  test_src48_hash_distinguishes_in_the_tail, ts);
+   TestBit.run_ex("SRC49_hash_stable_across_word_boundary_lengths", NULL,
+                  test_src49_hash_stable_across_word_boundary_lengths, ts);
 
    return TestBit.report();
 }
