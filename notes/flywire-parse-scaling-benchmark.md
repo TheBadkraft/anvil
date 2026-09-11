@@ -331,12 +331,24 @@ the process), is in [`BR-2609-anvl-002`](../BR/BR-2609-anvl-002.md)
 (filed as a continuation of `BR-2609-anvl-001` — that fix was real, just
 not the one that mattered here).
 
-We're bumping `anvil-node`/`anvil-wasm`'s vendored pins to this fix next
-and will re-run `bench/native-backend-compare.js` against it before
-reporting numbers again — this is the fix that should actually move your
-real measurement, not the escape-resolution one above.
+## This one actually moved it — real numbers from your own harness
 
-## Real-world implication for FlyWire, stated plainly
+Vendored pins bumped in both bindings, rebuilt, retested (29/29 `anvil-node`, 30/30 `anvil-wasm`).
+Ran `bench/native-backend-compare.js` directly against your real Postgres BULKGEN data:
+
+| n=10,000, single-call | anvil-js | anvil-node (original report) | anvil-node (this fix) |
+|---|---:|---:|---:|
+| `anvl.parse()` | 1.972ms | 3.061ms | **1.661ms** |
+
+`anvil-node` went from **1.8x slower** than `anvil.js` to **1.2x faster** — the direction of your
+original finding is reversed. Reproduced your "warmed" condition too (one throwaway parse of the
+identical string first): 5 runs, mean **~1.80ms**, down from your original 2.723ms warmed
+baseline (~34% faster). The escape-resolution fix (`BR-2609-anvl-001`) barely moved this number
+because it was never on your hot path; this one — bulk-scanning blob content instead of one
+function call per byte in the parser itself — was the actual bottleneck all along. Full detail in
+[`BR-2609-anvl-002`](../BR/BR-2609-anvl-002.md).
+
+## Real-world implication for FlyWire, stated plainly (superseded — see below)
 
 FlyWire's server process (`harness/server.js`) is long-lived — it
 parses many messages over its life, not one per process. That means
@@ -350,3 +362,11 @@ slower — the opposite of what we expected and the opposite of what
 small-payload testing had shown us. We're not drawing a migration
 conclusion from this yet; we want your read on the mechanism first,
 per the above.
+
+**Update, post-`BR-2609-anvl-002`:** this is no longer the case. With the blob-scan fix vendored
+in, `anvil-node` measures faster than `anvil.js` at FlyWire's production-relevant scale in both
+conditions (single-call: 1.661ms vs. 1.972ms; warmed: ~1.80ms vs. an ~1.53ms-1.97ms historical
+`anvil.js` range) — the small/medium-payload win now extends to large payloads too, closing the
+gap this whole investigation started from. This *is* a real basis for a migration conclusion, at
+least for this document shape; worth your own independent re-confirmation before treating it as
+settled on your side.
