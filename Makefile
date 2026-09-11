@@ -50,8 +50,14 @@ RELEASE_OBJ  = build/release
 # Release carries no debug info at all (no -g), on top of an explicit strip pass on the
 # archive/shared object themselves — belt and suspenders, so nothing slips in from a
 # mismatched flag later.
-DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS)
-RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS)
+# -MMD -MP generate a per-object .d file listing every header it includes, so a header-only
+# change (e.g. include/internal/source.h) correctly triggers a rebuild of every object that
+# includes it -- not just the .c files touched directly. Without this, a stale object built
+# against an old header layout can silently link into the archive/.so alongside fresh ones,
+# producing a corrupted artifact with no build error (found the hard way: a new anvl_source_i
+# vtable field left non-recompiled objects reading every later field one slot off).
+DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
+RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 
 DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS))
 RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS))
@@ -103,6 +109,9 @@ $(DEBUG_OBJ)/%.o: src/%.c
 $(RELEASE_OBJ)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
+
+-include $(DEBUG_OBJS:.o=.d)
+-include $(RELEASE_OBJS:.o=.d)
 
 clean:
 	rm -rf build lib coverage.info coverage.filtered.info $(COVERAGE_DIR)

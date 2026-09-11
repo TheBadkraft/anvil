@@ -294,18 +294,47 @@ n=10,000: 2.79ms, 2.90ms, 2.57ms, 2.97ms, 2.92ms (mean ~2.83ms) — against
 your original warmed baseline of **2.723ms**. That's not an improvement
 outside run-to-run noise; if anything it's flat.
 
-**Honest conclusion:** the fix is real, verified, and correct at the level
-we measured it (core string-resolution cost, ~97% faster in isolation) —
-but at the true `anvl.parse()` boundary you actually care about, its
-effect is small to negligible. That tells us something useful about where
-the real cost lives: not in escape resolution, which is what your original
-report's hypothesis pointed at, but predominantly in the N-API boundary
-itself — building the JS object graph, V8 string allocation for every
-returned value — which this fix never touched. If closing the ~1.8x gap
-further matters to you, the next place to look on our side is that
-marshalling layer, not more C-parser micro-optimization; we don't have a
-characterization of that cost yet the way we now do for the string-escape
-path.
+**Honest conclusion (superseded below):** the fix is real and correct at
+the level we measured it (core string-resolution cost, ~97% faster in
+isolation) — but at the true `anvl.parse()` boundary, its effect was
+small to negligible. We initially pointed at the N-API boundary as the
+likely remaining cause. Digging in before profiling that layer turned up
+something more fundamental first — see the next section.
+
+## The actual bottleneck — a correction to our own diagnosis
+
+Before profiling N-API, we checked exactly what your real payload *is* —
+and found we'd been benchmarking the wrong value kind. Your wire format
+wraps the payload as `payload := @bin\`<base64>\`;`
+(`src/am-packet.js`) — a **BLOB**, not a quoted STRING. We'd inferred a
+STRING shape from your original report's English description ("one
+`blob := "<base64>"`-shaped value"), never checked it against your actual
+source. A BLOB's `get_text` never touches `resolve_string_escapes` at all
+— it was already fast, before *and* after the fix above (0.013ms either
+way on your real shape, confirmed directly). **The fix is real and
+correct, but it was never on your actual hot path** — which explains
+why re-testing barely moved the needle.
+
+The real cost: isolating `anvil_load_buffer` alone (parsing only, no
+`get_text` call at all) on your real 813,766-byte `@bin` shape costs
+2.37ms — essentially the *entire* per-call cost. `parse_blob_literal`
+scans blob content one byte at a time (three indirect calls per byte,
+~2.4 million of them for your payload size) instead of a bulk scan for
+the closing delimiter. Fixed with a proper bulk-scan primitive
+(`Source.consume_until`, one `memchr` pass + correct line/column
+bookkeeping) — verified real, `-O2`, full pipeline on your actual `@bin`
+shape: **2.415ms → 0.762ms, 68.4% faster (~3.2x)**, `anvil_load_buffer`
+alone 2.369ms → 0.707ms (70.2% faster). Full writeup, including the
+build-system bug this fix's own header change exposed (a Makefile
+dependency-tracking gap, unrelated to your report but found and fixed in
+the process), is in [`BR-2609-anvl-002`](../BR/BR-2609-anvl-002.md)
+(filed as a continuation of `BR-2609-anvl-001` — that fix was real, just
+not the one that mattered here).
+
+We're bumping `anvil-node`/`anvil-wasm`'s vendored pins to this fix next
+and will re-run `bench/native-backend-compare.js` against it before
+reporting numbers again — this is the fix that should actually move your
+real measurement, not the escape-resolution one above.
 
 ## Real-world implication for FlyWire, stated plainly
 
