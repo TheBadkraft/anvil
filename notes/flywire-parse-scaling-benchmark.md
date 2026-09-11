@@ -213,10 +213,68 @@ call — 98.3% saved, roughly 60x**.
 Both fixes are behavior-preserving (identical resolved output for every
 input, including strings that do contain real escapes) and land entirely in
 core Anvil Native, so the benefit reaches `anvil-node`, `anvil-wasm`, and any
-future binding without binding-specific work. We'll report real
-before/after numbers against your own `bench/native-backend-compare.js`
-shape (not just the isolated microbenchmark above) once the fix lands and
-passes full regression.
+future binding without binding-specific work.
+
+## Fix landed — real before/after numbers, closer to your actual shape
+
+The fix above is implemented (`BR-2609-anvl-001`, both changes, full unit +
+functional + sigma regression green, Valgrind-clean). Rather than stop at
+the isolated microbenchmark, we measured two more realistic conditions,
+same 813,766-byte n=10,000 blob shape, `-O2` (a real release-equivalent
+build, not a debug one):
+
+**`anvil_value_get_text` alone, called against a real parsed document/value
+(not a standalone copy of the function)** — the two-call sizing+copy
+pattern `anvil-node`'s `CopyAnvlText` actually uses:
+
+| n bytes | before | after | change |
+|---:|---:|---:|---:|
+| 81,765 | 0.1120ms | 0.0036ms | 96.8% faster |
+| 244,434 | 0.3219ms | 0.0086ms | 97.3% faster |
+| 407,102 | 0.5331ms | 0.0137ms | 97.4% faster |
+| 813,766 | 1.0617ms | 0.0283ms | 97.3% faster (~37x) |
+
+That closely matches the isolated-function numbers above — the fix behaves
+the same whether measured standalone or through the real document/value
+API.
+
+**Full pipeline — `anvil_load_buffer` (parse) + statement lookup +
+`anvil_value_get_text`, one call per iteration, matching what a single
+`anvl.parse()` call actually does end to end:**
+
+| n bytes | before | after | change |
+|---:|---:|---:|---:|
+| 8,564 | 0.0540ms | 0.0389ms | 28.0% faster |
+| 81,765 | 0.4371ms | 0.3397ms | 22.3% faster |
+| 163,102 | 0.8382ms | 0.6294ms | 24.9% faster |
+| 244,434 | 1.2761ms | 0.9780ms | 23.4% faster |
+| 407,102 | 2.1459ms | 1.6500ms | 23.1% faster |
+| 569,766 | 3.0199ms | 2.3493ms | 22.2% faster |
+| 813,766 | 4.3458ms | 3.3851ms | 22.1% faster |
+
+**Why the end-to-end number is ~22%, not ~97%:** `get_text` was never the
+whole cost of a parse call — `anvil_load_buffer` itself does a full,
+unavoidable scan of the entire document (tokenizing, including the blob
+string) before `get_text` ever runs, and that scan is untouched by this
+fix. At this document shape, parsing dominates total time; `get_text`'s
+contribution (pre-fix) was real but a minority share, so eliminating
+nearly all of it moves the total by roughly a fifth to a quarter, not by
+orders of magnitude. Both numbers are real and both matter: the ~97%
+number is what a caller doing repeated `get_text` calls against an
+already-parsed document (or a larger/rarer document-parse to
+many-value-read ratio) would feel; the ~22% number is the honest expectation
+for a single `parse()`-then-immediately-read-the-blob call, which is closer
+to your `bench/native-backend-compare.js` pattern.
+
+**What this doesn't tell us:** these are pure-C, in-process numbers — no
+N-API boundary, no V8/JS string handling on either side. We can't project
+where this lands `anvil-node` relative to `anvil.js` without you
+re-running `bench/native-backend-compare.js` against a build with this fix
+vendored in; the ~1.8x gap you measured includes marshalling costs this fix
+doesn't touch at all, so a ~22% reduction in the native parse+read cost is
+very unlikely to fully close it by itself. We'll bump `anvil-node`'s
+vendored `anvil` pin once this merges so you can re-measure against your
+real harness rather than against our C-level numbers.
 
 ## Real-world implication for FlyWire, stated plainly
 
