@@ -172,6 +172,52 @@ this stop mattering relative to ANVL's other advantages — FlyWire's
 real production message sizes are the thing we'd want to know that
 against, not an abstract threshold.
 
+## Anvil team follow-up — mechanism found, both in core Anvil Native
+
+**Status: characterized and verified, fix in progress.** Filed as
+[`BR-2609-anvl-001`](../BR/BR-2609-anvl-001.md). Neither cause is N-API
+marshalling — both live in `src/core/anvil_flat.c`, in the code path every
+string-valued read goes through (`anvil_value_get_text`), so they affect
+every binding equally, not just `anvil-node`. FlyWire's wire shape (one huge
+string, and — because it's base64 — containing no backslash-escape bytes at
+all) happens to land on exactly the pattern that triggers both.
+
+**1. A redundant third full-string scan.** `anvil_value_get_text` always
+calls `resolve_string_escapes()` once with a `NULL` buffer purely to compute
+`needed` (the resolved length), then calls it a second time into the real
+caller-supplied buffer — discarding that second call's own accurate return
+value in favor of the first. `anvil-node`'s own `CopyAnvlText` helper
+(`binding.c`) already calls `anvil_value_get_text` twice itself (once to
+size, once to copy), so one conversion of one string currently costs three
+full passes over the bytes where two are achievable.
+
+Verified with a standalone microbenchmark (`resolve_string_escapes` copied
+verbatim, 813,766-byte base64-alphabet buffer — FlyWire's own n=10,000 size —
+2,000 iterations): eliminating the redundant third scan (by making
+`anvil_value_get_text` trust the real call's own return value when a real
+buffer is supplied) took the per-call cost from **1.0696ms to 0.7232ms —
+32.4% saved**, independent of the fix below.
+
+**2. No fast path for the zero-escape case.** `resolve_string_escapes` is a
+per-byte branching loop (checking every byte for `\`) regardless of whether
+the string contains any backslash at all. Base64 text — FlyWire's exact
+payload shape — never does. A `memchr`-for-any-backslash check followed by a
+single `memcpy` when none is found (falling back to the existing per-byte
+loop, completely untouched, whenever a real backslash is present) is
+dramatically faster for this common case.
+
+Verified with the same microbenchmark/buffer: the per-byte loop cost
+**0.3627ms per call**; the `memchr`+`memcpy` fast path cost **0.0060ms per
+call — 98.3% saved, roughly 60x**.
+
+Both fixes are behavior-preserving (identical resolved output for every
+input, including strings that do contain real escapes) and land entirely in
+core Anvil Native, so the benefit reaches `anvil-node`, `anvil-wasm`, and any
+future binding without binding-specific work. We'll report real
+before/after numbers against your own `bench/native-backend-compare.js`
+shape (not just the isolated microbenchmark above) once the fix lands and
+passes full regression.
+
 ## Real-world implication for FlyWire, stated plainly
 
 FlyWire's server process (`harness/server.js`) is long-lived — it
