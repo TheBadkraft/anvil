@@ -3,6 +3,7 @@
 flag := true;
 count := 42;
 greeting := "hello\nworld";
+plain_string := "no escapes here";
 tag := @date`2026-01-01`;
 word := bareword;
 items := [1, 2, 3];

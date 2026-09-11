@@ -872,6 +872,62 @@ static void test_anv34_object_block_get_value(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * ANV35 — STRING accessor on a string with zero backslash escapes: text
+ * and length match the raw source exactly (the escape-free fast path must
+ * behave identically to the general per-byte loop it replaces)
+ * ---------------------------------------------------------------------- */
+static void test_anv35_string_no_escapes(void) {
+   anvil_document doc = load_accessors_doc();
+   TestBit.is_not_null(doc, "ANV35: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_statement plain = anvil_statement_get(doc, "plain_string");
+   TestBit.is_not_null(plain, "ANV35: 'plain_string' statement found");
+   anvil_value plain_val = anvil_statement_get_value(plain);
+   TestBit.is_equal_int(ANVIL_VALUE_STRING, anvil_value_get_type(plain_val),
+                        "ANV35: 'plain_string' is ANVIL_VALUE_STRING");
+
+   size_t needed = anvil_value_get_text(plain_val, NULL, 0);
+   TestBit.is_equal_int(15, (long long)needed,
+                        "ANV35: escape-free string needs exactly its raw length");
+
+   char buf[32] = {0};
+   size_t len = anvil_value_get_text(plain_val, buf, sizeof(buf));
+   TestBit.is_equal_int(15, (long long)len, "ANV35: returned length matches raw length");
+   TestBit.is_true(0 == strcmp("no escapes here", buf),
+                   "ANV35: text is byte-for-byte the raw source, untouched");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV36 — STRING accessor with a buffer too small for the resolved text:
+ * the returned length is still the full resolved length (never the
+ * truncated amount actually written), and the buffer holds a correctly
+ * truncated, NUL-terminated prefix
+ * ---------------------------------------------------------------------- */
+static void test_anv36_string_truncated_buffer(void) {
+   anvil_document doc = load_accessors_doc();
+   TestBit.is_not_null(doc, "ANV36: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_statement greeting = anvil_statement_get(doc, "greeting");
+   anvil_value greeting_val = anvil_statement_get_value(greeting);
+
+   // resolved text is "hello\nworld" (11 bytes); a 5-byte buffer only has
+   // room for 4 real characters plus the NUL terminator.
+   char buf[5] = {0};
+   size_t len = anvil_value_get_text(greeting_val, buf, sizeof(buf));
+   TestBit.is_equal_int(11, (long long)len,
+                        "ANV36: returned length is the full resolved length, not the truncated one");
+   TestBit.is_true(0 == strcmp("hell", buf), "ANV36: buffer holds a truncated, NUL-terminated prefix");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -918,6 +974,8 @@ int main(void) {
    TestBit.run_ex("ANV33_import_iteration_null_safety", NULL,
                   test_anv33_import_iteration_null_safety, th);
    TestBit.run_ex("ANV34_object_block_get_value", NULL, test_anv34_object_block_get_value, th);
+   TestBit.run_ex("ANV35_string_no_escapes", NULL, test_anv35_string_no_escapes, th);
+   TestBit.run_ex("ANV36_string_truncated_buffer", NULL, test_anv36_string_truncated_buffer, th);
 
    return TestBit.report();
 }
