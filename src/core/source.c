@@ -370,6 +370,40 @@ static usize source_consume(anvl_source src, usize count) {
    return consumed;
 }
 
+// Bulk equivalent of `while (!is_eof(src) && peek(src) != delim) consume(src, 1);` -- a single
+// memchr scan for the delimiter, then one pass over just the skipped span to count embedded
+// newlines (for correct line/col bookkeeping), instead of one vtable-indirect call per byte.
+// Behavior-preserving: same end state (cursor on the delimiter, or at EOF) and same line/col
+// result as the byte-by-byte loop it replaces. See notes/document-body-parse.md.
+static usize source_consume_until(anvl_source src, char delim) {
+   if (!src || !src->buffer.bucket) {
+      return 0;
+   }
+
+   const char *data = (const char *)src->buffer.bucket;
+   const char *start = data + src->pos;
+   usize remaining = src->length - src->pos;
+
+   const void *found = memchr(start, delim, remaining);
+   usize span = found ? (usize)((const char *)found - start) : remaining;
+
+   const char *last_nl = NULL;
+   usize scanned = 0;
+   while (scanned < span) {
+      const void *nl = memchr(start + scanned, '\n', span - scanned);
+      if (!nl) {
+         break;
+      }
+      src->line++;
+      last_nl = (const char *)nl;
+      scanned = (usize)(last_nl - start) + 1;
+   }
+
+   src->pos += span;
+   src->col = last_nl ? (usize)((start + span) - last_nl) : src->col + span;
+   return span;
+}
+
 /*
  * Parse an optional leading shebang (`#!dialect`) on the source. Leading whitespace is skipped so
  * that indented or padded shebangs are accepted. The dialect token is validated against the known
@@ -839,6 +873,7 @@ const anvl_source_i Source = {
    .is_identifier_part = source_is_identifier_part,
    .is_bare_literal_part = source_is_bare_literal_part,
    .consume = source_consume,
+   .consume_until = source_consume_until,
    .data = source_data,
    .at = source_at,
    .length = source_length,

@@ -320,6 +320,19 @@ typedef struct anvl_source_i {
     * the requested count if the end of the source is reached.
     */
    usize (*consume)(anvl_source, usize);
+   /**
+    * @brief Advance the cursor forward up to (but not past) the next occurrence of a delimiter
+    * byte, or to EOF if the delimiter never appears.
+    * @param src The source object to advance.
+    * @param delim The delimiter byte to stop at.
+    * @return The number of characters actually skipped.
+    * @details A bulk equivalent of `while (!is_eof(src) && peek(src) != delim) consume(src, 1);`
+    * — same line/column bookkeeping (every skipped newline advances the line and resets the
+    * column), same end state (the cursor sits on the delimiter, or at EOF if it was never found).
+    * Exists for scanning long delimited spans (blob/string literal content) in one bulk pass
+    * instead of one vtable-indirect call per byte — see notes/document-body-parse.md.
+    */
+   usize (*consume_until)(anvl_source, char);
 
    // Data access (for scanning without consuming)
    /**

@@ -988,10 +988,10 @@ static bool parse_blob_literal(anvl_source src, anvl_value *out_value) {
    Source.consume(src, 1);
    const char *start = Source.at(src);
 
-   // Parse the blob content until the closing brace or EOF
-   while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_BACKTICK) {
-      Source.consume(src, 1); // Consume blob content character
-   }
+   // Parse the blob content until the closing brace or EOF -- one bulk scan instead of a
+   // vtable-indirect call per byte, since blob content can be arbitrarily long (see
+   // notes/document-body-parse.md).
+   Source.consume_until(src, ANVL_TOK_BACKTICK);
 
    // Check for closing brace
    if (Source.peek(src) != ANVL_TOK_BACKTICK) {

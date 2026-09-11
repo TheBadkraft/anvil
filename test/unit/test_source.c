@@ -918,6 +918,97 @@ static void test_src41_shebang_too_short_is_error(void) {
                         "SRC41: too-short shebang is ANVL_DIALECT_ERROR, not a crash");
    Source.dispose(src);
 }
+/* ---------------------------------------------------------------------- *
+ * SRC42 - consume_until scans forward to (not past) the delimiter, in one
+ * bulk pass, matching what a byte-by-byte peek/consume loop would leave
+ * behind: cursor sitting on the delimiter, and the count of characters
+ * actually skipped.
+ * ---------------------------------------------------------------------- */
+static void test_src42_consume_until_finds_delimiter(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "hello`world";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   usize skipped = Source.consume_until(src, '`');
+   TestBit.is_equal_int(5, (long long)skipped, "SRC42: skipped exactly up to the delimiter");
+   TestBit.is_false(Source.is_eof(src), "SRC42: not at EOF -- delimiter still there");
+   TestBit.is_equal_int('`', Source.peek(src), "SRC42: cursor sits on the delimiter itself");
+   TestBit.is_equal_int(1, (long long)Source.line(src), "SRC42: line unchanged, no newline in span");
+   TestBit.is_equal_int(6, (long long)Source.column(src), "SRC42: column advanced by the skip");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC43 - consume_until with no matching delimiter anywhere ahead consumes
+ * to EOF, same "capped, not an error" contract as plain consume().
+ * ---------------------------------------------------------------------- */
+static void test_src43_consume_until_no_match_reaches_eof(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "no delimiter here";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   usize skipped = Source.consume_until(src, '`');
+   TestBit.is_equal_int((long long)strlen(buffer), (long long)skipped,
+                        "SRC43: skipped the entire remaining buffer");
+   TestBit.is_true(Source.is_eof(src), "SRC43: EOF reached when the delimiter never appears");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC44 - line/column bookkeeping across embedded newlines matches exactly
+ * what a byte-by-byte consume(src, 1) loop would have produced -- this is
+ * the one correctness property the fast path must never trade away for
+ * speed, since later error messages depend on accurate positions.
+ * ---------------------------------------------------------------------- */
+static void test_src44_consume_until_tracks_newlines(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "line1\nline2\nline3`rest";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   usize skipped = Source.consume_until(src, '`');
+   TestBit.is_equal_int(17, (long long)skipped, "SRC44: skipped up to the delimiter");
+   TestBit.is_equal_int('`', Source.peek(src), "SRC44: cursor sits on the delimiter");
+   TestBit.is_equal_int(3, (long long)Source.line(src), "SRC44: line advanced once per newline");
+   TestBit.is_equal_int(6, (long long)Source.column(src),
+                        "SRC44: column counts from the last newline, not from buffer start");
+
+   Source.dispose(src);
+}
+/* ---------------------------------------------------------------------- *
+ * SRC45 - NULL safety
+ * ---------------------------------------------------------------------- */
+static void test_src45_consume_until_null_safety(void) {
+   TestBit.is_equal_int(0, (long long)Source.consume_until(NULL, '`'),
+                        "SRC45: consume_until(NULL, ...) is 0, not a crash");
+}
+/* ---------------------------------------------------------------------- *
+ * SRC46 - delimiter is the very first character: zero-length skip, cursor
+ * unchanged.
+ * ---------------------------------------------------------------------- */
+static void test_src46_consume_until_zero_length(void) {
+   anvl_source src = NULL;
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *buffer = "`already here";
+
+   Source.create(&src, &err_code);
+   Source.from_buffer(&src, buffer, strlen(buffer), &err_code);
+
+   usize skipped = Source.consume_until(src, '`');
+   TestBit.is_equal_int(0, (long long)skipped, "SRC46: nothing to skip");
+   TestBit.is_equal_int('`', Source.peek(src), "SRC46: cursor still on the delimiter");
+   TestBit.is_equal_int(1, (long long)Source.column(src), "SRC46: column unchanged");
+
+   Source.dispose(src);
+}
 
 /* ---------------------------------------------------------------------- *
  * Test runner
@@ -970,6 +1061,14 @@ int main(void) {
                   test_src40_shebang_invalid_dialect_is_error, ts);
    TestBit.run_ex("SRC41_shebang_too_short_is_error", NULL, test_src41_shebang_too_short_is_error,
                   ts);
+   TestBit.run_ex("SRC42_consume_until_finds_delimiter", NULL,
+                  test_src42_consume_until_finds_delimiter, ts);
+   TestBit.run_ex("SRC43_consume_until_no_match_reaches_eof", NULL,
+                  test_src43_consume_until_no_match_reaches_eof, ts);
+   TestBit.run_ex("SRC44_consume_until_tracks_newlines", NULL,
+                  test_src44_consume_until_tracks_newlines, ts);
+   TestBit.run_ex("SRC45_consume_until_null_safety", NULL, test_src45_consume_until_null_safety, ts);
+   TestBit.run_ex("SRC46_consume_until_zero_length", NULL, test_src46_consume_until_zero_length, ts);
 
    return TestBit.report();
 }
