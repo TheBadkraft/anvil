@@ -498,6 +498,15 @@ anvil_value_type anvil_value_get_type(anvil_value val) {
 // never silently drops data.
 static size_t resolve_string_escapes(const char *raw, size_t raw_len, char *out_buf,
                                      size_t out_cap) {
+   // Fast path: a string with no backslash at all (e.g. base64, UUIDs, most
+   // identifiers) needs no per-byte escape scanning - copy it verbatim.
+   if (raw_len > 0 && !memchr(raw, '\\', raw_len)) {
+      if (out_buf && out_cap > 0) {
+         size_t n = raw_len < out_cap ? raw_len : out_cap;
+         memcpy(out_buf, raw, n);
+      }
+      return raw_len;
+   }
    size_t out_len = 0;
    for (size_t i = 0; i < raw_len; i++) {
       char c = raw[i];
@@ -549,11 +558,16 @@ size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen) {
    if (v->type != ANVL_VALUE_STRING) {
       return copy_to_buffer(v->text.start, (size_t)raw_len, buf, buflen);
    }
-   size_t needed = resolve_string_escapes(v->text.start, (size_t)raw_len, NULL, 0);
+   size_t needed;
    if (buf && buflen > 0) {
-      resolve_string_escapes(v->text.start, (size_t)raw_len, buf, buflen - 1);
+      // resolve_string_escapes always returns the full resolved length, even
+      // when out_cap truncates what it actually writes - no separate sizing
+      // scan is needed when a real buffer is already supplied.
+      needed = resolve_string_escapes(v->text.start, (size_t)raw_len, buf, buflen - 1);
       size_t term_at = needed < buflen - 1 ? needed : buflen - 1;
       buf[term_at] = '\0';
+   } else {
+      needed = resolve_string_escapes(v->text.start, (size_t)raw_len, NULL, 0);
    }
    return needed;
 }
