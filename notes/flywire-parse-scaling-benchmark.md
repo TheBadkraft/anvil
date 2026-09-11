@@ -370,3 +370,52 @@ conditions (single-call: 1.661ms vs. 1.972ms; warmed: ~1.80ms vs. an ~1.53ms-1.9
 gap this whole investigation started from. This *is* a real basis for a migration conclusion, at
 least for this document shape; worth your own independent re-confirmation before treating it as
 settled on your side.
+
+## You were right to keep pushing — a real third cost, now fixed too
+
+Your own more granular re-measurement across intermediate scales (100 → 1,000 → 10,000) still
+showed a real crossover after `BR-2609-anvl-002`: ~12x faster at small `n`, dropping to roughly
+parity or slightly *slower* by n=10,000. That was a legitimate, correctly-observed regression in
+the improvement, not noise — the blob-scan fix was real, but it wasn't the whole story.
+
+Using the parser's own instrumentation (`anvl_parser_set_hook`, not a new ad hoc timer) to check
+precisely, body-parsing itself was confirmed negligible (~0.015 ns/byte) — so the remaining
+per-byte cost had to be somewhere else in `anvil_load_buffer`. It was: `source_from_buffer`
+computes an FNV-1a content hash over the *entire* buffer, unconditionally, on every load — root
+document included, AMP documents included (which can never contain an `import` at all, so the
+hash's only real purpose — import deduplication — can never apply to them). That byte-wise hash
+was ~98% of `anvil_load_buffer`'s remaining cost on your 813KB shape. Fixed by widening it to
+process 8 bytes per multiply instead of 1 (no change to what it's used for, no caller depends on
+a specific value) — **~8.2x faster in isolation**, **~5.9x faster for `anvil_load_buffer` as a
+whole** on your real document. Full writeup:
+[`BR-2609-anvl-003`](../BR/BR-2609-anvl-003.md).
+
+## Final numbers — the crossover is gone at every scale
+
+Vendored pins bumped again, rebuilt, retested. Ran your own expanded
+`bench/native-backend-compare.js` (fresh process per scale, both conditions) against real
+Postgres BULKGEN data:
+
+**True single-call, fresh process:**
+
+| n | anvil-js | anvil-node | speedup |
+|---:|---:|---:|---:|
+| 100 | 1.230ms | 0.098ms | 12.5x |
+| 1,000 | 3.503ms | 0.236ms | 14.9x |
+| 2,000 | 3.737ms | 0.365ms | 10.2x |
+| 3,000 | 4.185ms | 0.417ms | 10.0x |
+| 5,000 | 4.015ms | 0.604ms | 6.6x |
+| 7,000 | 4.638ms | 0.793ms | 5.9x |
+| 10,000 | 5.125ms | 1.227ms | **4.2x** |
+
+**Warmed:**
+
+| n | anvil-js | anvil-node | speedup |
+|---:|---:|---:|---:|
+| 100 | 0.437ms | 0.023ms | 19.3x |
+| 1,000 | 0.658ms | 0.043ms | 15.3x |
+| 10,000 | 1.730ms | 1.100ms | **1.6x** |
+
+No crossover at any tested scale, in either condition — `anvil-node` is faster everywhere now,
+from 100 to 10,000 records. This is the real basis for a migration conclusion on this document
+shape; still worth your own independent re-confirmation on your side before treating it as final.
