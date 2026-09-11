@@ -195,6 +195,27 @@ reflects both suites together, which is why it's higher than either alone. Nothi
 enforced by CI; it'll drift out of date as new code lands until someone reruns `make coverage`
 and updates this table by hand. That's a deliberate, accepted tradeoff for now, not an oversight.
 
+## Performance
+
+Another manually-updated snapshot, same caveat as Test Coverage above. Reproduce with
+`make -C bench throughput` (builds the release library first if needed, then runs
+`bench/throughput.c` against it — a realistic, hand-authored-style AML config: inheritance,
+attributes, nested objects, arrays, mixed scalar kinds, not a synthetic one-value stress shape).
+Measures `anvil_load_buffer` end to end (parse + resolve), warmed, against the exact release
+artifact this repo ships:
+
+| Document | Size | Throughput |
+|---|---|---|
+| Small app config, 5 services | 1.6 KB | 103 MB/s |
+| Moderate microservice fleet, 100 services | 30 KB | 123 MB/s |
+| Large generated environment config, 1,000 services | 308 KB | 125 MB/s |
+
+Throughput holds steady across two orders of magnitude of document size — no scaling cliff
+between a small hand-written config and a large generated one. This is a different, narrower
+measurement than `notes/flywire-parse-scaling-benchmark.md`'s investigation (a real consumer's
+message-shaped workload compared across backends/JSON) — this one is just "how fast does Anvil
+Native parse a typical config," in isolation.
+
 ## Documentation
 
 - [`docs/getting-started.md`](docs/getting-started.md) — practical, task-oriented walkthrough of

@@ -119,6 +119,33 @@ endpoint:server {
 };
 </code></pre>
 
+    <h2>Real throughput</h2>
+    <p class="lede">
+      Not a synthetic microbenchmark — a realistic, hand-authored-style AML config (inheritance,
+      attributes, nested objects, arrays, mixed scalar kinds), parsed end to end
+      (<code>anvil_load_buffer</code>: parse and resolve, the real cost a caller pays) by the
+      exact release library this site ships for download. Reproducible yourself:
+      <code>bench/throughput.c</code> in the repo.
+    </p>
+    <div class="grid-3">
+      <div class="card">
+        <h3>1.6 KB</h3>
+        <p>A small app's config, 5 services.<br /><strong>103 MB/s</strong></p>
+      </div>
+      <div class="card">
+        <h3>30 KB</h3>
+        <p>A moderate microservice fleet, 100 services.<br /><strong>123 MB/s</strong></p>
+      </div>
+      <div class="card">
+        <h3>308 KB</h3>
+        <p>A large generated environment config, 1,000 services.<br /><strong>125 MB/s</strong></p>
+      </div>
+    </div>
+    <p>
+      Throughput holds steady across two orders of magnitude of document size — no scaling
+      cliff between a small hand-written config and a large generated one.
+    </p>
+
     <h2>Why not just JSON?</h2>
     <p class="lede">
       JSON earned its win honestly — simple enough to hold in your head, human-readable, and by
