@@ -23,6 +23,9 @@ Reading order and status for everything in `notes/`, reconstructed from git hist
 ### Iteration 4 — AnvilScript (ASL) design (2026-09-05)
 - **`anvilscript-design.md`** — design-only, no implementation; a prior ASL implementation (v0.4.0-alpha) existed but predates the current architecture and has since been removed from the tree. Collects the ASL-relevant fragments already decided elsewhere (`docs/dialect-ownership-matrix.md`, fixture comments, `build.anvl`), the five items moved here from `deferred-work.md`'s former ASL section, and the founding framing questions the design conversation is starting from.
 
+### Iteration 5 — Binding boundary throughput (2026-09-13)
+- **`binding-boundary-throughput.md`** — reference guide synthesized from `BR/BR-2609-anvl-004.md` (N-API/JS-boundary call volume in `anvil-node` and `anvil.wasm`): why crossing *count* dominates over payload size, why a batched strategy still needs a fast serializer to actually pay off, and a checklist for the next binding (`anvil.net` or otherwise) to get the architecture right before rediscovering the same cost. No implementation here — the binding source lives in sibling repos; this note is the design record this repo owns.
+
 ## Status key
 
 - **Active** — the live design record for the current iteration; still being edited.
@@ -30,6 +33,8 @@ Reading order and status for everything in `notes/`, reconstructed from git hist
 - **Historical / partially superseded** — kept for background context; specific corrected claims are tracked in `deferred-work.md` § *Superseded notes* rather than rewritten in place.
 - **Index** — cross-cutting, not tied to one iteration (`deferred-work.md`, this file).
 - **Not started** — design-only, no implementation (`anvlo-compilation.md`, `resolution-phase.md`, `anvilscript-design.md`).
+
+`binding-boundary-throughput.md` is **Reference** — synthesized after a resolved investigation, amended if a future binding investigation adds a new principle, not tied to an open implementation phase in this repo.
 
 ## Miscellaneous
 
