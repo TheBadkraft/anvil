@@ -4,7 +4,7 @@
 **Type:** Feature Request
 **Owner:** sigma.collections
 **Filed:** 2026-09-04
-**Status:** implemented (2026-09-04) — see Resolution below; `chore/sigma-subset-workspace` branch, awaiting merge/review by the regular anvil agent
+**Status:** resolved (2026-09-04) — see Resolution below; merged into `main` (commit `8acacfb`)
 **Requested by:** Anvil (downstream consumer — `anvil/src/core/parser.c`, `document.c`, and the upcoming Resolution phase)
 **Tags:** sigma-collections, iterator, query, zero-allocation
 

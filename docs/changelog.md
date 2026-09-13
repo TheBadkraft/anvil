@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v0.8.0-rc] — (2026-08-17 – 2026-09-09)
+## [v0.8.0-rc] — (2026-08-17 – 2026-09-13)
 
 **Status:** ANVL proper (core parser + resolver, opt-in types, AnvilSchema) is feature-complete
 and builds as a real distributable library. Minor bump, not a patch: opt-in types, AnvilSchema,
@@ -159,6 +159,58 @@ account. Everything from native schema/opt-in types onward is current work, docu
   `doc_scan_header`. `test_source.c` (SRC39–41), `test_header.c` (HDR21), and
   `test/functional/test_e2e.c` (FN06) all cover this; full record in
   `notes/document-header-scan.md`'s "Shebang parsing" section.
+
+### Fixed — FlyWire performance investigation (BR-2609-anvl-001 through -004)
+
+A real production consumer's benchmark (`notes/flywire-parse-scaling-benchmark.md`) found
+`anvil-node` measuring ~1.8x *slower* per byte than the vendored, pure-JS `anvil.js` at
+production scale on FlyWire's real wire shapes — the opposite of what small-payload testing had
+shown. Chasing that down surfaced four real, independent inefficiencies, three in core Anvil
+Native and one spanning both native bindings' own conversion layers:
+
+- **BR-2609-anvl-001**: `anvil_value_get_text`/`resolve_string_escapes` did a redundant third
+  scan per string conversion and had no fast path for escape-free strings (base64, UUIDs, most
+  identifiers) — real and correct, but turned out not to be on FlyWire's actual hot path (see
+  BR-002).
+- **BR-2609-anvl-002**: the real cause — `parse_blob_literal` scanned blob content one byte at a
+  time (~2.4 million vtable-indirect calls for an 810KB blob) instead of a bulk scan. Fixed with
+  a new `Source.consume_until` primitive. Also fixed a real, unrelated Makefile bug this change's
+  own header edit exposed: no header dependency tracking, so a header-only change could silently
+  ship a corrupted library with a mismatched vtable layout.
+- **BR-2609-anvl-003**: even after -002, a real-harness crossover remained at scale — traced to
+  `source_from_buffer`'s FNV-1a content hash, computed unconditionally on every load (root
+  documents and AMP documents included, neither of which can ever need it for import dedup).
+  Made the hash itself ~8x faster (word-wise instead of byte-wise) rather than touching the
+  registration logic that depends on it.
+- **BR-2609-anvl-004**: a different FlyWire wire shape (`@table`, many small values rather than
+  one large blob) surfaced a cost in each binding's *own* value-conversion layer, not core Anvil
+  Native — `anvil-node` built one N-API call per leaf scalar value (measured ~7–10ms of pure
+  call overhead alone on a 100,000-leaf document); `anvil-wasm` already used a smarter one-JSON-
+  string-boundary-crossing strategy, but had two smaller bugs of its own (a per-character
+  escaping loop, an unnecessary numeric string round-trip). `anvil-node` adopted `anvil-wasm`'s
+  JSON-string strategy with both bugs fixed from the start; `anvil-wasm` got the same two fixes
+  applied directly.
+
+Combined real-world result, verified against FlyWire's own harness: `anvil-node` now beats
+`anvil-js` at every tested scale (12.5x–19.3x faster at small payloads, still ~1.6–4.2x faster
+at FlyWire's original 10,000-record scale where it had previously fallen behind), and the
+`@table` shape improved a further ~18%. Full detail and real numbers in `BR/BR-2609-anvl-001.md`
+through `-004.md` and `notes/flywire-parse-scaling-benchmark.md`.
+
+### Added — Real parser throughput numbers
+
+- **`bench/throughput.c`** — a permanent benchmark tool (not a one-off script), linked against
+  the built release library artifact like `test/functional/` does, measuring `anvil_load_buffer`
+  end to end on a realistic, hand-authored-style AML config (inheritance, attributes, nested
+  objects, arrays, mixed scalar kinds) at three scales. Real numbers — ~103–125 MB/s, holding
+  steady across two orders of magnitude of document size — published to `README.md`'s new
+  "Performance" section and the site's new "Real throughput" section.
+
+### Notes
+
+- `FR-2603-sigma-collections-006` and `-007`'s status lines were still naming feature branches
+  as "awaiting merge/review" — both were confirmed already merged into `main` (`8acacfb`,
+  `2a4ad98`); corrected to plain `resolved`.
 
 ---
 

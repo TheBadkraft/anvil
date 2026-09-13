@@ -150,6 +150,16 @@ parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the compa
 
 ## Deferred cleanup / refactoring
 
+- **`anvl_parse_value_fragment` has no `anvl_parser_set_hook` instrumentation coverage** —
+  `anvl_parse` (`src/core/parser.c`, used by `anvil_load_buffer`/`parse()`) fires the registered
+  hook unconditionally after every parse, but `anvl_parse_value_fragment` (used by
+  `parseRawValue()` across both bindings) has no reference to `hook_fn` anywhere in its body —
+  value-fragment parses are invisible to any registered throughput/instrumentation hook. Found
+  while investigating the FlyWire performance work (`BR-2609-anvl-004`), not fixed there since it
+  wasn't blocking that investigation (a direct wall-clock timer worked fine as a substitute).
+  Genuinely just a gap, not a bug with observable symptoms today — no current caller depends on
+  `parseRawValue()`'s own throughput being hookable. Worth evaluating whether it's worth closing
+  (for instrumentation-coverage symmetry with `anvl_parse`) before treating it as scheduled work.
 - **Arena function API asymmetry**: `mod_ctx_create_arena` is declared in `include/internal/module.h` alongside the rest of the public context API, but `mod_ctx_dispose_arena` (`src/core/module.c`) is only forward-declared locally in `module.c` and never exposed in the header, even though the two are a matched create/dispose pair. Not a functional problem — nothing external needs to call dispose directly today, `mod_ctx_dispose` does it — but worth reconciling for consistency in a future cleanup pass.
 - **`import_load_child` (`src/core/module.c`) is monolithic**: raised as a general refactor candidate, not yet reviewed closely enough to fully scope. At minimum, its path-resolution logic (stripping quotes from the import slice, branching on absolute vs. directory-relative resolution, building the resolved path via `snprintf`) reads as a natural standalone helper (e.g. `import_resolve_path`), separate from the load/register/scan-header/recurse orchestration it's currently interleaved with. There is likely at least one more seam beyond that; needs a closer read before it's scoped as concrete work.
 - **`test/infra/` needs a cleanup pass**: two known gaps found while porting `FArray`/`array_base` in from `../sigma.collections/src/` and fixing `test/infra/Makefile`'s missing `parser.c` link.
