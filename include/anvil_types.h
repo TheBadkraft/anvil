@@ -51,15 +51,15 @@ typedef struct anvil_statement_t *anvil_statement;
 typedef struct anvil_statement_iterator_t *anvil_statement_iterator;
 
 /**
- * @brief Opaque, heapless-scan cursor over a document's own direct imports
- * (`import "...";`, not the whole transitive graph) — see
- * anvil_document_get_imports/anvil_document_iterator_next.
+ * @brief Opaque, heapless-scan cursor over a document's own direct includes
+ * (`include "...";`, not the whole transitive graph) — see
+ * anvil_document_get_includes/anvil_document_iterator_next.
  *
  * Owns only its own scan position, never the documents it yields — those are
  * the caller's own responsibility. A yielded anvil_document is a real, fully
  * usable handle (anvil_document_get_statements, anvil_document_get_attribute*,
  * etc. all work on it normally) but does not own the underlying parse
- * context — it shares that with the document anvil_document_get_imports was
+ * context — it shares that with the document anvil_document_get_includes was
  * called on. Dispose each yielded handle with anvil_dispose once done with
  * it, same as any other anvil_document — safe, since disposing one of these
  * only frees the small handle itself and never touches the shared context
@@ -139,8 +139,8 @@ typedef enum {
 typedef enum {
    ANVIL_OK = 0,
    ANVIL_ERR_IO,                // couldn't read the source at all
-   ANVIL_ERR_HEADER,            // phase 1 - shebang/import/attribute scan
-   ANVIL_ERR_IMPORT,            // phase 2 - import graph loading
+   ANVIL_ERR_HEADER,            // phase 1 - shebang/include/attribute scan
+   ANVIL_ERR_INCLUDE,           // phase 2 - include graph loading
    ANVIL_ERR_SYNTAX,            // phase 3 - body/grammar
    ANVIL_ERR_RESOLVE,           // phase 4 - identifier/base/inheritance resolution
    ANVIL_ERR_MEMORY,            // allocation failure

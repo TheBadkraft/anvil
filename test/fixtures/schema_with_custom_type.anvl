@@ -1,5 +1,5 @@
 #!aml
-import "schema_vehicle_types.anvl";
+include "schema_vehicle_types.anvl";
 @[schema, table=vehicles]
 
 vin := { type := types.VIN; required := true; };

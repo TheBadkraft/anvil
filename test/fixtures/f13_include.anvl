@@ -1,0 +1,6 @@
+#!aml
+
+include "f01_bare_literal.anvl";
+
+// included statements merge flat into this document's namespace (no alias)
+alias := name;

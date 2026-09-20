@@ -164,7 +164,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) 
 
 // Walks one document's own top-level statements into reg, registering each well-formed type
 // definition — shared by anvil_type_registry_load (doc itself is the definitions file) and
-// anvil_type_registry_load_from_imports (called once per @[types]-carrying direct import, so
+// anvil_type_registry_load_from_includes (called once per @[types]-carrying direct include, so
 // several documents' definitions can land in the same combined registry).
 static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *reg) {
    anvil_statement_iterator it = anvil_document_get_statements(doc);
@@ -217,7 +217,7 @@ anvil_type_registry anvil_type_registry_load(anvil_document doc) {
    return (anvil_type_registry)reg;
 }
 
-anvil_type_registry anvil_type_registry_load_from_imports(anvil_document doc) {
+anvil_type_registry anvil_type_registry_load_from_includes(anvil_document doc) {
    if (!doc) {
       return NULL;
    }
@@ -226,14 +226,14 @@ anvil_type_registry anvil_type_registry_load_from_imports(anvil_document doc) {
       return NULL;
    }
 
-   anvil_document_iterator it = anvil_document_get_imports(doc);
+   anvil_document_iterator it = anvil_document_get_includes(doc);
    if (it) {
-      anvil_document imported = NULL;
-      while (anvil_document_iterator_next(it, &imported)) {
-         if (anvil_document_find_attribute(imported, "types")) {
-            collect_type_defs(imported, reg);
+      anvil_document included = NULL;
+      while (anvil_document_iterator_next(it, &included)) {
+         if (anvil_document_find_attribute(included, "types")) {
+            collect_type_defs(included, reg);
          }
-         anvil_dispose(imported); // caller's own responsibility — safe, shares doc's context
+         anvil_dispose(included); // caller's own responsibility — safe, shares doc's context
                                    // (see anvil_document_iterator's own doc comment)
       }
       anvil_document_iterator_dispose(it);

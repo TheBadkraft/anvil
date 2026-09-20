@@ -33,7 +33,7 @@ compiled objects can be looked up and merged by content hash.
 | `header` | Magic, version, target dialect, build number. |
 | `source` | Original source buffer (or a hash-verified copy) for slice metadata. |
 | `docmeta` | Document identity: source hash, filepath offset, header metadata. |
-| `imports` | Import graph edges: source hashes of imported documents. |
+| `includes` | Include graph edges: source hashes of included documents. |
 | `attrs` | Module attribute slice metadata. |
 | `nodes` | Parsed AST nodes with offsets into `source` or `strings`. |
 | `strings` | Deduplicated string data referenced by nodes and metadata. |
@@ -55,7 +55,7 @@ compiled objects can be looked up and merged by content hash.
 - It is section-based, similar to ELF or wasm.
 - It preserves the no-copy slice metadata model: nodes and metadata reference
   offsets into a source section rather than duplicating text.
-- Source hash is the canonical identity key for objects and imports.
+- Source hash is the canonical identity key for objects and includes.
 
 ## Open questions
 
@@ -64,11 +64,11 @@ compiled objects can be looked up and merged by content hash.
 3. **Source retention**: does `.anvlo` keep the full source, only a hash, or
    both? Full source is easiest for slice metadata; hash-only requires
    reconstituting slices as offsets into a separate source file.
-4. **Import resolution**: are imports stored as raw paths, resolved hashes, or
+4. **Include resolution**: are includes stored as raw paths, resolved hashes, or
    both?
    - In my estimate, it seems that compiling an anvl source differs slightly
    from C. in C where each source become an `.o` file, we might bring all 
-   imports into the root, like a fat `.o` file might be built from several 
+   includes into the root, like a fat `.o` file might be built from several 
    C sources.
 5. **Body representation**: do we store a full AST, a flat node list, or a
    higher-level IR?

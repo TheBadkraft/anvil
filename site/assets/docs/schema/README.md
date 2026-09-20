@@ -39,7 +39,7 @@ A `.schema.anvl` file is parsed by the exact same `anvil_load()` call, running t
 grammar, as any other `.anvl` file on earth. There is no second parser. There is no second
 specification. We checked, directly, against the real parser, before writing a single line of
 schema-specific code: every piece of grammar a schema file needs — attributes on any statement at
-any nesting depth, ordinary objects, imports — was already there, fully implemented and tested,
+any nesting depth, ordinary objects, includes — was already there, fully implemented and tested,
 before this design thread even started. Zero new grammar was required. Not "we kept it minimal."
 Zero.
 
@@ -53,7 +53,7 @@ other ANVL document describes whatever it describes.
 
 Here's the part worth sitting with: Anvil Native doesn't have schema support built in. It never
 will, exactly. What it has is a public API — read a document's statements, read their values,
-read their attributes, walk what they import — available in full to *any* consumer, for *any*
+read their attributes, walk what they include — available in full to *any* consumer, for *any*
 purpose. AnvilSchema is what you get when that generic API gets pointed at one specific job:
 reading a document that says `@[schema]` and checking another document's shape against it.
 

@@ -25,10 +25,10 @@
 #include <stddef.h>
 
 /**
- * @brief Load, scan, import, parse, and resolve a document from a file path.
+ * @brief Load, scan, include, parse, and resolve a document from a file path.
  * @param filepath Path to the root .anvl/.aml/.amp source file.
  * @return A document handle on success. Also returns a valid, non-NULL
- * handle when a later pipeline phase fails (bad path, syntax error, import
+ * handle when a later pipeline phase fails (bad path, syntax error, include
  * or resolve failure) — check anvil_has_errors()/anvil_get_error() to know
  * whether the document actually loaded cleanly. Returns NULL only when the
  * handle itself could not be allocated.
@@ -36,7 +36,7 @@
 anvil_document anvil_load(const char *filepath);
 
 /**
- * @brief Load, scan, import, parse, and resolve a document from an in-memory
+ * @brief Load, scan, include, parse, and resolve a document from an in-memory
  * buffer, rather than a file path — otherwise identical to anvil_load.
  * @param source The source text. Not required to be NUL-terminated; exactly
  * `length` bytes are read, and nothing beyond it.
@@ -49,7 +49,7 @@ anvil_document anvil_load_buffer(const char *source, size_t length);
 
 /**
  * @brief Parse a single, standalone value expression (a "Value Fragment")
- * with no enclosing document/statement context — no header, no imports, no
+ * with no enclosing document/statement context — no header, no includes, no
  * top-level statements. Unlike anvil_load/anvil_load_buffer, a '$identifier'
  * VarRef is never supported here, at any nesting depth: there is no
  * identifier map to resolve one against outside a real document.
@@ -65,7 +65,7 @@ anvil_document anvil_load_buffer(const char *source, size_t length);
 anvil_document anvil_parse_value_fragment(const char *text, size_t length);
 
 /**
- * @brief Release a document and everything it owns (every imported
+ * @brief Release a document and everything it owns (every included
  * document, the shared arena, all recorded errors).
  * @param doc The document to dispose. Safe to call with NULL (no-op).
  */
@@ -139,7 +139,7 @@ anvil_statement anvil_statement_get(anvil_document doc, const char *name);
 
 /**
  * @brief A heapless cursor over this document's own top-level statements, in
- * declaration order (never descending into nested/imported documents' own
+ * declaration order (never descending into nested/included documents' own
  * statements) — backed by Sigma's Query/sc_queryable mechanism over
  * `module_document->body` (an farray), not a hand-rolled scan.
  * @param doc The document to iterate. A document whose body parse failed
@@ -169,27 +169,27 @@ bool anvil_statement_iterator_next(anvil_statement_iterator it, anvil_statement 
 void anvil_statement_iterator_dispose(anvil_statement_iterator it);
 
 /**
- * @brief A heapless cursor over this document's own direct imports
- * (`import "...";`), in declaration order — never the whole transitive
- * import graph; call this again on a yielded document to walk further.
+ * @brief A heapless cursor over this document's own direct includes
+ * (`include "...";`), in declaration order — never the whole transitive
+ * include graph; call this again on a yielded document to walk further.
  * Backed by Sigma's Query/sc_queryable mechanism over
- * `module_document->header->imports`, not a hand-rolled scan.
+ * `module_document->header->includes`, not a hand-rolled scan.
  * @param doc The document to iterate.
  * @return The iterator handle, or NULL if doc is NULL or invalid. A document
- * with zero imports still yields a real, immediately-exhausted iterator, not
+ * with zero includes still yields a real, immediately-exhausted iterator, not
  * NULL — NULL is reserved for `doc` itself being unusable. Dispose with
  * anvil_document_iterator_dispose once done — never valid after `doc` itself
  * is disposed.
  */
-anvil_document_iterator anvil_document_get_imports(anvil_document doc);
+anvil_document_iterator anvil_document_get_includes(anvil_document doc);
 
 /**
- * @brief Pull the next imported document from an iterator, in order.
+ * @brief Pull the next included document from an iterator, in order.
  * @param it The iterator to advance (mutated in place).
  * @param out_doc Set to the next document on success; untouched otherwise.
  * The yielded handle is a real, fully usable anvil_document — every other
  * accessor works on it normally — but it shares its underlying parse context
- * with the document anvil_document_get_imports was called on. Dispose it
+ * with the document anvil_document_get_includes was called on. Dispose it
  * with anvil_dispose once done, same as any other anvil_document (see
  * anvil_document_iterator's own doc comment for why that's safe here).
  * @return true if a document was yielded; false once exhausted, or if

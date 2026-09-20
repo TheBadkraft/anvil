@@ -14,11 +14,11 @@ So: what about a build configuration in JSON? That lasted about as long as it to
 
 That's the moment the actual question changed. Not "what existing format can I bend into shape" but "what would I build if I designed this properly, for how I actually think about structure." One requirement was non-negotiable from the start: variable replacement. A build configuration without it is just a list of things you'll be retyping forever.
 
-From there it kept unfolding. If a top-level entry could hold something like a set of paths, and another document could import it and inherit that entry — reuse it wholesale, override only what's different — then nothing ever needed to be rewritten or re-looked-up again. That was the moment it clicked: this wasn't a config format anymore. This was an object modeling language.
+From there it kept unfolding. If a top-level entry could hold something like a set of paths, and another document could include it and inherit that entry — reuse it wholesale, override only what's different — then nothing ever needed to be rewritten or re-looked-up again. That was the moment it clicked: this wasn't a config format anymore. This was an object modeling language.
 
 A quick look around confirmed it — object modeling languages are a real, established category, and UML (Universal Modeling Language) is the well-known one in that space. Anvil's design didn't set out to compete with UML — it arrived at object modeling by way of a build-config problem — but it belongs in the same conversation: a language for modeling objects and their relationships, arrived at from a completely different direction.
 
-Once the object modeling side was solid, the rest moved fast. Strip a handful of features back out — no inheritance, no imports, no attributes, no nesting — and what's left is a stable, deterministic messaging protocol. Not a second language — the same grammar with fewer permissions turned on. That became AMP.
+Once the object modeling side was solid, the rest moved fast. Strip a handful of features back out — no inheritance, no includes, no attributes, no nesting — and what's left is a stable, deterministic messaging protocol. Not a second language — the same grammar with fewer permissions turned on. That became AMP.
 
 And once there were two dialects sharing one grammar, a third possibility opened up: instead of one giant, fixed scripting language, an extensible DSL model — dialects declared explicitly, enforced at the parser level, each one only as permissive as the problem actually requires. That's ASL, still in the design stage.
 

@@ -73,7 +73,7 @@ typedef enum {
  * attribute — every one of its top-level statements is then treated,
  * without exception, as a field rule. A field's own `type :=` (if any) is
  * resolved via anvil_type_resolve, against a type registry built from
- * doc's own imports (anvil_type_registry_load_from_imports) — the same
+ * doc's own includes (anvil_type_registry_load_from_includes) — the same
  * `types.X` namespace any other document would see. A field rule with no
  * recognized `type :=` (including none at all — e.g. a FlyWire-style
  * `pooled` field) is still registered, just with no type to check against;

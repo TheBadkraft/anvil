@@ -31,7 +31,7 @@ There's a lot more to it than a couple of lines can give credit for. [Read the f
 
 **A bare `no` in your config silently becomes the boolean `false`.** YAML's Norway problem doesn't announce itself — it just quietly means the wrong thing until something breaks in production, maybe months later. ANVL's grammar never guesses: a literal is only `true`, `false`, or `null` if it's exactly that word. A mistake fails to parse instead of silently meaning something else.
 
-**A message schema starts as five scalar fields and quietly grows a nested object.** Nobody reviews that kind of drift until a downstream consumer breaks on structure it was never built to handle. AMP, Anvil's restricted dialect, forbids objects, attributes, inheritance, and imports outright — rejected at parse time, not by convention or code review. The payload can't grow arbitrary structure even by accident.
+**A message schema starts as five scalar fields and quietly grows a nested object.** Nobody reviews that kind of drift until a downstream consumer breaks on structure it was never built to handle. AMP, Anvil's restricted dialect, forbids objects, attributes, inheritance, and includes outright — rejected at parse time, not by convention or code review. The payload can't grow arbitrary structure even by accident.
 
 **A fuzzer or a heap dump can only expose what a parser actually held.** Anvil Native's internal state is integers — byte offsets and lengths into the buffer you hand it. No string is copied during parsing, and blob payloads are skipped entirely. Under adversarial conditions, the parser can't leak payload data, because it never held any.
 

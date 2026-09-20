@@ -104,18 +104,18 @@ farther one in a transitive chain (`c : b : a`). Inheriting from an anonymous (b
 name of its own to be a base) statement is a hard error, and an inheritance cycle is rejected —
 both checked before any merge happens.
 
-## 7. Imports
+## 7. Includes
 
 ```anvl
-import "path/to/file.anvl";
+include "path/to/file.anvl";
 ```
 
-One quoted path per import, no aliasing and no namespaces — an imported document's statements
-merge flat into the importing document's own namespace. A name collision between an import and
-the importing document (or between two imports) is a hard error, not a silent override. Diamond
-imports (the same file reached via two different paths) are deduplicated by content, not
-re-parsed twice; import cycles are rejected. `$identifier` VarRefs (§4) resolve across the whole
-merged import graph, not just within one file.
+One quoted path per include, no aliasing and no namespaces — an included document's statements
+merge flat into the including document's own namespace. A name collision between an include and
+the including document (or between two includes) is a hard error, not a silent override. Diamond
+includes (the same file reached via two different paths) are deduplicated by content, not
+re-parsed twice; include cycles are rejected. `$identifier` VarRefs (§4) resolve across the whole
+merged include graph, not just within one file.
 
 ## 8. Weak Typing (the Default)
 
@@ -127,7 +127,7 @@ never changes for anyone who doesn't opt into more.
 
 Layered on top of the weak-typing default: name a reusable, constrained shape once
 (`VIN := { type := String; size := 17; };`, in a document carrying the `@[types]` module
-attribute), then reference it — `type := types.VIN;` — from anywhere that imports the file
+attribute), then reference it — `type := types.VIN;` — from anywhere that includes the file
 defining it. Full reference, including the native primitive vocabulary, enums, and cross-file
 resolution: [`types-reference.md`](types-reference.md).
 
@@ -143,7 +143,7 @@ zero new grammar, not a bolt-on the way XSD/XSLT or JSON Schema are — see
 
 ## 11. AMP's Restrictions
 
-AMP forbids objects, attributes, inheritance, and imports outright — rejected at parse time, no
+AMP forbids objects, attributes, inheritance, and includes outright — rejected at parse time, no
 separate runtime guard layer. AMP exists for structured messaging/transport, where the sender and
 receiver already agree on shape out of band; the restrictions keep the wire format flat, keep the
 parser's own security property (§1) simple to reason about, and make AMP equally at home on any
@@ -158,8 +158,8 @@ code (so internal churn is never a public API break):
 | Category | Meaning |
 |---|---|
 | `ANVIL_ERR_IO` | Couldn't read the source at all |
-| `ANVIL_ERR_HEADER` | Shebang/import/attribute header scan failed |
-| `ANVIL_ERR_IMPORT` | Import graph loading failed |
+| `ANVIL_ERR_HEADER` | Shebang/include/attribute header scan failed |
+| `ANVIL_ERR_INCLUDE` | Include graph loading failed |
 | `ANVIL_ERR_SYNTAX` | Body/grammar error |
 | `ANVIL_ERR_RESOLVE` | Identifier/base/inheritance resolution failed |
 | `ANVIL_ERR_MEMORY` | Allocation failure |

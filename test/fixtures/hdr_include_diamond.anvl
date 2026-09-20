@@ -1,0 +1,3 @@
+include "hdr_include_base.anvl";
+include "hdr_include_types.anvl";
+main : = diamond

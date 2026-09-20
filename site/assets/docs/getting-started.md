@@ -73,7 +73,7 @@ if (anvil_has_errors(doc)) {
 ```
 
 `anvil_get_error(doc)` alone gives you the stable category (`ANVIL_ERR_SYNTAX`,
-`ANVIL_ERR_IMPORT`, ...) without the detail object — see `language-reference.md`'s §12 for the
+`ANVIL_ERR_INCLUDE`, ...) without the detail object — see `language-reference.md`'s §12 for the
 full category table.
 
 The examples below assume this document, loaded once:
@@ -199,25 +199,25 @@ returns a real handle, `anvil_attribute_get_value` just reports zero length for 
 after (as above); use the `_count`/indexed-`_get` pair on either level to enumerate every
 attribute a document or statement carries.
 
-## 8. Walking Imports
+## 8. Walking Includes
 
-`anvil_document_get_imports` walks a document's own *direct* imports (not the whole transitive
+`anvil_document_get_includes` walks a document's own *direct* includes (not the whole transitive
 graph) — useful any time you need to reach into what a document pulled in, the same iterator
 shape as statements:
 
 ```c
-anvil_document_iterator it = anvil_document_get_imports(doc);
-anvil_document imported = NULL;
-while (anvil_document_iterator_next(it, &imported)) {
-   anvil_statement_iterator sit = anvil_document_get_statements(imported);
+anvil_document_iterator it = anvil_document_get_includes(doc);
+anvil_document includeed = NULL;
+while (anvil_document_iterator_next(it, &includeed)) {
+   anvil_statement_iterator sit = anvil_document_get_statements(includeed);
    anvil_statement s = NULL;
    while (anvil_statement_iterator_next(sit, &s)) {
       char name[32] = {0};
       anvil_statement_get_name(s, name, sizeof(name));
-      printf("imported statement: %s\n", name);
+      printf("includeed statement: %s\n", name);
    }
    anvil_statement_iterator_dispose(sit);
-   anvil_dispose(imported); // see §10 — this is safe, and yours to do
+   anvil_dispose(includeed); // see §10 — this is safe, and yours to do
 }
 anvil_document_iterator_dispose(it);
 ```
@@ -249,7 +249,7 @@ directly, with no registry needed at all — pass `NULL` as the first argument f
 
 - `anvil_dispose(doc)` on every handle you got from `anvil_load`/`anvil_load_buffer` — this tears
   down the whole underlying parse context, including every statement/value reached from it.
-- A document yielded by `anvil_document_get_imports`'s iterator is real and fully usable, but
+- A document yielded by `anvil_document_get_includes`'s iterator is real and fully usable, but
   shares its owner's underlying context. Dispose it with `anvil_dispose` like any other document
   when you're done with it (as §8 does) — safe, since it only ever frees the small handle itself,
   never the shared context the owner still needs.
@@ -262,7 +262,7 @@ directly, with no registry needed at all — pass `NULL` as the first argument f
 ## 11. Where to Go Next
 
 - [`language-reference.md`](language-reference.md) — the full grammar: dialects, statement/value
-  forms, attributes, inheritance, imports, errors, and the public API/bindings surface.
+  forms, attributes, inheritance, includes, errors, and the public API/bindings surface.
 - [`types-reference.md`](types-reference.md) — the full opt-in type system.
 - [`schema/README.md`](schema/README.md) — AnvilSchema, fully implemented: loading, required-field
   presence, type-kind validation, and full constraint checking.

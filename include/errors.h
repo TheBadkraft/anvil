@@ -95,7 +95,7 @@ typedef enum {
    ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050,
    ANVL_ERR_RESOLVER_MISSING_BASE = 4051,
    ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS = 4052,
-   // Two top-level statements (in the same document, or across merged imports) declare the
+   // Two top-level statements (in the same document, or across merged includes) declare the
    // same name — ambiguous for both '$identifier' VarRef and 'base' lookup purposes, so this
    // is a hard error regardless of where the collision originates. See notes/resolution-phase.md.
    ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER = 4053,
@@ -107,17 +107,20 @@ typedef enum {
    ANVL_ERR_VARS_CIRCULAR_REF = 4104,
    ANVL_ERR_VARS_KEY_NOT_FOUND = 4105,
 
-   // Import Errors (42xx)
-   ANVL_ERR_IMPORT_NOT_FIRST = 4201,
-   ANVL_ERR_IMPORT_AMP_FORBIDDEN = 4202,
-   ANVL_ERR_IMPORT_DUPLICATE_ALIAS = 4203,
-   ANVL_ERR_IMPORT_FILE_NOT_FOUND = 4204,
-   ANVL_ERR_IMPORT_CYCLIC = 4206,
+   // Include Errors (42xx)
+   ANVL_ERR_INCLUDE_NOT_FIRST = 4201,
+   ANVL_ERR_INCLUDE_AMP_FORBIDDEN = 4202,
+   ANVL_ERR_INCLUDE_DUPLICATE_ALIAS = 4203,
+   ANVL_ERR_INCLUDE_FILE_NOT_FOUND = 4204,
+   ANVL_ERR_INCLUDE_CYCLIC = 4206,
 
-   // Using Errors (43xx)
-   ANVL_ERR_USING_MODULE_NOT_FOUND = 4305,
-   ANVL_ERR_USING_IN_AMP = 4306,
-   ANVL_ERR_USING_AFTER_STATEMENTS = 4307,
+   // Import Errors (43xx) -- reserved ahead of AnvlScript's own foreign-code-bridge feature
+   // (not yet implemented), same status the AML `include` mechanism's codes had before it
+   // shipped. Formerly reserved under "Using Errors" for the same not-yet-built construct,
+   // renamed alongside the keyword itself -- see FR-2609-anvl-public-api-002.
+   ANVL_ERR_IMPORT_MODULE_NOT_FOUND = 4305,
+   ANVL_ERR_IMPORT_IN_AMP = 4306,
+   ANVL_ERR_IMPORT_AFTER_STATEMENTS = 4307,
 
    // AMP Dialect Errors (44xx)
    ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401,

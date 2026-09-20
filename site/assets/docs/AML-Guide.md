@@ -26,13 +26,13 @@ document {
 };
 ```
 
-**Reserved words:** `vars`, `import`, `using`, `true`, `false`, and `null`
+**Reserved words:** `vars`, `include`, `import`, `true`, `false`, and `null`
 (exact lowercase only) can't be used as an identifier anywhere — a
 statement name, an inheritance base, an object field name, an attribute
 key, a `$` reference target, or a blob tag. Using one is a parse error
 (`RESERVED_IDENTIFIER`).
 
-`vars`/`import`/`using` are also reserved as a *value* — `foo := vars;` is
+`vars`/`include`/`import` are also reserved as a *value* — `foo := vars;` is
 a parse error too, not a bare string. This build doesn't do anything with
 these three words itself; they're reserved so a document written today
 doesn't break once parsed by the eventual native/WASM replacement, which

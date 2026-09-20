@@ -33,7 +33,7 @@ static void th(void) {
    Registry.clear();
 }
 
-/* Parses every document currently registered on ctx, root and imports alike. */
+/* Parses every document currently registered on ctx, root and includes alike. */
 static bool parse_all_docs(module_context ctx) {
    usize count = List.size(ctx->docs);
    for (usize i = 0; i < count; i++) {
@@ -74,13 +74,13 @@ static void test_rsv01_duplicate_name_same_document(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * RSV02 — duplicate top-level name across a merged import
- * (resolver_dup_import.anvl declares 'shared' too)
+ * RSV02 — duplicate top-level name across a merged include
+ * (resolver_dup_include.anvl declares 'shared' too)
  * ---------------------------------------------------------------------- */
-static void test_rsv02_duplicate_name_across_import(void) {
+static void test_rsv02_duplicate_name_across_include(void) {
    module_context ctx = NULL;
    module_document doc = setup_amp_doc("#!aml\n"
-                                       "import \"../fixtures/resolver_dup_import.anvl\";\n"
+                                       "include \"../fixtures/resolver_dup_include.anvl\";\n"
                                        "shared := 2;\n",
                                        &ctx);
    TestBit.is_not_null(doc, "RSV02: document loaded");
@@ -512,8 +512,8 @@ static void test_rsv14_inheritance_cycle_rejected(void) {
 int main(void) {
    TestBit.run_ex("RSV01_duplicate_name_same_document", NULL,
                   test_rsv01_duplicate_name_same_document, th);
-   TestBit.run_ex("RSV02_duplicate_name_across_import", NULL,
-                  test_rsv02_duplicate_name_across_import, th);
+   TestBit.run_ex("RSV02_duplicate_name_across_include", NULL,
+                  test_rsv02_duplicate_name_across_include, th);
    TestBit.run_ex("RSV03_varref_resolves_single_hop", NULL,
                   test_rsv03_varref_resolves_single_hop, th);
    TestBit.run_ex("RSV04_varref_chain_resolves_to_final_value", NULL,

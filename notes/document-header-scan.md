@@ -1,6 +1,6 @@
 # Document Header Scan
 
-**Status: implemented and GREEN.** Phase 1 of the document pipeline (`doc_scan_header`) is complete — shebang/import/module-attribute scanning, import-graph loading (`mod_load_imports`, including diamond/cycle handling), and the source-hash registry it all sits on. `test_header.c` (`HDR00`–`HDR20`), `test_source.c`, `test_registry.c`, `test_module.c`'s `CR17`–`CR22` all pass, Valgrind-clean. Kept as implementation reference below, not rewritten now that it's done — see per-section "Status" notes throughout for what shipped and why.
+**Status: implemented and GREEN.** Phase 1 of the document pipeline (`doc_scan_header`) is complete — shebang/include/module-attribute scanning, include-graph loading (`mod_load_includes`, including diamond/cycle handling), and the source-hash registry it all sits on. `test_header.c` (`HDR00`–`HDR20`), `test_source.c`, `test_registry.c`, `test_module.c`'s `CR17`–`CR22` all pass, Valgrind-clean. Kept as implementation reference below, not rewritten now that it's done — see per-section "Status" notes throughout for what shipped and why.
 
 Implementation reference for the header-scan step that precedes full body parsing in AML. Edited as the implementation evolves.
 
@@ -10,9 +10,9 @@ See `notes/deferred-work.md` for anything raised here that's deferred to a later
 
 AML uses a two-phase parse:
 
-1. **Header scan** — discover dialect, imports, and module attributes without parsing the body.
-2. **Body parse** — parse statements and expressions after the full import graph is known.
-3. **Resolution** — resolve inheritance, references, and imports after all bodies are parsed.
+1. **Header scan** — discover dialect, includes, and module attributes without parsing the body.
+2. **Body parse** — parse statements and expressions after the full include graph is known.
+3. **Resolution** — resolve inheritance, references, and includes after all bodies are parsed.
 
 This document focuses on phase 1.
 
@@ -21,7 +21,7 @@ This document focuses on phase 1.
 The header scan runs over the source buffer and extracts only the leading document-level constructs:
 
 - Optional shebang (`#!aml`, `#!amp`, `#!asl`) for dialect.
-- Import declarations (`import "path";`).
+- Include declarations (`include "path";`).
 - Optional module attributes (`@[...]`).
 - Stop at the first body statement (e.g., `name := value`, `derived : base`, or anonymous block).
 
@@ -29,11 +29,11 @@ The scan does **not**:
 
 - Parse statement bodies or values.
 - Resolve inheritance targets.
-- Validate that imported files exist (that happens when they are loaded).
+- Validate that included files exist (that happens when they are loaded).
 
 ## Storage details
 
-`imports` and `attributes` are Sigma lists configured with `sizeof(void *)` stride and therefore store pointers to heap-allocated `anvl_doc_import_t` and `anvl_doc_attribute_t` entries. The entries themselves own no additional allocations; their slice fields point into the source buffer, preserving the no-copy parser philosophy. Header disposal iterates each list, frees every entry, and then disposes the lists.
+`includes` and `attributes` are Sigma lists configured with `sizeof(void *)` stride and therefore store pointers to heap-allocated `anvl_include_t` and `anvl_doc_attribute_t` entries. The entries themselves own no additional allocations; their slice fields point into the source buffer, preserving the no-copy parser philosophy. Header disposal iterates each list, frees every entry, and then disposes the lists.
 
 ## Public function boundary
 
@@ -42,7 +42,7 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code);
 ```
 
 - Input: a document whose source buffer has already been loaded.
-- Output: dialect resolved, imports and module attributes recorded.
+- Output: dialect resolved, includes and module attributes recorded.
 - Returns `ANVL_RES_OK` on success, `ANVL_RES_ERR` on failure.
 
 This function is exposed for independent testing and is called internally by `doc_load_source` after loading the source.
@@ -57,12 +57,12 @@ typedef struct anvl_src_slice_t {
 } anvl_slice;
 typedef anvl_slice *slice;
 
-typedef struct anvl_doc_import_t {
-   anvl_slice decl;          // "import \"path\"" (no trailing ';')
+typedef struct anvl_include_t {
+   anvl_slice decl;          // "include \"path\"" (no trailing ';')
    anvl_slice path;          // "\"path\"" (quotes included)
-   module_document resolved; // child document after import graph expansion; NULL until loaded
-} anvl_import;
-typedef anvl_import *anvl_doc_import;
+   module_document resolved; // child document after include graph expansion; NULL until loaded
+} anvl_include;
+typedef anvl_include *anvl_include;
 
 typedef struct anvl_doc_attribute_t {
    anvl_slice key;   // identifier (e.g., "active", "is_active")
@@ -71,7 +71,7 @@ typedef struct anvl_doc_attribute_t {
 typedef anvl_doc_attribute_t *anvl_doc_attribute;
 
 struct anvl_doc_header_t {
-   list imports;     // anvl_doc_import pointers
+   list includes;     // anvl_include pointers
    list attributes;  // anvl_doc_attribute pointers
 };
 ```
@@ -101,7 +101,7 @@ struct anvl_mod_doc_t {
 
 The parser has always been no-copy. Header metadata follows the same model:
 
-- Imports are stored as declaration/path slice pairs into the source buffer.
+- Includes are stored as declaration/path slice pairs into the source buffer.
 - Attributes are stored as key/value slice pairs; `value.length == 0` denotes a flag attribute.
 - No path or attribute text is duplicated; slices are stable as long as the source object lives.
 - When an `.anvlo` object file is generated, the same slices can be serialized as offsets into a mapped source section.
@@ -111,16 +111,16 @@ The parser has always been no-copy. Header metadata follows the same model:
 Header elements must appear in this order:
 
 1. Skip whitespace and comments (`//`, `/* */`).
-2. The source loader has already consumed any leading shebang; the header scanner starts on the first import/attribute/body token.
+2. The source loader has already consumed any leading shebang; the header scanner starts on the first include/attribute/body token.
 3. Skip whitespace and comments.
-4. While the next token is `import`, parse the quoted path and consume the terminating `;`.
+4. While the next token is `include`, parse the quoted path and consume the terminating `;`.
 5. Skip whitespace and comments.
 6. If the next token is `@[`, parse module attributes.
 7. Skip whitespace and comments.
-8. If the next token is `import` after attributes have been seen, report an ordering error.
+8. If the next token is `include` after attributes have been seen, report an ordering error.
 9. Stop when a non-header construct is encountered.
 
-Import declarations following any attribute block are rejected because the header ordering is shebang → imports → attributes → body.
+Include declarations following any attribute block are rejected because the header ordering is shebang → includes → attributes → body.
 
 ## Shebang parsing
 
@@ -132,32 +132,32 @@ The shebang line has the form `#!dialect` where `dialect` is one of:
 
 It may be preceded by whitespace. It overrides any file-extension dialect hint. The shebang itself is **not** stored as header metadata; it only affects dialect resolution.
 
-Shebang detection and consumption now happen at source load time (`Source.from_buffer` / `Source.from_file`). After loading, the source position is advanced past the shebang, so the header scanner starts on the first import/attribute/body token rather than re-reading it. The source object records whether a shebang was found in `src->has_shebang`; `Source.is_shebang` reports this flag, and `Source.dialect` reports `ANVL_DIALECT_ERROR` if the shebang token was invalid.
+Shebang detection and consumption now happen at source load time (`Source.from_buffer` / `Source.from_file`). After loading, the source position is advanced past the shebang, so the header scanner starts on the first include/attribute/body token rather than re-reading it. The source object records whether a shebang was found in `src->has_shebang`; `Source.is_shebang` reports this flag, and `Source.dialect` reports `ANVL_DIALECT_ERROR` if the shebang token was invalid.
 
 **Fixed-length dialect matching, not scan-to-newline** (hardened — see "Real bug found and fixed" below): every legal shebang is exactly `ANVL_SHEBANG_LEN` (5) bytes — `"#!"` plus a fixed 3-letter dialect token — a permanent invariant of the grammar, not just true of today's three dialects. `source_parse_shebang` compares those 5 bytes directly against `ANVL_SHEBANG_AML`/`ANVL_SHEBANG_AMP`/`ANVL_SHEBANG_ASL`, then consumes exactly 5 bytes (plus one immediately-following newline, if present, purely to keep the source position identical to before for the conventional form). This means the shebang never needs a trailing separator at all — `"#!aml\n"`, `"#!aml name := 1;"`, and even fully minified `"#!amlname := 1;"` all resolve identically, since whatever follows byte 5 is simply left for the header scanner/tokenizer to read as ordinary content. The header scanner itself does not re-validate the shebang's dialect token, but it does now check `Source.dialect(doc->source) == ANVL_DIALECT_ERROR` (see below) — it doesn't re-derive it.
 
 **Real bug found and fixed**: the original implementation scanned from `#!` to the next `\n` and required the in-between text to be exactly 3 bytes matching `"aml"`/`"amp"`/`"asl"`. Two real, previously-undetected defects fell out of that design, caught while validating full-minification support: (1) any shebang lacking a trailing newline — same-line with a space, or fully minified with zero separator — failed dialect resolution even though the intended dialect was perfectly legible; (2) far more seriously, an *unrecognized* dialect token (a typo, or any garbage after `#!`) silently left `src->dialect` at `ANVL_DIALECT_ERROR` with nothing anywhere ever checking for that state — `doc_scan_header` only special-cased `== ANVL_DIALECT_AMP` for AMP's restrictions, so an invalid shebang just silently fell through and got treated as permissive AML, contradicting this very note's own prior claim (below) that invalid dialects were "reported." Verified directly before fixing: `anvil_load_buffer("#!xyz\nconfig := { a := 1; };\n", ...)` parsed with zero errors despite `#!xyz` naming no real dialect. Fixed by the fixed-length rewrite above, plus a new, explicit check at the very top of `doc_scan_header` (`src/core/document.c`) — `Source.is_shebang(doc->source) && Source.dialect(doc->source) == ANVL_DIALECT_ERROR` — reporting `ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT` (2011), a real header error, before any other header-scan check runs. Covered by `test_source.c` (SRC39–SRC41), `test_header.c` (HDR21), and `test/functional/test_e2e.c` (FN06, exercised against the real built library, both static and shared, debug and release).
 
-## Import path parsing
+## Include path parsing
 
-Each import declaration has the form:
+Each include declaration has the form:
 
 ```anvl
-import "path";
+include "path";
 ```
 
-- `import` keyword.
+- `include` keyword.
 - Flexible whitespace before the quoted string.
 - A double-quoted string literal representing the path.
 - A terminating semicolon.
 
-Extensions are optional. By convention AML imports are written without one; the loader searches the directory and uses the first file whose stem matches the path. The discovered file's actual extension provides the dialect hint. The loader does not impose deterministic ordering on directory listings. Explicit extensions are also accepted.
+Extensions are optional. By convention AML includes are written without one; the loader searches the directory and uses the first file whose stem matches the path. The discovered file's actual extension provides the dialect hint. The loader does not impose deterministic ordering on directory listings. Explicit extensions are also accepted.
 
-Imports are stored as metadata slices pointing into the source buffer. Canonicalization and resolution happen when the import graph is expanded.
+Includes are stored as metadata slices pointing into the source buffer. Canonicalization and resolution happen when the include graph is expanded.
 
 ## Module attributes
 
-Module attributes are declared with `@[...]` syntax and must appear after imports.
+Module attributes are declared with `@[...]` syntax and must appear after includes.
 
 Example:
 
@@ -180,9 +180,9 @@ The value slice is raw text after `=` and is trimmed of surrounding whitespace a
 The scan reports errors such as:
 
 - Unterminated comment.
-- Malformed import declaration (missing quotes, missing semicolon).
-- Import after an attribute (ordering violation).
-- Body statement appearing before imports/attributes are complete.
+- Malformed include declaration (missing quotes, missing semicolon).
+- Include after an attribute (ordering violation).
+- Body statement appearing before includes/attributes are complete.
 
 Invalid shebang dialects are *detected* at source-load time and *reported* by the header scanner (`doc_scan_header`'s own explicit check, `ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT`) — see "Fixed-length dialect matching" above for why this line used to be only half true.
 
@@ -200,8 +200,8 @@ doc_load_source(doc, origin, source, len, err)
 mod_ctx_register_doc(ctx, doc, filepath, err)
   |- document registered in source hash registry
 doc_scan_header(doc, err)
-  |- header scanned, imports/attributes recorded
-|- (later) import graph expansion, body parse, resolution
+  |- header scanned, includes/attributes recorded
+|- (later) include graph expansion, body parse, resolution
 ```
 
 For tests that exercise only header extraction, create a context, load the source, register the document, then call `doc_scan_header` directly.
@@ -210,14 +210,14 @@ For tests that exercise only header extraction, create a context, load the sourc
 
 A dedicated test suite in `test/unit/test_header.c` covers the scanner with nine cases (HDR00, HDR02–HDR05, HDR07–HDR10):
 
-- Empty header (no shebang, no imports).
-- Multiple imports in order.
-- Imports interleaved with comments.
-- Missing semicolon after import.
-- Missing quotes around import path.
+- Empty header (no shebang, no includes).
+- Multiple includes in order.
+- Includes interleaved with comments.
+- Missing semicolon after include.
+- Missing quotes around include path.
 - Unterminated comment before shebang.
-- Module attributes after imports.
-- Import after attribute fails (ordering violation).
+- Module attributes after includes.
+- Include after attribute fails (ordering violation).
 - First body statement terminates the header scan; source location is placed on the first body character.
 
 (The dedicated shebang-detection and invalid-shebang tests were removed because shebang handling lives entirely in the source loader; `test_source` and `test_document` still exercise valid shebangs.)
@@ -226,7 +226,7 @@ A dedicated test suite in `test/unit/test_header.c` covers the scanner with nine
 
 Current status (build 12+):
 
-- `test_header`: 9/9 scanner tests passing; 7 import-loader tests (HDR11–HDR17) passing against the real loader. 17/17 total, Valgrind-clean.
+- `test_header`: 9/9 scanner tests passing; 7 include-loader tests (HDR11–HDR17) passing against the real loader. 17/17 total, Valgrind-clean.
 - `test_document`: 31/31 passing; Valgrind-clean.
 - `test_module`: 28/28 passing; Valgrind-clean.
 - `test_registry`: 9/9 passing; Valgrind-clean.
@@ -234,36 +234,36 @@ Current status (build 12+):
 
 All active unit suites report 0 Valgrind errors and 0 bytes in use at exit.
 
-The header-scan and import-loader work is wrapped.
+The header-scan and include-loader work is wrapped.
 
-## Import graph expansion
+## Include graph expansion
 
-After the header scan records import slices, a separate loader phase expands the graph:
+After the header scan records include slices, a separate loader phase expands the graph:
 
 ```c
-anvl_result mod_load_imports(module_context ctx, module_document root, anvl_err_code *out_err_code);
+anvl_result mod_load_includes(module_context ctx, module_document root, anvl_err_code *out_err_code);
 ```
 
 Responsibilities:
 
-- Walk `root->header->imports` in order.
+- Walk `root->header->includes` in order.
 - Strip quotes from each `path` slice.
 - Resolve the path relative to `root->filepath`.
 - Load the referenced file as a new document (`doc_load_source` + `mod_ctx_register_doc`).
 - Scan the child header (`doc_scan_header`).
-- Recursively expand the child’s imports.
-- Set `anvl_doc_import_t.resolved` to the loaded child document.
+- Recursively expand the child’s includes.
+- Set `anvl_include_t.resolved` to the loaded child document.
 - Detect cycles and missing files, reporting errors on the requesting document.
 
-The loader does not parse bodies; it only ensures the full import graph is loaded and header-scanned before body parsing begins. This separation keeps path resolution, cycle detection, and duplicate-document deduplication in one place.
+The loader does not parse bodies; it only ensures the full include graph is loaded and header-scanned before body parsing begins. This separation keeps path resolution, cycle detection, and duplicate-document deduplication in one place.
 
 ### Cycle detection
 
-A transient stack of source hashes (or document identities) tracks documents currently being expanded. If an import resolves to a document already on the stack, the loader reports `ANVL_ERR_IMPORT_CYCLIC` on the requesting document and unwinds.
+A transient stack of source hashes (or document identities) tracks documents currently being expanded. If an include resolves to a document already on the stack, the loader reports `ANVL_ERR_INCLUDE_CYCLIC` on the requesting document and unwinds.
 
 ### Duplicate document deduplication
 
-The source-hash registry naturally deduplicates diamond imports. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy. The freshly-loaded duplicate `module_document` that `mod_ctx_register_doc` rejected is then disposed via the ordinary `doc_dispose`.
+The source-hash registry naturally deduplicates diamond includes. When the loader attempts to register a file whose content hash is already present, it reuses the existing `module_document` and sets `resolved` to that document rather than loading a second copy. The freshly-loaded duplicate `module_document` that `mod_ctx_register_doc` rejected is then disposed via the ordinary `doc_dispose`.
 
 **Resolved — bug found and fixed: disposing the discarded duplicate was silently un-registering the original.** `doc_dispose` used to call `Registry.remove(Source.hash(doc->source))` unconditionally for whatever source it was disposing. Since the discarded duplicate shares the *exact same content hash* as the original document it lost the dedup race to, disposing it removed the registry entry belonging to the still-alive original — even though that original was never disposed and remained in `ctx->docs`. From that point on, any `Source.*` registry-lookup call (`get_arena`, `new_node`, `set_error`, `has_errors`) would silently fail for that document, indistinguishable from it being genuinely unregistered.
 
@@ -273,30 +273,30 @@ This went undetected through `HDR13` (diamond reuse) because that test only chec
 
 "Resolve the path relative to `root->filepath`" (above) needs to account for how `root` was loaded, since a root document doesn't always have a real file behind it:
 
-- **File-rooted**: `Anvil.load(filepath)`-style loading gives `root->filepath` a real path. `import_resolve_dir` takes the directory component (everything before the last `/`) as the base for resolving that document's own imports, and this repeats recursively — each document resolves its imports relative to *its own* directory, not the original root's, per `aml-import-namespace-rules.md` §1.
-- **Buffer-rooted**: a document loaded via `Source.from_buffer` (no real file) has no meaningful directory. `import_resolve_dir` falls back to `.` — imports in a buffer-loaded root resolve relative to the process's current working directory at the time the import is loaded, not to any notion of "where the buffer came from" (there isn't one). This falls out of the existing NULL/no-slash handling in `import_resolve_dir` already (an empty or bare-filename `filepath` both resolve to `.`) rather than being special-cased — but there is currently no dedicated test exercising a buffer-rooted document with an import, so this behavior isn't locked in by a test yet. Flagged in `notes/deferred-work.md`.
+- **File-rooted**: `Anvil.load(filepath)`-style loading gives `root->filepath` a real path. `include_resolve_dir` takes the directory component (everything before the last `/`) as the base for resolving that document's own includes, and this repeats recursively — each document resolves its includes relative to *its own* directory, not the original root's, per `aml-include-namespace-rules.md` §1.
+- **Buffer-rooted**: a document loaded via `Source.from_buffer` (no real file) has no meaningful directory. `include_resolve_dir` falls back to `.` — includes in a buffer-loaded root resolve relative to the process's current working directory at the time the include is loaded, not to any notion of "where the buffer came from" (there isn't one). This falls out of the existing NULL/no-slash handling in `include_resolve_dir` already (an empty or bare-filename `filepath` both resolve to `.`) rather than being special-cased — but there is currently no dedicated test exercising a buffer-rooted document with an include, so this behavior isn't locked in by a test yet. Flagged in `notes/deferred-work.md`.
 
-`./` and `../` are not special-cased differently from each other — both are ordinary relative-path text that gets string-joined onto the resolved parent directory (`import_resolve_dir` + `snprintf("%s/%s", parent_dir, import_name)`) and handed to the filesystem as-is; the OS resolves `.`/`..` segments when the file is actually opened. What's *not* yet implemented is path **canonicalization** before that string join/compare — `aml-import-namespace-rules.md` § *Canonical-path function* already flags this as TBD (`realpath()` or a custom resolver). Without it, two imports of the same file written differently (e.g. `"./a/../a/x"` vs `"./a/x"`) would be treated as distinct paths by the cycle-detection stack's `strcmp` and by dedup, even though they resolve to the same file. No current fixture exercises `../`-style imports, so this gap isn't test-covered either. Also tracked in `notes/deferred-work.md`.
+`./` and `../` are not special-cased differently from each other — both are ordinary relative-path text that gets string-joined onto the resolved parent directory (`include_resolve_dir` + `snprintf("%s/%s", parent_dir, include_name)`) and handed to the filesystem as-is; the OS resolves `.`/`..` segments when the file is actually opened. What's *not* yet implemented is path **canonicalization** before that string join/compare — `aml-include-namespace-rules.md` § *Canonical-path function* already flags this as TBD (`realpath()` or a custom resolver). Without it, two includes of the same file written differently (e.g. `"./a/../a/x"` vs `"./a/x"`) would be treated as distinct paths by the cycle-detection stack's `strcmp` and by dedup, even though they resolve to the same file. No current fixture exercises `../`-style includes, so this gap isn't test-covered either. Also tracked in `notes/deferred-work.md`.
 
-### Import loader test contract (HDR11–HDR20)
+### Include loader test contract (HDR11–HDR20)
 
-A new batch of header-suite tests exercises `mod_load_imports` through fixture files:
+A new batch of header-suite tests exercises `mod_load_includes` through fixture files:
 
-- **HDR11** — single import resolves: root imports `hdr_import_base.anvl`; `resolved` is set and two documents are registered.
-- **HDR12** — nested imports: root imports `hdr_import_nested.anvl`, which imports `hdr_import_types.anvl`, which imports `hdr_import_base.anvl`; all four documents are loaded and linked.
-- **HDR13** — diamond reuse: root imports base and types, types imports base; both paths point `resolved` at the same base document and only three total documents are registered.
-- **HDR14** — cyclic import rejected: a self-importing fixture reports `ANVL_ERR_IMPORT_CYCLIC`.
-- **HDR15** — missing import file: an import referencing a non-existent file reports an error on the root document.
-- **HDR16** — buffer-rooted document, no fixture file: a document registered with a bare (no-directory) `filepath` via `setup_registered_doc` imports `../fixtures/hdr_import_base.anvl` and resolves successfully, confirming imports on a buffer-loaded root resolve relative to the process's CWD. Passed on the first run with no code changes — the `import_resolve_dir` NULL/no-slash fallback already did the right thing; this test just locks it in.
-- **HDR17** — `../` resolves relative to the importing file's own directory: `test/fixtures/hdr_import_sub/hdr_import_dotdot.anvl` (a new fixture in a new subdirectory) imports `"../hdr_import_base.anvl"`, which correctly navigates back up to `test/fixtures/hdr_import_base.anvl`. Also passed on the first run with no code changes — `import_resolve_dir` computes each document's own directory correctly on recursion, and the unquoted `../` segment is handled by the filesystem when the file is opened, with no canonicalization needed for a single-hop resolve like this one.
+- **HDR11** — single include resolves: root includes `hdr_include_base.anvl`; `resolved` is set and two documents are registered.
+- **HDR12** — nested includes: root includes `hdr_include_nested.anvl`, which includes `hdr_include_types.anvl`, which includes `hdr_include_base.anvl`; all four documents are loaded and linked.
+- **HDR13** — diamond reuse: root includes base and types, types includes base; both paths point `resolved` at the same base document and only three total documents are registered.
+- **HDR14** — cyclic include rejected: a self-including fixture reports `ANVL_ERR_INCLUDE_CYCLIC`.
+- **HDR15** — missing include file: an include referencing a non-existent file reports an error on the root document.
+- **HDR16** — buffer-rooted document, no fixture file: a document registered with a bare (no-directory) `filepath` via `setup_registered_doc` includes `../fixtures/hdr_include_base.anvl` and resolves successfully, confirming includes on a buffer-loaded root resolve relative to the process's CWD. Passed on the first run with no code changes — the `include_resolve_dir` NULL/no-slash fallback already did the right thing; this test just locks it in.
+- **HDR17** — `../` resolves relative to the including file's own directory: `test/fixtures/hdr_include_sub/hdr_include_dotdot.anvl` (a new fixture in a new subdirectory) includes `"../hdr_include_base.anvl"`, which correctly navigates back up to `test/fixtures/hdr_include_base.anvl`. Also passed on the first run with no code changes — `include_resolve_dir` computes each document's own directory correctly on recursion, and the unquoted `../` segment is handled by the filesystem when the file is opened, with no canonicalization needed for a single-hop resolve like this one.
 
 Both HDR16 and HDR17 are Valgrind-clean (0 errors, 0 leaks). Together they close the buffer-root and `../`-resolution testing gaps noted in `deferred-work.md`. What's still open — and distinct from what these tests cover — is path **canonicalization** (`realpath()` or equivalent): comparing two *differently-written* paths to the same file (e.g. `"./a/../a/x"` vs `"./a/x"`) for dedup/cycle-detection purposes. HDR17 only proves a single relative resolve works; it doesn't touch canonicalization at all.
 
 - **HDR18** — repeated shebang rejected: a document with two `#!` lines reports `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS`.
-- **HDR19** — import loader body-size hint: `mod_load_imports`'s `out_body_size_hint` sums `Source.length()` across the whole graph, diamond counted once — verified against an independent walk of `ctx->docs` on the diamond fixture rather than hardcoded byte counts. See `notes/document-body-parse.md` "Arena-backed allocation".
-- **HDR20** — registry survives disposal of a discarded diamond duplicate: the bug fix documented above, in "Duplicate document deduplication". After the diamond fixture's import graph fully resolves, the surviving `base` document must still be findable via `Registry.find` by its own content hash.
+- **HDR19** — include loader body-size hint: `mod_load_includes`'s `out_body_size_hint` sums `Source.length()` across the whole graph, diamond counted once — verified against an independent walk of `ctx->docs` on the diamond fixture rather than hardcoded byte counts. See `notes/document-body-parse.md` "Arena-backed allocation".
+- **HDR20** — registry survives disposal of a discarded diamond duplicate: the bug fix documented above, in "Duplicate document deduplication". After the diamond fixture's include graph fully resolves, the surviving `base` document must still be findable via `Registry.find` by its own content hash.
 
-These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc_import_t`.
+These tests exercise the loader API and the `resolved` back-pointer on `anvl_include_t`.
 
 ## Deferred to AnvilScript / later work
 
@@ -305,18 +305,18 @@ These tests exercise the loader API and the `resolved` back-pointer on `anvl_doc
 - Namespace keyword, if AML ever adds it.
 - Body compaction / `.anvlo` generation — keep the parse layer zero-copy; compaction belongs to a separate compile phase.
 
-## Import-graph processing order — resolved as unnecessary
+## Include-graph processing order — resolved as unnecessary
 
-`mod_load_imports` discovers the import graph via DFS, and `ctx->docs` ends up in DFS *pre-order* (a document is registered before its imports are recursively expanded) as a side effect of that traversal. **No document-processing order is actually required.** The resolver design is map-based: every document in the graph is body-parsed (in any order) before Resolution begins, so by the time anything resolves a `base`/`IDENTIFIER` reference, every statement in the whole graph is already registered in an identifier map. Resolution fails only on a missed lookup, never because of processing order — see `document-body-parse.md` § *Relationship to header scan and import loading* for the full reasoning. This also means `.anvlo` linking's eventual "how do imports fold into a root object" question (`anvlo-compilation.md` open question 4) doesn't need a topological order either, just the same completeness guarantee (whole graph loaded/parsed before linking).
+`mod_load_includes` discovers the include graph via DFS, and `ctx->docs` ends up in DFS *pre-order* (a document is registered before its includes are recursively expanded) as a side effect of that traversal. **No document-processing order is actually required.** The resolver design is map-based: every document in the graph is body-parsed (in any order) before Resolution begins, so by the time anything resolves a `base`/`IDENTIFIER` reference, every statement in the whole graph is already registered in an identifier map. Resolution fails only on a missed lookup, never because of processing order — see `document-body-parse.md` § *Relationship to header scan and include loading* for the full reasoning. This also means `.anvlo` linking's eventual "how do includes fold into a root object" question (`anvlo-compilation.md` open question 4) doesn't need a topological order either, just the same completeness guarantee (whole graph loaded/parsed before linking).
 
-That said, `notes/aml-import-namespace-rules.md` § *Import graph order* contains a genuine bug worth keeping on record independent of whether anything needs the fix: it concludes that **reversing** the pre-order discovery list gives a valid bottom-up (dependencies-first) order. That's only true for tree-shaped import graphs. It breaks under diamond imports, which this project explicitly supports and tests (HDR13): take `u` importing `v` and `w`, where both `v` and `w` import `x` (already registered/deduped by the time `w` is reached). Pre-order discovery is `[u, v, x, w]`; reversing gives `[w, x, v, u]` — but `w` depends on `x`, and `w` now comes *before* `x`. Reversed pre-order is wrong whenever a shared dependency is reachable through more than one path. If an ordering is ever wanted for some other reason (readability, deterministic output, etc.), the correct construction is DFS **post-order** (append each document to the order list only *after* fully recursing into its own imports, skipping documents already in the list for dedup) — no reversal required, and it directly guarantees dependencies precede dependents even through diamonds, unlike reversed pre-order.
+That said, `notes/aml-include-namespace-rules.md` § *Include graph order* contains a genuine bug worth keeping on record independent of whether anything needs the fix: it concludes that **reversing** the pre-order discovery list gives a valid bottom-up (dependencies-first) order. That's only true for tree-shaped include graphs. It breaks under diamond includes, which this project explicitly supports and tests (HDR13): take `u` including `v` and `w`, where both `v` and `w` include `x` (already registered/deduped by the time `w` is reached). Pre-order discovery is `[u, v, x, w]`; reversing gives `[w, x, v, u]` — but `w` depends on `x`, and `w` now comes *before* `x`. Reversed pre-order is wrong whenever a shared dependency is reachable through more than one path. If an ordering is ever wanted for some other reason (readability, deterministic output, etc.), the correct construction is DFS **post-order** (append each document to the order list only *after* fully recursing into its own includes, skipping documents already in the list for dedup) — no reversal required, and it directly guarantees dependencies precede dependents even through diamonds, unlike reversed pre-order.
 
 ## Resolved questions
 
-1. **Header ordering**: shebang → imports → attributes. Enforced by the scanner.
-2. **Header storage**: `struct anvl_doc_header_t` with `imports` and `attributes` lists, owned by `module_document`.
-3. **No-copy**: imports/attributes stored as slice metadata into the source buffer.
-4. **Import slice**: declaration slice excludes `;`, path slice includes surrounding quotes.
+1. **Header ordering**: shebang → includes → attributes. Enforced by the scanner.
+2. **Header storage**: `struct anvl_doc_header_t` with `includes` and `attributes` lists, owned by `module_document`.
+3. **No-copy**: includes/attributes stored as slice metadata into the source buffer.
+4. **Include slice**: declaration slice excludes `;`, path slice includes surrounding quotes.
 5. **Attribute slice**: each attribute stored as key/value slice pair; empty value slice means flag.
 6. **Slice representation**: `anvl_slice` is a self-referential `{data, start, end}` pointer triple into the owning source buffer, not a `{start, length}` offset pair. Length, emptiness, and substring extraction are derived via `Source.slice_length`/`slice_is_empty`/`substring` rather than stored.
 7. **Scan timing**: header scan runs after source load and document registration so errors can route through the source registry.
@@ -326,17 +326,17 @@ That said, `notes/aml-import-namespace-rules.md` § *Import graph order* contain
 
 The header-scan work required changes beyond the scanner itself. The following files were touched and why:
 
-- `include/internal/module.h` — added `anvl_src_slice_t`/`anvl_slice`/`slice`, `anvl_doc_import_t`(`anvl_import`)/`anvl_doc_import`, `anvl_doc_attribute_t`/`anvl_doc_attribute`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
+- `include/internal/module.h` — added `anvl_src_slice_t`/`anvl_slice`/`slice`, `anvl_include_t`(`anvl_include`)/`anvl_include`, `anvl_doc_attribute_t`/`anvl_doc_attribute`, `struct anvl_doc_header_t`, and the `header` field on `module_document`.
 - `src/core/source.c` — expanded the previously minimal `Source` interface with FNV-1a hashing, peek/consume/match helpers, whitespace/comment skipping, line/column tracking, and registry-backed `has_errors`/`set_error`. The code was newly written for the scanner rather than ported from `_source.c`. Shebang parsing was later moved here from `document.c` so that the source loader advances past the shebang line and resolves the dialect before the header scanner runs.
-- `src/core/document.c` — implemented `doc_scan_header` and its helpers; created/disposed import/attribute lists; fixed `doc_load_source` so it no longer leaks the existing source object when one is already present. `header_scan_shebang` was removed from `doc_scan_header`; shebang handling now lives entirely in the source loader.
+- `src/core/document.c` — implemented `doc_scan_header` and its helpers; created/disposed include/attribute lists; fixed `doc_load_source` so it no longer leaks the existing source object when one is already present. `header_scan_shebang` was removed from `doc_scan_header`; shebang handling now lives entirely in the source loader.
 - `src/core/errors.c` — fixed `anvl_error_set` to accept a NULL `out_err_code` so `Source.set_error(..., NULL)` still appends the error.
-- `src/core/module.c` — ensured `mod_dispose` releases the registry reference acquired in `mod_new`; implemented the recursive import loader (`mod_load_imports`, `import_load_child`, `import_load_child_recursive`, `import_path_on_stack`) with cycle detection and diamond deduplication.
+- `src/core/module.c` — ensured `mod_dispose` releases the registry reference acquired in `mod_new`; implemented the recursive include loader (`mod_load_includes`, `include_load_child`, `include_load_child_recursive`, `include_path_on_stack`) with cycle detection and diamond deduplication.
 - `src/core/source_registry.c` — unchanged in this phase; `Registry.clear()` remains available for test teardown.
 - `test/utilities/debug.c` — added `Registry.release()` to `dispose_mod_manual` so module-based tests keep the registry refcount correct.
-- `test/unit/test_header.c` — new dedicated header suite (HDR00, HDR02–HDR05, HDR07–HDR10); import-loader tests HDR11–HDR17 appended and passing, including HDR16 (buffer-rooted CWD-relative resolution) and HDR17 (`../` resolves relative to the importing file's own directory).
-- `test/fixtures/hdr_import_sub/hdr_import_dotdot.anvl` — new fixture in a new subdirectory, imports `../hdr_import_base.anvl` to exercise HDR17.
+- `test/unit/test_header.c` — new dedicated header suite (HDR00, HDR02–HDR05, HDR07–HDR10); include-loader tests HDR11–HDR17 appended and passing, including HDR16 (buffer-rooted CWD-relative resolution) and HDR17 (`../` resolves relative to the including file's own directory).
+- `test/fixtures/hdr_include_sub/hdr_include_dotdot.anvl` — new fixture in a new subdirectory, includes `../hdr_include_base.anvl` to exercise HDR17.
 - `test/utilities/helpers.c`/`helpers.h` — added `slice_equals`, `setup_registered_doc`, and `setup_registered_file` shared helpers for source-slice assertions, registered-document setup, and fixture-based document setup. `slice_equals` now takes only an `anvl_slice` (no separate `anvl_source`, since the slice is self-referential) and compares through `Source.slice_length`/`Source.substring`; the standalone `slice_is_empty` test helper was removed in favor of calling `Source.slice_is_empty` directly.
-- `test/fixtures/hdr_import_*.anvl` — fixture graph for import-loader tests (single, nested, diamond, cyclic, missing); `hdr_import_nested.anvl` was added to create the 3-level import chain required by HDR12.
+- `test/fixtures/hdr_include_*.anvl` — fixture graph for include-loader tests (single, nested, diamond, cyclic, missing); `hdr_include_nested.anvl` was added to create the 3-level include chain required by HDR12.
 - `test/unit/test_source.c` — new dedicated Source interface suite (SRC00–SRC22) covering all public helpers and registry-backed error routing.
 - `test/unit/test_document.c` — added SRC08a–SRC08e for source error routing and HDR00–HDR10 for header scanning; fixed double-dispose of documents already owned by a context (SRC08a, SRC08b, DOC09, DOC10).
 - `test/unit/Makefile` — added `test_source` build/run target.
@@ -375,5 +375,5 @@ Once a document is registered with a context via `mod_ctx_register_doc`, the con
 
 ## Open questions
 
-1. Should imports carry a resolved dialect hint once the import graph is expanded?
+1. Should includes carry a resolved dialect hint once the include graph is expanded?
 2. How does the header struct serialize into an `.anvlo` file? (See `anvlo-compilation.md`.)

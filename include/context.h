@@ -74,19 +74,19 @@ struct anvl_context_t {
       usize capacity;                  // allocated capacity
       bool parsed;                     // true once vars block has been seen
    } vars_list;
-   // Import declarations (populated during parse; in-order, before vars/statements)
+   // Include declarations (populated during parse; in-order, before vars/statements)
+   struct {
+      struct anvl_include_decl *decls; // array of include declarations
+      usize count;                     // number of declarations
+      usize capacity;                  // allocated capacity
+   } include_list;
+   // Import declarations (populated during parse; before vars/statements) -- AnvlScript's own
+   // foreign-code-bridge construct (not yet implemented). First import escalates dialect AML → ASL.
    struct {
       struct anvl_import_decl *decls; // array of import declarations
       usize count;                    // number of declarations
       usize capacity;                 // allocated capacity
    } import_list;
-   // Using declarations (populated during parse; before vars/statements)
-   // First using escalates dialect AML → ASL.
-   struct {
-      struct anvl_using_decl *decls; // array of using declarations
-      usize count;                   // number of declarations
-      usize capacity;                // allocated capacity
-   } using_list;
    // Lazy-built statement name → index map (FNV-1a, sigma.collections Map).
    // NULL until the first get_statement_by_name call. Freed by context_dispose.
    void *stmt_name_index;

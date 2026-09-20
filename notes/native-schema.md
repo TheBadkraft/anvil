@@ -193,9 +193,9 @@ Resolved by giving `@[types]` exactly one meaning, full stop: **every top-level 
 (a `.types.anvl`) — there is no "just an object" at the top level of one; a document that wants
 ordinary data alongside custom types simply doesn't carry `@[types]`, full stop. A *consuming*
 document — a schema file, a plain data document, anything — never attributes itself at all to
-gain `types.X` access. That access is granted purely by the import graph: if a document imports a
-file whose own header carries `@[types]`, `types.X` references inside the importer resolve
-against whatever that imported file registered. No self-declaration on the consumer's side, so no
+gain `types.X` access. That access is granted purely by the include graph: if a document includes a
+file whose own header carries `@[types]`, `types.X` references inside the including document resolve
+against whatever that included file registered. No self-declaration on the consumer's side, so no
 way for its own statements to be swept up as type definitions by accident. Mirrors how `@[schema]`
 files are already 100% schema fields in FlyWire's real usage, nothing else mixed in. Consequence
 for `types.c`'s eventual registration pass: walk every root statement of a `@[types]` document
@@ -312,32 +312,32 @@ throughout Anvil's own source, unrelated to this module) sits as a direct siblin
 `sigma/` under `src/` — not nested inside `src/schema/`. `src/schema/` is reserved for `schema.c`
 itself once that work starts, since schema (not types) is the genuine add-on.
 
-## Found — loading types via `import` mostly already works, but one real public-API gap exists
+## Found — loading types via `include` mostly already works, but one real public-API gap exists
 
-Checked whether "the schema engine gets types loaded via `import "file.types.anvl";`" already
-holds today. Good news: Anvil's existing import pipeline (`mod_load_imports`, `src/core/
-module.c`) already fully parses, resolves, and registers every imported document — a
-`.types.anvl` file pulled in via `import` is completely loaded internally with zero new work.
+Checked whether "the schema engine gets types loaded via `include "file.types.anvl";`" already
+holds today. Good news: Anvil's existing include pipeline (`mod_load_includes`, `src/core/
+module.c`) already fully parses, resolves, and registers every included document — a
+`.types.anvl` file pulled in via `include` is completely loaded internally with zero new work.
 The gap: the **public flat API only exposes the root document.** `anvil_document_get_statements`
 (`anvil_flat.c:287`) walks `doc->root->body` specifically; there is currently no public accessor
-that reaches into `module_context.ctx->docs` (the full import graph, confirmed to hold every
-imported `module_document` with its own body/header/attributes — `include/internal/module.h`) to
-read an *imported* document's own top-level statements or its own `@[types]`/`@[schema]` module
+that reaches into `module_context.ctx->docs` (the full include graph, confirmed to hold every
+included `module_document` with its own body/header/attributes — `include/internal/module.h`) to
+read an *included* document's own top-level statements or its own `@[types]`/`@[schema]` module
 attribute. So a schema engine built purely on the public flat API can't yet see what got
-imported — the loading already happens, but there's no window onto it from outside core.
+included — the loading already happens, but there's no window onto it from outside core.
 
 This is a real, small, natural Anvil Native addition. First draft of this note proposed a
-count+index pair (`anvil_document_get_import_count`/`get_import(doc, index)`) — wrong, the same
+count+index pair (`anvil_document_get_include_count`/`get_include(doc, index)`) — wrong, the same
 anti-pattern already corrected once this session (see the `anvil-prefer-sigma-hps-iterator`
 memory). Corrected shape: `ctx->docs` is a Sigma `list`, and `list` already has `as_queryable`
 (`include/sigma/list.h:131`) — the exact mechanism `anvil_document_get_statements` already uses
 via `FArray.as_queryable`. So this should be an iterator, mirroring `anvil_statement_iterator`
-exactly: `anvil_document_get_imports(doc) -> anvil_document_iterator`,
+exactly: `anvil_document_get_includes(doc) -> anvil_document_iterator`,
 `anvil_document_iterator_next(it, anvil_document *out)`, `anvil_document_iterator_dispose(it)`.
 Not a design problem or a core-parser change either way. Needed before `schema.c` can do
-anything with `import "file.types.anvl";` at all.
+anything with `include "file.types.anvl";` at all.
 
-**Implemented.** `anvil_document_get_imports`/`anvil_document_iterator_next`/`_dispose` landed
+**Implemented.** `anvil_document_get_includes`/`anvil_document_iterator_next`/`_dispose` landed
 (flat + vtable, `ANV32`/`ANV33`/`VT09`, Valgrind-clean, full regression green) — see
 `notes/public-api.md`'s own entry for the full writeup, including a real double-free found and
 fixed along the way (a shared-context handle's ownership needed one consistent model, not two).
@@ -345,7 +345,7 @@ This was a genuine prerequisite tackled before the rest of `types.c`, not `types
 
 ## Implemented — `types.c` is feature-complete for this phase: GREEN
 
-`anvil_type_registry_load(doc)` / `anvil_type_registry_load_from_imports(doc)` /
+`anvil_type_registry_load(doc)` / `anvil_type_registry_load_from_includes(doc)` /
 `anvil_type_registry_dispose` / `anvil_type_registry_find(reg, name)` /
 `anvil_type_def_get_kind(def)` / `get_size`/`get_min`/`get_max` / `get_value_count`/`get_value` /
 `anvil_type_resolve` — `src/anvil_types.c`, `include/anvil_type_registry.h`, built entirely on
@@ -366,14 +366,14 @@ real, independently justified gap, not scope creep).
   bare-identifier array convention into a list of individually-allocated label copies, freed
   correctly on registry disposal (Valgrind-verified — this was the one place genuinely new
   per-registry heap ownership got introduced).
-- **Cross-file resolution**: `anvil_type_registry_load_from_imports(doc)` walks `doc`'s own
-  *direct* imports (`anvil_document_get_imports`) and merges every `@[types]`-carrying one's
+- **Cross-file resolution**: `anvil_type_registry_load_from_includes(doc)` walks `doc`'s own
+  *direct* includes (`anvil_document_get_includes`) and merges every `@[types]`-carrying one's
   definitions into a single combined registry, keyed by bare name — realizing "`types.` is a flat
   namespace, independent of which file a name came from" as actual working code. A name collision
-  between two imports currently resolves last-write-wins (`Map.set`'s own default) — no collision
+  between two includes currently resolves last-write-wins (`Map.set`'s own default) — no collision
   reporting designed yet. `doc` itself never needs `@[types]` — matches the decided semantics
   exactly. The loading/collecting logic is shared between both entry points (`collect_type_defs`,
-  called once per source document, whether that's `doc` itself or one of its imports) rather than
+  called once per source document, whether that's `doc` itself or one of its includes) rather than
   duplicated.
 - **Unified resolution**: `anvil_type_resolve(reg, name)` — one function resolving *any* type
   reference (a bare native primitive, bare `enum`, or a registered `types.X` custom type) to the
@@ -426,18 +426,18 @@ opt-in-module build, serving as the concrete precedent for `schema.c` and eventu
 Real compatibility gap found while starting schema.c's sketch: FlyWire's actual, currently-
 generated `assets.meta.anvl` uses lowercase `int32`/`str`/`date` — none of which exist in
 `types.c`'s own six-primitive vocabulary (`Numeric`/`String`/`Bool`/`Object`/`Tuple`/`Array`) or
-its `enum` kind. First instinct was to hardcode these four as hidden, zero-import aliases inside
+its `enum` kind. First instinct was to hardcode these four as hidden, zero-include aliases inside
 `types.c` itself, purely for FlyWire compatibility — rejected. The repo owner's better call: each
 SQL adapter (Postgres, eventually MySQL/SQLite/etc.) gets its *own* real `.types.anvl` file
 (`postgres.types.anvl`, ...) defining `Int32`/`Str`/`Date`/`Bool` as ordinary custom types over
 the native primitives (`Int32 := { type := Numeric; };`, etc.) — needing **zero new code**, since
-`anvil_type_registry_load_from_imports` already resolves exactly this. Generalizes properly
+`anvil_type_registry_load_from_includes` already resolves exactly this. Generalizes properly
 (MySQL's own integer-width quirks, SQLite's dynamic typing, Mongo's non-relational shape each get
 their own file instead of ANVIL guessing one lowest-common-denominator vocabulary) and keeps
 vendor-specific vocabulary out of core entirely.
 
 Consequence, faced directly rather than avoided: this means FlyWire's existing checked-in
-`.meta.anvl` files need regenerating (`type := int32;` → `import "postgres.types.anvl";` +
+`.meta.anvl` files need regenerating (`type := int32;` → `include "postgres.types.anvl";` +
 `type := types.Int32;`) to work against the new `schema.c` — "zero regeneration" (the deciding
 reason for rejecting the hardcoded-alias option one round earlier) doesn't actually hold.
 Resolved as an acceptable, deliberate tradeoff: regeneration was never fully avoidable anyway — a
@@ -489,8 +489,8 @@ the public flat API and `anvil_type_registry.h` — no core parser/resolver chan
   an empty schema) and walks every top-level statement via `anvil_document_get_statements`,
   treating each as a field rule — same "no exceptions" pattern as `anvil_types.c`'s own
   `@[types]` handling. A field's `type :=` (if present) is resolved via `anvil_type_resolve`
-  against a type registry built from the schema document's own imports
-  (`anvil_type_registry_load_from_imports`) — `@[schema]` never implies `types.` access on its
+  against a type registry built from the schema document's own includes
+  (`anvil_type_registry_load_from_includes`) — `@[schema]` never implies `types.` access on its
   own, matching the decided semantics exactly; only the resolved *kind* is copied out, so the
   registry itself doesn't need to outlive the load call. A field with no recognized `type :=`
   (including none at all — a FlyWire-style `pooled` field) is still registered, just with
@@ -540,7 +540,7 @@ own `size := 25;` uses 25, not 17.
 logic itself**:
 
 1. The test fixture (`schema_with_custom_type.anvl`) originally wrote `@[schema, ...]` *before*
-   `import "...";` — a genuine header-ordering violation (`shebang → imports → attributes →
+   `include "...";` — a genuine header-ordering violation (`shebang → includes → attributes →
    body`, per `document-header-scan.md`'s own scanning rules), not a schema.c bug at all. Caught
    immediately as a real parse error (`ANVIL_ERR_HEADER`, "Unexpected token"), not a silent
    misparse.

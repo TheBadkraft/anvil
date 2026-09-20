@@ -175,20 +175,20 @@ static void test_typ05_constraint_null_safety(void) {
 }
 /* ---------------------------------------------------------------------- *
  * TYP06 — types.X resolution: a document that never carries @[types]
- * itself resolves types from its own direct imports
+ * itself resolves types from its own direct includes
  * ---------------------------------------------------------------------- */
-static void test_typ06_load_from_imports(void) {
+static void test_typ06_load_from_includes(void) {
    anvil_document doc = anvil_load(fixture_path("types_consumer.anvl"));
    TestBit.is_not_null(doc, "TYP06: consumer document loaded");
    if (!doc) {
       return;
    }
 
-   anvil_type_registry reg = anvil_type_registry_load_from_imports(doc);
-   TestBit.is_not_null(reg, "TYP06: registry built from imports");
+   anvil_type_registry reg = anvil_type_registry_load_from_includes(doc);
+   TestBit.is_not_null(reg, "TYP06: registry built from includes");
    if (reg) {
       anvil_type_def vin = anvil_type_registry_find(reg, "VIN");
-      TestBit.is_not_null(vin, "TYP06: 'VIN' (from the imported types file) is resolvable");
+      TestBit.is_not_null(vin, "TYP06: 'VIN' (from the includeed types file) is resolvable");
       if (vin) {
          TestBit.is_equal_int(ANVIL_TYPE_STRING, anvil_type_def_get_kind(vin),
                               "TYP06: 'VIN' is kind String");
@@ -203,18 +203,18 @@ static void test_typ06_load_from_imports(void) {
    anvil_dispose(doc);
 }
 /* ---------------------------------------------------------------------- *
- * TYP07 — load_from_imports on a document with no @[types] imports at
+ * TYP07 — load_from_includes on a document with no @[types] includes at
  * all still yields a real, empty registry, not NULL
  * ---------------------------------------------------------------------- */
-static void test_typ07_load_from_imports_empty(void) {
-   TestBit.is_null(anvil_type_registry_load_from_imports(NULL),
-                   "TYP07: load_from_imports(NULL) is NULL");
+static void test_typ07_load_from_includes_empty(void) {
+   TestBit.is_null(anvil_type_registry_load_from_includes(NULL),
+                   "TYP07: load_from_includes(NULL) is NULL");
 
-   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl")); // no imports at all
-   TestBit.is_not_null(doc, "TYP07: document with no imports loaded");
+   anvil_document doc = anvil_load(fixture_path("f01_bare_literal.anvl")); // no includes at all
+   TestBit.is_not_null(doc, "TYP07: document with no includes loaded");
    if (doc) {
-      anvil_type_registry reg = anvil_type_registry_load_from_imports(doc);
-      TestBit.is_not_null(reg, "TYP07: a document with no imports still yields a real registry");
+      anvil_type_registry reg = anvil_type_registry_load_from_includes(doc);
+      TestBit.is_not_null(reg, "TYP07: a document with no includes still yields a real registry");
       if (reg) {
          TestBit.is_null(anvil_type_registry_find(reg, "VIN"),
                          "TYP07: nothing is resolvable from an empty registry");
@@ -319,8 +319,8 @@ int main(void) {
    TestBit.run_ex("TYP03_null_safety", NULL, test_typ03_null_safety, th);
    TestBit.run_ex("TYP04_constraints", NULL, test_typ04_constraints, th);
    TestBit.run_ex("TYP05_constraint_null_safety", NULL, test_typ05_constraint_null_safety, th);
-   TestBit.run_ex("TYP06_load_from_imports", NULL, test_typ06_load_from_imports, th);
-   TestBit.run_ex("TYP07_load_from_imports_empty", NULL, test_typ07_load_from_imports_empty, th);
+   TestBit.run_ex("TYP06_load_from_includes", NULL, test_typ06_load_from_includes, th);
+   TestBit.run_ex("TYP07_load_from_includes_empty", NULL, test_typ07_load_from_includes_empty, th);
    TestBit.run_ex("TYP08_resolve_native", NULL, test_typ08_resolve_native, th);
    TestBit.run_ex("TYP09_resolve_custom_falls_through", NULL,
                   test_typ09_resolve_custom_falls_through, th);

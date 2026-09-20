@@ -1055,7 +1055,7 @@ static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
    text.start = start;
    text.end = Source.at(src);
 
-   // RESERVED keywords (import/using/vars) are illegal as a bare value, same as they are as
+   // RESERVED keywords (include/import/vars) are illegal as a bare value, same as they are as
    // an identifier — true/false/null can never reach here, since parse_reserved_literal
    // already intercepts and classifies them earlier in parse_scalar_value's dispatch chain.
    if (Source.is_keyword(text)) {

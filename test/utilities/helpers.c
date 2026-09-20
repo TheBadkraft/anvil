@@ -130,7 +130,7 @@ module_document setup_amp_doc(const char *buffer, module_context *out_ctx) {
    }
 
    usize size_hint = 0;
-   (void)mod_load_imports(*out_ctx, doc, &size_hint, &err_code);
+   (void)mod_load_includes(*out_ctx, doc, &size_hint, &err_code);
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    mod_ctx_create_arena(*out_ctx, capacity, &err_code);
 

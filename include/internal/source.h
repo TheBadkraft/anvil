@@ -443,7 +443,7 @@ typedef struct anvl_source_i {
     * @brief Check whether a slice's content is one of Anvil's reserved keywords.
     * @param slice The slice to check (e.g. a scanned identifier).
     * @return `true` if the slice matches a reserved keyword exactly; otherwise `false`.
-    * @details Checks against the full reserved set (`import`, `using`, `vars`, `true`, `false`,
+    * @details Checks against the full reserved set (`include`, `import`, `vars`, `true`, `false`,
     * `null`) — callers needing only the value-position subset (`true`/`false`/`null`) match those
     * directly via `match_token` instead, since that check runs against the live cursor before a
     * candidate token is consumed, not against an already-scanned slice.

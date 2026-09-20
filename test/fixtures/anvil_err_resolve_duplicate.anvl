@@ -1,5 +1,5 @@
 #!aml
 
-import "resolver_dup_import.anvl";
+include "resolver_dup_include.anvl";
 
 shared := 2;

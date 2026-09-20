@@ -206,11 +206,11 @@ anvil_schema anvil_schema_load(anvil_document doc) {
    schema->by_name = Map.new(8);
    schema->violations = NULL;
 
-   // types. access comes purely from doc's own imports — @[schema] never implies it, matching
+   // types. access comes purely from doc's own includes — @[schema] never implies it, matching
    // how any other document would resolve types.X. Only needed for the duration of the load
    // pass itself: each field's resolved *kind* is copied out below, so the registry doesn't
    // need to outlive this function.
-   anvil_type_registry types = anvil_type_registry_load_from_imports(doc);
+   anvil_type_registry types = anvil_type_registry_load_from_includes(doc);
 
    anvil_statement_iterator it = anvil_document_get_statements(doc);
    if (it) {

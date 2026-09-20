@@ -5,7 +5,7 @@
 **Complete.** The transition from per-context namespace/doc_map identity to a
 process-wide source-hash registry (`module_document` as the document identity)
 finished — everything under "Completed"/"Completed step 1–6" below shipped,
-and the "Next iteration" pointer at the bottom (header scanning and import
+and the "Next iteration" pointer at the bottom (header scanning and include
 resolution) was itself completed too, along with every phase after it (body
 parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 `resolution-phase.md`. Kept as historical reference below, not rewritten.
@@ -94,7 +94,7 @@ parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 ## Step 5 (deferred)
 
 - Deferred: update parser to take `anvl_source` and emit errors via source
-  interface. The parser will be revisited after document header/import loading
+  interface. The parser will be revisited after document header/include loading
   is defined.
 
 ## Completed step 6 (cleanup)
@@ -107,13 +107,13 @@ parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 
 ## Next iteration
 
-Document header scanning and import resolution (see `document-header-scan.md`):
+Document header scanning and include resolution (see `document-header-scan.md`):
 
 - Define the document header boundary: content from the optional shebang up to
   (but not including) the first valid ANVL statement.
 - Resolve whether module-level attributes (`@[...]`) belong to the header or
   to the statement stream.
-- Design header scanning to collect imports/usings so the loader can build the
+- Design header scanning to collect includes/usings so the loader can build the
   dependency graph before parsing the document body.
 
 ## Decisions
@@ -133,7 +133,7 @@ Document header scanning and import resolution (see `document-header-scan.md`):
 
 A dedicated Source test suite was added in `test/unit/test_source.c` (SRC00–SRC22) to exercise every public `Source` helper before the body parser consumes them. The suite covers create/dispose, buffer/file loading, FNV-1a hash stability, position/line/column tracking, EOF/peek/match helpers, character classification, consume bounds, data/length accessors, whitespace/comment skipping, shebang detection, and registry-backed `has_errors`/`set_error`. All 23 tests pass and are Valgrind-clean.
 
-Shebang parsing was subsequently moved from the header scanner into `Source.from_buffer`/`Source.from_file`. The source object now carries a `has_shebang` flag and advances its position past the shebang line during load, so the header scanner starts on imports/attributes/body rather than re-reading the shebang. File-extension hints are applied only when no shebang is present.
+Shebang parsing was subsequently moved from the header scanner into `Source.from_buffer`/`Source.from_file`. The source object now carries a `has_shebang` flag and advances its position past the shebang line during load, so the header scanner starts on includes/attributes/body rather than re-reading the shebang. File-extension hints are applied only when no shebang is present.
 
 ## Valgrind follow-up
 
