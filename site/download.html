@@ -78,6 +78,22 @@ const doc = anvil.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1</code></pre>
     </div>
 
+    <h2>.NET — C#</h2>
+    <div class="card">
+      <div class="dl-row">
+        <div>
+          <strong>anvil-net-v0.8.0-rc-linux-x64.tar.gz</strong> — a prebuilt managed assembly
+          (<code>Anvil.Net.dll</code>) built directly on Anvil Native's vtable ABI, plus the
+          native library it links against. Linux x64 only today; not yet published to NuGet, so
+          other platforms build from source.
+        </div>
+        <a class="btn secondary" href="/assets/downloads/anvil-net-v0.8.0-rc-linux-x64.tar.gz">Download</a>
+      </div>
+      <pre><code>using var doc = AnvilDocument.Load("config.anvl");
+var server = doc.FindValue("server");
+server["port"].AsInt(); // 8080</code></pre>
+    </div>
+
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
       Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>.
       This is release-candidate software — the format and API are stable enough to build
@@ -86,7 +102,7 @@ doc.get('foo').asInt(); // 1</code></pre>
   </main>
 
   <footer class="site-footer">
-    Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js, WebAssembly, and .NET
     bindings. Alpha/RC software.
   </footer>
 

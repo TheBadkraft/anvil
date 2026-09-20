@@ -1,15 +1,16 @@
 # Bindings
 
 **Anvil Native** — a reference C implementation of the AML/AMP parser — is the one parser behind
-everything below. Nothing here is a separate reimplementation: the Node and WebAssembly bindings
-are thin wrappers over the exact same C source, so a document parses identically no matter which
-one reads it. Pick the one that matches where your code runs.
+everything below. Nothing here is a separate reimplementation: the Node, WebAssembly, and .NET
+bindings are thin wrappers over the exact same C source, so a document parses identically no
+matter which one reads it. Pick the one that matches where your code runs.
 
 | | Runtime | Status |
 |---|---|---|
 | [Native library](Bindings-Guide.md#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
 | [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | Downloadable today |
 | [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | Downloadable today |
+| [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
 
 ## Native library
 
@@ -177,3 +178,103 @@ before any other call.
 
 Returns the underlying Anvil Native version string (e.g. `"0.8.0+89-rc"`) — a toolchain sanity
 check, not a compatibility contract to branch logic on.
+
+## .NET
+
+**[Download anvil-net-v0.8.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.8.0-rc-linux-x64.tar.gz)**
+— a prebuilt managed assembly (`Anvil.Net.dll`) plus the native library it links against.
+Verified standalone: extracted to a clean directory with nothing else present, referenced
+directly by a fresh console project, parsed real source correctly.
+
+Shaped differently from the two bindings above on purpose: Node/WASM boundary crossings are
+genuinely expensive (V8's object model, `cwrap`/`ccall` overhead), so both convert a whole parsed
+document to JSON and cross the boundary once. P/Invoke doesn't have that problem — a call with
+blittable types costs tens of nanoseconds — so this binding does real, lazy, on-demand navigation
+instead: every accessor below is a direct call into Anvil Native's vtable ABI
+(`anvil_vtable.h`), resolved once at startup into cached delegates, nothing pre-materialized into
+a tree.
+
+### Requirements
+
+- .NET 9 runtime or later (`net9.0` target; a newer major runtime works too via roll-forward, e.g.
+  `<RollForward>LatestMajor</RollForward>`).
+- Linux x64 (glibc) only today. Other platforms build from source (`make so-release` in
+  `vendor/anvil`'s `v0.8.0-rc` tag or later, then `dotnet build`) — not yet published to NuGet, so
+  building means pointing at a real checkout, not `dotnet add package`.
+- No other runtime dependencies once built.
+
+```csharp
+using Anvil.Net;
+
+using var doc = AnvilDocument.Load("config.anvl");
+if (doc is null || doc.HasErrors)
+{
+    Console.WriteLine($"Failed: {doc?.Error?.Message} at {doc?.Error?.Line}:{doc?.Error?.Column}");
+    return;
+}
+
+if (doc.FindValue("server") is { Type: AnvilValueType.Object } server)
+{
+    string? host = server["host"]?.AsString();
+    int? port = server["port"]?.AsInt();
+}
+
+foreach (var stmt in doc.Statements)
+    Console.WriteLine($"{stmt.Name}: {stmt.Value?.Type}");
+```
+
+`Load`/`LoadBuffer`/`ParseValueFragment` never throw on a syntax error — they return a document
+whose `HasErrors` is `true`. `using`/`Dispose()` releases the native document deterministically;
+the whole object graph (`AnvlValue`, `AnvlStatement`, `AnvilAttribute`) is a lightweight,
+non-disposable view tied to that document's lifetime — never valid after it's disposed.
+
+### `AnvilDocument` — the one disposable root
+
+| Member | Returns | Notes |
+|---|---|---|
+| `AnvilDocument.Load(path)` | `AnvilDocument?` | `null` only on a hard I/O failure (missing file); a syntax error still returns a document with `HasErrors == true`. |
+| `AnvilDocument.LoadBuffer(source)` | `AnvilDocument?` | Same contract, from an in-memory string. |
+| `AnvilDocument.ParseValueFragment(text)` | `AnvilDocument?` | Parses a single, standalone value expression — see `FragmentValue` below. |
+| `.HasErrors` / `.ErrorCategory` / `.Error` | `bool` / `AnvilErrorCode` / `AnvilError?` | `.Error` gives message/line/column; `.ErrorCategory` alone is cheaper when you only need to branch on the failure kind. |
+| `.FindStatement(name)` | `AnvlStatement?` | Root-level lookup by name — the whole declaration (name, value, its own `@[...]` attributes). |
+| `.FindValue(name)` | `AnvlValue?` | Convenience one-hop equivalent of `FindStatement(name)?.Value`. |
+| `.Statements` / `.Includes` | `IEnumerable<AnvlStatement>` / `IEnumerable<AnvilDocument>` | Declaration order. Each yielded `Includes` document is independently `IDisposable`. |
+| `.Attributes` / `.FindAttribute(key)` | document-level `@[...]` attributes, same shape as a statement's own (below). |
+
+### `AnvlValue` — type inspection and navigation
+
+| Member | Returns | Notes |
+|---|---|---|
+| `.Type` | `AnvilValueType` | `Null \| Bool \| Numeric \| String \| Blob \| Identifier \| Array \| Tuple \| Object` — finer-grained than the Node/WASM bindings' `.type`, which collapses several of these into one `'scalar'` kind. |
+| `.Count` | `int` | Field count for an object, element count for an array/tuple, `0` otherwise. |
+| `this[int index]` | `AnvlValue?` | Array/tuple element by position; `null` if out of bounds or not array/tuple-shaped. |
+| `this[string key]` | `AnvlValue?` | Object field's value directly, not the statement. `null` if `key` isn't present or this isn't object-shaped. |
+| `.Has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
+| `.Entries()` | `IEnumerable<KeyValuePair<string, AnvlValue>>` | Declaration order. Empty for a non-object value. |
+| `.AsString()` / `.AsBool()` / `.AsInt()` | `string?` / `bool?` / `int?` | Each `null` unless `.Type` matches exactly (`String` / `Bool` / `Numeric`); `AsInt()` truncates toward zero. |
+
+### `AnvlStatement` and `AnvilAttribute`
+
+| Member | Returns | Notes |
+|---|---|---|
+| `AnvlStatement.Name` / `.Value` | `string` / `AnvlValue?` | The declaration's name and the value it's assigned. |
+| `AnvlStatement.Attributes` / `.FindAttribute(key)` | `IReadOnlyList<AnvilAttribute>` / `AnvilAttribute?` | This statement's own `@[...]` attributes. |
+| `AnvilAttribute.Key` / `.Value` | `string` / `string?` | `.Value` is `null` specifically for a flag attribute (`@[active]`, no `=value`). |
+
+### `ParseValueFragment` / `FragmentValue` — for when you already know the shape
+
+Equivalent to `parseRawValue()` on the Node/WASM bindings, but returns a real `AnvlValue` rather
+than a plain JS value — no enclosing document/statement context required:
+
+```csharp
+using var frag = AnvilDocument.ParseValueFragment("[(1,2,3),(4,5,6)]");
+if (frag?.FragmentValue is { Type: AnvilValueType.Array } rows)
+{
+    int? first = rows[0]![0]!.AsInt(); // 1 -- rows[0] is the Tuple, [0] its first element
+}
+```
+
+### `AnvilDocument.GetVersion()`
+
+Returns the underlying Anvil Native version string (e.g. `"0.8.0+127-rc"`) — same toolchain
+sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility contract.
