@@ -135,7 +135,7 @@ size_t anvil_error_get_column(anvil_error err);
  * @return The statement handle, or NULL if doc/name is NULL, doc failed to
  * load, or no top-level statement has that name.
  */
-anvil_statement anvil_statement_get(anvil_document doc, const char *name);
+anvil_statement anvil_document_find_statement(anvil_document doc, const char *name);
 
 /**
  * @brief A heapless cursor over this document's own top-level statements, in
@@ -281,6 +281,20 @@ anvil_value anvil_value_get_element(anvil_value val, size_t index);
  * out of bounds.
  */
 anvil_statement anvil_value_get_statement(anvil_value val, size_t index);
+
+/**
+ * @brief The statement named `key` in an OBJECT's nested field list.
+ * Transparent through a resolved VarRef. Mirrors
+ * anvil_document_find_statement's by-name-lookup contract, one level down —
+ * the missing sibling to anvil_value_get_statement's positional access, the
+ * same get/find pairing anvil_document_get_attribute/find_attribute already
+ * has.
+ * @param val The object to search.
+ * @param key The field's declared name.
+ * @return The statement handle, or NULL if val isn't an OBJECT, val/key is
+ * NULL, or no field has that name.
+ */
+anvil_statement anvil_value_find_statement(anvil_value val, const char *key);
 
 /**
  * @brief The value parsed by anvil_parse_value_fragment.

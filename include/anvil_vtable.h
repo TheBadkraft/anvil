@@ -46,7 +46,6 @@ typedef struct anvil_i {
 extern const anvil_i Anvil;
 
 typedef struct anvil_statement_i {
-   anvil_statement (*get)(anvil_document doc, const char *name);
    anvil_value (*get_value)(anvil_statement stmt);
    size_t (*get_name)(anvil_statement stmt, char *buf, size_t buflen);
    size_t (*get_attribute_count)(anvil_statement stmt);
@@ -59,6 +58,7 @@ typedef struct anvil_document_i {
    size_t (*get_attribute_count)(anvil_document doc);
    anvil_attribute (*get_attribute)(anvil_document doc, size_t index);
    anvil_attribute (*find_attribute)(anvil_document doc, const char *key);
+   anvil_statement (*find_statement)(anvil_document doc, const char *name);
    anvil_value (*get_fragment_value)(anvil_document doc);
    anvil_statement_iterator (*get_statements)(anvil_document doc);
    anvil_document_iterator (*get_includes)(anvil_document doc);
@@ -98,5 +98,6 @@ typedef struct anvil_value_i {
    size_t (*get_count)(anvil_value val);
    anvil_value (*get_element)(anvil_value val, size_t index);
    anvil_statement (*get_statement)(anvil_value val, size_t index);
+   anvil_statement (*find_statement)(anvil_value val, const char *key);
 } anvil_value_i;
 extern const anvil_value_i Value;

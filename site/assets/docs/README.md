@@ -24,7 +24,7 @@ server := {
 #include "anvil_flat.h"
 
 anvil_document doc = anvil_load_buffer(source, source_len);
-anvil_statement stmt = anvil_statement_get(doc, "server");
+anvil_statement stmt = anvil_document_find_statement(doc, "server");
 ```
 
 The same document parses the same way through every binding — see [Bindings](Bindings-Guide.md)

@@ -349,7 +349,7 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
          continue;
       }
 
-      anvil_statement data_stmt = anvil_statement_get(data_doc, field->name);
+      anvil_statement data_stmt = anvil_document_find_statement(data_doc, field->name);
       if (!data_stmt) {
          if (field->required) {
             add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,

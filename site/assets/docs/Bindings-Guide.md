@@ -35,7 +35,7 @@ if (anvil_has_errors(doc)) {
     anvil_error err = anvil_document_get_error(doc);
     /* err's message/line/column */
 } else {
-    anvil_statement stmt = anvil_statement_get(doc, "host");
+    anvil_statement stmt = anvil_document_find_statement(doc, "host");
     /* anvil_statement_get_value(stmt), etc. */
 }
 anvil_dispose(doc);
