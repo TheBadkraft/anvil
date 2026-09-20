@@ -112,8 +112,27 @@ or public-surface change there.
   shipped, under their real names at the time. Only the current/unreleased section was updated to
   track today's real symbol names.
 
+## Follow-up — `anvil.node`/`anvil.wasm` vendored-source bumps
+
+Both bindings compile Anvil Native from source via a pinned `vendor/anvil` git submodule (no
+released/versioned library to depend on yet), so this rename didn't reach either one automatically.
+Scoped directly before touching anything (read-only pass per repo): neither repo's own test suite,
+fixtures, or embedded ANVL string literals use `import`/`include` syntax at all — only the
+vendored submodule pin itself was stale (both pinned to `06f2d0f8`, 9 commits behind this rename).
+
+Fixed identically in both, matching each repo's own established "bump vendored anvil" commit
+convention (five prior examples in `anvil-node` alone):
+- **`anvil-node`**: submodule bumped to `52f29bf`, rebuilt via `node-gyp rebuild`, full suite
+  re-run — 34/34 pass. Commit `97d1ad9`.
+- **`anvil-wasm`**: submodule bumped to `52f29bf`, rebuilt via Emscripten on the Linode build host
+  (the only place `emcc` is available), full suite re-run there directly — 37/37 pass. Commit
+  `1422659`.
+
+No test or fixture content needed rewriting in either repo — this was a pure vendored-source
+refresh, not a consumer-code change.
+
 ## Resolution
 
-Renamed across every scope listed above; full regression green and Valgrind-clean. Historical
-records preserved. A parallel `anvil.net` rename is flagged as a recommended, separate follow-up
-decision — not committed to here.
+Renamed across every scope listed above; full regression green and Valgrind-clean, in Anvil Native
+itself and in both bindings that vendor it. Historical records preserved. A parallel `anvil.net`
+rename is flagged as a recommended, separate follow-up decision — not committed to here.
