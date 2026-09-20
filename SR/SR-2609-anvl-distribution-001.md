@@ -91,7 +91,43 @@ zero manual steps (needs the registry or an HTTPS tarball URL, not FTP), versus 
 manual-download-and-place step being acceptable for now (FTP, or any static host, is fine for
 that).
 
+## Update 2026-09-20 — the hosting half of this is already done; two things remain
+
+Checked directly, not assumed: `anvldata.com` is already a real HTTPS static host (Cloudflare,
+deployed via `wrangler`), and it's already serving both artifacts this SR asks about —
+`anvil-node-v0.8.0-rc-linux-x86_64.tar.gz` (a prebuilt N-API addon, not source needing a compile
+step) and `anvil-wasm-v0.8.0-rc.tar.gz` — confirmed live with `curl -I`, both `200`. **The
+`ftp.anvldata.com` idea floated above should be dropped in favor of what's already running**: per
+the npm-resolver analysis above, HTTPS tarball URLs work as real dependency specifiers and FTP
+doesn't, so standing up FTP alongside an HTTPS host that already exists and already works would be
+strictly worse, not a real option to weigh against it.
+
+That reframes what's actually still open into two narrower, concrete gaps:
+
+1. **The published tarballs aren't shaped as npm packages.** Verified directly — pointed a real
+   `package.json` dependency at the live `anvil-wasm-v0.8.0-rc.tar.gz` URL and ran `npm install`:
+   the fetch itself succeeds (`GET 200`, no protocol issue, confirming the HTTPS analysis above),
+   but reification then fails (`ENOENT ... package.json`) because the tarball has no
+   `package.json` inside it at all — it's a generic distributable (`README.md`, `index.js`,
+   `anvil.wasm`, `anvil.js`), not an npm-shaped package (conventionally a `package/` root
+   directory containing a real `package.json`). Fixable without re-hosting anything: add a
+   `package.json` (name/version/main pointing at `index.js`) to what gets tarred, matching what
+   `npm pack` would produce from `anvil-wasm`'s own `package.json` today.
+2. **`anvil-node`'s prebuilt addon is still Linux x86_64 only.** Real fix for broad
+   installability, as originally framed: `prebuildify`-style multi-platform binaries, most
+   naturally produced by the Linode CI this project already plans to build out, uploaded to
+   `anvldata.com` alongside the existing tarball rather than requiring a compiler on the
+   consumer's machine.
+
+Registry publish (real `npm install anvil-wasm@x.y.z`, versioning, integrity hashes) is still the
+better long-term answer per the original analysis above — this update doesn't change that, it just
+narrows what's blocking the nearer-term "point a `package.json` dependency at an HTTPS URL" path
+that's achievable without a registry account at all.
+
 ## Verification
 
-Not applicable yet — this is an open request, not a resolution. No implementation work has started
-on either side.
+- `curl -I` against both live tarball URLs on `anvldata.com`: `200`.
+- `npm install` against a `package.json` dependency pointing at the live `anvil-wasm` tarball URL:
+  fetch succeeds, reification fails on the missing `package.json` inside the tarball (see above) —
+  reproduced directly, not assumed.
+- Otherwise not applicable yet — no fix has been implemented on either side.
