@@ -124,10 +124,35 @@ better long-term answer per the original analysis above — this update doesn't 
 narrows what's blocking the nearer-term "point a `package.json` dependency at an HTTPS URL" path
 that's achievable without a registry account at all.
 
+## Correction 2026-09-20 (flywire) — the bare filenames above aren't the real URLs
+
+Re-verified independently before acting on this update: `curl -I` against the bare root paths this
+document names (`https://anvldata.com/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz`,
+`https://anvldata.com/anvil-wasm-v0.8.0-rc.tar.gz`) returns `404`, not `200`. The site's own
+`wrangler.toml` serves the whole `site/` directory as `[assets] directory = "."`, and both files
+actually live under `site/assets/downloads/` in the repo — so the real, live URLs are:
+
+- `https://anvldata.com/assets/downloads/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz`
+- `https://anvldata.com/assets/downloads/anvil-wasm-v0.8.0-rc.tar.gz`
+
+Both confirmed `200` at the corrected paths (`curl -I`, done directly, not assumed). The
+substantive claim above — that hosting is live and working — holds; only the path written in this
+document was wrong. Worth being exact about before any `package.json` (in `flywire-protocol` or
+elsewhere) gets pointed at either URL as a real dependency, since the bare-root form would fail
+silently for anyone who copied it as written.
+
+The tarball-shape finding also independently re-verified: downloaded the live `anvil-wasm`
+tarball directly and inspected it (`tar -tzf`) — contents are exactly
+`anvil-wasm-v0.8.0-rc/{README.md,index.js,anvil.wasm,anvil.js}`, no `package.json` anywhere inside,
+confirming gap #1 above as written.
+
 ## Verification
 
-- `curl -I` against both live tarball URLs on `anvldata.com`: `200`.
+- `curl -I` against both live tarball URLs on `anvldata.com`: `200` — at
+  `/assets/downloads/<filename>`, not the bare root path (see Correction above).
 - `npm install` against a `package.json` dependency pointing at the live `anvil-wasm` tarball URL:
   fetch succeeds, reification fails on the missing `package.json` inside the tarball (see above) —
   reproduced directly, not assumed.
+- `tar -tzf` on the downloaded `anvil-wasm` tarball: confirmed no `package.json` present, matching
+  gap #1 above.
 - Otherwise not applicable yet — no fix has been implemented on either side.
