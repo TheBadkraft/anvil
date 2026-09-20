@@ -754,15 +754,15 @@ static void test_cr20_mod_ctx_arena_size_hint(void) {
 }
 /* ---------------------------------------------------------------------- *
  * CR21 — full sequencing: header scan through arena creation, one real
- * multi-document import graph, no orchestration function exists yet so this
+ * multi-document include graph, no orchestration function exists yet so this
  * test chains the real pieces manually, exactly as the eventual production
- * sequencing point (mod_load_imports -> mod_ctx_arena_size_hint ->
+ * sequencing point (mod_load_includes -> mod_ctx_arena_size_hint ->
  * mod_ctx_create_arena) will. RED until CR20's stub is implemented — nothing
  * else in this chain needs to change for this test to go GREEN.
  * ---------------------------------------------------------------------- */
 static void test_cr21_full_sequencing_arena_ready(void) {
    module_context ctx = NULL;
-   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   module_document root = setup_registered_file("hdr_include_diamond.anvl", &ctx);
    TestBit.is_not_null(root, "CR21: root document loaded");
    if (!root) {
       return;
@@ -773,11 +773,11 @@ static void test_cr21_full_sequencing_arena_ready(void) {
                         "CR21: root header scan returns OK");
 
    usize size_hint = 0;
-   TestBit.is_equal_int(ANVL_RES_OK, mod_load_imports(ctx, root, &size_hint, &err_code),
-                        "CR21: load imports returns OK");
+   TestBit.is_equal_int(ANVL_RES_OK, mod_load_includes(ctx, root, &size_hint, &err_code),
+                        "CR21: load includes returns OK");
    TestBit.is_equal_int(3, (long long)List.size(ctx->docs),
                         "CR21: three documents registered (root + base + types)");
-   TestBit.is_true(size_hint > 0, "CR21: size hint is non-zero after loading the import graph");
+   TestBit.is_true(size_hint > 0, "CR21: size hint is non-zero after loading the include graph");
 
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    TestBit.is_equal_int(ANVL_RES_OK, mod_ctx_create_arena(ctx, capacity, &err_code),
@@ -791,13 +791,13 @@ static void test_cr21_full_sequencing_arena_ready(void) {
  * the graph, not just the root: allocate a statement via the root's source
  * and a value via a child document's source, both landing on the same
  * shared ctx->statements/ctx->values indexes. This is the concrete proof
- * that "one arena, shared across the whole import graph" (the design
+ * that "one arena, shared across the whole include graph" (the design
  * decision behind putting the arena on module_context, not module_document)
  * actually holds. RED until CR20's stub is implemented.
  * ---------------------------------------------------------------------- */
 static void test_cr22_ready_for_parser_new_node(void) {
    module_context ctx = NULL;
-   module_document root = setup_registered_file("hdr_import_diamond.anvl", &ctx);
+   module_document root = setup_registered_file("hdr_include_diamond.anvl", &ctx);
    TestBit.is_not_null(root, "CR22: root document loaded");
    if (!root) {
       return;
@@ -807,7 +807,7 @@ static void test_cr22_ready_for_parser_new_node(void) {
    doc_scan_header(root, &err_code);
 
    usize size_hint = 0;
-   mod_load_imports(ctx, root, &size_hint, &err_code);
+   mod_load_includes(ctx, root, &size_hint, &err_code);
 
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    mod_ctx_create_arena(ctx, capacity, &err_code);
@@ -819,7 +819,7 @@ static void test_cr22_ready_for_parser_new_node(void) {
 
    module_document child = NULL;
    List.get(ctx->docs, 1, (object *)&child);
-   TestBit.is_not_null(child, "CR22: a child document is available from the loaded import graph");
+   TestBit.is_not_null(child, "CR22: a child document is available from the loaded include graph");
 
    err_code = ANVL_ERR_NONE;
    void *stmt = Source.new_node(root->source, ANVL_NODE_STATEMENT, &err_code);

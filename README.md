@@ -54,7 +54,7 @@ where a blob starts and how long it is, then moves on without reading a single b
 Under adversarial conditions — heap dump, memory probe, fuzzer, timing side-channel — the parser
 cannot expose payload data because it holds none.
 
-AMP forbids objects, attributes, inheritance, and imports outright, rejected at parse time with
+AMP forbids objects, attributes, inheritance, and includes outright, rejected at parse time with
 no separate runtime guard layer.
 
 ### Weakly Typed by Default. Strongly Typed When You Opt In.
@@ -62,7 +62,7 @@ no separate runtime guard layer.
 AML/AMP's default is a weak type system — `foo := 42;` is just a numeric value with no declared
 shape. On top of that, Anvil now has a native, opt-in type system: define a reusable, named,
 constrained type once (`VIN := { type := String; size := 17; };`), reference it from anywhere
-that imports the file that defines it. Nothing about opting in changes the default for anyone who
+that includes the file that defines it. Nothing about opting in changes the default for anyone who
 doesn't. See [`docs/types-reference.md`](docs/types-reference.md) for the full reference.
 
 Schema (validating a *data* document's shape against declared field types) builds on the same
@@ -221,7 +221,7 @@ Native parse a typical config," in isolation.
 - [`docs/getting-started.md`](docs/getting-started.md) — practical, task-oriented walkthrough of
   the C API: load a document, read what's in it, clean up.
 - [`docs/language-reference.md`](docs/language-reference.md) — the full language reference:
-  dialects, document/value grammar, attributes, inheritance, imports, weak typing, errors, and
+  dialects, document/value grammar, attributes, inheritance, includes, weak typing, errors, and
   the public C API/bindings surface.
 - [`docs/types-reference.md`](docs/types-reference.md) — the opt-in type system: how to define
   types, the native primitive vocabulary, enums, cross-file resolution.

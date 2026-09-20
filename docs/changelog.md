@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v0.8.0-rc] — (2026-08-17 – 2026-09-13)
+## [v0.8.0-rc] — (2026-08-17 – 2026-09-19)
 
 **Status:** ANVL proper (core parser + resolver, opt-in types, AnvilSchema) is feature-complete
 and builds as a real distributable library. Minor bump, not a patch: opt-in types, AnvilSchema,
@@ -61,16 +61,16 @@ account. Everything from native schema/opt-in types onward is current work, docu
 
 ### Added — Native schema foundation & opt-in types (current)
 
-- **Document import iterator** (`anvil_document_get_imports`/`anvil_document_iterator_*`) —
-  closes the gap where the public API could load and resolve an import graph but never expose an
-  imported document's own statements/attributes from outside core.
+- **Document include iterator** (`anvil_document_get_includes`/`anvil_document_iterator_*`) —
+  closes the gap where the public API could load and resolve an include graph but never expose an
+  included document's own statements/attributes from outside core.
 - **`anvil_statement_get_value` now supports anonymous `OBJECT_BLOCK` statements** (`ident { ... };`,
   not just `ident := { ... };`) — both forms are now indistinguishable through the accessor,
   matching how they're already treated identically everywhere else.
 - **Opt-in type registry — full first phase** (`src/anvil_types.c`, part of ANVL proper, not an
   add-on): `@[types]`-gated loading, the six native primitives + `enum`, constraint fields
-  (`size`/`min`/`max`/`values`), cross-file `types.X` resolution via a document's own imports
-  (`anvil_type_registry_load_from_imports`), and `anvil_type_resolve` — one function resolving
+  (`size`/`min`/`max`/`values`), cross-file `types.X` resolution via a document's own includes
+  (`anvil_type_registry_load_from_includes`), and `anvil_type_resolve` — one function resolving
   any type reference (native, `enum`, or custom) to a uniform, queryable handle.
 - **Sigma FR-2603-sigma-collections-007 + 011** — opt-in per-instance allocator override for
   `List`/`Collection`, and an arena-backed `Stack` built on top of it for the eventual AnvilScript
@@ -179,7 +179,7 @@ Native and one spanning both native bindings' own conversion layers:
   ship a corrupted library with a mismatched vtable layout.
 - **BR-2609-anvl-003**: even after -002, a real-harness crossover remained at scale — traced to
   `source_from_buffer`'s FNV-1a content hash, computed unconditionally on every load (root
-  documents and AMP documents included, neither of which can ever need it for import dedup).
+  documents and AMP documents included, neither of which can ever need it for include dedup).
   Made the hash itself ~8x faster (word-wise instead of byte-wise) rather than touching the
   registration logic that depends on it.
 - **BR-2609-anvl-004**: a different FlyWire wire shape (`@table`, many small values rather than
@@ -211,6 +211,31 @@ through `-004.md` and `notes/flywire-parse-scaling-benchmark.md`.
 - `FR-2603-sigma-collections-006` and `-007`'s status lines were still naming feature branches
   as "awaiting merge/review" — both were confirmed already merged into `main` (`8acacfb`,
   `2a4ad98`); corrected to plain `resolved`.
+
+### Changed — `import` renamed to `include`; `import` reserved for AnvilScript (FR-2609-anvl-public-api-002)
+
+- **AML's `import "path.anvl";` is now `include "path.anvl";`** — same mechanism (DAG resolution,
+  cycle detection, diamond dedup, forbidden in AMP), only the keyword changed. `import` is freed
+  for AnvilScript's own foreign-code-bridge construct (`import "c:anvil.std.math";` and similar),
+  renamed from `using` for the same reason — the word `import` reads as the cross-industry
+  standard for "pull in a module, foreign ones included," where `using` read too much like C#'s
+  own same-language namespace directive.
+- **Public API renamed to match**: `anvil_document_get_imports`→`anvil_document_get_includes`,
+  `anvil_type_registry_load_from_imports`→`anvil_type_registry_load_from_includes`, vtable field
+  and error codes (`ANVIL_ERR_IMPORT`→`ANVIL_ERR_INCLUDE`, `ANVL_ERR_IMPORT_*`→
+  `ANVL_ERR_INCLUDE_*`, same numeric values) renamed alongside.
+- **Keyword reservation swapped consistently**: `import` is now reserved ahead of AnvlScript's own
+  grammar (not yet implemented), matching this codebase's existing "reserve ahead of the feature"
+  policy that `using`/`vars` already used — `using` is now fully freed, no longer reserved for
+  anything.
+- Full test suite renamed and re-verified: 14/14 suites green, Valgrind-clean. A real,
+  pre-existing latent buffer-overflow bug in `test_header.c` (a fixed-size buffer with no room for
+  `Source.substring`'s null terminator, silently off-by-one with the old 6-character `import`)
+  surfaced and was fixed once the equivalent content grew by one character to `include`.
+- AnvilScript's design docs (`notes/anvilscript-design.md` and friends) reconciled to the new
+  scheme — this also resolved a genuine pre-existing ambiguity where ASL's `import` was described
+  as literally reusing AML's mechanism verbatim; the two are now unambiguously distinct.
+- Full detail: `FR/FR-2609-anvl-public-api-002.md`.
 
 ---
 

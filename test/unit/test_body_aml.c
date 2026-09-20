@@ -9,7 +9,7 @@
  * ---------------------------------------------------------------------- *
  * Only what AML adds beyond AMP: tuple, object-as-value, static          *
  * references, OBJECT_BLOCK (namespace / immutable / inheritance), and    *
- * import. Scalar/array assignment is already proven by test_body_amp.c   *
+ * include. Scalar/array assignment is already proven by test_body_amp.c   *
  * and behaves identically here, so it isn't re-tested. See               *
  * notes/document-body-parse.md.                                          *
  *                                                                        *
@@ -37,7 +37,7 @@ static void th(void) {
    Registry.clear();
 }
 
-/* Loads a fixture through header-scan + import-loading, ready for doc_parse_body. */
+/* Loads a fixture through header-scan + include-loading, ready for doc_parse_body. */
 static module_document setup_aml_doc(const char *fixture_name, module_context *out_ctx) {
    module_document doc = setup_registered_file(fixture_name, out_ctx);
    if (!doc) {
@@ -48,7 +48,7 @@ static module_document setup_aml_doc(const char *fixture_name, module_context *o
       return doc;
    }
    usize size_hint = 0;
-   (void)mod_load_imports(*out_ctx, doc, &size_hint, &err_code);
+   (void)mod_load_includes(*out_ctx, doc, &size_hint, &err_code);
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    mod_ctx_create_arena(*out_ctx, capacity, &err_code);
    return doc;
@@ -406,18 +406,18 @@ static void test_aml10_bare_base_statement(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * AML11 — import + static reference into the flat merged namespace
- * (f13_import.anvl)
+ * AML11 — include + static reference into the flat merged namespace
+ * (f13_include.anvl)
  * ---------------------------------------------------------------------- */
-static void test_aml11_import_and_static_reference(void) {
+static void test_aml11_include_and_static_reference(void) {
    module_context ctx = NULL;
-   module_document doc = setup_aml_doc("f13_import.anvl", &ctx);
+   module_document doc = setup_aml_doc("f13_include.anvl", &ctx);
    TestBit.is_not_null(doc, "AML11: document loaded");
    if (!doc) {
       return;
    }
-   TestBit.is_equal_int(1, (long long)List.size(doc->header->imports),
-                        "AML11: one import captured at header scan");
+   TestBit.is_equal_int(1, (long long)List.size(doc->header->includes),
+                        "AML11: one include captured at header scan");
 
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_parse_body(doc, &err_code);
@@ -687,7 +687,7 @@ int main(void) {
    TestBit.run_ex("AML09_unterminated_object_block", NULL, test_aml09_unterminated_object_block,
                   th);
    TestBit.run_ex("AML10_bare_base_statement", NULL, test_aml10_bare_base_statement, th);
-   TestBit.run_ex("AML11_import_and_static_reference", NULL, test_aml11_import_and_static_reference,
+   TestBit.run_ex("AML11_include_and_static_reference", NULL, test_aml11_include_and_static_reference,
                   th);
    TestBit.run_ex("AML12_attributes_on_assign", NULL, test_aml12_attributes_on_assign, th);
    TestBit.run_ex("AML13_nested_collections", NULL, test_aml13_nested_collections, th);

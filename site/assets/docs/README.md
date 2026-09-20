@@ -35,7 +35,7 @@ for the Node.js/WebAssembly/native-C equivalents of the snippet above.
 - **[Getting Started](getting-started.md)** — task-oriented C API walkthrough: load a document,
   read what's in it, clean up. Every example compiled and run against the real parser.
 - **[Language Reference](language-reference.md)** — the full grammar: dialects, statement/value
-  forms, attributes, inheritance, imports, weak typing, errors, and the public C API/bindings
+  forms, attributes, inheritance, includes, weak typing, errors, and the public C API/bindings
   surface.
 - **[Types](types-reference.md)** — the opt-in type system: native primitives, `enum`,
   constraints, cross-file `types.X` resolution.

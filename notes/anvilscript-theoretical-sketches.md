@@ -7,7 +7,7 @@ This note collects concrete-but-speculative examples for AnvilScript built-ins, 
 ```anvs
 #!anvs
 
-using "c:anvil.std.math";
+import "c:anvil.std.math";
 
 abs (x) => {
     return math._abs(x);
@@ -35,7 +35,7 @@ The `_abs` and `_floor` functions are host callbacks registered from the C stand
 ```anvs
 #!anvs
 
-using "c:anvil.std.time";
+import "c:anvil.std.time";
 
 now () => {
     return time._monotonic_now();
@@ -53,7 +53,7 @@ elapsed (start) => {
 ```anvs
 #!anvs
 
-using "c:anvil.std.io";
+import "c:anvil.std.io";
 
 print (value) => {
     io._print(value.as_string());
@@ -71,7 +71,7 @@ print_line (value) => {
 ```anvs
 #!anvs
 
-using "c:anvil.std.collections";
+import "c:anvil.std.collections";
 
 new () => {
     return list._new();
@@ -105,7 +105,7 @@ at (l, index) => {
 ```anvs
 #!anvs
 
-using "c:anvil.std.collections";
+import "c:anvil.std.collections";
 
 new () => {
     return dict._new();
@@ -194,7 +194,7 @@ AnvilScript source can be precompiled to `.anvlo` in the same way ANVL documents
 
 - the module's function registry entries;
 - a serialized runtime AST for each function body;
-- the namespace bindings produced by `import`/`using`;
+- the namespace bindings produced by `include`/`import`;
 - source-span metadata for error reporting.
 
 Loading an `.anvlo` bypasses parsing for the body AST but still requires the runtime to set up the same registry and stack state. Built-in modules can therefore ship either as `.anvs` source or as `.anvlo` compiled objects without changing how callers use them.

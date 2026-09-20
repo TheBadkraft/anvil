@@ -29,7 +29,7 @@ module_document setup_registered_doc(const char *, module_context *);
 /* Load a fixture file and register it as a document. Returns the document and sets out_ctx. */
 module_document setup_registered_file(const char *, module_context *);
 
-/* Loads an AMP buffer through header-scan + import-loading, ready for doc_parse_body. */
+/* Loads an AMP buffer through header-scan + include-loading, ready for doc_parse_body. */
 module_document setup_amp_doc(const char *, module_context *);
 
 /* Formats parse metrics as "N bytes in X ms (Y MB/s)" and hands it to TestBit.log(),

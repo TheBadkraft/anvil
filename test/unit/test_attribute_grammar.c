@@ -41,7 +41,7 @@ static void th(void) {
    Registry.clear();
 }
 
-/* Loads a buffer through header-scan + import-loading + arena creation,
+/* Loads a buffer through header-scan + include-loading + arena creation,
  * ready for doc_parse_body — the buffer-based counterpart to
  * test_body_aml.c's setup_aml_doc, needed here since every statement-level
  * case is a short inline buffer rather than a fixture file. */
@@ -55,7 +55,7 @@ static module_document setup_attr_stmt_doc(const char *buffer, module_context *o
       return doc;
    }
    usize size_hint = 0;
-   (void)mod_load_imports(*out_ctx, doc, &size_hint, &err_code);
+   (void)mod_load_includes(*out_ctx, doc, &size_hint, &err_code);
    usize capacity = mod_ctx_arena_size_hint(size_hint);
    mod_ctx_create_arena(*out_ctx, capacity, &err_code);
    return doc;

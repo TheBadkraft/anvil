@@ -8,20 +8,20 @@ Resolution is the fourth and final phase of the document pipeline:
 
 ```
 1. Header scan     — doc_scan_header
-2. Import loading  — mod_load_imports
+2. Include loading  — mod_load_includes
 3. Body parse      — doc_parse_body
 4. Resolution      — this note
 ```
 
-It runs once, post-parse - after every document in the import graph has been body-parsed — not per-document, and not in any particular order (see "Why document processing order doesn't matter" below).
+It runs once, post-parse - after every document in the include graph has been body-parsed — not per-document, and not in any particular order (see "Why document processing order doesn't matter" below).
 
 ## Design sketch: a global identifier map, not order-dependent traversal
 
-`derived : base { ... };` resolves by looking `base` up in a map that's already complete by the time any resolution happens, because Resolution is a _post-parse process_, after every document in the import graph has been body-parsed. As long as that phase boundary holds — all bodies parsed before any resolving begins — order among documents doesn't matter; the resolver only fails when a lookup misses, never because of processing order.
+`derived : base { ... };` resolves by looking `base` up in a map that's already complete by the time any resolution happens, because Resolution is a _post-parse process_, after every document in the include graph has been body-parsed. As long as that phase boundary holds — all bodies parsed before any resolving begins — order among documents doesn't matter; the resolver only fails when a lookup misses, never because of processing order.
 
 **Confirmed shape for the map itself** (settled while designing VarRef resolution, below — this piece is no longer a sketch): one `map identifiers` (Sigma's `sigma/map.h` — byte-string-keyed, FNV-1a, no hand-rolled hashing needed) lives on `module_context`, alongside `ctx->values`/`ctx->statements`, built once by `mod_resolve_context` before any lookups happen. Built by walking every `module_document` in `ctx->docs` and, for each, only its **top-level** statements (`doc->body` — not the flat `ctx->statements` index, which also includes nested statements and would wrongly make them resolvable targets): `Map.set(identifiers, stmt->name.start, slice_len(stmt->name), (addr)stmt)`. Living on the context, not built privately inside whichever resolution mechanism needs it first, is deliberate — `base`/inheritance resolution needs the exact same top-level-name lookup and should reuse this same map rather than building its own.
 
-**Duplicate names are a hard error, full stop** — any duplicate top-level name fails resolution immediately, whether the collision is between two statements in the same document or across an import boundary (matches `aml-import-namespace-rules.md` §2's "collisions across imported documents fail fast," extended uniformly since the map itself has no way to distinguish origin once flattened, and a duplicate name is equally ambiguous for lookup purposes either way). Implemented as `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` (4053, `include/errors.h`) — a new code, added alongside the three already sitting pre-reserved in the same "Resolver Errors (405x)" block (see "Implementation" below).
+**Duplicate names are a hard error, full stop** — any duplicate top-level name fails resolution immediately, whether the collision is between two statements in the same document or across an include boundary (matches `aml-include-namespace-rules.md` §2's "collisions across included documents fail fast," extended uniformly since the map itself has no way to distinguish origin once flattened, and a duplicate name is equally ambiguous for lookup purposes either way). Implemented as `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` (4053, `include/errors.h`) — a new code, added alongside the three already sitting pre-reserved in the same "Resolver Errors (405x)" block (see "Implementation" below).
 
 The legacy (`anvil.bak`) `anvl_resolver_build_state` was reviewed for precedent: its hand-rolled FNV-1a `anvl_id_map_t` (raw byte-offset/length keys) is exactly this "global identifier map" idea, already proven — but Sigma's `Map` supersedes the hand-rolled table entirely (same hashing scheme, already implemented, already tested). Its Kahn's-topological-sort cycle detection, however, does **not** carry over as a *mechanism* — that validates an entire inheritance graph upfront via adjacency lists and a queue, which is more machinery than this project's `base` relation needs (see "Field-merging inheritance" below for why the same hop-counter trick as VarRef resolution covers it instead). Its *policy* does carry over, though: a `base` cycle is confirmed as a hard error (`ANVL_ERR_RESOLVER_CYCLE_DETECTED`), unlike VarRef chains, which resolve missing/cyclic references to `null` rather than erroring (see "VarRef resolution" below) — a cyclic inheritance chain can't produce a sensible merged object at all, where a null VarRef is a perfectly normal outcome.
 
@@ -50,9 +50,9 @@ A cycle (`a : b := { ... }; b : a := { ... };`) is only reachable here at all be
 
 ## Why document processing order doesn't matter
 
-Body-parse only reads its own document's source (see `document-body-parse.md` § *Responsibilities of the body parse*). Under the global-identifier-map design above, this makes `aml-import-namespace-rules.md` § 7's "parse bodies in reverse dependency order" requirement unnecessary under this design, not just unproven — the map is complete before any resolving starts, so no document needs another document's body to already be parsed.
+Body-parse only reads its own document's source (see `document-body-parse.md` § *Responsibilities of the body parse*). Under the global-identifier-map design above, this makes `aml-include-namespace-rules.md` § 7's "parse bodies in reverse dependency order" requirement unnecessary under this design, not just unproven — the map is complete before any resolving starts, so no document needs another document's body to already be parsed.
 
-`notes/document-header-scan.md` § *Deferred to Resolution phase* separately corrects `aml-import-namespace-rules.md` § *Import graph order*'s claim that reversing DFS discovery (pre-order) gives a valid bottom-up order — that reasoning is still wrong under diamond imports (this project explicitly supports them, `HDR13`) regardless of whether anything ends up needing the order fixed.
+`notes/document-header-scan.md` § *Deferred to Resolution phase* separately corrects `aml-include-namespace-rules.md` § *Include graph order*'s claim that reversing DFS discovery (pre-order) gives a valid bottom-up order — that reasoning is still wrong under diamond includes (this project explicitly supports them, `HDR13`) regardless of whether anything ends up needing the order fixed.
 
 ## Open questions
 
@@ -70,12 +70,12 @@ Body-parse only reads its own document's source (see `document-body-parse.md` §
 - `include/errors.h` / `src/core/errors.c`: `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER = 4053` added (message + name table entries) alongside the three already-reserved Resolver Errors codes; all four now in active use (`ANVL_ERR_RESOLVER_CYCLE_DETECTED` by field-merging, `ANVL_ERR_RESOLVER_MISSING_BASE`/`ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` by `base` validation, `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` by the `identifiers` build).
 - `src/core/module.c`: `mod_ctx_dispose` releases `ctx->identifiers` (`Map.dispose` — keys and values are both arena-owned, borrowed, nothing to free but the map's own bucket storage, same non-owning relationship `ctx->statements`/`ctx->values` already have to the arena).
 - `src/core/resolver.c` (new file): `build_identifiers`, `validate_bases`, `own_fields`/`fields_has_name`/`merge_inherited_fields`/`merge_all_inheritance`, `resolve_varref_chain`/`resolve_varrefs`, and `mod_resolve_context` itself.
-- `test/unit/test_resolver.c` (14 cases `RSV01`–`RSV14`, 73 assertions): duplicate name (same document, and across a merged import via a new `resolver_dup_import.anvl` fixture), VarRef single-hop/chain/cycle/missing-target/anonymous-target, `base` missing/anonymous/valid, and field-merging (append+override, transitive three-level chain, `OBJECT_BLOCK`-form derived, inheritance cycle rejected). All passing, Valgrind-clean.
+- `test/unit/test_resolver.c` (14 cases `RSV01`–`RSV14`, 73 assertions): duplicate name (same document, and across a merged include via a new `resolver_dup_include.anvl` fixture), VarRef single-hop/chain/cycle/missing-target/anonymous-target, `base` missing/anonymous/valid, and field-merging (append+override, transitive three-level chain, `OBJECT_BLOCK`-form derived, inheritance cycle rejected). All passing, Valgrind-clean.
 - Wired into both `test/unit/Makefile` and `test/infra/Makefile`'s `ANVIL_SRCS`/`all`/per-binary targets, matching every other `src/core/*.c` file's build integration.
 - Full regression (source, module, header, document, registry, body_amp, body_aml, resolver) green; resolver re-confirmed Valgrind-clean after field-merging landed.
 
 ## Related notes
 
 - `document-body-parse.md` — the phase this one follows; defines the statement/value tree Resolution will consume.
-- `document-header-scan.md` § *Deferred to Resolution phase* and § *Import-graph processing order — resolved as unnecessary* — the import-graph-order side of this same "order doesn't matter" conclusion.
+- `document-header-scan.md` § *Deferred to Resolution phase* and § *Include-graph processing order — resolved as unnecessary* — the include-graph-order side of this same "order doesn't matter" conclusion.
 - `deferred-work.md` § *Deferred to Resolution phase* — index entry pointing here.

@@ -87,16 +87,20 @@
  * role, not one flat list: RESERVED words are illegal both as an
  * identifier and as a bare value; VALUE words are illegal as an
  * identifier but classify a value when seen in value position (`true`/
- * `false` -> ANVL_VALUE_BOOL, `null` -> ANVL_VALUE_NULL). `vars`/`using`
- * are reserved ahead of their actual feature (AnvlScript, not yet
- * implemented) so a name chosen today doesn't silently break later.
+ * `false` -> ANVL_VALUE_BOOL, `null` -> ANVL_VALUE_NULL). `include` is
+ * AML's own whole-document composition keyword (formerly `import` — see
+ * FR-2609-anvl-public-api-002). `vars`/`import` are reserved ahead of
+ * their actual feature (AnvlScript, not yet implemented — `import` is
+ * ASL's own foreign-code-bridge keyword, replacing what was previously
+ * reserved as `using`) so a name chosen today doesn't silently break
+ * later.
  * ----------------------------------------------------------------------- */
-#define ANVL_KEYWORD_IMPORT "import"
-#define ANVL_KEYWORD_IMPORT_LEN (sizeof(ANVL_KEYWORD_IMPORT) - 1)
+#define ANVL_KEYWORD_INCLUDE "include"
+#define ANVL_KEYWORD_INCLUDE_LEN (sizeof(ANVL_KEYWORD_INCLUDE) - 1)
 #define ANVL_KEYWORD_VARS "vars"
 #define ANVL_KEYWORD_VARS_LEN (sizeof(ANVL_KEYWORD_VARS) - 1)
-#define ANVL_KEYWORD_USING "using"
-#define ANVL_KEYWORD_USING_LEN (sizeof(ANVL_KEYWORD_USING) - 1)
+#define ANVL_KEYWORD_IMPORT "import"
+#define ANVL_KEYWORD_IMPORT_LEN (sizeof(ANVL_KEYWORD_IMPORT) - 1)
 
 #define ANVL_KEYWORD_TRUE "true"
 #define ANVL_KEYWORD_TRUE_LEN (sizeof(ANVL_KEYWORD_TRUE) - 1)

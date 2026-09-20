@@ -31,19 +31,20 @@
 
 static ssize_t src_size = sizeof(struct anvl_source_t);
 
-// Reserved keywords for Anvil (import, using, vars, true, false, null)
-static const char *reserved_keywords[] = {ANVL_KEYWORD_IMPORT, ANVL_KEYWORD_USING,
-                                          ANVL_KEYWORD_VARS,   ANVL_KEYWORD_TRUE,
-                                          ANVL_KEYWORD_FALSE,  ANVL_KEYWORD_NULL};
+// Reserved keywords for Anvil (include, import, vars, true, false, null) -- `import` is reserved
+// ahead of AnvlScript's own foreign-code-bridge keyword (not yet implemented), same as `vars`.
+static const char *reserved_keywords[] = {ANVL_KEYWORD_INCLUDE, ANVL_KEYWORD_IMPORT,
+                                          ANVL_KEYWORD_VARS,    ANVL_KEYWORD_TRUE,
+                                          ANVL_KEYWORD_FALSE,   ANVL_KEYWORD_NULL};
 
 /* Forward declarations */
 static void source_parse_shebang(anvl_source);
 static bump_allocator source_get_arena(anvl_source, anvl_err_code *);
 
 // Word-wise FNV-1a variant (BR-2609-anvl-003): every registered document's content is hashed
-// unconditionally at load time (mod_ctx_register_doc's registry key, and diamond-import dedup),
-// so this runs on every parse, including documents that never import anything (AMP forbids
-// imports outright, but still pays this cost). Processing 8 bytes per multiply instead of 1 cuts
+// unconditionally at load time (mod_ctx_register_doc's registry key, and diamond-include dedup),
+// so this runs on every parse, including documents that never include anything (AMP forbids
+// includes outright, but still pays this cost). Processing 8 bytes per multiply instead of 1 cuts
 // the sequential multiply-dependency chain length by 8x -- measured ~8.2x faster on an 813KB
 // buffer (0.851ns/byte -> 0.104ns/byte), with no change to the hash's own contract: still
 // deterministic, still non-zero for non-empty content, still virtually certain to differ for

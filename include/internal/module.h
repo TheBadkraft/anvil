@@ -71,14 +71,14 @@ typedef struct anvl_src_slice_t {
 typedef anvl_slice *slice;
 
 /* ---------------------------------------------------------------------- *
- * Header import / attribute metadata
+ * Header include / attribute metadata
  * ---------------------------------------------------------------------- */
-typedef struct anvl_import_t {
-   anvl_slice decl;          // "import \"path\"" (no trailing ';')
+typedef struct anvl_include_t {
+   anvl_slice decl;          // "include \"path\"" (no trailing ';')
    anvl_slice path;          // "\"path\"" (quotes included)
-   module_document resolved; // child document after import graph expansion; NULL until loaded
-} anvl_import_t;
-typedef anvl_import_t *anvl_import;
+   module_document resolved; // child document after include graph expansion; NULL until loaded
+} anvl_include_t;
+typedef anvl_include_t *anvl_include;
 
 typedef struct anvl_attribute_t {
    anvl_slice key;   // identifier
@@ -90,7 +90,7 @@ typedef anvl_attribute_t *anvl_attribute;
  * Document header — collected before body parsing
  * ---------------------------------------------------------------------- */
 struct anvl_doc_header_t {
-   list imports;    // list of anvl_import
+   list includes;   // list of anvl_include
    list attributes; // list of anvl_attribute
 };
 
@@ -152,7 +152,7 @@ typedef enum {
    ANVL_STMT_ASSIGN = 0,   // ident [: base] [@[...]] := value;
    ANVL_STMT_OBJECT_BLOCK, // ident [: base] [@[...]] { statements };
    ANVL_STMT_VARS,         // vars { ... }
-   ANVL_STMT_USING,        // using "path";
+   ANVL_STMT_IMPORT,       // import "path"; (AnvlScript's foreign-code-bridge construct)
 } anvl_stmt_kind;
 
 /* ---------------------------------------------------------------------- *
@@ -166,7 +166,7 @@ typedef enum {
 typedef struct anvl_statement_t {
    anvl_stmt_kind kind;
    anvl_slice span;  // full source span of the statement
-   anvl_slice name;  // declared identifier; empty only for VARS/USING
+   anvl_slice name;  // declared identifier; empty only for VARS/IMPORT
    anvl_slice base;  // inheritance base; empty when absent
    anvl_value value; // ASSIGN only; NULL otherwise
    list body;        // OBJECT_BLOCK only; nested list of anvl_statement pointers
@@ -283,15 +283,15 @@ void mod_ctx_set_parser(module_context, anvl_parser);
  * @param size Initial arena capacity in bytes (e.g. the sum of Source.length() across ctx->docs).
  * @param[out] out_err_code Pointer to the error code if creation fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
- * @details Call once, after mod_load_imports has fully expanded the import graph (so the size can
+ * @details Call once, after mod_load_includes has fully expanded the include graph (so the size can
  * be computed from the complete document set) and before any doc_parse_body call. Not yet
  * implemented — stub for RED-state testing; see notes/document-body-parse.md.
  */
 anvl_result mod_ctx_create_arena(module_context ctx, usize size, anvl_err_code *out_err_code);
 /**
  * @brief Apply the working arena-sizing heuristic to a summed source length.
- * @param summed_source_length Sum of `Source.length()` across every document in the import graph —
- * typically `mod_load_imports`'s `out_body_size_hint`.
+ * @param summed_source_length Sum of `Source.length()` across every document in the include graph —
+ * typically `mod_load_includes`'s `out_body_size_hint`.
  * @return `max(summed_source_length * ANVL_ARENA_SIZE_MULTIPLIER, ANVL_ARENA_MIN_SIZE)`.
  * @details Pure arithmetic, no failure mode. See notes/document-body-parse.md "Initial sizing
  * heuristic" and the constants themselves (`include/constants.h`) for the reasoning behind the
@@ -304,7 +304,7 @@ usize mod_ctx_arena_size_hint(usize summed_source_length);
  * the context.
  * @param ctx The module context to resolve. Every document in `ctx->docs` must already have
  * been through a successful `doc_parse_body` — Resolution is phase 4, run once, after every
- * body in the import graph has parsed; document order does not matter.
+ * body in the include graph has parsed; document order does not matter.
  * @param[out] out_err_code Pointer to the error code if resolution fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  * @details Builds `ctx->identifiers` (every document's top-level statements, by name) first;
@@ -367,7 +367,7 @@ void doc_dispose(module_document);
 anvl_result doc_load_source(module_document, anvl_source_origin, const char *, size_t,
                             anvl_err_code *);
 /**
- * @brief Scan the document header for shebang, imports, and module attributes.
+ * @brief Scan the document header for shebang, includes, and module attributes.
  * @param doc The document to scan. Must have a loaded source and be registered
  *   in the global source registry.
  * @param[out] out_err_code Pointer to the error code if scanning fails.
@@ -379,27 +379,27 @@ anvl_result doc_load_source(module_document, anvl_source_origin, const char *, s
 anvl_result doc_scan_header(module_document, anvl_err_code *);
 
 /**
- * @brief Recursively expand the import graph starting from a root document.
- * @param ctx The module context that owns the root document and will own all imported documents.
- * @param root The document whose header imports should be expanded.
+ * @brief Recursively expand the include graph starting from a root document.
+ * @param ctx The module context that owns the root document and will own all included documents.
+ * @param root The document whose header includes should be expanded.
  * @param[out] out_body_size_hint Optional; if non-NULL, receives the sum of `Source.length()`
- * across root and every newly-registered imported document (diamonds counted once). Pass NULL
+ * across root and every newly-registered included document (diamonds counted once). Pass NULL
  * if the caller doesn't need it. Intended as the `size` input to `mod_ctx_create_arena` — see
  * notes/document-body-parse.md "Arena-backed allocation".
  * @param[out] out_err_code Pointer to the error code if expansion fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
- * @details This function resolves each import path in `root->header->imports` relative to
+ * @details This function resolves each include path in `root->header->includes` relative to
  * `root->filepath`, loads the referenced file as a new document, registers it with `ctx`,
- * scans its header, and recursively expands its imports. Each `anvl_doc_import_t` has its
- * `resolved` field set to the child document. Cyclic imports and missing files are reported
+ * scans its header, and recursively expands its includes. Each `anvl_include_t` has its
+ * `resolved` field set to the child document. Cyclic includes and missing files are reported
  * as errors on the requesting document.
  */
-anvl_result mod_load_imports(module_context ctx, module_document root, usize *out_body_size_hint,
-                             anvl_err_code *out_err_code);
+anvl_result mod_load_includes(module_context ctx, module_document root, usize *out_body_size_hint,
+                              anvl_err_code *out_err_code);
 
 /**
  * @brief Parse the document body into a list of statements.
- * @param doc The document whose header has been scanned and whose imports have been loaded.
+ * @param doc The document whose header has been scanned and whose includes have been loaded.
  * @param[out] out_err_code Pointer to the error code if parsing fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise, `ANVL_RES_ERR`.
  * @details See `notes/document-body-parse.md` for the full grammar. Not yet implemented — the
@@ -417,12 +417,12 @@ void doc_unload_source(module_document);
 bool doc_has_errors(module_document);
 bool doc_set_error(module_document, anvl_err_code, usize, usize, const char *);
 /**
- * @brief Scan the document header for shebang, imports, and module attributes.
+ * @brief Scan the document header for shebang, includes, and module attributes.
  * @param doc The document whose source has been loaded and registered with a context.
  * @param[out] out_err_code Pointer to the error code if scanning fails.
  * @return Anvl result: `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
  * @details This function scans the leading header constructs of the document source and populates
- * `doc->header` with import and attribute metadata. It stops at the first body statement and
+ * `doc->header` with include and attribute metadata. It stops at the first body statement and
  * leaves `doc->source->pos` at the first body character. Errors are reported via
  * `Source.set_error` and `out_err_code`.
  */

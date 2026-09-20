@@ -89,8 +89,8 @@ static void test_vt05_document_matches_flat(void) {
                    "VT05: Document.get_fragment_value is anvil_document_get_fragment_value");
    TestBit.is_true(Document.get_statements == anvil_document_get_statements,
                    "VT05: Document.get_statements is anvil_document_get_statements");
-   TestBit.is_true(Document.get_imports == anvil_document_get_imports,
-                   "VT05: Document.get_imports is anvil_document_get_imports");
+   TestBit.is_true(Document.get_includes == anvil_document_get_includes,
+                   "VT05: Document.get_includes is anvil_document_get_includes");
    TestBit.is_true(Document.get_error == anvil_document_get_error,
                    "VT05: Document.get_error is anvil_document_get_error");
 }

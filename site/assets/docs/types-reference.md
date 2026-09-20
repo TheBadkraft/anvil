@@ -40,13 +40,13 @@ filename is special), just a naming convention so a `.types.anvl` file is recogn
 glance, the same way `.schema.anvl` already is.
 
 **Consuming** a type — referencing `types.VIN` from some other document — needs no attribute of
-its own. Access to the `types.` namespace comes entirely from what a document `import`s: if a
-document imports a file whose header carries `@[types]`, every type that file defines becomes
-available as `types.<Name>` inside the importer.
+its own. Access to the `types.` namespace comes entirely from what a document `include`s: if a
+document includes a file whose header carries `@[types]`, every type that file defines becomes
+available as `types.<Name>` inside the including document.
 
 *Runtime support: implemented — `@[types]` detection and the every-statement-is-a-definition
 rule (`anvil_type_registry_load` rejects any document without the attribute), and cross-file
-`types.X` resolution via `import` (`anvil_type_registry_load_from_imports`, see "Using a type
+`types.X` resolution via `include` (`anvil_type_registry_load_from_includes`, see "Using a type
 from another document" below).*
 
 ## Defining a type
@@ -135,24 +135,24 @@ label text is readable by its ordinal (array index).*
 
 ## Using a type from another document
 
-A schema, or any other document, brings a type into scope by importing the file that defines it,
+A schema, or any other document, brings a type into scope by including the file that defines it,
 then referencing it by its `types.` — prefixed name:
 
 ```anvl
-import "vehicle_types.anvl";
+include "vehicle_types.anvl";
 
 vin_serial := { type := types.VIN; required := true; };
 ```
 
-`types.` is a namespace the engine exposes once a document has imported a `@[types]` file — it
+`types.` is a namespace the engine exposes once a document has included a `@[types]` file — it
 has nothing to do with that file's own name. Two different `.types.anvl` files could both define
-types reachable as `types.X`, `types.Y` regardless of which physical file each import came from.
+types reachable as `types.X`, `types.Y` regardless of which physical file each include came from.
 
-*Runtime support: implemented (`anvil_type_registry_load_from_imports`) — walks `doc`'s own
-direct imports (not the whole transitive graph) and merges every `@[types]`-carrying one's
+*Runtime support: implemented (`anvil_type_registry_load_from_includes`) — walks `doc`'s own
+direct includes (not the whole transitive graph) and merges every `@[types]`-carrying one's
 definitions into a single combined registry, keyed by bare name. `types.` really is a flat
-namespace: two different imported files could each define types reachable this same way,
-regardless of which file each name actually came from. A name collision between two imports
+namespace: two different included files could each define types reachable this same way,
+regardless of which file each name actually came from. A name collision between two includes
 currently resolves last-write-wins — no error reporting for that yet.*
 
 ## What's not built yet
@@ -164,7 +164,7 @@ For a complete picture, the pieces of this design that are settled but not yet i
   yet).
 - Type inference through inheritance (`base`) — architecturally free once built, since inherited
   fields already alias their ancestor's real statement object, attributes and all.
-- Reporting a name collision when two imports both define the same type name, instead of
+- Reporting a name collision when two includes both define the same type name, instead of
   silently taking the later one.
 - Everything about `@[schema]` and schema validation — a separate, not-yet-started module
   (`schema.c`) that will depend on `types.c`, never the reverse.

@@ -10,10 +10,10 @@
 
 Nothing here is a finished ASL design; these are the load-bearing fragments already on the books that any real design has to be consistent with, gathered so the conversation starts from the current state of things instead of re-deriving it.
 
-- **`docs/dialect-ownership-matrix.md`** — the current three-dialect policy (AML, ASL, AMP/AMP+), gated by explicit per-feature capability checks rather than implicit token support. As currently written: ASL is the default/least-restrictive dialect when no shebang or other clue is present; it owns `using` declarations, `vars` blocks, var-refs (`$name`, `${name}`), and interpolation (`$"...{...}"`); it deliberately does *not* own inheritance/`base` or anonymous blocks (those stay AML-only "module composition" features); module attributes (`@[...]`) are marked "optional/policy decision" for ASL. This matrix predates real ASL work in the current architecture and reads as a placeholder policy sketch, not a settled design — worth confirming or revising deliberately rather than assuming it's final.
+- **`docs/dialect-ownership-matrix.md`** — the current three-dialect policy (AML, ASL, AMP/AMP+), gated by explicit per-feature capability checks rather than implicit token support. As currently written: AML is the default/least-restrictive dialect when no shebang or other clue is present; ASL owns `import` declarations (its own foreign-code-bridge construct — see Decision 5 below, renamed from `using` alongside AML's own `import`→`include` rename, `FR-2609-anvl-public-api-002`), `vars` blocks, var-refs (`$name`, `${name}`), and interpolation (`$"...{...}"`); it deliberately does *not* own inheritance/`base` or anonymous blocks (those stay AML-only "module composition" features); module attributes (`@[...]`) are marked "optional/policy decision" for ASL. This matrix has already been reconciled with the settled decisions below — see its own header.
 - **`test/fixtures/body_varref.anvl`, `f11_static_ref.anvl`** (comments, verbatim): *"AML has no dynamic var-refs or interpolation (reserved for AnvilScript); cross-statement reference is always a static, resolve-once `$identifier`."* — i.e. AML's `$identifier` is a resolve-once alias; ASL is where dynamic (re-evaluated) var-refs and string interpolation are meant to live instead.
 - **`.vscode/build.anvl`** (comment, verbatim, from a hypothetical `Sigma.Build` use case): *"AML ... there is no `vars` section, interpolation, or functions. It is verbose by design, so you can see what is this what the ASL (AnvilScript) will generate."* — one existing hint at a use case: ASL as an authoring convenience that *can generate* AML, with `Sigma.Build` accepting either as input. This is now treated as a capability, not the sole purpose.
-- **`notes/deferred-work.md` § *Deferred to AnvilScript (ASL) design*** — five items explicitly parked pending this design, moved here now that this doc exists to own them (see "Open questions" below): `using` declarations, `vars` blocks' header-vs-body classification, a namespace keyword (if AML ever adds one), interpolation/dynamic var-refs, and whether `:=` is ever optional.
+- **`notes/deferred-work.md` § *Deferred to AnvilScript (ASL) design*** — five items explicitly parked pending this design, moved here now that this doc exists to own them (see "Open questions" below): `import` declarations, `vars` blocks' header-vs-body classification, a namespace keyword (if AML ever adds one), interpolation/dynamic var-refs, and whether `:=` is ever optional.
 - **`README.md`** — architecture diagrams place `anvil.asl.o` ("AnvilScript parser + evaluator") as a peer of `anvil.schema.o`/`anvil.serializer.o` under the core library, above the language bindings layer — i.e. ASL is meant to live in this native repo, not as a per-binding feature, matching the "one-truth implementation" framing `public-api.md` already established for the rest of Anvil Native. Also: legacy `_*`-prefixed source files were retained for comparison during the refactor "AnvilScript (ASL) excepted" — since removed anyway (see Status above), so that carve-out no longer applies to anything in the tree.
 
 ## Founding framing
@@ -22,7 +22,7 @@ Three questions, deliberately mirroring how `public-api.md` opened its own desig
 
 1. **What is ASL for, concretely?** What can a user do in ASL that they cannot do in AML/AMP, and why does that capability belong in a *separate dialect* rather than as an AML extension? (`build.anvl`'s comment above was the only concrete use case on record when design started; it is now treated as one capability among many.)
 2. **What is ASL's relationship to AML?** A shared grammar core with extra productions layered on top (one scanner/parser, dialect-gated per the ownership-matrix model already sketched), a genuinely separate grammar that happens to interoperate, or something else? This determines a lot of downstream structure (shared `anvl_value`/`anvl_statement` representation vs. its own AST, as the old `asl_node_t`/`asl_value_t` had).
-3. **What does extensibility mean for this language?** The old ASL had `asl_module_t` external-module dispatch (a callback-based FFI-into-the-script mechanism) and a `$varref` external-lookup callback — is "extensibility" about a host application injecting functions/values into a running script, embedding ASL as a scripting layer the way Lua is embedded, something narrower (e.g. just AML's own `import` mechanism reused), or something not yet imagined?
+3. **What does extensibility mean for this language?** The old ASL had `asl_module_t` external-module dispatch (a callback-based FFI-into-the-script mechanism) and a `$varref` external-lookup callback — is "extensibility" about a host application injecting functions/values into a running script, embedding ASL as a scripting layer the way Lua is embedded, something narrower (e.g. just AML's own `include` mechanism reused), or something not yet imagined?
 
 ## Decisions
 
@@ -37,14 +37,14 @@ Forks resolved during initial design conversations.
    };
    ```
 4. **`vars` blocks** — Header construct, placed at the end of the header. They contain immutable global constants.
-5. **`using` declarations** — ASL-only header construct, analogous to `import` but for foreign code sources (C#, C++, etc.). `import` and `using` coexist in ASL: `import` loads Anvil modules; `using` brings foreign code into scope.
+5. **`import` declarations** — ASL-only header construct, for foreign code sources (C#, C++, Python, etc.) — the natural cross-industry word for pulling in a module, possibly a foreign/native one, matching how Python/JS use `import` for exactly this even across language boundaries. `include` and `import` coexist across the two dialects but are never both live in the same document's grammar at once: AML owns `include` (whole ANVL-document composition — see `FR-2609-anvl-public-api-002`, renamed from `import`); ASL owns `import` (brings foreign code into scope — renamed from `using`, freed for this purpose since it read too much like C#'s own same-language namespace directive plus its unrelated resource-disposal meaning). `include` is not an ASL construct: an `#!asl` document that also needs AML document composition uses AML's `include` the same way any AML document would, since ASL is a superset dialect, not a walled-off one.
 6. **Module attributes (`@[...]`)** — Supported in ASL.
 7. **Evaluation model** — Distinct runtime evaluation phase after parsing.
 8. **AML first-class citizenship** — AML scalars, objects, and collections are first-class types in ASL. ASL functions can return AML values.
 9. **Cross-language callability** — Both directions: host bindings invoke ASL functions, and ASL can register/host callbacks.
 10. **Default dialect** — Change from ASL to AML. ASL must be declared explicitly via shebang (`#!asl`) or file extension (`.asl`).
 11. **Built-in distribution** — Built-in function libraries are distributed as downloadable source files (e.g., `math.anvs`) so the core library does not carry scripting features that object-model-only consumers do not need. Pre-compiled `.anvlo` components may be supported later.
-12. **Namespace model (initial)** — Namespaces are initially file-name-based (the imported module's file name is the namespace). A future `namespace` keyword (C#-style) is possible but not part of MVP.
+12. **Namespace model (initial)** — Namespaces are initially file-name-based (the imported module's file name is the namespace, for either dialect's loading construct — `include` or `import`). A future `namespace` keyword (C#-style) is possible but not part of MVP.
 13. **Error handling** — Context-local error state. Each `anvil_document` / evaluation context carries a last-error field; host code checks after a call. ASL functions may also return error values for in-language handling. The existing 5101–5105 codes are a starting point and will be expanded as the runtime grows.
 14. **Parser technology** — AnvilScript uses the same hand-written parser approach as the rest of Anvil Native (recursive-descent / Pratt-style), producing a dedicated runtime AST for function bodies. No external parser generator.
 15. **Dialect name and extension** — Name: **AnvilScript** (abbreviated **ASL**). File extension: `.anvs`.
@@ -152,14 +152,14 @@ Unresolved or explicitly TBD. These are inputs to the detailed specification, no
 
 This is the intended opening framing for the full specification.
 
-- **ANVL (top-level)** is a declarative document language. It models objects, arrays, scalars, attributes, imports, inheritance, and module structure. It is parsed by the existing ANVL parser into `anvl_value_t` / `anvl_statement_t` trees.
+- **ANVL (top-level)** is a declarative document language. It models objects, arrays, scalars, attributes, includes, inheritance, and module structure. It is parsed by the existing ANVL parser into `anvl_value_t` / `anvl_statement_t` trees.
 - **AnvilScript** is the imperative scripting layer that lives inside function bodies. It provides variables, expressions, control flow, function calls, and runtime evaluation. It is parsed by a separate ASL runtime parser into a dedicated AST.
 - The boundary between the two is the function declaration signature: ANVL parses `foo (a, b, c) => { ... };`, but everything inside `{ ... }` is AnvilScript.
-- If a `#!anvs` / `.anvs` document contains no function declarations, the AnvilScript Engine is never activated; the source is parsed as ANVL with ASL dialect features (`$` var-refs, interpolation, `vars`, `using`).
+- If a `#!anvs` / `.anvs` document contains no function declarations, the AnvilScript Engine is never activated; the source is parsed as ANVL with ASL dialect features (`$` var-refs, interpolation, `vars`, `import`).
 
 ## MVP Grammar (EBNF)
 
-This EBNF describes only the **AnvilScript function-body scripting language**. Top-level `#!asl` document structure (imports, `using`, `vars`, object blocks, attributes) is parsed by the existing ANVL parser and is not repeated here. The AnvilScript Engine activates only when a function declaration is encountered; if none are present, the source is effectively AML with ASL dialect capabilities (`$` var-refs, interpolation, `vars`, `using`) and no scripting runtime is needed.
+This EBNF describes only the **AnvilScript function-body scripting language**. Top-level `#!asl` document structure (includes, `import`, `vars`, object blocks, attributes) is parsed by the existing ANVL parser and is not repeated here. The AnvilScript Engine activates only when a function declaration is encountered; if none are present, the source is effectively AML with ASL dialect capabilities (`$` var-refs, interpolation, `vars`, `import`) and no scripting runtime is needed.
 
 The function declaration *signature* (`foo (a, b, c) => { ... }`) is owned by the ANVL parser; the ASL runtime receives the body as a source slice plus a validated parameter list. This grammar therefore begins at the first statement inside `{ ... }`.
 
@@ -248,7 +248,7 @@ digit             = "0" ... "9" ;
 
 ### Notes on the grammar
 
-- This grammar describes only what appears inside the `{ ... }` function body. The surrounding ANVL document grammar handles `#!asl`, imports, `using`, `vars`, object blocks, attributes, and the function signature itself.
+- This grammar describes only what appears inside the `{ ... }` function body. The surrounding ANVL document grammar handles `#!asl`, includes, `import`, `vars`, object blocks, attributes, and the function signature itself.
 - Inside function bodies, bare identifiers are variable/function references. The `$` sigil appears **only** in string interpolation (`$"...{var}..."`); it is not used for var-refs or function calls inside function bodies.
 - Assignment is `=` and local declaration is `var ... = ...`. Object literal entries retain ANVL's `:=` because they construct AML values, not execute assignments.
 - Function calls may be bare (`foo(1, 2, 3)`) or qualified (`math.abs(-5)`). The grammar allows both forms. At runtime, an unqualified call is resolved to its fully qualified form whenever possible; the namespace prefix is required only when the name would otherwise be ambiguous. Member access without a call (e.g., `math.abs` as a value) is not in MVP.
@@ -405,7 +405,7 @@ FR-011 delivered a dedicated `Stack` collection backed by `collection` (which it
 
 ## Function registry
 
-The ScriptEngine maintains a single registry per loaded module/document. At runtime the registry maps qualified names (`math.abs`) and unqualified names (`abs`, when unambiguous) to callable function descriptors. Built-in functions are not hard-coded; they are loaded into the registry from modules reached via `using` declarations, exactly like user-defined functions loaded via `import`. The only difference is origin: built-in modules ship as source files (e.g., `math.anvs`) and register themselves by declaring functions with the expected signatures.
+The ScriptEngine maintains a single registry per loaded module/document. At runtime the registry maps qualified names (`math.abs`) and unqualified names (`abs`, when unambiguous) to callable function descriptors. Built-in functions are not hard-coded; they are loaded into the registry from modules reached via `import` declarations, exactly like user-defined functions loaded via `include`. The only difference is origin: built-in modules ship as source files (e.g., `math.anvs`) and register themselves by declaring functions with the expected signatures.
 
 ### Registry shape (sketch)
 
@@ -444,12 +444,12 @@ typedef struct asl_registry {
 ### Resolution rules
 
 1. A qualified call (`math.abs`) looks up the exact qualified name.
-2. An unqualified call (`abs`) first checks the module's own functions, then built-ins/`using` imports.
+2. An unqualified call (`abs`) first checks the module's own functions, then built-ins reached via `import`.
 3. If more than one candidate exists for an unqualified name, the call is ambiguous and raises an exception.
 4. A member call (`xs.first_where(...)`) is resolved as an extension method on the receiver's type. The compiler looks up the type in `extensions_by_type`, then the method name within that type's extension map. The receiver is passed as the first argument.
 5. Host callbacks and ASL functions share the same lookup path; the descriptor's `is_host` flag selects the invocation mechanism.
 
-This is intentionally loose. The exact backing types (`map`, `list`, `parray`) and the `using` load protocol will be refined as the first built-in modules are designed.
+This is intentionally loose. The exact backing types (`map`, `list`, `parray`) and the `import` load protocol will be refined as the first built-in modules are designed.
 
 ## AnvilScript built-ins (theoretical sketch)
 
@@ -617,26 +617,26 @@ The same registry populates from all three sources, so callers cannot distinguis
 
 These topics are captured as active threads. They are not all next, but each must be resolved before the runtime is implemented.
 
-### 1. `using` declarations
+### 1. `import` declarations
 
-`using` brings foreign (non-ANVL) bindings into the module's function registry. It is the ASL counterpart to `import`, which loads ANVL documents.
+`import` brings foreign (non-ANVL) bindings into the module's function registry. It is the ASL counterpart to `include`, which loads ANVL documents.
 
 Syntax:
 
 ```anvs
-using "c:anvil.std.math";
-using "csharp:MyApp.Controllers";
-using "python:tools.logging";
+import "c:anvil.std.math";
+import "csharp:MyApp.Controllers";
+import "python:tools.logging";
 ```
 
-A `using` URI has a prefix that selects a host resolver; the remainder names a bundle or package within that resolver's domain. The core library ships a `c:` resolver that loads C callback bundles; language-binding layers register their own resolvers. If no prefix is given, `c:` is the default.
+An `import` URI has a prefix that selects a host resolver; the remainder names a bundle or package within that resolver's domain. The core library ships a `c:` resolver that loads C callback bundles; language-binding layers register their own resolvers. If no prefix is given, `c:` is the default.
 
 Semantics:
 
-- `using` does not create an ANVL document or execute foreign code at load time.
+- `import` does not create an ANVL document or execute foreign code at load time.
 - It populates the module function registry with qualified names (e.g., `math.abs`).
 - Resolution is lazy: names are registered immediately, but host callbacks are bound when first called or when the resolver explicitly loads the bundle.
-- `import` is for ANVL source; `using` is for foreign namespaces. This distinction keeps import-graph behavior (file paths, cycles, deduplication) separate from host callback registration.
+- `include` is for ANVL source; `import` is for foreign namespaces. This distinction keeps include-graph behavior (file paths, cycles, deduplication) separate from host callback registration.
 
 ### 2. Built-in module packaging
 

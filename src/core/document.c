@@ -27,7 +27,7 @@
 
 static ssize_t doc_size = sizeof(struct anvl_mod_doc_t);
 static ssize_t header_size = sizeof(struct anvl_doc_header_t);
-static ssize_t import_size = sizeof(struct anvl_import_t);
+static ssize_t include_size = sizeof(struct anvl_include_t);
 static ssize_t attribute_size = sizeof(struct anvl_attribute_t);
 static ssize_t list_ptr_size = sizeof(void *);
 
@@ -90,8 +90,8 @@ void doc_dispose(module_document doc) {
    if (doc->source) {
       // Only remove the registry entry if this doc is actually the one
       // registered under that hash. A document whose own registration
-      // failed (e.g. the discarded duplicate in a diamond import — see
-      // import_load_child's ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT
+      // failed (e.g. the discarded duplicate in a diamond include — see
+      // include_load_child's ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT
       // handling) shares its content hash with a different, still-alive
       // document; disposing it must not evict that document's entry.
       uint64_t hash = Source.hash(doc->source);
@@ -108,13 +108,13 @@ void doc_dispose(module_document doc) {
    }
 
    if (doc->header) {
-      if (doc->header->imports) {
-         for (usize i = 0; i < List.size(doc->header->imports); i++) {
-            anvl_import imp = NULL;
-            List.get(doc->header->imports, i, (object *)&imp);
-            Allocator.dispose(imp);
+      if (doc->header->includes) {
+         for (usize i = 0; i < List.size(doc->header->includes); i++) {
+            anvl_include inc = NULL;
+            List.get(doc->header->includes, i, (object *)&inc);
+            Allocator.dispose(inc);
          }
-         List.dispose(doc->header->imports);
+         List.dispose(doc->header->includes);
       }
       if (doc->header->attributes) {
          for (usize i = 0; i < List.size(doc->header->attributes); i++) {
@@ -193,7 +193,7 @@ static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code
    (void)data;
    return true;
 }
-static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
+static bool header_scan_includes(module_document doc, anvl_err_code *err_code) {
    anvl_source src = doc->source;
 
    while (true) {
@@ -201,18 +201,18 @@ static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
          return false;
       }
 
-      if (Source.match_length(src, "import", 6) != 6 ||
-          Source.is_identifier_part(Source.peek_offset(src, 6))) {
+      if (Source.match_length(src, "include", 7) != 7 ||
+          Source.is_identifier_part(Source.peek_offset(src, 7))) {
          break;
       }
 
       if (Source.dialect(src) == ANVL_DIALECT_AMP) {
-         *err_code = ANVL_ERR_IMPORT_AMP_FORBIDDEN;
+         *err_code = ANVL_ERR_INCLUDE_AMP_FORBIDDEN;
          return false;
       }
 
       usize decl_start = Source.position(src);
-      Source.consume(src, 6); // "import"
+      Source.consume(src, 7); // "include"
 
       if (!header_skip_ws_comments(doc, err_code)) {
          return false;
@@ -245,19 +245,19 @@ static bool header_scan_imports(module_document doc, anvl_err_code *err_code) {
       }
       Source.consume(src, 1); // semicolon
 
-      anvl_import imp = Allocator.alloc(import_size);
-      if (!imp) {
+      anvl_include inc = Allocator.alloc(include_size);
+      if (!inc) {
          *err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
          return false;
       }
-      // Store the positions of the declaration and path slices in the import struct.
-      imp->decl.data = src->buffer.bucket;
-      imp->decl.start = src->buffer.bucket + decl_start;
-      imp->decl.end = src->buffer.bucket + decl_end;
-      imp->path.data = src->buffer.bucket;
-      imp->path.start = src->buffer.bucket + path_start;
-      imp->path.end = src->buffer.bucket + path_end + 1;
-      List.append(doc->header->imports, (object)imp);
+      // Store the positions of the declaration and path slices in the include struct.
+      inc->decl.data = src->buffer.bucket;
+      inc->decl.start = src->buffer.bucket + decl_start;
+      inc->decl.end = src->buffer.bucket + decl_end;
+      inc->path.data = src->buffer.bucket;
+      inc->path.start = src->buffer.bucket + path_start;
+      inc->path.end = src->buffer.bucket + path_end + 1;
+      List.append(doc->header->includes, (object)inc);
    }
 
    return true;
@@ -387,18 +387,18 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
-   if (!doc->header->imports) {
-      doc->header->imports = List.new(4, list_ptr_size);
+   if (!doc->header->includes) {
+      doc->header->includes = List.new(4, list_ptr_size);
    }
    if (!doc->header->attributes) {
       doc->header->attributes = List.new(4, list_ptr_size);
    }
-   if (!doc->header->imports || !doc->header->attributes) {
+   if (!doc->header->includes || !doc->header->attributes) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
-   if (!header_scan_imports(doc, &err_code)) {
+   if (!header_scan_includes(doc, &err_code)) {
       goto error;
    }
    if (!header_scan_attributes(doc, &err_code)) {
@@ -410,9 +410,9 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
-   // Enforce header ordering: no imports may follow attributes.
-   if (Source.match_length(doc->source, "import", 6) == 6 &&
-       !Source.is_identifier_part(Source.peek_offset(doc->source, 6))) {
+   // Enforce header ordering: no includes may follow attributes.
+   if (Source.match_length(doc->source, "include", 7) == 7 &&
+       !Source.is_identifier_part(Source.peek_offset(doc->source, 7))) {
       err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
       goto error;
    }

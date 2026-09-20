@@ -22,11 +22,11 @@ point  := (10, 20);
 raw    := `payload bytes`;
 ```
 
-**Reserved words apply here too.** `vars`, `import`, `using`, `true`, `false`,
+**Reserved words apply here too.** `vars`, `include`, `import`, `true`, `false`,
 and `null` can't be used as a statement name or a blob tag — the only two
 identifier positions AMP has. See [AML Guide: Statements](AML-Guide.md#statements)
 for the full list of reserved-word positions and the additional
-value-position restriction on `vars`/`import`/`using`.
+value-position restriction on `vars`/`include`/`import`.
 
 ## Forbidden — hard parse errors, not silently ignored
 

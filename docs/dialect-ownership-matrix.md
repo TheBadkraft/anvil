@@ -1,17 +1,18 @@
 # Dialect Ownership Matrix and Parsing Policy
 
 Status: active policy reference for parser and language-surface refactors. Predates the current
-rebuilt architecture in places — the ownership rows below (`vars`, `using`, var-ref, interpolation)
+rebuilt architecture in places — the ownership rows below (`vars`, `import`, var-ref, interpolation)
 are under active reconsideration as part of AnvilScript (ASL) design; see `notes/anvilscript-design.md`
 for the current state of that work. The default-dialect policy below (AML, not ASL) is confirmed
-current and does not depend on that design settling.
+current and does not depend on that design settling. AML's own `include` (formerly `import`) and
+ASL's own `import` (formerly `using`) reflect a settled rename — see `FR-2609-anvl-public-api-002`.
 
 ## Core Policy
 
 - Explicit dialect capability checks are required for dialect-owned features.
 - If no shebang or other dialect clue is present, dialect defaults to **AML** (pivoted from the pre-rebuild stance of defaulting to ASL — ASL must now be declared explicitly via shebang `#!asl` or a `.anvs` file extension). This matches the current implementation (`src/core/files.c`, `src/core/source.c`).
 - AML keeps module-definition composition features: inheritance and anonymous blocks.
-- **ANVL/AnvilScript boundary**: top-level ANVL owns the document structure and the function declaration *signature* (`foo (a, b, c) => { ... }`). AnvilScript owns only the imperative body inside `{ ... }`. The ASL runtime receives the body as a source slice plus a validated parameter list; it does not re-parse the signature. If a `#!anvs` / `.anvs` document contains no function declarations, the AnvilScript Engine is never activated and the source is parsed as ANVL with ASL dialect features (`$` var-refs, interpolation, `vars`, `using`).
+- **ANVL/AnvilScript boundary**: top-level ANVL owns the document structure and the function declaration *signature* (`foo (a, b, c) => { ... }`). AnvilScript owns only the imperative body inside `{ ... }`. The ASL runtime receives the body as a source slice plus a validated parameter list; it does not re-parse the signature. If a `#!anvs` / `.anvs` document contains no function declarations, the AnvilScript Engine is never activated and the source is parsed as ANVL with ASL dialect features (`$` var-refs, interpolation, `vars`, `import`).
 - Mentions of AMP+ should be minimal in core docs and code comments.
 - AMP+ is treated as a constrained extension profile of AMP for government-use contexts.
 
@@ -19,8 +20,8 @@ current and does not depend on that design settling.
 
 | Feature | AML | ASL | AMP | Notes |
 |---|---|---|---|---|
-| import declarations | Yes (primary owner) | Yes (reuses ANVL `import`) | No | Keep deterministic ordering and cycle checks. |
-| using declarations | No | Yes (owner) | No | Brings foreign code into scope; rejected outside ASL. |
+| include declarations | Yes (primary owner) | Yes (reuses AML's `include`) | No | Keep deterministic ordering and cycle checks. |
+| import declarations | No | Yes (owner) | No | Brings foreign code into scope; rejected outside ASL. |
 | vars block | No | Yes (owner) | No | Immutable module-global constants; header construct in ASL. |
 | var-ref (`$name`, `${name}`) | Resolve-once static alias | Yes (dynamic owner) | No | AML `$x` resolves once during parsing; ASL `$x` re-evaluates at runtime. |
 | interpolation (`$"...{...}"`) | No | Yes (owner) | No | Dynamic string interpolation; gate by dialect. |

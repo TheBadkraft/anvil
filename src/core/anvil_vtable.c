@@ -44,7 +44,7 @@ const anvil_document_i Document = {
    .find_attribute = anvil_document_find_attribute,
    .get_fragment_value = anvil_document_get_fragment_value,
    .get_statements = anvil_document_get_statements,
-   .get_imports = anvil_document_get_imports,
+   .get_includes = anvil_document_get_includes,
    .get_error = anvil_document_get_error,
 };
 

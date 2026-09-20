@@ -42,7 +42,7 @@ static void th(void) {
 }
 
 /* A fragment has no header — just register the buffer and create an arena
- * sized off its own length, skipping doc_scan_header/mod_load_imports
+ * sized off its own length, skipping doc_scan_header/mod_load_includes
  * entirely (mirrors what anvil_parse_value_fragment itself will do). */
 static module_document setup_fragment_doc(const char *buffer, module_context *out_ctx) {
    module_document doc = setup_registered_doc(buffer, out_ctx);

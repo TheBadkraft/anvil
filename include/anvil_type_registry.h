@@ -72,21 +72,21 @@ typedef enum {
 anvil_type_registry anvil_type_registry_load(anvil_document doc);
 
 /**
- * @brief Build a registry from a document's own *direct* imports (not the
- * whole transitive graph — see anvil_document_get_imports), the mechanism
+ * @brief Build a registry from a document's own *direct* includes (not the
+ * whole transitive graph — see anvil_document_get_includes), the mechanism
  * behind the `types.X` namespace: `doc` itself does not need to carry
- * @[types] at all. Every direct import that does carry @[types] has its own
+ * @[types] at all. Every direct include that does carry @[types] has its own
  * type definitions merged into one combined registry, keyed by bare name
  * (e.g. "VIN", not "types.VIN") — `types.` is a flat namespace, independent
- * of which imported file a given name actually came from. If two imports
+ * of which included file a given name actually came from. If two includes
  * declare the same name, the later one silently wins (Map's own last-write
  * behavior) — collision reporting isn't designed yet.
- * @param doc The (typically non-@[types]) document whose imports to walk.
+ * @param doc The (typically non-@[types]) document whose includes to walk.
  * @return The registry handle (real but empty if `doc` has no @[types]
- * imports), or NULL only if doc itself is NULL. Dispose with
+ * includes), or NULL only if doc itself is NULL. Dispose with
  * anvil_type_registry_dispose once done.
  */
-anvil_type_registry anvil_type_registry_load_from_imports(anvil_document doc);
+anvil_type_registry anvil_type_registry_load_from_includes(anvil_document doc);
 
 /**
  * @brief Release a registry. Safe to call with NULL (no-op).
@@ -113,7 +113,7 @@ anvil_type_def anvil_type_registry_find(anvil_type_registry reg, const char *nam
  * every caller reads size/min/max/values through the same accessors no
  * matter which of those two sources actually produced the definition.
  * @param reg The registry to fall back to for custom types, or NULL if
- * only native/enum resolution is needed (e.g. a document with no imports).
+ * only native/enum resolution is needed (e.g. a document with no includes).
  * @param name The type name to resolve (e.g. "Numeric", "enum", "VIN").
  * @return The definition handle, or NULL if name is NULL, or name is
  * neither a native/enum name nor found in reg (including when reg is NULL

@@ -8,8 +8,8 @@ Reading order and status for everything in `notes/`, reconstructed from git hist
 
 ### Iteration 1 — Source identity & header scan (2026-08-14)
 - **`source-identity-registry.md`** — design record for the source-hash identity/registry mechanism (`Source.hash`, process-wide hash → `module_document` registry). Its own header still says "Status: in progress," which is stale — the registry is fully implemented and in heavy use as of this session (it's the exact mechanism `Source.get_arena`/`Source.new_node`/`Source.set_error` all look through, and this session found and fixed a real bug in how it interacts with `doc_dispose`). Worth a status-header pass later.
-- **`document-header-scan.md`** — design record for `doc_scan_header`/`mod_load_imports`. Phase itself is functionally complete, but this file is still actively amended when related work surfaces (most recently: the diamond-dispose registry bug, `HDR18`–`HDR20`, this session).
-- **`aml-import-namespace-rules.md`** — earlier, more informal design reference. Partially superseded (see its own header and `deferred-work.md` § *Superseded notes*); the rest still stands as background context.
+- **`document-header-scan.md`** — design record for `doc_scan_header`/`mod_load_includes`. Phase itself is functionally complete, but this file is still actively amended when related work surfaces (most recently: the diamond-dispose registry bug, `HDR18`–`HDR20`, this session).
+- **`aml-include-namespace-rules.md`** — earlier, more informal design reference. Partially superseded (see its own header and `deferred-work.md` § *Superseded notes*); the rest still stands as background context.
 - **`notes.md`** — miscellaneous, doesn't fit a specific doc. See *Miscellaneous* below — naming collision with this file worth resolving.
 
 ### Iteration 2 — `.anvlo` compilation exploration (2026-08-15)

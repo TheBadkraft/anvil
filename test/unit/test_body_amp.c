@@ -48,7 +48,7 @@ static void th(void) {
  * true/false/null are reserved keywords, not ordinary identifiers, and
  * only distinguishable from a bare IDENTIFIER reference by scanning the
  * full identifier-shaped token and comparing its text (see
- * notes/document-body-parse.md). Grouped here alongside AMP00b (import
+ * notes/document-body-parse.md). Grouped here alongside AMP00b (include
  * rejected as an identifier) as the same invariant from the other side:
  * these keywords work as values, but cannot work as identifiers.
  * ---------------------------------------------------------------------- */
@@ -101,25 +101,25 @@ static void test_amp00a_keyword_literal_assign(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * AMP00b — 'import' rejected as an identifier
- * Commentary: `import` is reserved by the header scanner for the
- * `import "path";` construct; using it as an ordinary statement name
+ * AMP00b — 'include' rejected as an identifier
+ * Commentary: `include` is reserved by the header scanner for the
+ * `include "path";` construct; using it as an ordinary statement name
  * must be rejected the same way, not silently accepted as a bare
  * identifier just because we're past the header and into the body.
- * `import` deliberately isn't the *first* statement here — the header
- * scanner's own import-loop only scans leading imports and stops for
- * good at the first non-import content, so `import` as a first
+ * `include` deliberately isn't the *first* statement here — the header
+ * scanner's own include-loop only scans leading includes and stops for
+ * good at the first non-include content, so `include` as a first
  * statement in an AMP document would instead trip
- * ANVL_ERR_IMPORT_AMP_FORBIDDEN at header-scan time (AMP forbids
- * imports entirely), never reaching body-parse at all. Putting a real
+ * ANVL_ERR_INCLUDE_AMP_FORBIDDEN at header-scan time (AMP forbids
+ * includes entirely), never reaching body-parse at all. Putting a real
  * statement first ensures this genuinely exercises the body parser's
  * own keyword check, not a header-scan collision.
  * ---------------------------------------------------------------------- */
-static void test_amp00b_import_rejected_as_identifier(void) {
+static void test_amp00b_include_rejected_as_identifier(void) {
    module_context ctx = NULL;
    module_document doc = setup_amp_doc("#!amp\n"
                                        "first := 1;\n"
-                                       "import := 2;\n",
+                                       "include := 2;\n",
                                        &ctx);
    TestBit.is_not_null(doc, "AMP00b: document loaded");
    if (!doc) {
@@ -749,12 +749,15 @@ static void test_amp13_vars_rejected(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * AMP14 — 'using "path";' rejected in AMP
+ * AMP14 — 'import "path";' rejected in AMP
+ * Commentary: `import` is AnvlScript's own reserved-ahead-of-feature
+ * keyword (not yet implemented) — same reservation status `using` had
+ * before the import/include rename (FR-2609-anvl-public-api-002).
  * ---------------------------------------------------------------------- */
-static void test_amp14_using_rejected(void) {
+static void test_amp14_import_rejected(void) {
    module_context ctx = NULL;
    module_document doc = setup_amp_doc("#!amp\n"
-                                       "using \"somewhere\";\n",
+                                       "import \"somewhere\";\n",
                                        &ctx);
    TestBit.is_not_null(doc, "AMP14: document loaded");
    if (!doc) {
@@ -925,7 +928,7 @@ static void test_amp20_array_element_not_scalar_rejected(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * AMP21 — reserved keyword ('import'/'vars'/'using') rejected as a bare
+ * AMP21 — reserved keyword ('include'/'vars'/'import') rejected as a bare
  * value, not just as an identifier
  * Commentary: true/false/null are fine as values (AMP00a) — this is the
  * other half of the same invariant, for the RESERVED group specifically
@@ -1090,8 +1093,8 @@ int main(void) {
    anvl_parser_set_hook(report_throughput, NULL);
 
    TestBit.run_ex("AMP00a_keyword_literal_assign", NULL, test_amp00a_keyword_literal_assign, th);
-   TestBit.run_ex("AMP00b_import_rejected_as_identifier", NULL,
-                  test_amp00b_import_rejected_as_identifier, th);
+   TestBit.run_ex("AMP00b_include_rejected_as_identifier", NULL,
+                  test_amp00b_include_rejected_as_identifier, th);
    TestBit.run_ex("AMP00c_empty_body", NULL, test_amp00c_empty_body, th);
    TestBit.run_ex("AMP01a_integer_assign", NULL, test_amp01a_integer_assign, th);
    TestBit.run_ex("AMP01b_float_assign", NULL, test_amp01b_float_assign, th);
@@ -1114,7 +1117,7 @@ int main(void) {
    TestBit.run_ex("AMP11_base_rejected", NULL, test_amp11_base_rejected, th);
    TestBit.run_ex("AMP12_object_block_rejected", NULL, test_amp12_object_block_rejected, th);
    TestBit.run_ex("AMP13_vars_rejected", NULL, test_amp13_vars_rejected, th);
-   TestBit.run_ex("AMP14_using_rejected", NULL, test_amp14_using_rejected, th);
+   TestBit.run_ex("AMP14_import_rejected", NULL, test_amp14_import_rejected, th);
    TestBit.run_ex("AMP15_statement_attributes_rejected", NULL,
                   test_amp15_statement_attributes_rejected, th);
    TestBit.run_ex("AMP16_object_value_rejected", NULL, test_amp16_object_value_rejected, th);

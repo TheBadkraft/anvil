@@ -15,7 +15,7 @@
  * File: src/core/resolver.c                                              *
  * ---------------------------------------------------------------------- *
  * Description:                                                          *
- * Runs once, after every document in the import graph has been through   *
+ * Runs once, after every document in the include graph has been through  *
  * a successful doc_parse_body — not per-document, order-independent.     *
  * See notes/resolution-phase.md for the full design.                     *
  * ********************************************************************** */
@@ -34,7 +34,7 @@
 // in ctx->docs. Only doc->body (a document's own top-level list) is walked, never the flat
 // ctx->statements index — that index also carries nested statements, which are never valid
 // resolution targets. A duplicate top-level name anywhere in the context — same document or
-// across a merged import — is a hard error (see notes/resolution-phase.md "Duplicate names are
+// across a merged include — is a hard error (see notes/resolution-phase.md "Duplicate names are
 // a hard error, full stop").
 static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_code) {
    if (!ctx->identifiers) {
@@ -63,7 +63,7 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
          }
          usize name_len = Source.slice_length(stmt->name);
          if (name_len == 0) {
-            continue; // VARS/USING - no declared name, never a resolvable target
+            continue; // VARS/IMPORT - no declared name, never a resolvable target
          }
          if (Map.has(ctx->identifiers, stmt->name.start, name_len)) {
             anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER, 0, 0, __FILE__,

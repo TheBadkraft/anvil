@@ -501,14 +501,14 @@ void mod_ctx_dispose_arena(bump_allocator arena) {
    Allocator.release((sc_ctrl_base_s *)arena);
 }
 /* ----------------------------------------------------------------------- *
- * Import graph expansion
+ * Include graph expansion
  * ----------------------------------------------------------------------- */
-#define IMPORT_PATH_MAX 1024
+#define INCLUDE_PATH_MAX 1024
 
-static anvl_result import_load_dependencies(module_context ctx, module_document doc, list stack,
-                                            usize *out_size, anvl_err_code *out_err_code);
+static anvl_result include_load_dependencies(module_context ctx, module_document doc, list stack,
+                                             usize *out_size, anvl_err_code *out_err_code);
 
-static void import_resolve_dir(const char *path, char *out_dir, usize out_size) {
+static void include_resolve_dir(const char *path, char *out_dir, usize out_size) {
    if (!path || out_size == 0) {
       if (out_size > 0) {
          out_dir[0] = '\0';
@@ -533,7 +533,7 @@ static void import_resolve_dir(const char *path, char *out_dir, usize out_size) 
    out_dir[len] = '\0';
 }
 
-static bool import_path_on_stack(list stack, const char *path) {
+static bool include_path_on_stack(list stack, const char *path) {
    if (!stack || !path) {
       return false;
    }
@@ -548,40 +548,41 @@ static bool import_path_on_stack(list stack, const char *path) {
    return false;
 }
 
-static anvl_result import_load_child(module_context ctx, module_document parent, anvl_import imp,
-                                     list stack, usize *out_size, anvl_err_code *out_err_code) {
+static anvl_result include_load_child(module_context ctx, module_document parent,
+                                      anvl_include inc, list stack, usize *out_size,
+                                      anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
-   usize path_len = Source.slice_length(imp->path);
+   usize path_len = Source.slice_length(inc->path);
    if (path_len < 2) {
-      err_code = ANVL_ERR_IMPORT_FILE_NOT_FOUND;
+      err_code = ANVL_ERR_INCLUDE_FILE_NOT_FOUND;
       goto error;
    }
 
    // Strip surrounding quotes from the path slice.
    path_len -= 2;
-   if (path_len >= IMPORT_PATH_MAX) {
+   if (path_len >= INCLUDE_PATH_MAX) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
 
-   char import_name[IMPORT_PATH_MAX];
-   memcpy(import_name, imp->path.start + 1, path_len);
-   import_name[path_len] = '\0';
+   char include_name[INCLUDE_PATH_MAX];
+   memcpy(include_name, inc->path.start + 1, path_len);
+   include_name[path_len] = '\0';
 
    // Resolve relative to the parent document's directory.
-   char resolved[IMPORT_PATH_MAX];
-   if (import_name[0] == '/') {
-      if (strlen(import_name) >= IMPORT_PATH_MAX) {
+   char resolved[INCLUDE_PATH_MAX];
+   if (include_name[0] == '/') {
+      if (strlen(include_name) >= INCLUDE_PATH_MAX) {
          err_code = ANVL_ERR_INVALID_ARGUMENT;
          goto error;
       }
-      strcpy(resolved, import_name);
+      strcpy(resolved, include_name);
    } else {
-      char parent_dir[IMPORT_PATH_MAX];
-      import_resolve_dir(parent->filepath, parent_dir, sizeof(parent_dir));
+      char parent_dir[INCLUDE_PATH_MAX];
+      include_resolve_dir(parent->filepath, parent_dir, sizeof(parent_dir));
 
       int written = snprintf(resolved, sizeof(resolved), "%s/%s", parent_dir[0] ? parent_dir : ".",
-                             import_name);
+                             include_name);
       if (written < 0 || (usize)written >= sizeof(resolved)) {
          err_code = ANVL_ERR_INVALID_ARGUMENT;
          goto error;
@@ -589,8 +590,8 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
    }
 
    // Cycle detection: the resolved path must not already be on the recursion stack.
-   if (import_path_on_stack(stack, resolved)) {
-      err_code = ANVL_ERR_IMPORT_CYCLIC;
+   if (include_path_on_stack(stack, resolved)) {
+      err_code = ANVL_ERR_INCLUDE_CYCLIC;
       goto error;
    }
 
@@ -604,7 +605,7 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
    if (res != ANVL_RES_OK) {
       if (err_code == ANVL_ERR_IO_FILE_NOT_FOUND || err_code == ANVL_ERR_IO_FILE_READ ||
           err_code == ANVL_ERR_IO_INVALID_PATH) {
-         err_code = ANVL_ERR_IMPORT_FILE_NOT_FOUND;
+         err_code = ANVL_ERR_INCLUDE_FILE_NOT_FOUND;
       }
       goto error_child;
    }
@@ -616,7 +617,7 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
       if (err_code == ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT) {
          module_document existing = Registry.find(Source.hash(child->source));
          if (existing) {
-            imp->resolved = existing;
+            inc->resolved = existing;
             doc_dispose(child);
             return ANVL_RES_OK;
          }
@@ -625,20 +626,20 @@ static anvl_result import_load_child(module_context ctx, module_document parent,
    }
 
    // New document registered — count its source toward the module's body-parse
-   // arena size hint before recursing into its own imports.
+   // arena size hint before recursing into its own includes.
    if (out_size) {
       *out_size += Source.length(child->source);
    }
 
-   // Scan its header and recurse into its imports.
+   // Scan its header and recurse into its includes.
    res = doc_scan_header(child, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
 
-   imp->resolved = child;
+   inc->resolved = child;
 
-   res = import_load_dependencies(ctx, child, stack, out_size, &err_code);
+   res = include_load_dependencies(ctx, child, stack, out_size, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
@@ -657,8 +658,8 @@ error:
    return ANVL_RES_ERR;
 }
 
-static anvl_result import_load_dependencies(module_context ctx, module_document doc, list stack,
-                                            usize *out_size, anvl_err_code *out_err_code) {
+static anvl_result include_load_dependencies(module_context ctx, module_document doc, list stack,
+                                             usize *out_size, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (!doc || !doc->filepath) {
@@ -669,14 +670,14 @@ static anvl_result import_load_dependencies(module_context ctx, module_document 
    // Push this document onto the recursion stack for cycle detection.
    List.append(stack, (object)doc->filepath);
 
-   for (usize i = 0; i < List.size(doc->header->imports); i++) {
-      anvl_import imp = NULL;
-      List.get(doc->header->imports, i, (object *)&imp);
-      if (!imp) {
+   for (usize i = 0; i < List.size(doc->header->includes); i++) {
+      anvl_include inc = NULL;
+      List.get(doc->header->includes, i, (object *)&inc);
+      if (!inc) {
          continue;
       }
 
-      if (ANVL_RES_OK != import_load_child(ctx, doc, imp, stack, out_size, &err_code)) {
+      if (ANVL_RES_OK != include_load_child(ctx, doc, inc, stack, out_size, &err_code)) {
          goto error_pop;
       }
    }
@@ -693,8 +694,8 @@ error:
    return ANVL_RES_ERR;
 }
 
-anvl_result mod_load_imports(module_context ctx, module_document root, usize *out_body_size_hint,
-                             anvl_err_code *out_err_code) {
+anvl_result mod_load_includes(module_context ctx, module_document root, usize *out_body_size_hint,
+                              anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (out_err_code) {
@@ -706,7 +707,7 @@ anvl_result mod_load_imports(module_context ctx, module_document root, usize *ou
    }
 
    // Root counts toward the arena size hint too — it never passes through
-   // import_load_child, so it isn't picked up by the recursion below.
+   // include_load_child, so it isn't picked up by the recursion below.
    usize total = Source.length(root->source);
 
    list stack = List.new(8, sizeof(const char *));
@@ -715,7 +716,7 @@ anvl_result mod_load_imports(module_context ctx, module_document root, usize *ou
       goto error;
    }
 
-   anvl_result res = import_load_dependencies(ctx, root, stack, &total, &err_code);
+   anvl_result res = include_load_dependencies(ctx, root, stack, &total, &err_code);
 
    List.dispose(stack);
 

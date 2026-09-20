@@ -11,8 +11,8 @@
  * anvil_flat.c - Public ABI implementation: flat exported functions      *
  * ---------------------------------------------------------------------- *
  * Description:                                                          *
- * anvil_load runs the whole internal pipeline (header scan, import      *
- * loading, arena creation, body parse of every document in the import    *
+ * anvil_load runs the whole internal pipeline (header scan, include     *
+ * loading, arena creation, body parse of every document in the include   *
  * graph, resolution) and records which *phase* first failed, if any, on  *
  * the returned handle — not a translated internal anvl_err_code, so      *
  * internal error-code churn never becomes a public ABI change. See      *
@@ -137,13 +137,13 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    }
 
    usize size_hint = 0;
-   if (ANVL_RES_OK != mod_load_imports(ctx, doc, &size_hint, &err_code)) {
-      // Also covers a nested import's own header-scan failure (mod_load_imports scans each
+   if (ANVL_RES_OK != mod_load_includes(ctx, doc, &size_hint, &err_code)) {
+      // Also covers a nested include's own header-scan failure (mod_load_includes scans each
       // child's header as it recurses) - the root document's own header was fine, so
-      // ANVIL_ERR_IMPORT ("something went wrong resolving the import graph") is the more
+      // ANVIL_ERR_INCLUDE ("something went wrong resolving the include graph") is the more
       // accurate category from this caller's perspective, not ANVIL_ERR_HEADER.
-      handle->error = ANVIL_ERR_IMPORT;
-      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_IMPORT);
+      handle->error = ANVIL_ERR_INCLUDE;
+      handle->error_detail = make_error_detail(ctx, ANVIL_ERR_INCLUDE);
       return handle;
    }
 
@@ -228,7 +228,7 @@ anvil_document anvil_parse_value_fragment(const char *text, size_t length) {
       return handle;
    }
 
-   // No header, no imports — a fragment is just the value text itself.
+   // No header, no includes — a fragment is just the value text itself.
    usize capacity = mod_ctx_arena_size_hint(length);
    if (ANVL_RES_OK != mod_ctx_create_arena(ctx, capacity, &err_code)) {
       handle->error = ANVIL_ERR_MEMORY;
@@ -331,7 +331,7 @@ struct anvil_document_iterator_t {
    sc_queryable q;
 };
 
-anvil_document_iterator anvil_document_get_imports(anvil_document doc) {
+anvil_document_iterator anvil_document_get_includes(anvil_document doc) {
    if (!doc || !doc->root || !doc->root->header) {
       return NULL;
    }
@@ -341,7 +341,7 @@ anvil_document_iterator anvil_document_get_imports(anvil_document doc) {
       return NULL;
    }
    it->ctx = doc->ctx;
-   it->q = List.as_queryable(doc->root->header->imports);
+   it->q = List.as_queryable(doc->root->header->includes);
    return (anvil_document_iterator)it;
 }
 
@@ -356,8 +356,8 @@ bool anvil_document_iterator_next(anvil_document_iterator it, anvil_document *ou
    }
    const void *element = NULL;
    while (Query.next(&i->q, &element, NULL)) {
-      anvl_import imp = *(anvl_import *)element;
-      if (!imp || !imp->resolved) {
+      anvl_include inc = *(anvl_include *)element;
+      if (!inc || !inc->resolved) {
          continue; // skip a broken/unresolved entry rather than yielding a bad handle
       }
       struct anvil_document_t *handle = Allocator.alloc(sizeof(struct anvil_document_t));
@@ -365,7 +365,7 @@ bool anvil_document_iterator_next(anvil_document_iterator it, anvil_document *ou
          return false;
       }
       handle->ctx = i->ctx;
-      handle->root = imp->resolved;
+      handle->root = inc->resolved;
       handle->error = ANVIL_OK;
       handle->fragment_value = NULL;
       handle->error_detail = NULL;

@@ -382,8 +382,8 @@ Using the parser's own instrumentation (`anvl_parser_set_hook`, not a new ad hoc
 precisely, body-parsing itself was confirmed negligible (~0.015 ns/byte) — so the remaining
 per-byte cost had to be somewhere else in `anvil_load_buffer`. It was: `source_from_buffer`
 computes an FNV-1a content hash over the *entire* buffer, unconditionally, on every load — root
-document included, AMP documents included (which can never contain an `import` at all, so the
-hash's only real purpose — import deduplication — can never apply to them). That byte-wise hash
+document included, AMP documents included (which can never contain an `include` at all, so the
+hash's only real purpose — include deduplication — can never apply to them). That byte-wise hash
 was ~98% of `anvil_load_buffer`'s remaining cost on your 813KB shape. Fixed by widening it to
 process 8 bytes per multiply instead of 1 (no change to what it's used for, no caller depends on
 a specific value) — **~8.2x faster in isolation**, **~5.9x faster for `anvil_load_buffer` as a
