@@ -151,7 +151,7 @@ static void test_anv09_scalar_accessors(void) {
    }
    TestBit.is_false(anvil_has_errors(doc), "ANV09: no errors");
 
-   anvil_statement flag = anvil_statement_get(doc, "flag");
+   anvil_statement flag = anvil_document_find_statement(doc, "flag");
    TestBit.is_not_null(flag, "ANV09: 'flag' statement found");
    anvil_value flag_val = anvil_statement_get_value(flag);
    TestBit.is_equal_int(ANVIL_VALUE_BOOL, anvil_value_get_type(flag_val),
@@ -161,14 +161,14 @@ static void test_anv09_scalar_accessors(void) {
    TestBit.is_equal_int(4, (long long)len, "ANV09: 'flag' text length is 4");
    TestBit.is_true(0 == strcmp("true", buf), "ANV09: 'flag' text is 'true'");
 
-   anvil_statement count = anvil_statement_get(doc, "count");
+   anvil_statement count = anvil_document_find_statement(doc, "count");
    anvil_value count_val = anvil_statement_get_value(count);
    TestBit.is_equal_int(ANVIL_VALUE_NUMERIC, anvil_value_get_type(count_val),
                         "ANV09: 'count' is ANVIL_VALUE_NUMERIC");
    anvil_value_get_text(count_val, buf, sizeof(buf));
    TestBit.is_true(0 == strcmp("42", buf), "ANV09: 'count' text is '42'");
 
-   anvil_statement word = anvil_statement_get(doc, "word");
+   anvil_statement word = anvil_document_find_statement(doc, "word");
    anvil_value word_val = anvil_statement_get_value(word);
    TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, anvil_value_get_type(word_val),
                         "ANV09: 'word' is ANVIL_VALUE_IDENTIFIER");
@@ -188,7 +188,7 @@ static void test_anv10_string_escape_resolution(void) {
       return;
    }
 
-   anvil_statement greeting = anvil_statement_get(doc, "greeting");
+   anvil_statement greeting = anvil_document_find_statement(doc, "greeting");
    anvil_value greeting_val = anvil_statement_get_value(greeting);
    TestBit.is_equal_int(ANVIL_VALUE_STRING, anvil_value_get_type(greeting_val),
                         "ANV10: 'greeting' is ANVIL_VALUE_STRING");
@@ -211,7 +211,7 @@ static void test_anv11_blob_accessor(void) {
       return;
    }
 
-   anvil_statement tag = anvil_statement_get(doc, "tag");
+   anvil_statement tag = anvil_document_find_statement(doc, "tag");
    anvil_value tag_val = anvil_statement_get_value(tag);
    TestBit.is_equal_int(ANVIL_VALUE_BLOB, anvil_value_get_type(tag_val),
                         "ANV11: 'tag' is ANVIL_VALUE_BLOB");
@@ -231,7 +231,7 @@ static void test_anv12_array_tuple_accessors(void) {
       return;
    }
 
-   anvil_statement items = anvil_statement_get(doc, "items");
+   anvil_statement items = anvil_document_find_statement(doc, "items");
    anvil_value items_val = anvil_statement_get_value(items);
    TestBit.is_equal_int(ANVIL_VALUE_ARRAY, anvil_value_get_type(items_val),
                         "ANV12: 'items' is ANVIL_VALUE_ARRAY");
@@ -249,7 +249,7 @@ static void test_anv12_array_tuple_accessors(void) {
 
    TestBit.is_null(anvil_value_get_element(items_val, 3), "ANV12: items[3] is out of bounds");
 
-   anvil_statement pair = anvil_statement_get(doc, "pair");
+   anvil_statement pair = anvil_document_find_statement(doc, "pair");
    anvil_value pair_val = anvil_statement_get_value(pair);
    TestBit.is_equal_int(ANVIL_VALUE_TUPLE, anvil_value_get_type(pair_val),
                         "ANV12: 'pair' is ANVIL_VALUE_TUPLE");
@@ -268,7 +268,7 @@ static void test_anv13_object_accessors(void) {
       return;
    }
 
-   anvil_statement config = anvil_statement_get(doc, "config");
+   anvil_statement config = anvil_document_find_statement(doc, "config");
    anvil_value config_val = anvil_statement_get_value(config);
    TestBit.is_equal_int(ANVIL_VALUE_OBJECT, anvil_value_get_type(config_val),
                         "ANV13: 'config' is ANVIL_VALUE_OBJECT");
@@ -301,7 +301,7 @@ static void test_anv14_varref_transparency_scalar(void) {
       return;
    }
 
-   anvil_statement alias = anvil_statement_get(doc, "alias_count");
+   anvil_statement alias = anvil_document_find_statement(doc, "alias_count");
    anvil_value alias_val = anvil_statement_get_value(alias);
    TestBit.is_equal_int(ANVIL_VALUE_NUMERIC, anvil_value_get_type(alias_val),
                         "ANV14: alias reports NUMERIC, not a VARREF-shaped type");
@@ -322,7 +322,7 @@ static void test_anv15_varref_transparency_object(void) {
       return;
    }
 
-   anvil_statement alias = anvil_statement_get(doc, "alias_config");
+   anvil_statement alias = anvil_document_find_statement(doc, "alias_config");
    anvil_value alias_val = anvil_statement_get_value(alias);
    TestBit.is_equal_int(ANVIL_VALUE_OBJECT, anvil_value_get_type(alias_val),
                         "ANV15: alias reports OBJECT, transparently");
@@ -342,7 +342,7 @@ static void test_anv16_buffer_sizing_convention(void) {
       return;
    }
 
-   anvil_statement word = anvil_statement_get(doc, "word");
+   anvil_statement word = anvil_document_find_statement(doc, "word");
    anvil_value word_val = anvil_statement_get_value(word);
 
    size_t needed = anvil_value_get_text(word_val, NULL, 0);
@@ -364,12 +364,12 @@ static void test_anv16_buffer_sizing_convention(void) {
  * ANV17 — NULL safety across every Statement/Value accessor
  * ---------------------------------------------------------------------- */
 static void test_anv17_accessor_null_safety(void) {
-   TestBit.is_null(anvil_statement_get(NULL, "x"), "ANV17: statement_get(NULL, ...) is NULL");
+   TestBit.is_null(anvil_document_find_statement(NULL, "x"), "ANV17: find_statement(NULL, ...) is NULL");
 
    anvil_document doc = load_accessors_doc();
    TestBit.is_not_null(doc, "ANV17: document loaded (for the valid-doc/NULL-name case)");
    if (doc) {
-      TestBit.is_null(anvil_statement_get(doc, NULL), "ANV17: statement_get(doc, NULL) is NULL");
+      TestBit.is_null(anvil_document_find_statement(doc, NULL), "ANV17: find_statement(doc, NULL) is NULL");
       anvil_dispose(doc);
    }
 
@@ -399,7 +399,7 @@ static void test_anv18_load_buffer_clean(void) {
    }
    TestBit.is_false(anvil_has_errors(doc), "ANV18: no errors");
 
-   anvil_statement name = anvil_statement_get(doc, "name");
+   anvil_statement name = anvil_document_find_statement(doc, "name");
    TestBit.is_not_null(name, "ANV18: 'name' statement found");
    anvil_value name_val = anvil_statement_get_value(name);
    TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, anvil_value_get_type(name_val),
@@ -537,7 +537,7 @@ static void test_anv25_statement_attribute_enumeration(void) {
       return;
    }
 
-   anvil_statement server = anvil_statement_get(doc, "server");
+   anvil_statement server = anvil_document_find_statement(doc, "server");
    TestBit.is_not_null(server, "ANV25: 'server' statement found");
    TestBit.is_equal_int(2, (long long)anvil_statement_get_attribute_count(server),
                         "ANV25: 2 statement-level attributes");
@@ -839,7 +839,7 @@ static void test_anv34_object_block_get_value(void) {
       return;
    }
 
-   anvil_statement label = anvil_statement_get(doc, "label");
+   anvil_statement label = anvil_document_find_statement(doc, "label");
    TestBit.is_not_null(label, "ANV34: 'label' statement found");
    if (label) {
       anvil_value val = anvil_statement_get_value(label);
@@ -883,7 +883,7 @@ static void test_anv35_string_no_escapes(void) {
       return;
    }
 
-   anvil_statement plain = anvil_statement_get(doc, "plain_string");
+   anvil_statement plain = anvil_document_find_statement(doc, "plain_string");
    TestBit.is_not_null(plain, "ANV35: 'plain_string' statement found");
    anvil_value plain_val = anvil_statement_get_value(plain);
    TestBit.is_equal_int(ANVIL_VALUE_STRING, anvil_value_get_type(plain_val),
@@ -914,7 +914,7 @@ static void test_anv36_string_truncated_buffer(void) {
       return;
    }
 
-   anvil_statement greeting = anvil_statement_get(doc, "greeting");
+   anvil_statement greeting = anvil_document_find_statement(doc, "greeting");
    anvil_value greeting_val = anvil_statement_get_value(greeting);
 
    // resolved text is "hello\nworld" (11 bytes); a 5-byte buffer only has
@@ -924,6 +924,46 @@ static void test_anv36_string_truncated_buffer(void) {
    TestBit.is_equal_int(11, (long long)len,
                         "ANV36: returned length is the full resolved length, not the truncated one");
    TestBit.is_true(0 == strcmp("hell", buf), "ANV36: buffer holds a truncated, NUL-terminated prefix");
+
+   anvil_dispose(doc);
+}
+/* ---------------------------------------------------------------------- *
+ * ANV37 — anvil_value_find_statement: by-key lookup into an OBJECT's
+ * nested fields, the missing sibling to anvil_value_get_statement's
+ * positional access (see FR-2609-anvl-public-api-001.md's "Document.find_statement /
+ * Value.find_statement" entry)
+ * ---------------------------------------------------------------------- */
+static void test_anv37_value_find_statement(void) {
+   anvil_document doc = load_accessors_doc();
+   TestBit.is_not_null(doc, "ANV37: document loaded");
+   if (!doc) {
+      return;
+   }
+
+   anvil_statement config = anvil_document_find_statement(doc, "config");
+   anvil_value config_val = anvil_statement_get_value(config);
+
+   anvil_statement port_stmt = anvil_value_find_statement(config_val, "port");
+   TestBit.is_not_null(port_stmt, "ANV37: 'port' field found by key");
+   char text_buf[32] = {0};
+   anvil_value_get_text(anvil_statement_get_value(port_stmt), text_buf, sizeof(text_buf));
+   TestBit.is_true(0 == strcmp("8080", text_buf), "ANV37: 'port' value is 8080");
+
+   anvil_statement host_stmt = anvil_value_find_statement(config_val, "host");
+   TestBit.is_not_null(host_stmt, "ANV37: 'host' field found by key too, not just the first match");
+
+   TestBit.is_null(anvil_value_find_statement(config_val, "nonexistent"),
+                   "ANV37: an absent key returns NULL");
+   TestBit.is_null(anvil_value_find_statement(NULL, "port"),
+                   "ANV37: find_statement(NULL, ...) is NULL");
+   TestBit.is_null(anvil_value_find_statement(config_val, NULL),
+                   "ANV37: find_statement(val, NULL) is NULL");
+
+   // A non-OBJECT value (an ARRAY here) has no fields to find by key.
+   anvil_statement items = anvil_document_find_statement(doc, "items");
+   anvil_value items_val = anvil_statement_get_value(items);
+   TestBit.is_null(anvil_value_find_statement(items_val, "anything"),
+                   "ANV37: find_statement on a non-OBJECT value is NULL");
 
    anvil_dispose(doc);
 }
@@ -976,6 +1016,7 @@ int main(void) {
    TestBit.run_ex("ANV34_object_block_get_value", NULL, test_anv34_object_block_get_value, th);
    TestBit.run_ex("ANV35_string_no_escapes", NULL, test_anv35_string_no_escapes, th);
    TestBit.run_ex("ANV36_string_truncated_buffer", NULL, test_anv36_string_truncated_buffer, th);
+   TestBit.run_ex("ANV37_value_find_statement", NULL, test_anv37_value_find_statement, th);
 
    return TestBit.report();
 }

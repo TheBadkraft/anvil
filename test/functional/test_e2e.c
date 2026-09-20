@@ -28,7 +28,7 @@ static void test_fn01_core_parse(void) {
    TestBit.is_not_null(doc, "FN01: document loaded");
    if (doc) {
       TestBit.is_false(anvil_has_errors(doc), "FN01: no parse errors");
-      anvil_statement stmt = anvil_statement_get(doc, "count");
+      anvil_statement stmt = anvil_document_find_statement(doc, "count");
       TestBit.is_not_null(stmt, "FN01: 'count' statement found");
       if (stmt) {
          anvil_value val = anvil_statement_get_value(stmt);
@@ -150,7 +150,7 @@ static void test_fn06_minified_shebang(void) {
    TestBit.is_not_null(doc, "FN06: minified document loaded");
    if (doc) {
       TestBit.is_false(anvil_has_errors(doc), "FN06: no parse errors despite zero separator");
-      anvil_statement stmt = anvil_statement_get(doc, "name");
+      anvil_statement stmt = anvil_document_find_statement(doc, "name");
       TestBit.is_not_null(stmt, "FN06: 'name' statement found");
       anvil_dispose(doc);
    }

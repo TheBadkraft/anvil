@@ -282,7 +282,7 @@ const char *anvil_get_version(void) {
    return Anvl.get_version();
 }
 
-anvil_statement anvil_statement_get(anvil_document doc, const char *name) {
+anvil_statement anvil_document_find_statement(anvil_document doc, const char *name) {
    if (!doc || !doc->ctx || !doc->ctx->identifiers || !name) {
       return NULL;
    }
@@ -610,6 +610,22 @@ anvil_statement anvil_value_get_statement(anvil_value val, size_t index) {
    anvl_statement stmt = NULL;
    List.get(v->object.statements, index, (object *)&stmt);
    return (anvil_statement)stmt;
+}
+
+anvil_statement anvil_value_find_statement(anvil_value val, const char *key) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || v->type != ANVL_VALUE_OBJECT || !key) {
+      return NULL;
+   }
+   usize count = (usize)List.size(v->object.statements);
+   for (usize i = 0; i < count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(v->object.statements, i, (object *)&stmt);
+      if (stmt && Source.slice_equals(stmt->name, key)) {
+         return (anvil_statement)stmt;
+      }
+   }
+   return NULL;
 }
 
 anvil_value anvil_document_get_fragment_value(anvil_document doc) {

@@ -30,7 +30,6 @@ const anvil_i Anvil = {
 };
 
 const anvil_statement_i Statement = {
-   .get = anvil_statement_get,
    .get_value = anvil_statement_get_value,
    .get_name = anvil_statement_get_name,
    .get_attribute_count = anvil_statement_get_attribute_count,
@@ -42,6 +41,7 @@ const anvil_document_i Document = {
    .get_attribute_count = anvil_document_get_attribute_count,
    .get_attribute = anvil_document_get_attribute,
    .find_attribute = anvil_document_find_attribute,
+   .find_statement = anvil_document_find_statement,
    .get_fragment_value = anvil_document_get_fragment_value,
    .get_statements = anvil_document_get_statements,
    .get_includes = anvil_document_get_includes,
@@ -76,4 +76,5 @@ const anvil_value_i Value = {
    .get_count = anvil_value_get_count,
    .get_element = anvil_value_get_element,
    .get_statement = anvil_value_get_statement,
+   .find_statement = anvil_value_find_statement,
 };

@@ -170,7 +170,7 @@ whatever the reference resolved *to*, transparently (see `language-reference.md`
 When you know what you want, skip the walk:
 
 ```c
-anvil_statement port = anvil_statement_get(doc, "port");
+anvil_statement port = anvil_document_find_statement(doc, "port");
 if (port) {
    char text[32] = {0};
    anvil_value_get_text(anvil_statement_get_value(port), text, sizeof(text));

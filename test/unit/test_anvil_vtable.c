@@ -48,7 +48,6 @@ static void test_vt01_anvil_matches_flat(void) {
  * counterpart
  * ---------------------------------------------------------------------- */
 static void test_vt02_statement_matches_flat(void) {
-   TestBit.is_true(Statement.get == anvil_statement_get, "VT02: Statement.get is anvil_statement_get");
    TestBit.is_true(Statement.get_value == anvil_statement_get_value,
                    "VT02: Statement.get_value is anvil_statement_get_value");
    TestBit.is_true(Statement.get_name == anvil_statement_get_name,
@@ -73,6 +72,8 @@ static void test_vt03_value_matches_flat(void) {
                    "VT03: Value.get_element is anvil_value_get_element");
    TestBit.is_true(Value.get_statement == anvil_value_get_statement,
                    "VT03: Value.get_statement is anvil_value_get_statement");
+   TestBit.is_true(Value.find_statement == anvil_value_find_statement,
+                   "VT03: Value.find_statement is anvil_value_find_statement");
 }
 /* ---------------------------------------------------------------------- *
  * VT05 — every Document vtable field is pointer-identical to its flat
@@ -85,6 +86,8 @@ static void test_vt05_document_matches_flat(void) {
                    "VT05: Document.get_attribute is anvil_document_get_attribute");
    TestBit.is_true(Document.find_attribute == anvil_document_find_attribute,
                    "VT05: Document.find_attribute is anvil_document_find_attribute");
+   TestBit.is_true(Document.find_statement == anvil_document_find_statement,
+                   "VT05: Document.find_statement is anvil_document_find_statement");
    TestBit.is_true(Document.get_fragment_value == anvil_document_get_fragment_value,
                    "VT05: Document.get_fragment_value is anvil_document_get_fragment_value");
    TestBit.is_true(Document.get_statements == anvil_document_get_statements,
@@ -150,7 +153,7 @@ static void test_vt04_vtable_only_smoke_test(void) {
    }
    TestBit.is_false(Anvil.has_errors(doc), "VT04: no errors, via the vtable");
 
-   anvil_statement name = Statement.get(doc, "name");
+   anvil_statement name = Document.find_statement(doc, "name");
    TestBit.is_not_null(name, "VT04: 'name' statement found via the vtable");
    anvil_value name_val = Statement.get_value(name);
    TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, Value.get_type(name_val),
