@@ -113,11 +113,21 @@ That reframes what's actually still open into two narrower, concrete gaps:
    directory containing a real `package.json`). Fixable without re-hosting anything: add a
    `package.json` (name/version/main pointing at `index.js`) to what gets tarred, matching what
    `npm pack` would produce from `anvil-wasm`'s own `package.json` today.
-2. **`anvil-node`'s prebuilt addon is still Linux x86_64 only.** Real fix for broad
+2. **`anvil-node`'s prebuilt addon is still Linux x86_64 only — deliberate, not an oversight.**
+   The project owner's own available build hardware is Linux-only today; there's no macOS or
+   Windows machine to produce or verify a prebuilt addon for either platform, so shipping one
+   would mean shipping something untested and unverifiable, not a real fix. Real fix for broad
    installability, as originally framed: `prebuildify`-style multi-platform binaries, most
    naturally produced by the Linode CI this project already plans to build out, uploaded to
    `anvldata.com` alongside the existing tarball rather than requiring a compiler on the
-   consumer's machine.
+   consumer's machine — but that only covers Linux too, since CI still needs to actually run on
+   each target platform (or cross-compile convincingly) to produce a trustworthy binary for it,
+   not just Linux hardware building for everyone. **Plan, not just a gap:** macOS and Windows
+   support gets added once a contributor with real access to that platform joins the project and
+   can build and verify a prebuilt addon for it — not attempted blind beforehand. Until then, both
+   `anvil-node` and anything that depends on it (including any `flywire` package published from
+   `dist`) are Linux-only, on purpose, and should be documented as such wherever they're offered
+   for install, not left implicit.
 
 Registry publish (real `npm install anvil-wasm@x.y.z`, versioning, integrity hashes) is still the
 better long-term answer per the original analysis above — this update doesn't change that, it just
