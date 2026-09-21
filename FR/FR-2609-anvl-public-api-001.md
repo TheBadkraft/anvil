@@ -149,6 +149,8 @@ across all four build variants (static/shared × debug/release).
 
 **Node/JS binding tech: N-API first, WASM second.** A native N-API addon (direct FFI-speed access to a compiled `libanvil`, matching flywire's actual context — server-side Node, not a browser) lands first; a WASM build follows for the browser use case `flywire-client.js` already anticipates (`window.anvl`) but — per that file's own comment — has "not been exercised yet, revisit when browser-side FlyWire code is actually built."
 
+**Node/JS → .NET → Python.** `anvil-node`/`anvil-wasm` landed first (above); `anvil.net` landed next, as a real vtable-based binding rather than a flat-P/Invoke or JSON-blob port — see that repo's own README for the design record. **`anvil.py` is next, scoped and sequenced in its own FR** — [`FR-2609-anvl-py-binding-001`](FR-2609-anvl-py-binding-001.md) — built explicitly to the `anvil.net` standard (vtable-first via `ctypes`, lazy navigation, the same repo/test/distribution methodology) rather than re-deriving the design from scratch.
+
 ### What flywire's real usage revealed — three gaps to close before the binding work starts
 
 Investigated `../flywire/`'s actual call sites (`src/table.js`, `src/schema-registry.js`, `src/anvl/index.js`) rather than assuming. The real, minimal surface flywire depends on:
