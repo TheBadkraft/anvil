@@ -156,13 +156,44 @@ tarball directly and inspected it (`tar -tzf`) — contents are exactly
 `anvil-wasm-v0.8.0-rc/{README.md,index.js,anvil.wasm,anvil.js}`, no `package.json` anywhere inside,
 confirming gap #1 above as written.
 
+## Fix 2026-09-20 — gap #1 closed; a second, related bug found and fixed alongside it
+
+Both tarballs rebuilt with a purpose-built `package.json` added at the packaged root (not copied
+verbatim from either repo's own `package.json` — those describe the *repo's* layout, which differs
+from the flattened public artifact; see below). `anvil-node`'s also declares `"os": ["linux"]`,
+`"cpu": ["x64"]` so npm itself refuses the install outright on the wrong platform, rather than
+failing confusingly later.
+
+**A second, independent bug surfaced while verifying the fix, not before**: `anvil-wasm`'s packaged
+`index.js` still had `require('../dist/anvil.js')` — correct for the *repo's* own layout
+(`lib/index.js` requiring a sibling `../dist/anvil.js`), but wrong for the tarball's already-
+flattened layout, where `index.js` sits at the root next to `anvil.js` directly. This has been
+silently broken since the tarball was first published — a `package.json`-only fix would have let
+`npm install` succeed while `require('anvil-wasm')` still threw `MODULE_NOT_FOUND` immediately
+after. Fixed by pointing that one `require` at `./anvil.js` in the packaged copy only — the real
+repo's own `lib/index.js` is correct as-is and was not touched, since its `../dist/anvil.js` really
+does resolve correctly in the repo's own (non-flattened) directory shape. `anvil-node`'s packaged
+`lib/index.js` was checked too and needed no change — its tarball layout already mirrors the
+repo's own `lib/` + `build/` shape exactly, unlike `anvil-wasm`'s deliberately-flattened one.
+
+Both fixes verified together, end to end, against the real deployed URLs (not just locally): a
+fresh `package.json` pointing `dependencies` at
+`https://anvldata.com/assets/downloads/anvil-wasm-v0.8.0-rc.tar.gz` and the equivalent
+`anvil-node` URL, `npm install`, then `require('anvil-wasm')`/`require('anvil-node')` and a real
+`parse()` call on each — both returned the correct parsed value. Redeployed to `anvldata.com` via
+`wrangler deploy`.
+
 ## Verification
 
 - `curl -I` against both live tarball URLs on `anvldata.com`: `200` — at
   `/assets/downloads/<filename>`, not the bare root path (see Correction above).
-- `npm install` against a `package.json` dependency pointing at the live `anvil-wasm` tarball URL:
-  fetch succeeds, reification fails on the missing `package.json` inside the tarball (see above) —
+- `npm install` against a `package.json` dependency pointing at the live `anvil-wasm` tarball URL,
+  pre-fix: fetch succeeds, reification fails on the missing `package.json` inside the tarball —
   reproduced directly, not assumed.
-- `tar -tzf` on the downloaded `anvil-wasm` tarball: confirmed no `package.json` present, matching
-  gap #1 above.
-- Otherwise not applicable yet — no fix has been implemented on either side.
+- `tar -tzf` on the downloaded `anvil-wasm` tarball, pre-fix: confirmed no `package.json` present,
+  matching gap #1 above.
+- Post-fix, against the real redeployed `anvldata.com` URLs (not a local file): `npm install`
+  succeeds for both `anvil-wasm` and `anvil-node`, `require()` succeeds for both, and a real
+  `parse('#!aml\nname := "David";\n')` on each returns `"David"` via `.get('name').asString()`.
+- `anvil-node`'s multi-platform gap (§2 above) is unresolved — Linux x64 only, on purpose, per the
+  plan recorded above.
