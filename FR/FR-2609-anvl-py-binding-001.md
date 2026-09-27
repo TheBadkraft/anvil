@@ -5,7 +5,7 @@
 **Owner:** anvl
 **Filed:** 2026-09-21
 **Filed by:** anvil
-**Status:** open — not started
+**Status:** resolved — implemented, tested, documented, and distributed
 **Continues:** [`FR-2609-anvl-public-api-001`](FR-2609-anvl-public-api-001.md)'s "Bindings — organization
 and sequencing" section, which already names Python (`Anvil.Py`) as one of the planned bindings and
 `ctypes`' `in_dll` as its documented path to the vtable's `extern const` data symbols.
@@ -62,39 +62,70 @@ Each `anvil.net` decision, carried forward or translated:
   that's a plan-mode design pass before implementation, the same step `anvil.net` went through
   before any code was written.
 
-## Open questions — resolve in a plan-mode pass before implementation starts
+## Open questions — resolved
 
-1. **Exact surface shape.** C# has `Anvil.Document.FindStatement(...)`-style nested static classes;
-   Python has no direct equivalent idiom. Candidates: a thin namespace object (`anvil.document.find_statement(...)`),
-   plain module-level functions grouped by submodule, or classmethods on lightweight per-group
-   classes. Whichever is chosen, it should still cleanly mirror the vtable's own grouping (the same
-   principle `anvil.net`'s own nested-class structure was built on), not flatten it back into one
-   giant module.
-2. **Minimum supported CPython version.** Not yet decided — needs only enough to support `ctypes.CFUNCTYPE`
-   and dataclasses/typing cleanly; almost any current-and-supported 3.x line qualifies, exact floor
-   TBD.
-3. **Naming**: repo `anvil.py` (matches `anvil.net`/`anvil.node`/`anvil.wasm`'s convention) is assumed,
-   not yet confirmed; the PyPI package name (`anvil-py`? `anvilpy`? `anvil`, if unclaimed?) is a
-   separate, real decision — PyPI name squatting/collisions aren't checked yet.
-4. **Whether Python's own real usage surfaces a core-API gap**, the way `anvil.net`'s design work
-   surfaced `anvil_document_find_statement`/`anvil_value_find_statement`. Not assumed either way —
-   to be discovered by actually sketching the binding against a real document, not guessed at here.
+1. **Exact surface shape — decided: plain module-level functions, one submodule per vtable
+   group** (`src/anvil/_native/document.py`, `_native/value.py`, ...). Shown side by side against
+   a namespace object and per-group classmethod classes before deciding; the deciding factor was
+   that this is the one option with no live Python-style debate attached — real Python modules
+   as namespaces is how the standard library itself organizes related functions (`os.path`,
+   `urllib.parse`), where the other two candidates each carry a real, ongoing style disagreement
+   (attaching bound callables onto a plain object; classes used purely as namespaces, which
+   PEP 8 itself leans away from).
+2. **Minimum supported CPython version — 3.11+.** No feature of this binding needs anything
+   newer; picked as a floor that's comfortably current without excluding recently-shipped
+   versions.
+3. **Naming — resolved for the repo, deferred for the package.** Repo is `anvil.py`, confirmed.
+   PyPI package name is still open — no PyPI publish has happened yet (matching every other
+   binding's own "tarball first, registry later" sequencing), so no name has been claimed or
+   checked for collisions.
+4. **Whether Python's own real usage surfaces a core-API gap — no.** Every primitive
+   `anvil.net`'s own design work already surfaced (`anvil_document_find_statement`,
+   `anvil_value_find_statement`) covered this binding's needs directly; no new core (`anvil`
+   repo) change was required to build `anvil.py`.
 
 ## Sequencing
 
-Design (plan mode, resolving the Open questions above) → prerequisite core fixes, if any surface →
-scaffold (repo, submodule, build step) → binding layer (vtable marshal) → wrapper types → tests →
-docs → distributable tarball + `anvldata.com` knowledge-base section — the same order `anvil.net`
-itself followed.
+Followed exactly as planned: design (a quick plan-mode-style comparison of the three surface-shape
+candidates, resolved directly with the user rather than a full plan-mode session) → scaffold
+(repo, submodule, build step, verified standalone) → binding layer (vtable marshal, strict TDD,
+one RED/GREEN cycle per vtable member) → wrapper types (same TDD discipline, bottom-up:
+`AnvilError` → `AnvilAttribute` → `AnvlStatement` → `AnvlValue` → `AnvilDocument`) → docs →
+distributable tarball + `anvldata.com` knowledge-base section.
 
-## Acceptance criteria
+## Resolution
 
-- `anvil.py` repo exists on Linode, `vendor/anvil` submodule vendored, builds `libanvil.so` from
-  source via the same `make so-release` step every other binding already uses.
-- Vtable-based binding (`ctypes.Structure` + `in_dll`, cached callables) — not flat-export-only.
-- `AnvilDocument`-equivalent context manager + the four supporting types, lazy navigation, the
-  per-key memoization cache carried forward from `anvil.net`.
-- `pytest` suite, marshaling-layer scope only, green.
-- `docs/getting-started.md`, every example actually run first.
-- Tarball published on `anvldata.com`, `Bindings-Guide.md` gets a Python section in parity with the
-  existing four, verified standalone the same way every prior tarball was.
+All acceptance criteria met:
+
+- `anvil.py` repo live on Linode (`linode:repos/anvil.py.git`), `vendor/anvil` submodule pinned,
+  `make so-release` verified standalone before any code was written.
+- Vtable-based binding, not flat-export-only: each of the 8 vtable groups (`Anvil`, `Document`,
+  `Statement`, `Value`, `Attribute`, `Error`, `StatementIterator`, `DocumentIterator`) is a
+  `ctypes.Structure` read once via `in_dll`, its function-pointer fields resolved into cached
+  callables at import time.
+- `AnvilDocument` (a real context manager, `with`/`.dispose()`, idempotent, raises on
+  use-after-dispose) plus `AnvlValue`/`AnvlStatement`/`AnvilAttribute`/`AnvilError`, all lazy. The
+  per-key memoization cache carried forward from `anvil.net` — proven directly via a
+  call-count assertion (`monkeypatch`), not just value consistency, that a repeated lookup of the
+  same key costs exactly one native call.
+- `pytest` suite, marshaling-layer scope only: 45/45 green, built one strict RED→GREEN cycle at a
+  time, no implementation code written ahead of a failing test that demanded it.
+- `docs/getting-started.md` written, every example actually run against the real parser first
+  (via a throwaway script, not assumed) — the same walkthrough surfaced a real, worth-documenting
+  gap (no public accessor for an identifier's/blob's raw text, matching a gap `anvil.net` already
+  has) rather than being silently worked around.
+- A real packaging gap found and fixed before distribution: the library-path resolution
+  (`_lib.py`) was hardcoded to this dev checkout's `vendor/anvil` layout, which doesn't exist in a
+  standalone tarball. Fixed to check a packaged `runtimes/linux-x64/native/` layout first,
+  falling back to the dev-checkout path — unit-tested directly (`tmp_path`, no real filesystem
+  dependency) rather than only verified by building a tarball.
+- `anvil-py-v0.8.0-rc-linux-x64.tar.gz` published on `anvldata.com`, verified standalone
+  (extracted to a clean directory with nothing else present, imported via `PYTHONPATH`, real
+  parse). `Bindings-Guide.md` gained a Python section in parity with the existing four — its own
+  first code sample was caught with a real bug before publishing (a `with`-block scoping mistake:
+  Python disposes exactly at block-exit, unlike C#'s `using var` declaration, which lives until
+  the end of the enclosing scope) and fixed before going live.
+
+**Not done, by design, matching the FR's own explicit scope**: storage/migration tooling (Q-Or's
+territory), Windows/macOS support (no build hardware yet), and a real PyPI publish (tarball-first
+sequencing, same as every other binding).
