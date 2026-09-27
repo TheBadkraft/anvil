@@ -1,9 +1,9 @@
 # Bindings
 
 **Anvil Native** — a reference C implementation of the AML/AMP parser — is the one parser behind
-everything below. Nothing here is a separate reimplementation: the Node, WebAssembly, and .NET
-bindings are thin wrappers over the exact same C source, so a document parses identically no
-matter which one reads it. Pick the one that matches where your code runs.
+everything below. Nothing here is a separate reimplementation: the Node, WebAssembly, .NET, and
+Python bindings are thin wrappers over the exact same C source, so a document parses identically
+no matter which one reads it. Pick the one that matches where your code runs.
 
 | | Runtime | Status |
 |---|---|---|
@@ -11,6 +11,7 @@ matter which one reads it. Pick the one that matches where your code runs.
 | [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | Downloadable today |
 | [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | Downloadable today |
 | [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
+| [Python](Bindings-Guide.md#python) | CPython 3.11+ (ctypes) | Downloadable today |
 
 ## Native library
 
@@ -278,3 +279,102 @@ if (frag?.FragmentValue is { Type: AnvilValueType.Array } rows)
 
 Returns the underlying Anvil Native version string (e.g. `"0.8.0+127-rc"`) — same toolchain
 sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility contract.
+
+## Python
+
+**[Download anvil-py-v0.8.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.8.0-rc-linux-x64.tar.gz)**
+— a pure-`ctypes` binding, no compiled extension module, plus the native library it links
+against. Verified standalone: extracted to a clean directory with nothing else present (no
+`vendor/`, no dev checkout), added to `PYTHONPATH`, parsed real source correctly.
+
+Same design as the .NET binding above, translated to Python's own idiom rather than copied
+verbatim: real, lazy, on-demand navigation through Anvil Native's vtable ABI (`anvil_vtable.h`),
+resolved once via `ctypes`' `in_dll` (the same mechanism P/Invoke uses on the .NET side), not a
+JSON-blob port. Where C# organizes the vtable groups as nested static classes, this binding uses
+one real Python submodule per group (`_native/document.py`, `_native/value.py`, ...) — the
+idiomatic Python equivalent (matching how `os.path`/`urllib.parse` are themselves organized),
+not a synthetic namespace object or a class used purely for grouping.
+
+### Requirements
+
+- CPython 3.11 or later. No dependency beyond the standard library — `ctypes` ships with every
+  install.
+- Linux x64 (glibc) only today. Other platforms build from source (`make so-release` in
+  `vendor/anvil`'s `v0.8.0-rc` tag or later) — not yet published to PyPI, so building means
+  pointing at a real checkout, not `pip install anvil-py`.
+- No other runtime dependencies once built.
+
+```python
+from anvil import AnvilDocument, ValueType
+
+with AnvilDocument.load("config.anvl") as doc:
+    if doc is None or doc.has_errors:
+        err = doc.error if doc else None
+        print(f"Failed: {err.message if err else 'allocation failed'}")
+
+    server = doc.find_value("server")
+    if server is not None and server.type == ValueType.OBJECT:
+        host = server["host"].as_string() if server["host"] else None
+        port = server["port"].as_int() if server["port"] else None
+
+    for stmt in doc.statements:
+        print(f"{stmt.name}: {stmt.value.type}")
+```
+
+Everything that needs `doc` stays inside the `with` block — Python's `with` disposes exactly at
+block-exit (unlike C#'s `using var` declaration, which lives until the end of the enclosing
+scope), so `doc.statements` (or anything else touching `doc`) called after the block has already
+been disposed and raises `RuntimeError`.
+
+`load`/`load_buffer`/`parse_value_fragment` never throw on a syntax error — they return a
+document whose `.has_errors` is `True`. Python's `with` statement is this binding's translation of
+the .NET binding's `using`/`IDisposable` — both are deterministic (cleanup runs exactly at
+block-exit), unlike `__del__`'s own GC-finalizer timing, which has the identical non-determinism
+problem that ruled out a live-handle design for the Node/WASM bindings.
+
+### `AnvilDocument` — the one disposable root
+
+| Member | Returns | Notes |
+|---|---|---|
+| `AnvilDocument.load(path)` | `AnvilDocument \| None` | `None` only on a hard I/O failure (missing file); a syntax error still returns a document with `.has_errors == True`. |
+| `AnvilDocument.load_buffer(source)` | `AnvilDocument \| None` | Same contract, from an in-memory string. |
+| `AnvilDocument.parse_value_fragment(text)` | `AnvilDocument \| None` | Parses a single, standalone value expression — see `.fragment_value` below. |
+| `.has_errors` / `.error_category` / `.error` | `bool` / `ErrorCode` / `AnvilError \| None` | `.error` gives message/line/column; `.error_category` alone is cheaper when you only need to branch on the failure kind. |
+| `.find_statement(name)` | `AnvlStatement \| None` | Root-level lookup by name — the whole declaration (name, value, its own `@[...]` attributes). |
+| `.find_value(name)` | `AnvlValue \| None` | Convenience one-hop equivalent of `find_statement(name).value`. |
+| `.statements` / `.includes` | generator of `AnvlStatement` / `AnvilDocument` | Declaration order. Each yielded `.includes` document is independently usable as its own context manager. |
+| `.attributes` / `.find_attribute(key)` | document-level `@[...]` attributes, same shape as a statement's own (below). |
+
+### `AnvlValue` — type inspection and navigation
+
+| Member | Returns | Notes |
+|---|---|---|
+| `.type` | `ValueType` | `NULL \| BOOL \| NUMERIC \| STRING \| BLOB \| IDENTIFIER \| ARRAY \| TUPLE \| OBJECT` — same finer-grained kinds as the .NET binding, more granular than the Node/WASM bindings' `.type`. |
+| `.count` | `int` | Field count for an object, element count for an array/tuple, `0` otherwise. |
+| `value[i]` (int) | `AnvlValue \| None` | Array/tuple element by position; `None` if out of bounds or not array/tuple-shaped. |
+| `value[key]` (str) | `AnvlValue \| None` | Object field's value directly, not the statement. `None` if `key` isn't present or this isn't object-shaped. |
+| `.has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
+| `.entries()` | generator of `(str, AnvlValue)` | Declaration order. Empty for a non-object value. |
+| `.as_string()` / `.as_bool()` / `.as_int()` | `str \| None` / `bool \| None` / `int \| None` | Each `None` unless `.type` matches exactly (`STRING` / `BOOL` / `NUMERIC`); `as_int()` truncates toward zero. |
+
+### `AnvlStatement` and `AnvilAttribute`
+
+| Member | Returns | Notes |
+|---|---|---|
+| `AnvlStatement.name` / `.value` | `str` / `AnvlValue \| None` | The declaration's name and the value it's assigned. |
+| `AnvlStatement.attributes` / `.find_attribute(key)` | `list[AnvilAttribute]` / `AnvilAttribute \| None` | This statement's own `@[...]` attributes. |
+| `AnvilAttribute.key` / `.value` | `str` / `str \| None` | `.value` is `None` specifically for a flag attribute (`@[active]`, no `=value`). |
+
+### `parse_value_fragment` / `.fragment_value` — for when you already know the shape
+
+```python
+with AnvilDocument.parse_value_fragment("[(1,2,3),(4,5,6)]") as frag:
+    rows = frag.fragment_value
+    if rows is not None and rows.type == ValueType.ARRAY:
+        first = rows[0][0].as_int()  # 1 -- rows[0] is the Tuple, [0] its first element
+```
+
+### `AnvilDocument.get_version()`
+
+Returns the underlying Anvil Native version string (e.g. `"0.8.0+135-rc"`) — same toolchain
+sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.

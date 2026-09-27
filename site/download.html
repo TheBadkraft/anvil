@@ -94,6 +94,22 @@ var server = doc.FindValue("server");
 server["port"].AsInt(); // 8080</code></pre>
     </div>
 
+    <h2>Python — ctypes</h2>
+    <div class="card">
+      <div class="dl-row">
+        <div>
+          <strong>anvil-py-v0.8.0-rc-linux-x64.tar.gz</strong> — a pure-<code>ctypes</code>
+          binding built directly on Anvil Native's vtable ABI, plus the native library it links
+          against. No compiled extension module. Linux x64 only today; not yet published to PyPI,
+          so other platforms build from source.
+        </div>
+        <a class="btn secondary" href="/assets/downloads/anvil-py-v0.8.0-rc-linux-x64.tar.gz">Download</a>
+      </div>
+      <pre><code>with AnvilDocument.load("config.anvl") as doc:
+    server = doc.find_value("server")
+    server["port"].as_int()  # 8080</code></pre>
+    </div>
+
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
       Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>.
       This is release-candidate software — the format and API are stable enough to build
@@ -102,8 +118,8 @@ server["port"].AsInt(); // 8080</code></pre>
   </main>
 
   <footer class="site-footer">
-    Anvil Native — the reference C implementation of AML/AMP, with Node.js, WebAssembly, and .NET
-    bindings. Alpha/RC software.
+    Anvil Native — the reference C implementation of AML/AMP, with Node.js, WebAssembly, .NET, and
+    Python bindings. Alpha/RC software.
   </footer>
 
   <script src="/assets/version.js"></script>
