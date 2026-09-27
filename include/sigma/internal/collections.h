@@ -26,7 +26,7 @@
  */
 #pragma once
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/internal/array_base.h>
 
 // forward declarations

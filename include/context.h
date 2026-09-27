@@ -34,7 +34,7 @@
 #include "types.h"
 #include "utils.h"
 #include <sigma/types.h>
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

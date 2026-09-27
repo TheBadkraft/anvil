@@ -20,7 +20,7 @@
 #include "anvil_schema.h"
 #include "anvil_type_registry.h"
 // ----------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <stdlib.h>

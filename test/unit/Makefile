@@ -6,7 +6,7 @@ TESTBIT = ../../../testbit
 BUILD_NUM := $(shell git rev-list --count HEAD)
 CFLAGS  = -Wall -Wextra -g -std=$(STD) \
           -I$(ANVL)/include \
-          -I$(ANVL)/vendor/sigma.core/include \
+          -I$(ANVL)/../sigma.core/include \
           -I$(TESTBIT)/include \
           -D_POSIX_C_SOURCE=200809L \
           -DANVL_BUILD=$(BUILD_NUM)
@@ -29,7 +29,7 @@ ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/sigma/arrays.c \
 			 $(ANVL)/src/sigma/array_base.c \
 			 $(ANVL)/src/sigma/farray.c \
-          $(ANVL)/vendor/sigma.core/src/system_alloc.c \
+          $(ANVL)/../sigma.core/src/system_alloc.c \
           $(ANVL)/src/sigma/strings.c \
 			 $(ANVL)/src/sigma/collections.c \
 			 $(ANVL)/src/sigma/query.c

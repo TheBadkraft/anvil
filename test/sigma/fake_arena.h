@@ -21,7 +21,7 @@
  */
 #pragma once
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/types.h>
 #include <stdlib.h>
 #include <string.h>

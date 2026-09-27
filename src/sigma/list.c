@@ -30,7 +30,7 @@
  * index, or by appending to the end.
  */
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/internal/arrays.h>
 #include <sigma/internal/collections.h>
 #include <sigma/list.h>

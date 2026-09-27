@@ -36,7 +36,7 @@
 #include <sigma/internal/arrays.h>
 #include <sigma/internal/collections.h>
 // -----------------------------------------------------------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <string.h>
 
 //  declare the PointerArray struct: the collection with attitude

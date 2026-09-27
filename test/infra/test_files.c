@@ -14,7 +14,7 @@
 #include "testbit.h"
 #include "std.h"
 // ----------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 
 static void td(void) {}
 

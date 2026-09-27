@@ -23,7 +23,7 @@
 #include "constants.h"
 #include "errors.h"
 // ----------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/farray.h>
 #include <sigma/list.h>
 #include <sigma/map.h>

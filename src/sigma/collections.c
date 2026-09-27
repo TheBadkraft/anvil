@@ -29,7 +29,7 @@
  *             for arrays (parray/farray), with stride-aware operations.
  */
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/collections.h>
 #include <sigma/internal/array_base.h>
 #include <sigma/internal/arrays.h>
