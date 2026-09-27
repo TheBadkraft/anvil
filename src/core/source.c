@@ -22,7 +22,7 @@
 #include "errors.h"
 #include "std.h"
 // -----------------------------------------------------------------
-#include <sigma/memory.h>
+#include <system_alloc.h>
 #include <string.h>
 
 // FNV-1a 64-bit hash constants

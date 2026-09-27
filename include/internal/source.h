@@ -25,7 +25,7 @@
 // -----------------------------------------------------------------
 #include <sigma/list.h>
 #include <sigma/types.h>
-#include <sigma/memory.h>
+#include <system_alloc.h>
 #include <sigma/strings.h>
 
 /* ----------------------------------------------------------------- *

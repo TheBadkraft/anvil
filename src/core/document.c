@@ -22,7 +22,7 @@
 #include "internal/source.h"
 #include "internal/source_registry.h"
 //
-#include <sigma/memory.h>
+#include <sigma/allocator.h>
 #include <sigma/strings.h>
 
 static ssize_t doc_size = sizeof(struct anvl_mod_doc_t);

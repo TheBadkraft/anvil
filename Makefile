@@ -5,7 +5,7 @@ STRIP = strip
 
 BUILD_NUM := $(shell git rev-list --count HEAD)
 
-INCLUDE = -Iinclude
+INCLUDE = -Iinclude -Ivendor/sigma.core/include
 DEFS    = -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM)
 
 # Full ANVL bundle for this milestone: core parser + resolver (src/core, src/sigma),
@@ -30,13 +30,19 @@ CORE_SRCS = src/core/anvil.c \
             src/sigma/arrays.c \
             src/sigma/array_base.c \
             src/sigma/farray.c \
-            src/sigma/memory.c \
             src/sigma/strings.c \
             src/sigma/collections.c \
             src/sigma/query.c
 
 TYPES_SRCS  = src/anvil_types.c
 SCHEMA_SRCS = src/schema/schema.c
+
+# sigma.system.alloc (FR-2609-sigmem-001): the Allocator/bump-arena provider, formerly
+# src/sigma/memory.c's own vendored-and-modified copy, now sourced from vendor/sigma.core (a
+# pinned snapshot of the real sigma.core repo -- see vendor/sigma.core/README.md for why this
+# isn't a git submodule yet). Kept as its own variable, not folded into CORE_SRCS, since it
+# doesn't live under src/ and needs its own pattern rule below.
+VENDOR_SIGMA_CORE_SRCS = vendor/sigma.core/src/system_alloc.c
 
 LIB_SRCS = $(CORE_SRCS) $(TYPES_SRCS) $(SCHEMA_SRCS)
 
@@ -59,8 +65,10 @@ RELEASE_OBJ  = build/release
 DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 
-DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS))
-RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS))
+DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS)) \
+               $(patsubst vendor/%.c,$(DEBUG_OBJ)/vendor/%.o,$(VENDOR_SIGMA_CORE_SRCS))
+RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS)) \
+               $(patsubst vendor/%.c,$(RELEASE_OBJ)/vendor/%.o,$(VENDOR_SIGMA_CORE_SRCS))
 
 LIB_DEBUG   = $(DEBUG_DIR)/libanvil.a
 LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
@@ -107,6 +115,14 @@ $(DEBUG_OBJ)/%.o: src/%.c
 	$(CC) $(DEBUG_CFLAGS) -c $< -o $@
 
 $(RELEASE_OBJ)/%.o: src/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
+
+$(DEBUG_OBJ)/vendor/%.o: vendor/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(DEBUG_CFLAGS) -c $< -o $@
+
+$(RELEASE_OBJ)/vendor/%.o: vendor/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
 
