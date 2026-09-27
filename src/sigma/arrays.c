@@ -25,7 +25,7 @@
  * Description: Common array operations implementation
  */
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/internal/arrays.h>
 // -----------------------------------------------------------------
 #include <string.h>

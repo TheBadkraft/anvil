@@ -25,7 +25,7 @@
 #include "internal/source_registry.h"
 #include "std.h"
 // ----------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/map.h>
 
 // Initial capacity for the global source registry. Must be a power-of-two

@@ -20,7 +20,7 @@
  */
 
 #include <sigma/map.h>
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/collections.h>
 #include <sigma/math.h>
 #include <string.h>

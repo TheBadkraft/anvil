@@ -34,7 +34,7 @@
  */
 #pragma once
 
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <sigma/collections.h>
 
 // forward declaration of the stack structure

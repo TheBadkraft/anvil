@@ -17,7 +17,7 @@
 #include "types.h"
 #include "internal/files.h"
 // -------------------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 
 static anvl_result files_load(const char *path, const char **out_source, size_t *out_len,
                               anvl_err_code *out_err_code) {

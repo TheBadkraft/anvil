@@ -37,7 +37,7 @@
 #include <sigma/internal/collections.h>
 #include <sigma/parray.h>
 // -----------------------------------------------------------------
-#include <sigma/allocator.h>
+#include <sigma.core/allocator.h>
 #include <string.h>
 
 //  declare the SlotArray struct: uses parray internally
