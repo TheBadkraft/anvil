@@ -27,7 +27,6 @@
 // ----------------
 #include <sigma/allocator.h>
 #include <sigma/map.h>
-#include <sigma/memory.h>
 
 // Initial capacity for the global source registry. Must be a power-of-two
 // to satisfy the Sigma map contract.

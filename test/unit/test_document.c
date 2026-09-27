@@ -22,7 +22,7 @@
 #include "../utilities/helpers.h"
 #include <sigma/list.h>
 #include <sigma/map.h>
-#include <sigma/memory.h>
+#include <sigma/allocator.h>
 #include <sigma/types.h>
 
 static void td(void) {

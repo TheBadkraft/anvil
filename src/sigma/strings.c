@@ -8,7 +8,7 @@
  */
 
 #include <sigma/strings.h>
-#include <sigma/memory.h>
+#include <sigma/allocator.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
