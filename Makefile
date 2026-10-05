@@ -5,15 +5,15 @@ STRIP = strip
 
 BUILD_NUM := $(shell git rev-list --count HEAD)
 
-# sigma.core: a real sibling-repo checkout, not vendored into this repo (FR-2609-sigmem-001) --
-# see notes/sigma-system-alloc-dependency.md for the full rationale, including why this can't be
-# a git submodule yet (the branch this depends on isn't pushed anywhere public). Assumes anvil
-# and sigma.core are checked out side by side under the same parent directory, matching the
-# sibling-relative-path convention this whole sigma.* ecosystem's own build scripts already use
-# (e.g. sigma.memory's own config.sh: -I../sigma.core/include).
-SIGMA_CORE = ../sigma.core
-
-INCLUDE = -Iinclude -I$(SIGMA_CORE)/include
+# sigma.core: a real system-installed dependency, not vendored into this repo and not a
+# sibling-relative path either (FR-2609-sigmem-001) -- see notes/sigma-system-alloc-dependency.md
+# for the full rationale. A sibling-relative path (../sigma.core) broke the moment anvil is
+# checked out *nested* inside something else, which is exactly how every binding vendors it
+# (anvil.net/vendor/anvil, etc.) -- confirmed directly, not assumed. /usr/local/include and
+# /usr/local/packages are absolute and machine-wide, so they resolve identically regardless of
+# where this repo is checked out, matching the sigma.* ecosystem's own existing package
+# convention (sigma.memory's config.sh already references /usr/local/packages/sigma.core.o).
+INCLUDE = -Iinclude -I/usr/local/include
 DEFS    = -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM)
 
 # Full ANVL bundle for this milestone: core parser + resolver (src/core, src/sigma),
@@ -46,12 +46,10 @@ TYPES_SRCS  = src/anvil_types.c
 SCHEMA_SRCS = src/schema/schema.c
 
 # sigma.system.alloc (FR-2609-sigmem-001): the Allocator/bump-arena provider, formerly
-# src/sigma/memory.c's own vendored-and-modified copy. Compiled directly from sigma.core's real
-# checkout (see SIGMA_CORE above) -- not copied into this repo at all, matching the whole point
-# of this migration: link the real thing, don't vendor a copy of it.
-SIGMA_SYSTEM_ALLOC_SRC = $(SIGMA_CORE)/src/system_alloc.c
-SIGMA_SYSTEM_ALLOC_OBJ_DEBUG   = $(DEBUG_OBJ)/sigma_core/system_alloc.o
-SIGMA_SYSTEM_ALLOC_OBJ_RELEASE = $(RELEASE_OBJ)/sigma_core/system_alloc.o
+# src/sigma/memory.c's own vendored-and-modified copy. A real prebuilt package, installed once
+# to /usr/local/packages/ -- linked as-is, the same way any other real system library is (you
+# don't get to pick a "debug" build of libm either). Not copied into this repo at all.
+SIGMA_SYSTEM_ALLOC_PKG = /usr/local/packages/sigma.system.alloc.o
 
 LIB_SRCS = $(CORE_SRCS) $(TYPES_SRCS) $(SCHEMA_SRCS)
 
@@ -74,8 +72,8 @@ RELEASE_OBJ  = build/release
 DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 
-DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_OBJ_DEBUG)
-RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_OBJ_RELEASE)
+DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)
+RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)
 
 LIB_DEBUG   = $(DEBUG_DIR)/libanvil.a
 LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
@@ -122,14 +120,6 @@ $(DEBUG_OBJ)/%.o: src/%.c
 	$(CC) $(DEBUG_CFLAGS) -c $< -o $@
 
 $(RELEASE_OBJ)/%.o: src/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
-
-$(SIGMA_SYSTEM_ALLOC_OBJ_DEBUG): $(SIGMA_SYSTEM_ALLOC_SRC)
-	@mkdir -p $(dir $@)
-	$(CC) $(DEBUG_CFLAGS) -c $< -o $@
-
-$(SIGMA_SYSTEM_ALLOC_OBJ_RELEASE): $(SIGMA_SYSTEM_ALLOC_SRC)
 	@mkdir -p $(dir $@)
 	$(CC) $(RELEASE_CFLAGS) -c $< -o $@
 
