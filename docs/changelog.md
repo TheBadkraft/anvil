@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   streaming writer; same grammar rules (`src/writer/grammar.c`); depth-limited and non-recursive on
   disposal. Tests: `test_builder`, `test_builder_roundtrip` (random trees must match the writer
   byte for byte).
+- `anvil.java` wraps both (`AnvilWriter`, `AnvilBuilder`); other bindings to follow.
 
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
