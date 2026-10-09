@@ -141,7 +141,7 @@ static anvil_document load_accessors_doc(void) {
 }
 
 /* ---------------------------------------------------------------------- *
- * ANV09 — scalar accessors: BOOL, NUMERIC, IDENTIFIER text round-trips
+ * ANV09 — scalar accessors: BOOL, NUMERIC, BARE text round-trips
  * ---------------------------------------------------------------------- */
 static void test_anv09_scalar_accessors(void) {
    anvil_document doc = load_accessors_doc();
@@ -170,8 +170,8 @@ static void test_anv09_scalar_accessors(void) {
 
    anvil_statement word = anvil_document_find_statement(doc, "word");
    anvil_value word_val = anvil_statement_get_value(word);
-   TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, anvil_value_get_type(word_val),
-                        "ANV09: 'word' is ANVIL_VALUE_IDENTIFIER");
+   TestBit.is_equal_int(ANVIL_VALUE_BARE, anvil_value_get_type(word_val),
+                        "ANV09: 'word' is ANVIL_VALUE_BARE");
    anvil_value_get_text(word_val, buf, sizeof(buf));
    TestBit.is_true(0 == strcmp("bareword", buf), "ANV09: 'word' text is 'bareword'");
 
@@ -402,8 +402,8 @@ static void test_anv18_load_buffer_clean(void) {
    anvil_statement name = anvil_document_find_statement(doc, "name");
    TestBit.is_not_null(name, "ANV18: 'name' statement found");
    anvil_value name_val = anvil_statement_get_value(name);
-   TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, anvil_value_get_type(name_val),
-                        "ANV18: 'name' is ANVIL_VALUE_IDENTIFIER");
+   TestBit.is_equal_int(ANVIL_VALUE_BARE, anvil_value_get_type(name_val),
+                        "ANV18: 'name' is ANVIL_VALUE_BARE");
 
    anvil_dispose(doc);
 }

@@ -1,5 +1,5 @@
 # Anvil — The Final Data Language
-**ANVL · Version 0.8.0-rc**
+**ANVL · Version 0.9.0-rc**
 
 **Public Repository (Non-Open Source) · Reference Implementation in Pure C**
 

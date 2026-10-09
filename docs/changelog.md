@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.9.0-rc] — (2026-10-09)
+
+**Status:** minor bump — one public-API rename (`ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`, source-breaking for C callers, ABI-compatible).
+
+### Changed
+- **Public API rename: `ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`** (same numeric value, `5`),
+  and the internal `ANVL_VALUE_IDENTIFIER` → `ANVL_VALUE_BARE`. Matches the `ANVIL_VALUE_<KIND>`
+  family and the grammar's own term (`parse_bare_literal`, "Bare literal grammar"). A bare literal
+  is an ordinary unquoted string, so `anvil.java`/`anvil.net`/`anvil.py`'s `asString()`/`AsString()`/
+  `as_string()` now accept it alongside `STRING` (`anvil.node`/`anvil.wasm` already did, via their
+  JSON conversion; their vendor bump is deferred — see `notes/deferred-work.md`).
+
+---
+
 ## [v0.8.0-rc] — (2026-08-17 – 2026-09-19)
 
 **Status:** ANVL proper (core parser + resolver, opt-in types, AnvilSchema) is feature-complete

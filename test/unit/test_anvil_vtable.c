@@ -156,8 +156,8 @@ static void test_vt04_vtable_only_smoke_test(void) {
    anvil_statement name = Document.find_statement(doc, "name");
    TestBit.is_not_null(name, "VT04: 'name' statement found via the vtable");
    anvil_value name_val = Statement.get_value(name);
-   TestBit.is_equal_int(ANVIL_VALUE_IDENTIFIER, Value.get_type(name_val),
-                        "VT04: 'name' is ANVIL_VALUE_IDENTIFIER, via the vtable");
+   TestBit.is_equal_int(ANVIL_VALUE_BARE, Value.get_type(name_val),
+                        "VT04: 'name' is ANVIL_VALUE_BARE, via the vtable");
 
    Anvil.dispose(doc);
 

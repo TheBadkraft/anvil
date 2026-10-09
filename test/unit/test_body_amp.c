@@ -46,7 +46,7 @@ static void th(void) {
  * AMP00a — keyword literal assignments: true, false, null
  * Commentary: the start of a broader "reserved keyword" invariant group —
  * true/false/null are reserved keywords, not ordinary identifiers, and
- * only distinguishable from a bare IDENTIFIER reference by scanning the
+ * only distinguishable from a bare literal reference by scanning the
  * full identifier-shaped token and comparing its text (see
  * notes/document-body-parse.md). Grouped here alongside AMP00b (include
  * rejected as an identifier) as the same invariant from the other side:
@@ -367,8 +367,8 @@ static void test_amp03b_bare_literal_assign(void) {
       FArray.get(doc->body, i, sizeof(anvl_statement), (object *)&stmt);
       TestBit.is_not_null(stmt, "AMP03b: statement retrieved");
       if (stmt && stmt->value) {
-         TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)stmt->value->type,
-                              "AMP03b: value is IDENTIFIER");
+         TestBit.is_equal_int(ANVL_VALUE_BARE, (long long)stmt->value->type,
+                              "AMP03b: value is BARE");
          TestBit.is_true(slice_equals(stmt->value->text, expected[i]),
                          "AMP03b: value text matches expected bare literal");
       }
@@ -474,8 +474,8 @@ static void test_amp05a_scalar_array_assign(void) {
       anvl_value elem = NULL;
       List.get(stmt->value->collection.items, 0, (object *)&elem);
       if (elem) {
-         TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)elem->type,
-                              "AMP05a: cars first element is IDENTIFIER (bare literal)");
+         TestBit.is_equal_int(ANVL_VALUE_BARE, (long long)elem->type,
+                              "AMP05a: cars first element is BARE (bare literal)");
          TestBit.is_true(slice_equals(elem->text, "Toyota"),
                          "AMP05a: cars first element is 'Toyota'");
       }
@@ -518,7 +518,7 @@ static void test_amp05b_mixed_array_assign(void) {
 
    static const anvl_value_type expected_types[] = {
       ANVL_VALUE_NUMERIC, ANVL_VALUE_STRING,     ANVL_VALUE_BOOL,
-      ANVL_VALUE_NULL,    ANVL_VALUE_IDENTIFIER,
+      ANVL_VALUE_NULL,    ANVL_VALUE_BARE,
    };
    usize expected_count = sizeof(expected_types) / sizeof(expected_types[0]);
    TestBit.is_equal_int((long long)expected_count,
@@ -1006,8 +1006,8 @@ static void test_amp23_second_decimal_point_declines_to_bare(void) {
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "AMP23: statement retrieved");
    if (stmt && stmt->value) {
-      TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)stmt->value->type,
-                           "AMP23: value declined numeric, parsed as IDENTIFIER instead");
+      TestBit.is_equal_int(ANVL_VALUE_BARE, (long long)stmt->value->type,
+                           "AMP23: value declined numeric, parsed as BARE instead");
       TestBit.is_true(slice_equals(stmt->value->text, "1.5.5"),
                       "AMP23: value text is the whole, untouched '1.5.5' span");
    }

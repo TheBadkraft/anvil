@@ -474,8 +474,8 @@ anvil_value_type anvil_value_get_type(anvil_value val) {
       return ANVIL_VALUE_STRING;
    case ANVL_VALUE_BLOB:
       return ANVIL_VALUE_BLOB;
-   case ANVL_VALUE_IDENTIFIER:
-      return ANVIL_VALUE_IDENTIFIER;
+   case ANVL_VALUE_BARE:
+      return ANVIL_VALUE_BARE;
    case ANVL_VALUE_ARRAY:
       return ANVIL_VALUE_ARRAY;
    case ANVL_VALUE_TUPLE:

@@ -175,6 +175,7 @@ parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the compa
   evaluating whether it's genuinely dead and safe to remove outright, or whether alias support is
   still a real future direction worth keeping the reserved code for — not fixed or removed now,
   just flagged.
+- **`anvil.node` / `anvil.wasm`: bump `vendor/anvil` past `sigma.system.alloc` and pick up the `ANVIL_VALUE_BARE` rename**: both bindings compile the native sources directly (`binding.gyp` / `build.sh`) and are still pinned to a pre-`FR-2609-sigmem-001` vendor (their source lists still name the removed `src/sigma/memory.c`). `ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE` (public C API, numeric value unchanged) therefore can't reach them without also adopting the system-installed `sigma.system.alloc.o`. No behavior change is needed on their side — their JSON conversion already turns a bare literal into a JS string, so `asString()` already reads one (pinned by a new test in each). Remaining work when picked up: (1) `anvil.node` — link `/usr/local/packages/sigma.system.alloc.o` and add `/usr/local/include` in `binding.gyp`, then rename `ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE` in `src/binding.c`; (2) `anvil.wasm` — a prebuilt Linux `.o` can't link into an emscripten build, so this needs a wasm-compatible `sigma.system.alloc` first (open design question), then the same `src/binding.c` rename.
 
 ## Open — blocking the current body-parse iteration
 
