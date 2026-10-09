@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Public API rename: `ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`** (same numeric value, `5`),
   and the internal `ANVL_VALUE_IDENTIFIER` → `ANVL_VALUE_BARE`. Matches the `ANVIL_VALUE_<KIND>`
   family and the grammar's own term (`parse_bare_literal`, "Bare literal grammar"). A bare literal
-  is an ordinary unquoted string, so every binding's `asString()`/`as_string()`/`AsString()` now
-  accepts it alongside `STRING`.
+  is an ordinary unquoted string, so `anvil.java`/`anvil.net`/`anvil.py`'s `asString()`/`AsString()`/
+  `as_string()` now accept it alongside `STRING` (`anvil.node`/`anvil.wasm` already did, via their
+  JSON conversion; their vendor bump is deferred — see `notes/deferred-work.md`).
 
 ---
 
