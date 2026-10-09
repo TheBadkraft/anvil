@@ -80,6 +80,9 @@ bool anvil_writer_include(anvil_writer w, const char *path);
 /**
  * @brief Begin a statement at the top level or inside an object. Always emitted as
  * `name := value;`. Complete it with one value call.
+ * A top-level name may only be declared once (the reader's resolver rejects a repeat), so a repeat
+ * fails with ANVIL_WRITER_ERR_DUPLICATE_NAME; names inside objects may repeat. The writer can't see
+ * names pulled in by an include.
  * @param name Identifier, not a reserved word. @param base Optional inheritance base
  * (identifier, not reserved), or NULL. A base requires an object value; AML only.
  */

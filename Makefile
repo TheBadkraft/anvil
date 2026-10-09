@@ -51,13 +51,17 @@ SCHEMA_SRCS = src/schema/schema.c
 # don't get to pick a "debug" build of libm either). Not copied into this repo at all.
 SIGMA_SYSTEM_ALLOC_PKG = /usr/local/packages/sigma.system.alloc.o
 
-# The streaming writer (include/anvil_writer*.h, src/writer/) is a standalone add-on: it links no
+# The streaming writer and document builder (include/anvil_writer*.h, include/anvil_builder*.h,
+# src/writer/) are a standalone add-on: it links no
 # reader code and the reader links none of it. It ships in the bundle by default; build a
 # reader-only library with `make WITH_WRITER=0` (see `check-reader-only`, which proves nothing of
 # the writer leaks into that build). FR/FR-2609-anvl-writer-001.md.
 WITH_WRITER ?= 1
-WRITER_SRCS = src/writer/writer.c \
-              src/writer/writer_vtable.c
+WRITER_SRCS = src/writer/grammar.c \
+              src/writer/writer.c \
+              src/writer/writer_vtable.c \
+              src/writer/builder.c \
+              src/writer/builder_vtable.c
 
 LIB_SRCS = $(CORE_SRCS) $(TYPES_SRCS) $(SCHEMA_SRCS)
 ifeq ($(WITH_WRITER),1)
@@ -138,16 +142,18 @@ $(RELEASE_OBJ)/%.o: src/%.c
 -include $(RELEASE_OBJS:.o=.d)
 
 # Builds the reader-only bundle (WITH_WRITER=0) into its own directories, then checks it: no
-# anvil_writer_* function or `Writer` vtable symbol, and a program using only the reader API links
+# anvil_writer_*/anvil_builder_* function or `Writer`/`Builder` vtable symbol, and a program using only the reader API links
 # against it. The full bundle must still carry both.
 READER_ONLY_DIR = build/reader-only
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release
 	$(MAKE) WITH_WRITER=1 RELEASE_DIR=$(READER_ONLY_DIR)/full-lib RELEASE_OBJ=$(READER_ONLY_DIR)/full-obj lib-release
-	@if nm $(READER_ONLY_DIR)/lib/libanvil.a | grep -E ' [TDR] (anvil_writer_|Writer$$)'; then \
+	@if nm $(READER_ONLY_DIR)/lib/libanvil.a | grep -E ' [TDR] (anvil_writer_|anvil_builder_|Writer$$|Builder$$)'; then \
 		echo "FAIL: writer symbols present in the reader-only library"; exit 1; fi
 	@nm $(READER_ONLY_DIR)/full-lib/libanvil.a | grep -q ' T anvil_writer_new' || \
 		{ echo "FAIL: full bundle is missing the writer"; exit 1; }
+	@nm $(READER_ONLY_DIR)/full-lib/libanvil.a | grep -q ' T anvil_builder_new' || \
+		{ echo "FAIL: full bundle is missing the builder"; exit 1; }
 	@printf '#include "anvil_flat.h"\nint main(void){anvil_document d=anvil_load_buffer("#!aml\\nx := 1;\\n",16);return d?0:1;}\n' > $(READER_ONLY_DIR)/reader_only.c
 	$(CC) -std=$(STD) $(INCLUDE) $(DEFS) $(READER_ONLY_DIR)/reader_only.c $(READER_ONLY_DIR)/lib/libanvil.a -o $(READER_ONLY_DIR)/reader_only
 	$(READER_ONLY_DIR)/reader_only

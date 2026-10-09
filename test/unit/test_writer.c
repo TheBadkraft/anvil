@@ -668,6 +668,72 @@ static void test_w16_vtable_matches_flat(void) {
    TestBit.is_true(Writer.data == anvil_writer_data, "W16: data");
 }
 
+/* ---------------------------------------------------------------------- *
+ * W17 - a top-level name can't be declared twice (the reader's resolver
+ * rejects it); nested objects may repeat a name, and a nested name may
+ * match a top-level one
+ * ---------------------------------------------------------------------- */
+static bool dup_top_level(anvil_writer w) {
+   return anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_top_level_after_object(anvil_writer w) {
+   return anvil_writer_statement(w, "a", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "x", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_end_object(w) && anvil_writer_statement(w, "a", NULL);
+}
+
+static void test_w17_duplicate_names(void) {
+   expect_error(ANVIL_WRITER_AML, dup_top_level, ANVIL_WRITER_ERR_DUPLICATE_NAME,
+                "W17: duplicate top-level name");
+   expect_error(ANVIL_WRITER_AML, dup_top_level_after_object, ANVIL_WRITER_ERR_DUPLICATE_NAME,
+                "W17: duplicate top-level name after an object");
+   expect_error(ANVIL_WRITER_AMP, dup_top_level, ANVIL_WRITER_ERR_DUPLICATE_NAME,
+                "W17: duplicate top-level name in AMP");
+
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_int(w, 2);
+   anvil_writer_end_object(w);
+   anvil_writer_statement(w, "b", NULL);
+   anvil_writer_begin_array(w);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_end_array(w);
+   expect_text(w,
+               "#!aml\n\n"
+               "a := {\n"
+               "   a := 1;\n"
+               "   a := 2;\n"
+               "};\n"
+               "b := [\n"
+               "   {\n"
+               "      a := 1;\n"
+               "   }\n"
+               "];\n",
+               "W17: nested repeats are legal");
+
+   // enough distinct names to force the name set to grow, then one repeat
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   char name[16];
+   for (int i = 0; i < 5000; i++) {
+      snprintf(name, sizeof name, "n%d", i);
+      anvil_writer_statement(w, name, NULL);
+      anvil_writer_int(w, i);
+   }
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_writer_get_error(w), "W17: 5000 distinct names");
+   TestBit.is_false(anvil_writer_statement(w, "n4321", NULL), "W17: repeat after growth rejected");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_NAME, anvil_writer_get_error(w),
+                        "W17: repeat after growth is DUPLICATE_NAME");
+   anvil_writer_dispose(w);
+}
+
 int main(void) {
    TestBit.run_ex("W01_lifecycle", NULL, test_w01_lifecycle, th);
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
@@ -686,5 +752,6 @@ int main(void) {
    TestBit.run_ex("W14_sticky_error", NULL, test_w14_sticky_error, th);
    TestBit.run_ex("W15_data_and_growth", NULL, test_w15_data_and_growth, th);
    TestBit.run_ex("W16_vtable_matches_flat", NULL, test_w16_vtable_matches_flat, th);
+   TestBit.run_ex("W17_duplicate_names", NULL, test_w17_duplicate_names, th);
    return TestBit.report();
 }

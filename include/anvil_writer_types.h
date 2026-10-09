@@ -58,4 +58,6 @@ typedef enum {
    ANVIL_WRITER_ERR_EMPTY_COLLECTION,            // empty array/object, or a tuple with fewer than 2 elements
    ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, // a statement with a base must have an object value
    ANVIL_WRITER_ERR_UNFINISHED,                  // finish called with an open statement/array/tuple/object
+   ANVIL_WRITER_ERR_DUPLICATE_NAME,              // a top-level name declared twice (the reader's resolver rejects it)
+   ANVIL_WRITER_ERR_DEPTH_EXCEEDED,              // nesting deeper than the builder will emit
 } anvil_writer_err_code;

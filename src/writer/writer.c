@@ -22,13 +22,13 @@
 
 #include "anvil_writer.h"
 #include "constants.h"
+#include "grammar.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define INDENT_WIDTH 3
-#define BLOB_TAG_MAX 31
 
 typedef enum { FRAME_ARRAY, FRAME_TUPLE, FRAME_OBJECT } frame_kind;
 
@@ -55,6 +55,7 @@ struct anvil_writer_t {
    bool stmt_open;    // a statement name is written and its value is pending
    bool stmt_base;    // that statement declared an inheritance base
    bool attrs_open;   // that statement's `@[` group is written but not yet closed
+   wg_nameset names;  // top-level statement names so far
 };
 
 /* ----------------------------------------------------------------------- *
@@ -99,6 +100,10 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "a statement with a base must have an object value";
    case ANVIL_WRITER_ERR_UNFINISHED:
       return "document has an open statement, array, tuple or object";
+   case ANVIL_WRITER_ERR_DUPLICATE_NAME:
+      return "top-level name declared twice";
+   case ANVIL_WRITER_ERR_DEPTH_EXCEEDED:
+      return "nesting is too deep";
    }
    return "unknown error";
 }
@@ -153,138 +158,8 @@ static bool put_indent(anvil_writer w, size_t levels) {
    return true;
 }
 
-/* ----------------------------------------------------------------------- *
- * Grammar checks
- * ----------------------------------------------------------------------- */
-static bool is_alpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-static bool is_digit(char c) { return c >= '0' && c <= '9'; }
-static bool is_ident_start(char c) { return is_alpha(c) || c == '_'; }
-static bool is_ident_part(char c) { return is_alpha(c) || is_digit(c) || c == '_'; }
-static bool is_bare_part(char c) {
-   return is_ident_part(c) || c == '-' || c == ANVL_TOK_DOT || c == '/' || c == ':' || c == '$';
-}
-
-static bool valid_identifier(const char *s, size_t max_len) {
-   if (!s || !is_ident_start(*s)) {
-      return false;
-   }
-   size_t n = 1;
-   while (is_ident_part(s[n])) {
-      n++;
-   }
-   return s[n] == '\0' && (max_len == 0 || n <= max_len);
-}
-
-static bool is_keyword(const char *s) {
-   return strcmp(s, ANVL_KEYWORD_INCLUDE) == 0 || strcmp(s, ANVL_KEYWORD_IMPORT) == 0 ||
-          strcmp(s, ANVL_KEYWORD_VARS) == 0 || strcmp(s, ANVL_KEYWORD_TRUE) == 0 ||
-          strcmp(s, ANVL_KEYWORD_FALSE) == 0 || strcmp(s, ANVL_KEYWORD_NULL) == 0;
-}
-
-// An identifier that is also not a reserved word - statement names, bases, varref targets.
-static bool check_name(anvil_writer w, const char *s) {
-   if (!s) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   if (!valid_identifier(s, 0)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_IDENTIFIER);
-   }
-   if (is_keyword(s)) {
-      return fail(w, ANVIL_WRITER_ERR_RESERVED_WORD);
-   }
-   return true;
-}
-
-// -?digits(.digits)?([eE][+-]digits)? - the whole string, nothing else.
-static bool is_numeric_text(const char *s) {
-   if (!s) {
-      return false;
-   }
-   if (*s == '-') {
-      s++;
-   }
-   if (!is_digit(*s)) {
-      return false;
-   }
-   while (is_digit(*s)) {
-      s++;
-   }
-   if (*s == '.') {
-      s++;
-      if (!is_digit(*s)) {
-         return false;
-      }
-      while (is_digit(*s)) {
-         s++;
-      }
-   }
-   if (*s == 'e' || *s == 'E') {
-      s++;
-      if (*s != '+' && *s != '-') {
-         return false;
-      }
-      s++;
-      if (!is_digit(*s)) {
-         return false;
-      }
-      while (is_digit(*s)) {
-         s++;
-      }
-   }
-   return *s == '\0';
-}
-
-// Whether the reader would take a digit-led token as a number (or fail on it) rather than fall
-// back to a bare literal. Deliberately looser than is_numeric_text: parse_numeric_literal also
-// accepts `1.` and commits to an exponent as soon as `e`/`E` is followed by a sign, so a token
-// like `1.` or `1e+` can never be written as a bare literal and read back as one.
-static bool reader_takes_as_number(const char *s) {
-   if (!is_digit(*s)) {
-      return false;
-   }
-   while (is_digit(*s)) {
-      s++;
-   }
-   if (*s == '.') {
-      s++;
-      while (is_digit(*s)) {
-         s++;
-      }
-      if (*s == '.') {
-         return false; // a second decimal point makes the reader decline the number
-      }
-   }
-   if ((*s == 'e' || *s == 'E') && (s[1] == '+' || s[1] == '-')) {
-      if (!is_digit(s[2])) {
-         return true; // malformed exponent: the reader errors rather than declining
-      }
-      s += 2;
-      while (is_digit(*s)) {
-         s++;
-      }
-   }
-   return *s == '\0'; // anything left over means the reader declines and reads it as bare
-}
-
-// Attribute values are raw text ended by ',' or ']' outside double quotes (parse_attribute_list).
-static bool valid_attribute_value(const char *v) {
-   size_t n = strlen(v);
-   if (n == 0 || v[0] == '$' || v[0] == ' ' || v[0] == '\t' || v[n - 1] == ' ' || v[n - 1] == '\t') {
-      return false;
-   }
-   bool in_string = false;
-   for (size_t i = 0; i < n; i++) {
-      char c = v[i];
-      if (c == '\n' || c == '\r') {
-         return false;
-      }
-      if (c == ANVL_TOK_QUOTE) {
-         in_string = !in_string;
-      } else if (!in_string && (c == ',' || c == ANVL_TOK_RBRACKET)) {
-         return false;
-      }
-   }
-   return !in_string;
+static bool check(anvil_writer w, anvil_writer_err_code code) {
+   return code == ANVIL_WRITER_OK ? true : fail(w, code);
 }
 
 /* ----------------------------------------------------------------------- *
@@ -314,6 +189,7 @@ void anvil_writer_dispose(anvil_writer w) {
    }
    free(w->buf);
    free(w->stack);
+   wg_nameset_free(&w->names);
    free(w);
 }
 
@@ -363,14 +239,8 @@ bool anvil_writer_attribute(anvil_writer w, const char *key, const char *value) 
    if (!attribute_context(w)) {
       return false;
    }
-   if (!key) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   if (!valid_identifier(key, 0)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_IDENTIFIER);
-   }
-   if (value && !valid_attribute_value(value)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE);
+   if (!check(w, wg_check_attribute_key(key)) || (value && !check(w, wg_check_attribute_value(value)))) {
+      return false;
    }
    return attribute_emit(w, key, value, false, value ? strlen(value) : 0);
 }
@@ -380,16 +250,8 @@ bool anvil_writer_attribute_string(anvil_writer w, const char *key, const char *
    if (!attribute_context(w)) {
       return false;
    }
-   if (!key || (!text && length > 0)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   if (!valid_identifier(key, 0)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_IDENTIFIER);
-   }
-   for (size_t i = 0; i < length; i++) {
-      if (text[i] == ANVL_TOK_QUOTE || text[i] == '\n' || text[i] == '\r') {
-         return fail(w, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE);
-      }
+   if (!check(w, wg_check_attribute_key(key)) || !check(w, wg_check_attribute_text(text, length))) {
+      return false;
    }
    return attribute_emit(w, key, text ? text : "", true, length);
 }
@@ -404,11 +266,8 @@ bool anvil_writer_include(anvil_writer w, const char *path) {
    if (w->phase != PHASE_HEADER || w->depth != 0 || w->stmt_open) {
       return fail(w, ANVIL_WRITER_ERR_STATE);
    }
-   if (!path) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   if (*path == '\0' || strpbrk(path, "\"\n\r")) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH);
+   if (!check(w, wg_check_include_path(path))) {
+      return false;
    }
    w->header_dirty = true;
    return puts_(w, ANVL_KEYWORD_INCLUDE " \"") && puts_(w, path) && puts_(w, "\";\n");
@@ -428,8 +287,17 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
    if (w->stmt_open || !in_object_or_top) {
       return fail(w, ANVIL_WRITER_ERR_STATE);
    }
-   if (!check_name(w, name) || (base && !check_name(w, base))) {
+   if (!check(w, wg_check_name(name)) || (base && !check(w, wg_check_name(base)))) {
       return false;
+   }
+   if (w->depth == 0) {
+      int added = wg_nameset_add(&w->names, name);
+      if (added < 0) {
+         return fail(w, ANVIL_WRITER_ERR_MEMORY);
+      }
+      if (added == 0) {
+         return fail(w, ANVIL_WRITER_ERR_DUPLICATE_NAME);
+      }
    }
    if (w->phase == PHASE_HEADER) {
       if (w->header_dirty && !put_char(w, '\n')) {
@@ -534,11 +402,8 @@ bool anvil_writer_numeric(anvil_writer w, const char *text) {
    if (!w || w->err != ANVIL_WRITER_OK) {
       return false;
    }
-   if (!text) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   if (!is_numeric_text(text)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_NUMERIC);
+   if (!check(w, wg_check_numeric(text))) {
+      return false;
    }
    return write_scalar(w, text, strlen(text));
 }
@@ -553,15 +418,9 @@ bool anvil_writer_double(anvil_writer w, double value) {
    if (!w || w->err != ANVIL_WRITER_OK) {
       return false;
    }
-   if (!isfinite(value)) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_NUMERIC);
-   }
    char text[40];
-   for (int precision = 15; precision <= 17; precision++) {
-      snprintf(text, sizeof text, "%.*g", precision, value);
-      if (strtod(text, NULL) == value) {
-         break;
-      }
+   if (!wg_format_double(value, text)) {
+      return fail(w, ANVIL_WRITER_ERR_INVALID_NUMERIC);
    }
    return anvil_writer_numeric(w, text);
 }
@@ -570,8 +429,8 @@ bool anvil_writer_string(anvil_writer w, const char *text, size_t length) {
    if (!w || w->err != ANVIL_WRITER_OK) {
       return false;
    }
-   if (!text && length > 0) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
+   if (!check(w, wg_check_string(text, length))) {
+      return false;
    }
    bool owns = false;
    if (!value_prelude(w, false, false, &owns) || !put_char(w, ANVL_TOK_QUOTE)) {
@@ -618,25 +477,8 @@ bool anvil_writer_bare(anvil_writer w, const char *text) {
    if (!w || w->err != ANVIL_WRITER_OK) {
       return false;
    }
-   if (!text) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
-   }
-   char first = text[0];
-   bool valid_start = is_ident_start(first) || first == ANVL_TOK_DOT || first == '/' || is_digit(first);
-   if (!valid_start) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_BARE);
-   }
-   for (const char *p = text + 1; *p; p++) {
-      if (!is_bare_part(*p)) {
-         return fail(w, ANVIL_WRITER_ERR_INVALID_BARE);
-      }
-   }
-   if (is_keyword(text)) {
-      return fail(w, ANVIL_WRITER_ERR_RESERVED_WORD);
-   }
-   // Read back as a different kind, or as a comment.
-   if (reader_takes_as_number(text) || (first == '/' && (text[1] == '/' || text[1] == '*'))) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_BARE);
+   if (!check(w, wg_check_bare(text))) {
+      return false;
    }
    return write_scalar(w, text, strlen(text));
 }
@@ -645,14 +487,10 @@ bool anvil_writer_blob(anvil_writer w, const char *tag, const char *data, size_t
    if (!w || w->err != ANVIL_WRITER_OK) {
       return false;
    }
-   if (!data && length > 0) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
+   if (!check(w, wg_check_blob(tag, data, length))) {
+      return false;
    }
    bool tagged = tag && *tag;
-   if ((tagged && !valid_identifier(tag, BLOB_TAG_MAX)) ||
-       (length > 0 && memchr(data, ANVL_TOK_BACKTICK, length))) {
-      return fail(w, ANVIL_WRITER_ERR_INVALID_BLOB);
-   }
    bool owns = false;
    if (!value_prelude(w, false, false, &owns)) {
       return false;
@@ -671,7 +509,7 @@ bool anvil_writer_varref(anvil_writer w, const char *name) {
    if (w->dialect == ANVIL_WRITER_AMP) {
       return fail(w, ANVIL_WRITER_ERR_DIALECT);
    }
-   if (!check_name(w, name)) {
+   if (!check(w, wg_check_name(name))) {
       return false;
    }
    bool owns = false;

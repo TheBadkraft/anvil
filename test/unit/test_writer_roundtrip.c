@@ -778,6 +778,26 @@ static void test_rt11_accepted_candidates_read_back(void) {
    TestBit.is_true(accepted_attr > 50, "RT11: enough attribute candidates were accepted");
 }
 
+/* ---------------------------------------------------------------------- *
+ * RT12 - the reader really does reject a duplicate top-level name (the
+ * reason the writer refuses to emit one), and accepts nested repeats
+ * ---------------------------------------------------------------------- */
+static void test_rt12_duplicate_names_match_reader(void) {
+   const char top_dup[] = "#!aml\n\na := 1;\na := 2;\n";
+   anvil_document doc = anvil_load_buffer(top_dup, sizeof top_dup - 1);
+   TestBit.is_true(doc && anvil_has_errors(doc), "RT12: reader rejects a duplicate top-level name");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+
+   const char nested_dup[] = "#!aml\n\no := {\n   a := 1;\n   a := 2;\n};\n";
+   doc = anvil_load_buffer(nested_dup, sizeof nested_dup - 1);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "RT12: reader accepts nested repeated names");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("RT01_scalars", NULL, test_rt01_scalars, th);
    TestBit.run_ex("RT02_string_escapes", NULL, test_rt02_string_escapes, th);
@@ -789,6 +809,8 @@ int main(void) {
    TestBit.run_ex("RT08_amp", NULL, test_rt08_amp, th);
    TestBit.run_ex("RT09_include", NULL, test_rt09_include, th);
    TestBit.run_ex("RT10_fixture_fixed_point", NULL, test_rt10_fixture_fixed_point, th);
+   TestBit.run_ex("RT12_duplicate_names_match_reader", NULL, test_rt12_duplicate_names_match_reader,
+                  th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,
                   th);
    return TestBit.report();

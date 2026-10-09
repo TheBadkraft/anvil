@@ -22,7 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reader (separate headers, no shared code). `make WITH_WRITER=0` builds a reader-only library and
   `make check-reader-only` proves it carries no writer symbols. Tests: `test_writer` (standalone,
   no reader linked) and `test_writer_roundtrip` (through the real parser, including a fixed-point
-  copy of every loadable fixture). The document builder is not started.
+  copy of every loadable fixture).
+- **Document builder** (same FR): `anvil_builder.h` (flat), `anvil_builder_vtable.h` (`Builder`),
+  `anvil_builder_types.h`. Create values detached, attach them to arrays/objects/the document in any
+  order, then `anvil_builder_emit` (or `anvil_builder_write` into a writer). Emits through the
+  streaming writer; same grammar rules (`src/writer/grammar.c`); depth-limited and non-recursive on
+  disposal. Tests: `test_builder`, `test_builder_roundtrip` (random trees must match the writer
+  byte for byte).
+
+### Changed
+- The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
+  reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
 
 ---
 
