@@ -36,7 +36,29 @@ ANVL is meant to be a genuine contender against JSON/YAML/TOML/etc. as *the* for
 
 5. **A resolved `$identifier` VarRef is fully transparent.** `anvil_value_get_type`/`get_text`/`get_count`/`get_element`/`get_statement` all report the *target's* own kind and content, never a distinct "this was a reference" type — a caller never has to know or care that a value came from a VarRef. An unresolved VarRef (missing target, or a reference cycle) reports as `ANVIL_VALUE_NULL`, matching the already-established policy that both cases are simply "unresolved," not an error.
 
-6. **`get_text` on a `STRING` value resolves escape sequences; every other kind returns its raw source span.** A minimal, deterministic set — `\n \t \r \\ \"` — resolves to real bytes; an unrecognized escape (backslash followed by anything else) passes both characters through unchanged rather than erroring or silently dropping the backslash. Quotes are already excluded from `.text` by the parser itself. Chosen over a `get_number()`-style typed accessor deliberately: `NUMERIC` text is never interpreted by Anvil itself (a `UINT64_MAX`-scale value would lose precision as a `double`), so handing back the raw span and letting each language's own binding parse it however fits — `int64`, bignum, whatever — is the more "primitives not policy" choice.
+6. **`get_text` on a `STRING` value resolves escape sequences; every other kind returns its raw source span.** A minimal, deterministic set — `\n \t \r \\ \"` — resolves to real bytes; an unrecognized escape (backslash followed by anything else) passes both characters through unchanged rather than erroring or silently dropping the backslash. Quotes are already excluded from `.text` by the parser itself. `get_text` itself is unchanged by the amendment directly below — it remains the raw-span escape hatch for every kind, `NUMERIC` included.
+
+   **Amended 2026-10-09 — a typed `NUMERIC` accessor added alongside `get_text`, not in place of it.** The original reasoning above (no typed accessor, because a bignum-scale value would lose precision) was right about the *extreme* case but wrong to generalize from it: an ordinary integer that merely exceeds a `double`'s 53-bit mantissa (e.g. `9007199254740993`, 2^53+1) fits an `int64_t` exactly, no precision lost at all — and confirmed directly, every binding built so far (`anvil.net`, `anvil.py`, `anvil.java`) independently reimplemented `NUMERIC` interpretation by routing it through a `double` first regardless, each hitting the identical precision bug on exactly this kind of value. That's the same shape of problem `FR-2609-anvl-writer-001` already made the call on for emission/grammar — logic that's easy to get right once and easy to get wrong independently belongs in native, not reimplemented per binding.
+
+   New accessor, flat + vtable (`Value.get_numeric`), alongside `get_text`, not replacing it:
+
+   ```c
+   typedef struct anvil_numeric_t {
+       bool is_integral;  // source text had no '.' / exponent
+       bool overflowed;   // doesn't fit the representation below -- fall back to get_text()
+                          // and parse as bignum/arbitrary precision, the same raw-span escape
+                          // hatch a binding already uses for e.g. BLOB's byte[] (same
+                          // underlying call, just read as bytes instead of decoded text)
+       int64_t as_int64; // valid when is_integral && !overflowed
+       double as_double; // valid when !is_integral && !overflowed
+   } anvil_numeric_t;
+
+   anvil_numeric_t anvil_value_get_numeric(anvil_value val);
+   ```
+
+   `overflowed` covers both directions: an integral literal too large for `int64_t` (`strtoll` + `ERANGE`), and a decimal/exponent literal whose magnitude overflows `double` itself (`strtod` producing `HUGE_VAL`/`inf`). Underflow-to-zero on a vanishingly small exponent is explicitly not handled by `overflowed` — out of scope for this amendment, not an oversight. Non-`NUMERIC` values report `is_integral = false, overflowed = true` (nothing valid to read; same "fall back to `get_text()`" instruction applies, trivially).
+
+   Originating request: `anvil.java/FR/FR-2609-anvl-codec-001-java.md` — kept open there pending re-evaluation once this lands, not resolved by this amendment alone.
 
 ## Implementation
 
