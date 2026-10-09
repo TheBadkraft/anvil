@@ -83,7 +83,7 @@ retire.
 
 [Download](/download) the native library or the WebAssembly bundle and parse real source in minutes — see the [Bindings guide](/docs#Bindings-Guide.md) for a runnable example in each. A live in-browser [sandbox](/sandbox) is in progress.
 
-Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly bindings. v0.8.0-rc.
+Anvil Native — the reference C implementation of AML/AMP, with Node.js and WebAssembly bindings. v0.9.0-rc.
 
 ---
 

@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [v0.9.0-rc] — (2026-10-09)
+
+**Status:** minor bump — one public-API rename (`ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`, source-breaking for C callers, ABI-compatible).
 
 ### Changed
 - **Public API rename: `ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`** (same numeric value, `5`),
