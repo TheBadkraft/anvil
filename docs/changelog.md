@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Streaming writer** (`FR-2609-anvl-writer-001`): `include/anvil_writer.h` (flat),
+  `anvil_writer_vtable.h` (`Writer`) and `anvil_writer_types.h`, implemented in `src/writer/`.
+  Emits canonical AML/AMP, validated against the real grammar, and is a separate add-on from the
+  reader (separate headers, no shared code). `make WITH_WRITER=0` builds a reader-only library and
+  `make check-reader-only` proves it carries no writer symbols. Tests: `test_writer` (standalone,
+  no reader linked) and `test_writer_roundtrip` (through the real parser, including a fixed-point
+  copy of every loadable fixture). The document builder is not started.
+
+---
+
 ## [v0.9.0-rc] — (2026-10-09)
 
 **Status:** minor bump — one public-API rename (`ANVIL_VALUE_IDENTIFIER` → `ANVIL_VALUE_BARE`, source-breaking for C callers, ABI-compatible).

@@ -30,6 +30,7 @@ reflects what's real and verified today, not what's planned.
 | **Public C API** — `anvil_flat.h` (flat) + `anvil_vtable.h` (vtable) | ✅ Complete |
 | **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented, first phase |
 | **AnvilSchema** (`@[schema]`, validating a document's shape, full constraint checking) | ✅ Implemented |
+| **Streaming writer** (`anvil_writer.h` — emits canonical AML/AMP; separate add-on from the reader) | ✅ Implemented — document builder not started |
 | **Distributable library** (static `.a` + shared `.so`, debug/release, functional/e2e tests against all four) | ✅ Implemented |
 | **ASL** (`#!asl`) — embedded scripting | 📝 Design only — nothing implemented, not required for "ANVL proper" |
 
