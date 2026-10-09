@@ -299,7 +299,7 @@ static bool kind_matches(anvil_type_kind expected, anvil_value_type actual) {
    case ANVIL_TYPE_NUMERIC: return actual == ANVIL_VALUE_NUMERIC;
    case ANVIL_TYPE_STRING:
    case ANVIL_TYPE_ENUM:
-      return actual == ANVIL_VALUE_STRING || actual == ANVIL_VALUE_IDENTIFIER;
+      return actual == ANVIL_VALUE_STRING || actual == ANVIL_VALUE_BARE;
    case ANVIL_TYPE_BOOL:   return actual == ANVIL_VALUE_BOOL;
    case ANVIL_TYPE_OBJECT: return actual == ANVIL_VALUE_OBJECT;
    case ANVIL_TYPE_TUPLE:  return actual == ANVIL_VALUE_TUPLE;

@@ -111,7 +111,7 @@ typedef enum {
    ANVL_VALUE_ARRAY,      // collection (e.g. `[1, 2, 3]`) - elements are anvl_value pointers
    ANVL_VALUE_TUPLE,      // collection (e.g. `(1, 2, 3)`) - elements are anvl_value pointers
    ANVL_VALUE_OBJECT,     // nested statement list, not key/value pairs
-   ANVL_VALUE_IDENTIFIER, // bare symbol: an ordinary literal string (e.g. `name := David;`) - no implicit resolution
+   ANVL_VALUE_BARE, // bare symbol: an ordinary literal string (e.g. `name := David;`) - no implicit resolution
    ANVL_VALUE_VARREF,     // `$identifier`: static, resolve-once reference - see notes/document-body-parse.md
 } anvl_value_type;
 

@@ -246,13 +246,13 @@ non-disposable view tied to that document's lifetime — never valid after it's 
 
 | Member | Returns | Notes |
 |---|---|---|
-| `.Type` | `AnvilValueType` | `Null \| Bool \| Numeric \| String \| Blob \| Identifier \| Array \| Tuple \| Object` — finer-grained than the Node/WASM bindings' `.type`, which collapses several of these into one `'scalar'` kind. |
+| `.Type` | `AnvilValueType` | `Null \| Bool \| Numeric \| String \| Blob \| Bare \| Array \| Tuple \| Object` — finer-grained than the Node/WASM bindings' `.type`, which collapses several of these into one `'scalar'` kind. |
 | `.Count` | `int` | Field count for an object, element count for an array/tuple, `0` otherwise. |
 | `this[int index]` | `AnvlValue?` | Array/tuple element by position; `null` if out of bounds or not array/tuple-shaped. |
 | `this[string key]` | `AnvlValue?` | Object field's value directly, not the statement. `null` if `key` isn't present or this isn't object-shaped. |
 | `.Has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
 | `.Entries()` | `IEnumerable<KeyValuePair<string, AnvlValue>>` | Declaration order. Empty for a non-object value. |
-| `.AsString()` / `.AsBool()` / `.AsInt()` | `string?` / `bool?` / `int?` | Each `null` unless `.Type` matches exactly (`String` / `Bool` / `Numeric`); `AsInt()` truncates toward zero. |
+| `.AsString()` / `.AsBool()` / `.AsInt()` | `string?` / `bool?` / `int?` | Each `null` unless `.Type` matches (`String` or `Bare` / `Bool` / `Numeric`) — a bare, unquoted literal like `host := localhost;` reads as a string; `AsInt()` truncates toward zero. |
 
 ### `AnvlStatement` and `AnvilAttribute`
 
@@ -349,13 +349,13 @@ problem that ruled out a live-handle design for the Node/WASM bindings.
 
 | Member | Returns | Notes |
 |---|---|---|
-| `.type` | `ValueType` | `NULL \| BOOL \| NUMERIC \| STRING \| BLOB \| IDENTIFIER \| ARRAY \| TUPLE \| OBJECT` — same finer-grained kinds as the .NET binding, more granular than the Node/WASM bindings' `.type`. |
+| `.type` | `ValueType` | `NULL \| BOOL \| NUMERIC \| STRING \| BLOB \| BARE \| ARRAY \| TUPLE \| OBJECT` — same finer-grained kinds as the .NET binding, more granular than the Node/WASM bindings' `.type`. |
 | `.count` | `int` | Field count for an object, element count for an array/tuple, `0` otherwise. |
 | `value[i]` (int) | `AnvlValue \| None` | Array/tuple element by position; `None` if out of bounds or not array/tuple-shaped. |
 | `value[key]` (str) | `AnvlValue \| None` | Object field's value directly, not the statement. `None` if `key` isn't present or this isn't object-shaped. |
 | `.has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
 | `.entries()` | generator of `(str, AnvlValue)` | Declaration order. Empty for a non-object value. |
-| `.as_string()` / `.as_bool()` / `.as_int()` | `str \| None` / `bool \| None` / `int \| None` | Each `None` unless `.type` matches exactly (`STRING` / `BOOL` / `NUMERIC`); `as_int()` truncates toward zero. |
+| `.as_string()` / `.as_bool()` / `.as_int()` | `str \| None` / `bool \| None` / `int \| None` | Each `None` unless `.type` matches (`STRING` or `BARE` / `BOOL` / `NUMERIC`) — a bare, unquoted literal like `host := localhost;` reads as a string; `as_int()` truncates toward zero. |
 
 ### `AnvlStatement` and `AnvilAttribute`
 

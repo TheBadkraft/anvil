@@ -118,7 +118,7 @@ to size a buffer first if you don't already know a safe upper bound.
 ## 5. Reading Values
 
 Every statement has a value; every value has a kind (`anvil_value_get_type`). Scalars
-(bool/numeric/string/blob/identifier) read their content as text via `anvil_value_get_text`;
+(bool/numeric/string/blob/bare) read their content as text via `anvil_value_get_text`;
 arrays and tuples are indexed via `anvil_value_get_count`/`anvil_value_get_element`; objects are
 walked the same way `anvil_statement`s are (`anvil_value_get_count`/`anvil_value_get_statement`):
 
@@ -141,7 +141,7 @@ void print_value(anvil_value val, int depth) {
       }
       break;
    }
-   default: { // NULL, BOOL, NUMERIC, STRING, BLOB, IDENTIFIER — all scalar text
+   default: { // NULL, BOOL, NUMERIC, STRING, BLOB, BARE — all scalar text
       char text[128] = {0};
       anvil_value_get_text(val, text, sizeof(text));
       printf("%*s%s\n", depth * 2, "", text);

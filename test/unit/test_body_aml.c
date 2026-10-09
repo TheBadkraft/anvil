@@ -429,8 +429,8 @@ static void test_aml11_include_and_static_reference(void) {
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&alias);
    TestBit.is_not_null(alias, "AML11: 'alias' statement retrieved");
    if (alias && alias->value) {
-      TestBit.is_equal_int(ANVL_VALUE_IDENTIFIER, (long long)alias->value->type,
-                           "AML11: value is IDENTIFIER");
+      TestBit.is_equal_int(ANVL_VALUE_BARE, (long long)alias->value->type,
+                           "AML11: value is BARE");
       TestBit.is_true(slice_equals(alias->value->text, "name"),
                       "AML11: identifier text references 'name'");
    }

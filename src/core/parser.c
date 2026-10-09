@@ -1064,7 +1064,7 @@ static bool parse_bare_literal(anvl_source src, anvl_value *out_value) {
    }
 
    // set value type & initialize the value slice
-   (*out_value)->type = ANVL_VALUE_IDENTIFIER;
+   (*out_value)->type = ANVL_VALUE_BARE;
    (*out_value)->text = text;
 
    return true; // Successfully parsed bare literal
