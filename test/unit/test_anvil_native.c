@@ -1072,6 +1072,134 @@ static void test_anv39_value_get_numeric_non_numeric(void) {
    anvil_dispose(doc);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV40 — anvil_value_get_bytes: the exact source span of every scalar
+ * kind, uninterpreted. A STRING's escapes stay unresolved (unlike get_text),
+ * a BLOB's bytes survive intact (embedded NUL, 0xFF), through a VarRef.
+ * ---------------------------------------------------------------------- */
+#define BYTES_DOC_HEAD "#!aml\n\nn := 007;\nb := true;\nz := null;\ns := \"a\\\"b\\n\";\nw := bare-word;\n"
+#define BYTES_DOC_TAIL "\ne := \"\";\na := [1, 2];\no := { k := 1; };\nalias := $n;\n"
+
+// Loads BYTES_DOC with a binary blob (`bin`, containing NUL and 0xFF) in the middle.
+static anvil_document load_bytes_doc(void) {
+   static const unsigned char blob[] = {'x', 0x00, 'y', 0xFF, 0x80, '\n', 'z'};
+   char source[512];
+   size_t n = 0;
+   memcpy(source + n, BYTES_DOC_HEAD, sizeof BYTES_DOC_HEAD - 1);
+   n += sizeof BYTES_DOC_HEAD - 1;
+   memcpy(source + n, "bin := @bin`", 12);
+   n += 12;
+   memcpy(source + n, blob, sizeof blob);
+   n += sizeof blob;
+   memcpy(source + n, "`;", 2);
+   n += 2;
+   memcpy(source + n, BYTES_DOC_TAIL, sizeof BYTES_DOC_TAIL - 1);
+   n += sizeof BYTES_DOC_TAIL - 1;
+   return anvil_load_buffer(source, n);
+}
+
+static anvil_value named(anvil_document doc, const char *name) {
+   return anvil_statement_get_value(anvil_document_find_statement(doc, name));
+}
+
+static void expect_bytes(anvil_document doc, const char *name, const void *expected, size_t len) {
+   anvil_value v = named(doc, name);
+   size_t need = anvil_value_get_bytes(v, NULL, 0);
+   TestBit.is_equal_int((long long)len, (long long)need, name);
+   unsigned char buf[64] = {0};
+   size_t got = anvil_value_get_bytes(v, buf, sizeof buf);
+   TestBit.is_equal_int((long long)len, (long long)got, name);
+   TestBit.is_true(len <= sizeof buf && memcmp(buf, expected, len) == 0, name);
+}
+
+static void test_anv40_value_get_bytes_scalars(void) {
+   anvil_document doc = load_bytes_doc();
+   TestBit.is_not_null(doc, "ANV40: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "ANV40: no errors");
+   expect_bytes(doc, "n", "007", 3);
+   expect_bytes(doc, "b", "true", 4);
+   expect_bytes(doc, "z", "null", 4);
+   expect_bytes(doc, "w", "bare-word", 9);
+   expect_bytes(doc, "alias", "007", 3); // transparent through the resolved VarRef
+   expect_bytes(doc, "e", "", 0);
+   // the raw span: backslashes are still there, nothing resolved
+   expect_bytes(doc, "s", "a\\\"b\\n", 6);
+   // arbitrary bytes, including an embedded NUL, come back exactly
+   static const unsigned char blob[] = {'x', 0x00, 'y', 0xFF, 0x80, '\n', 'z'};
+   expect_bytes(doc, "bin", blob, sizeof blob);
+
+   // get_text resolves the STRING's escapes; get_bytes must not
+   char text[16] = {0};
+   size_t text_len = anvil_value_get_text(named(doc, "s"), text, sizeof text);
+   TestBit.is_equal_int(4, (long long)text_len, "ANV40: get_text resolves escapes (a\"b\\n = 4 bytes)");
+   TestBit.is_true(anvil_value_get_bytes(named(doc, "s"), NULL, 0) != text_len,
+                   "ANV40: get_bytes and get_text differ for a STRING with escapes");
+   anvil_dispose(doc);
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV41 — get_bytes buffer convention: NULL buf sizes, a short buffer
+ * truncates but still reports the full length, and no NUL terminator is
+ * written (a blob can contain NUL; the length is the contract)
+ * ---------------------------------------------------------------------- */
+static void test_anv41_value_get_bytes_buffer_convention(void) {
+   anvil_document doc = load_bytes_doc();
+   TestBit.is_not_null(doc, "ANV41: document loaded");
+   if (!doc) {
+      return;
+   }
+   anvil_value w = named(doc, "w"); // "bare-word", 9 bytes
+
+   unsigned char guard[16];
+   memset(guard, 0x7F, sizeof guard);
+   size_t got = anvil_value_get_bytes(w, guard, sizeof guard);
+   TestBit.is_equal_int(9, (long long)got, "ANV41: full length reported");
+   TestBit.is_true(memcmp(guard, "bare-word", 9) == 0, "ANV41: bytes copied");
+   TestBit.is_equal_int(0x7F, guard[9], "ANV41: no NUL terminator written after the data");
+
+   memset(guard, 0x7F, sizeof guard);
+   got = anvil_value_get_bytes(w, guard, 4);
+   TestBit.is_equal_int(9, (long long)got, "ANV41: a short buffer still reports the full length");
+   TestBit.is_true(memcmp(guard, "bare", 4) == 0, "ANV41: a short buffer is filled to its size");
+   TestBit.is_equal_int(0x7F, guard[4], "ANV41: nothing written past buflen");
+
+   memset(guard, 0x7F, sizeof guard);
+   got = anvil_value_get_bytes(w, guard, 0);
+   TestBit.is_equal_int(9, (long long)got, "ANV41: buflen 0 reports the length");
+   TestBit.is_equal_int(0x7F, guard[0], "ANV41: buflen 0 writes nothing");
+
+   anvil_dispose(doc);
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV42 — get_bytes is scalar-only: collections, NULL, and anything that
+ * isn't a readable value report 0 and write nothing
+ * ---------------------------------------------------------------------- */
+static void test_anv42_value_get_bytes_not_scalar(void) {
+   anvil_document doc = load_bytes_doc();
+   TestBit.is_not_null(doc, "ANV42: document loaded");
+   if (!doc) {
+      return;
+   }
+   unsigned char guard[8];
+   const char *collections[] = {"a", "o"};
+   for (size_t i = 0; i < 2; i++) {
+      memset(guard, 0x7F, sizeof guard);
+      TestBit.is_equal_int(0, (long long)anvil_value_get_bytes(named(doc, collections[i]), guard, sizeof guard),
+                           collections[i]);
+      TestBit.is_equal_int(0x7F, guard[0], collections[i]);
+   }
+   memset(guard, 0x7F, sizeof guard);
+   TestBit.is_equal_int(0, (long long)anvil_value_get_bytes(NULL, guard, sizeof guard),
+                        "ANV42: NULL value reports 0");
+   TestBit.is_equal_int(0x7F, guard[0], "ANV42: NULL value writes nothing");
+   TestBit.is_equal_int(0, (long long)anvil_value_get_bytes(NULL, NULL, 0), "ANV42: NULL value, NULL buf");
+   anvil_dispose(doc);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1122,6 +1250,10 @@ int main(void) {
    TestBit.run_ex("ANV38_value_get_numeric", NULL, test_anv38_value_get_numeric, th);
    TestBit.run_ex("ANV39_value_get_numeric_non_numeric", NULL,
                   test_anv39_value_get_numeric_non_numeric, th);
+   TestBit.run_ex("ANV40_value_get_bytes_scalars", NULL, test_anv40_value_get_bytes_scalars, th);
+   TestBit.run_ex("ANV41_value_get_bytes_buffer_convention", NULL,
+                  test_anv41_value_get_bytes_buffer_convention, th);
+   TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
 
    return TestBit.report();
 }
