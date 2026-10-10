@@ -355,7 +355,11 @@ problem that ruled out a live-handle design for the Node/WASM bindings.
 | `value[key]` (str) | `AnvlValue \| None` | Object field's value directly, not the statement. `None` if `key` isn't present or this isn't object-shaped. |
 | `.has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
 | `.entries()` | generator of `(str, AnvlValue)` | Declaration order. Empty for a non-object value. |
-| `.as_string()` / `.as_bool()` / `.as_int()` | `str \| None` / `bool \| None` / `int \| None` | Each `None` unless `.type` matches (`STRING` or `BARE` / `BOOL` / `NUMERIC`) — a bare, unquoted literal like `host := localhost;` reads as a string; `as_int()` truncates toward zero. |
+| `.as_string()` / `.as_bool()` | `str \| None` / `bool \| None` | Each `None` unless `.type` matches (`STRING` or `BARE` / `BOOL`) — a bare, unquoted literal like `host := localhost;` reads as a string. |
+| `.as_int()` | `int \| None` | `NUMERIC` only. **Exact for every integral literal** (past int64 too — Python ints are unbounded); a decimal/exponent literal truncates toward zero; `None` when it overflows a double (`1e+999`). |
+| `.as_float()` / `.numeric_text()` / `.is_integral()` | `float \| None` / `str \| None` / `bool \| None` | `NUMERIC` only: the nearest float, the exact source text (`"007"`, `"1e+3"`, a bignum), and whether it was authored as an integer (`5` vs `5.0`). |
+| `.as_bytes()` / `.blob_tag()` | `bytes \| None` / `str \| None` | `BLOB` only: its exact content, and its `@tag` (`None` when untagged). Blob content is arbitrary bytes, so it is not `.as_string()`. |
+| `.raw_bytes()` | `bytes \| None` | The exact, uninterpreted source span of **any scalar** — a string's escapes stay as written. `None` for an array, tuple or object. |
 
 ### `AnvlStatement` and `AnvilAttribute`
 
@@ -373,6 +377,34 @@ with AnvilDocument.parse_value_fragment("[(1,2,3),(4,5,6)]") as frag:
     if rows is not None and rows.type == ValueType.ARRAY:
         first = rows[0][0].as_int()  # 1 -- rows[0] is the Tuple, [0] its first element
 ```
+
+### Writing: `AnvilWriter` and `AnvilBuilder`
+
+```python
+from anvil import AnvilBuilder, AnvilDialect, AnvilWriter
+
+with AnvilWriter.create(AnvilDialect.AML) as w:          # streaming: forward-only, chainable
+    text = (w.statement("server").begin_object()
+             .statement("host").bare("localhost")
+             .statement("port").value(8080)
+             .end_object().finish())
+
+with AnvilBuilder.create(AnvilDialect.AML) as b:         # builder: attach in any order, re-emit at will
+    server = b.object()
+    server.add("host", b.bare("localhost"))
+    b.add("server", server).attribute("env", "production")
+    text = b.emit()
+```
+
+| Member | Notes |
+|---|---|
+| `AnvilWriter.create(dialect)` / `AnvilBuilder.create(dialect)` | `AnvilDialect.AML` or `.AMP`. Context managers; `.dispose()` is idempotent and use afterwards raises `RuntimeError`. |
+| `.statement(name, base=None)`, `.attribute(key, value=None)`, `.include(path)` | Writer header/statement calls (`attribute_string` for a quoted value). |
+| `.value(x)` | `None`, `bool`, `int` or `float` — an int past int64 is written exactly. Text is `.string()` (quoted) or `.bare()`; bytes are `.blob(tag, data)`; a reference is `.varref(name)`. |
+| `.begin_array()/.end_array()`, `.begin_tuple()/.end_tuple()`, `.begin_object()/.end_object()` | Writer collections. |
+| `.finish()` / `.finish_bytes()` | Writer output as `str` / exact `bytes` (use bytes for non-UTF-8 blob content, and read it back with `AnvilDocument.load_buffer(bytes)`). |
+| `AnvilBuilder.add(name, node)` / `.find(name)`, `AnvilNode.append(el)` / `.add(name, node)`, `AnvilMember.set_base(...)` / `.attribute(...)` | Builder structure. Values are created detached and attached exactly once. `.emit()` / `.emit_bytes()` / `.write(writer)` produce output. |
+| `AnvilWriterError.code` | A `WriterErrorCode`. The writer's first error is sticky; the builder's are not (a failed call changes nothing). Wrong argument types raise `TypeError`, an embedded NUL `ValueError`, before reaching native code. |
 
 ### `AnvilDocument.get_version()`
 
