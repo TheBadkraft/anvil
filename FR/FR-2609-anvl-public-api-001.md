@@ -46,9 +46,8 @@ ANVL is meant to be a genuine contender against JSON/YAML/TOML/etc. as *the* for
    typedef struct anvil_numeric_t {
        bool is_integral;  // source text had no '.' / exponent
        bool overflowed;   // doesn't fit the representation below -- fall back to get_text()
-                          // and parse as bignum/arbitrary precision, the same raw-span escape
-                          // hatch a binding already uses for e.g. BLOB's byte[] (same
-                          // underlying call, just read as bytes instead of decoded text)
+                          // (now anvil_value_get_bytes(), see the amendment below) and parse as
+                          // bignum/arbitrary precision
        int64_t as_int64; // valid when is_integral && !overflowed
        double as_double; // valid when !is_integral && !overflowed
    } anvil_numeric_t;
@@ -61,6 +60,20 @@ ANVL is meant to be a genuine contender against JSON/YAML/TOML/etc. as *the* for
    **Implemented 2026-10-09**: `anvil_numeric_t` lives in `anvil_types.h`, `anvil_value_get_numeric` in `anvil_flat.h`, and `Value.get_numeric` is appended as the **last** field of `anvil_value_i` (existing field offsets unchanged, so a binding bound to the older struct keeps working). Integral text is parsed digit by digit with overflow detection - not `strtoll` - because the span isn't NUL-terminated and may be arbitrarily long (leading zeros are legal, so a 70-digit literal can still be `1`); decimal/exponent text goes through `strtod` on a NUL-terminated copy. Tests: `ANV38`/`ANV39` (`test_anvil_native.c`), `VT03` (`test_anvil_vtable.c`).
 
    Originating request: `anvil.java/FR/FR-2609-anvl-codec-001-java.md` — kept open there pending re-evaluation once this lands, not resolved by this amendment alone.
+
+   **Amended again 2026-10-10 — `get_bytes` is the primitive; the bignum fallback is `get_bytes`, not `get_text`.** The amendment above pointed the `overflowed` fallback at `get_text()` ("the same call BLOB's `byte[]` rides on"). Reviewing it: that worked only because `get_text` happens to return the raw span for every kind except `STRING`, a kind-dependent special case that `asBytes()` and the numeric fallback both leaned on. Decided (repo owner + review): `get_text` is a *view* (the string view: it resolves escapes, which is policy); the primitive is the exact bytes. New, flat + vtable (`Value.get_bytes`, appended as the 8th field, after `get_numeric`):
+
+   ```c
+   size_t anvil_value_get_bytes(anvil_value val, void *buf, size_t buflen);
+   ```
+
+   - **Exact, uninterpreted source span** of a *scalar* kind (`NULL`, `BOOL`, `NUMERIC`, `STRING`, `BLOB`, `BARE`): a `STRING`'s escapes stay as written, a `BLOB` comes back byte for byte (embedded NUL, non-UTF-8), a number is its literal text. Transparent through a resolved VarRef.
+   - **Scalars only.** `ARRAY`/`TUPLE`/`OBJECT` report 0 - a collection's source span is pre-resolution (inherited fields and `$` references aren't in it), so returning it would misrepresent the value.
+   - **No NUL terminator**, none counted: the returned length is the contract (a blob may contain NUL). Same two-call sizing convention otherwise: `NULL` buf sizes, a short buffer truncates but still returns the full length.
+   - **`get_text` is unchanged and stays total** - deliberately not narrowed to string kinds. Narrowing would remove no capability, break every existing caller (all five bindings, `ANV09`, the docs), and in C turn a misuse into an empty buffer indistinguishable from an empty string. The strictness belongs in the bindings, where it already lives (`asString()` etc. return null on the wrong kind). `get_text` is re-documented as the string view, with a pointer to `get_bytes`.
+   - **Binding convention** (decided): `asBytes()` stays blob-only (the blob's content); a separate, explicitly named any-scalar accessor exposes the raw span - `rawBytes()` (Java), `RawBytes()` (.NET), `raw_bytes()` (Python) - because "the bytes of a `STRING`" is otherwise ambiguous between the decoded value and the source span. A number's bignum fallback is `asNumericText()` (ASCII string) built on `get_bytes`.
+
+   Tests: `ANV40`-`ANV42` (`test_anvil_native.c`), `VT03` (`test_anvil_vtable.c`).
 
 ## Implementation
 

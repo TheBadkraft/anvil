@@ -136,7 +136,7 @@ typedef enum {
  */
 typedef struct anvil_numeric_t {
    bool is_integral; // the source text had no '.' and no exponent
-   bool overflowed;  // doesn't fit the representation below - fall back to anvil_value_get_text()
+   bool overflowed;  // doesn't fit the representation below - fall back to anvil_value_get_bytes()
                      // and parse it as a bignum/arbitrary-precision number
    int64_t as_int64; // valid when is_integral && !overflowed
    double as_double; // valid when !is_integral && !overflowed

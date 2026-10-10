@@ -239,8 +239,33 @@ size_t anvil_statement_get_name(anvil_statement stmt, char *buf, size_t buflen);
 anvil_value_type anvil_value_get_type(anvil_value val);
 
 /**
- * @brief A scalar value's text, copied into a caller-supplied buffer.
+ * @brief The exact bytes of a scalar value's source span, copied into a caller-supplied buffer -
+ * the primitive every other reader is a view of. Uninterpreted: a STRING's escape sequences are
+ * left as written (`a\nb` is four bytes, not three), a BLOB's content comes back byte for byte
+ * (it may hold NUL or non-UTF-8 data), and a NUMERIC/BOOL/BARE/`null` is its literal text.
  * Transparent through a resolved VarRef, same as anvil_value_get_type.
+ *
+ * Defined for the scalar kinds only (NULL, BOOL, NUMERIC, STRING, BLOB, BARE). An
+ * ARRAY/TUPLE/OBJECT reports 0: its source span is pre-resolution text (inherited fields and
+ * `$` references are not in it), which would misrepresent the value. An empty STRING or BLOB also
+ * reports 0 - use anvil_value_get_type to tell the cases apart.
+ * @param val The value to read. NULL, an unresolved VarRef or a non-scalar writes nothing and returns 0.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes. Unlike anvil_value_get_text no NUL terminator is written and
+ * none is counted - the returned length is the contract, since a blob may contain NUL.
+ * @return The full length in bytes, even when buflen is smaller (then only buflen bytes are copied).
+ */
+size_t anvil_value_get_bytes(anvil_value val, void *buf, size_t buflen);
+
+/**
+ * @brief A scalar value's text, copied into a caller-supplied buffer - the string view of a value.
+ * Transparent through a resolved VarRef, same as anvil_value_get_type.
+ *
+ * Prefer anvil_value_get_bytes for anything that isn't a string: it is the exact, uninterpreted
+ * span for every scalar kind. This function stays total (any kind returns something) so a C caller
+ * never mistakes a misuse for an empty string; for the scalar kinds other than STRING its text is
+ * just those same raw bytes plus a NUL terminator. (Unlike get_bytes it also returns the raw source
+ * span of an ARRAY/TUPLE/OBJECT, which is rarely what you want.)
  *
  * For ANVIL_VALUE_STRING specifically, this resolves escape sequences
  * (\n, \t, \r, \\, \") to their real byte values first — an unrecognized
@@ -257,15 +282,15 @@ size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen);
 
 /**
  * @brief A NUMERIC value as a machine number, without the precision loss of routing it through
- * a double. Alongside anvil_value_get_text, not instead of it: `get_text` stays the raw-span
- * escape hatch for every kind.
+ * a double. Alongside the raw-span readers, not instead of them: anvil_value_get_bytes is the
+ * escape hatch for a value that doesn't fit.
  *
  * Integral text (no '.' and no exponent, e.g. `9007199254740993`, which a double cannot hold)
  * is read exactly as an int64_t; anything else is read with strtod as a double.
  * `overflowed` is set when the value doesn't fit: an integral literal outside int64_t, or a
  * decimal/exponent literal whose magnitude overflows a double (`1e+999`). Underflow of a tiny
- * exponent to zero is not reported. In both cases `anvil_value_get_text` still has the exact text
- * for a binding to parse as a bignum.
+ * exponent to zero is not reported. In both cases `anvil_value_get_bytes` still has the exact text
+ * (ASCII) for a binding to parse as a bignum.
  *
  * Transparent through a resolved VarRef, like every other accessor.
  * @param val The value to read. NULL, an unresolved VarRef, or any kind other than NUMERIC

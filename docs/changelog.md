@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte for byte).
 - `anvil.java` wraps both (`AnvilWriter`, `AnvilBuilder`); other bindings to follow.
 - **`anvil_value_get_numeric`** (flat + `Value.get_numeric`, appended last in the vtable): a NUMERIC value as an exact `int64_t` (integral text, including values past a double's 53-bit mantissa) or a `double`, with `overflowed` as the fall-back-to-`get_text` signal. Amends decision #6 of `FR-2609-anvl-public-api-001`; `anvil_numeric_t` is in `anvil_types.h`.
+- **`anvil_value_get_bytes`** (flat + `Value.get_bytes`, appended last): the exact, uninterpreted source span of any scalar kind (a `STRING`'s escapes unresolved, a `BLOB` byte for byte, no NUL terminator); 0 for collections. The primitive that `get_text` is a view of, and the fallback for a number `get_numeric` can't hold. `get_text` is unchanged (still total) and re-documented as the string view. See decision #6 of `FR-2609-anvl-public-api-001`.
 
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the

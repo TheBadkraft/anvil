@@ -552,6 +552,32 @@ static size_t resolve_string_escapes(const char *raw, size_t raw_len, char *out_
    return out_len;
 }
 
+size_t anvil_value_get_bytes(anvil_value val, void *buf, size_t buflen) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v) {
+      return 0;
+   }
+   switch (v->type) {
+   case ANVL_VALUE_NULL:
+   case ANVL_VALUE_BOOL:
+   case ANVL_VALUE_NUMERIC:
+   case ANVL_VALUE_STRING:
+   case ANVL_VALUE_BLOB:
+   case ANVL_VALUE_BARE:
+      break;
+   default:
+      return 0; // collections, and the internal NONE placeholder
+   }
+   size_t len = (size_t)Source.slice_length(v->text);
+   if (len == 0 || !v->text.start) {
+      return 0;
+   }
+   if (buf && buflen > 0) {
+      memcpy(buf, v->text.start, len < buflen ? len : buflen);
+   }
+   return len;
+}
+
 size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen) {
    anvl_value v = deref_varref((anvl_value)val);
    if (!v) {
