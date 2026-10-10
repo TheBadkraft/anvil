@@ -107,9 +107,10 @@ objects may repeat. Names pulled in by an `include` are invisible to the writer.
 
 ## Findings along the way
 
-- The flat reader API doesn't expose a blob's tag or a statement's inheritance base, so a
-  reader→writer copy loses both (the tests copy blobs untagged and inherited objects as their merged
-  fields). A lossless reader→writer round trip would need those accessors.
+- The flat reader API didn't expose a blob's tag or a statement's inheritance base, so a
+  reader→writer copy lost both. **Blob tag: fixed 2026-10-10** (`anvil_value_get_blob_tag`; the
+  round-trip suites now copy tags, `RT13`/`RB04`). **Inheritance base: still open** - an inherited
+  object copies as its merged fields; a lossless copy would need a base accessor.
 - The reader's numeric grammar is looser than the documented one (`1.` is NUMERIC).
 
 ## Not started

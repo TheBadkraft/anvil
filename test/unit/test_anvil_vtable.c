@@ -78,6 +78,8 @@ static void test_vt03_value_matches_flat(void) {
                    "VT03: Value.get_numeric is anvil_value_get_numeric");
    TestBit.is_true(Value.get_bytes == anvil_value_get_bytes,
                    "VT03: Value.get_bytes is anvil_value_get_bytes");
+   TestBit.is_true(Value.get_blob_tag == anvil_value_get_blob_tag,
+                   "VT03: Value.get_blob_tag is anvil_value_get_blob_tag");
 }
 /* ---------------------------------------------------------------------- *
  * VT05 — every Document vtable field is pointer-identical to its flat
