@@ -578,6 +578,18 @@ size_t anvil_value_get_bytes(anvil_value val, void *buf, size_t buflen) {
    return len;
 }
 
+size_t anvil_value_get_blob_tag(anvil_value val, char *buf, size_t buflen) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || v->type != ANVL_VALUE_BLOB) {
+      return 0;
+   }
+   size_t len = (size_t)Source.slice_length(v->blob.tag); // 0 for an untagged blob
+   if (len == 0) {
+      return 0;
+   }
+   return copy_to_buffer(v->blob.tag.start, len, buf, buflen);
+}
+
 size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen) {
    anvl_value v = deref_varref((anvl_value)val);
    if (!v) {

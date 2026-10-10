@@ -100,6 +100,7 @@ typedef struct anvil_value_i {
    anvil_statement (*get_statement)(anvil_value val, size_t index);
    anvil_statement (*find_statement)(anvil_value val, const char *key);
    anvil_numeric_t (*get_numeric)(anvil_value val); // appended: existing field offsets are unchanged
-   size_t (*get_bytes)(anvil_value val, void *buf, size_t buflen); // appended last, same reason
+   size_t (*get_bytes)(anvil_value val, void *buf, size_t buflen); // appended, same reason
+   size_t (*get_blob_tag)(anvil_value val, char *buf, size_t buflen); // appended last, same reason
 } anvil_value_i;
 extern const anvil_value_i Value;

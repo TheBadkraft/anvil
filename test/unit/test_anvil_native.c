@@ -1200,6 +1200,72 @@ static void test_anv42_value_get_bytes_not_scalar(void) {
    anvil_dispose(doc);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV43 — anvil_value_get_blob_tag: a blob's `@tag`, which get_bytes /
+ * get_text never carry. 0 for an untagged blob and for every other kind;
+ * text buffer convention (NUL-terminated, like anvil_statement_get_name);
+ * transparent through a VarRef
+ * ---------------------------------------------------------------------- */
+static void test_anv43_value_get_blob_tag(void) {
+   const char source[] =
+      "#!aml\n\n"
+      "dated := @date`2026-07-07`;\n"
+      "sel := @sel`#input-date`;\n"
+      "raw := `no tag here`;\n"
+      "longest := @abcdefghijklmnopqrstuvwxyz01234`x`;\n" // 31 chars, the grammar's maximum
+      "under := @_t9`x`;\n"
+      "alias := $dated;\n"
+      "s := \"@date\";\n"
+      "n := 5;\n"
+      "a := [1, 2];\n";
+   anvil_document doc = anvil_load_buffer(source, sizeof source - 1);
+   TestBit.is_not_null(doc, "ANV43: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "ANV43: no errors");
+
+   struct {
+      const char *name;
+      const char *tag;
+   } tagged[] = {{"dated", "date"}, {"sel", "sel"}, {"longest", "abcdefghijklmnopqrstuvwxyz01234"},
+                 {"under", "_t9"}, {"alias", "date"}};
+   for (size_t i = 0; i < sizeof tagged / sizeof *tagged; i++) {
+      anvil_value v = anvil_statement_get_value(anvil_document_find_statement(doc, tagged[i].name));
+      size_t want = strlen(tagged[i].tag);
+      TestBit.is_equal_int((long long)want, (long long)anvil_value_get_blob_tag(v, NULL, 0), tagged[i].name);
+      char buf[64];
+      memset(buf, 0x7F, sizeof buf);
+      size_t got = anvil_value_get_blob_tag(v, buf, sizeof buf);
+      TestBit.is_equal_int((long long)want, (long long)got, tagged[i].name);
+      TestBit.is_equal_str(tagged[i].tag, buf, tagged[i].name);
+   }
+   TestBit.is_true(anvil_value_get_type(anvil_statement_get_value(
+                      anvil_document_find_statement(doc, "alias"))) == ANVIL_VALUE_BLOB,
+                   "ANV43: the alias really is a blob");
+
+   // untagged blob and every other kind: 0, nothing written
+   const char *no_tag[] = {"raw", "s", "n", "a"};
+   for (size_t i = 0; i < sizeof no_tag / sizeof *no_tag; i++) {
+      anvil_value v = anvil_statement_get_value(anvil_document_find_statement(doc, no_tag[i]));
+      char buf[8];
+      memset(buf, 0x7F, sizeof buf);
+      TestBit.is_equal_int(0, (long long)anvil_value_get_blob_tag(v, buf, sizeof buf), no_tag[i]);
+      TestBit.is_equal_int(0x7F, (unsigned char)buf[0], no_tag[i]);
+   }
+
+   // buffer convention: a short buffer truncates but reports the full length, always NUL-terminated
+   anvil_value dated = anvil_statement_get_value(anvil_document_find_statement(doc, "dated"));
+   char small[3];
+   memset(small, 0x7F, sizeof small);
+   TestBit.is_equal_int(4, (long long)anvil_value_get_blob_tag(dated, small, sizeof small),
+                        "ANV43: short buffer reports the full length");
+   TestBit.is_equal_str("da", small, "ANV43: short buffer is truncated and NUL-terminated");
+
+   TestBit.is_equal_int(0, (long long)anvil_value_get_blob_tag(NULL, NULL, 0), "ANV43: NULL value");
+   anvil_dispose(doc);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1254,6 +1320,7 @@ int main(void) {
    TestBit.run_ex("ANV41_value_get_bytes_buffer_convention", NULL,
                   test_anv41_value_get_bytes_buffer_convention, th);
    TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
+   TestBit.run_ex("ANV43_value_get_blob_tag", NULL, test_anv43_value_get_blob_tag, th);
 
    return TestBit.report();
 }

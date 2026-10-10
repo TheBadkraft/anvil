@@ -91,9 +91,9 @@ static void test_rb01_hand_built(void) {
 /* ---------------------------------------------------------------------- *
  * RB02 - fixed point over every real fixture, via the builder
  * ---------------------------------------------------------------------- *
- * Blob tags and inheritance bases aren't readable through the reader API,
- * so blobs go in untagged and an inherited object goes in as its merged
- * fields (same limits as test_writer_roundtrip.c's RT10).
+ * An inheritance base isn't readable through the reader API, so an inherited
+ * object goes in as its merged fields (same limit as test_writer_roundtrip.c's
+ * RT10); blob tags are, and survive.
  */
 static anvil_node node_from_value(anvil_builder b, anvil_value v);
 
@@ -143,9 +143,12 @@ static anvil_node node_from_value(anvil_builder b, anvil_value v) {
    case ANVIL_VALUE_BARE:
       node = anvil_builder_bare(b, text);
       break;
-   case ANVIL_VALUE_BLOB:
-      node = anvil_builder_blob(b, NULL, text, need);
+   case ANVIL_VALUE_BLOB: {
+      char tag[64];
+      size_t tag_len = anvil_value_get_blob_tag(v, tag, sizeof tag);
+      node = anvil_builder_blob(b, tag_len ? tag : NULL, text, need);
       break;
+   }
    case ANVIL_VALUE_ARRAY:
    case ANVIL_VALUE_TUPLE: {
       node = kind == ANVIL_VALUE_ARRAY ? anvil_builder_array(b) : anvil_builder_tuple(b);
@@ -260,6 +263,27 @@ static void test_rb02_fixture_fixed_point(void) {
    }
    closedir(dir);
    TestBit.is_true(copied >= 20, "RB02: at least 20 real fixtures round-tripped through the builder");
+}
+
+/* ---------------------------------------------------------------------- *
+ * RB04 - a blob's tag survives read -> builder -> text
+ * ---------------------------------------------------------------------- */
+static void test_rb04_blob_tags_round_trip(void) {
+   anvil_document original = anvil_load(fixture_path("f04_blobs.anvl"));
+   TestBit.is_not_null(original, "RB04: f04_blobs.anvl loaded");
+   if (!original) {
+      return;
+   }
+   size_t len = 0;
+   char *text = emit_copy(original, &len, "f04_blobs.anvl");
+   anvil_dispose(original);
+   TestBit.is_not_null(text, "RB04: copied through the builder");
+   if (text) {
+      TestBit.is_true(strstr(text, "created := @date`2026-07-07`;") != NULL, "RB04: @date tag survives");
+      TestBit.is_true(strstr(text, "dom_elem := @sel`#input-date`;") != NULL, "RB04: @sel tag survives");
+      TestBit.is_true(strstr(text, "raw := `some content`;") != NULL, "RB04: untagged stays untagged");
+      free(text);
+   }
 }
 
 /* ---------------------------------------------------------------------- *
@@ -431,6 +455,7 @@ static void test_rb03_random_trees(void) {
 int main(void) {
    TestBit.run_ex("RB01_hand_built", NULL, test_rb01_hand_built, th);
    TestBit.run_ex("RB02_fixture_fixed_point", NULL, test_rb02_fixture_fixed_point, th);
+   TestBit.run_ex("RB04_blob_tags_round_trip", NULL, test_rb04_blob_tags_round_trip, th);
    TestBit.run_ex("RB03_random_trees", NULL, test_rb03_random_trees, th);
    return TestBit.report();
 }

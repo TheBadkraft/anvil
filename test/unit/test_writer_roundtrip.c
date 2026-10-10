@@ -490,9 +490,9 @@ static void test_rt09_include(void) {
  * Copies a loaded document back out through the writer using only the
  * public reader API, then repeats on the result: the second copy must be
  * byte-identical to the first (the writer's output is canonical), and
- * must parse without errors. Blob tags and inheritance bases aren't
- * exposed by the reader API, so blobs copy untagged and an inherited
- * object copies as its merged fields.
+ * must parse without errors. An inheritance base isn't exposed by the
+ * reader API, so an inherited object copies as its merged fields; blob
+ * tags are (anvil_value_get_blob_tag) and survive the copy.
  */
 static bool copy_value(anvil_writer w, anvil_value v);
 
@@ -543,9 +543,12 @@ static bool copy_value(anvil_writer w, anvil_value v) {
    case ANVIL_VALUE_BARE:
       ok = anvil_writer_bare(w, text);
       break;
-   case ANVIL_VALUE_BLOB:
-      ok = anvil_writer_blob(w, NULL, text, need);
+   case ANVIL_VALUE_BLOB: {
+      char tag[64];
+      size_t tag_len = anvil_value_get_blob_tag(v, tag, sizeof tag);
+      ok = anvil_writer_blob(w, tag_len ? tag : NULL, text, need);
       break;
+   }
    case ANVIL_VALUE_ARRAY:
    case ANVIL_VALUE_TUPLE: {
       bool is_array = kind == ANVIL_VALUE_ARRAY;
@@ -798,6 +801,32 @@ static void test_rt12_duplicate_names_match_reader(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * RT13 - a blob's tag survives write -> read -> write
+ * ---------------------------------------------------------------------- */
+static void test_rt13_blob_tags_round_trip(void) {
+   anvil_document original = anvil_load(fixture_path("f04_blobs.anvl"));
+   TestBit.is_not_null(original, "RT13: f04_blobs.anvl loaded");
+   if (!original) {
+      return;
+   }
+   anvil_writer copy = copy_document(original, "f04_blobs.anvl");
+   anvil_dispose(original);
+   TestBit.is_not_null(copy, "RT13: copied");
+   if (!copy) {
+      return;
+   }
+   size_t len = 0;
+   const char *text = anvil_writer_data(copy, &len);
+   TestBit.is_true(text && strstr(text, "created := @date`2026-07-07`;") != NULL,
+                   "RT13: @date tag survives the copy");
+   TestBit.is_true(text && strstr(text, "dom_elem := @sel`#input-date`;") != NULL,
+                   "RT13: @sel tag survives the copy");
+   TestBit.is_true(text && strstr(text, "raw := `some content`;") != NULL,
+                   "RT13: an untagged blob stays untagged");
+   anvil_writer_dispose(copy);
+}
+
 int main(void) {
    TestBit.run_ex("RT01_scalars", NULL, test_rt01_scalars, th);
    TestBit.run_ex("RT02_string_escapes", NULL, test_rt02_string_escapes, th);
@@ -809,6 +838,7 @@ int main(void) {
    TestBit.run_ex("RT08_amp", NULL, test_rt08_amp, th);
    TestBit.run_ex("RT09_include", NULL, test_rt09_include, th);
    TestBit.run_ex("RT10_fixture_fixed_point", NULL, test_rt10_fixture_fixed_point, th);
+   TestBit.run_ex("RT13_blob_tags_round_trip", NULL, test_rt13_blob_tags_round_trip, th);
    TestBit.run_ex("RT12_duplicate_names_match_reader", NULL, test_rt12_duplicate_names_match_reader,
                   th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,

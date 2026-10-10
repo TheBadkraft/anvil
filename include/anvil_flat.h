@@ -258,6 +258,20 @@ anvil_value_type anvil_value_get_type(anvil_value val);
 size_t anvil_value_get_bytes(anvil_value val, void *buf, size_t buflen);
 
 /**
+ * @brief A BLOB's tag - the `date` in `@date\`2026-07-07\`` - copied into a caller-supplied buffer.
+ * The tag is not part of the content (anvil_value_get_bytes returns only what is between the
+ * backticks), so this is the only way to read it. A tag is an identifier of at most 31 bytes, so
+ * it uses the text buffer convention, like anvil_statement_get_name.
+ * Transparent through a resolved VarRef, same as anvil_value_get_type.
+ * @param val The value to read. NULL, an untagged blob, and every kind other than BLOB write
+ * nothing and return 0 (a tag is never empty, so 0 unambiguously means "no tag").
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full tag length (excluding NUL), even when buflen is smaller.
+ */
+size_t anvil_value_get_blob_tag(anvil_value val, char *buf, size_t buflen);
+
+/**
  * @brief A scalar value's text, copied into a caller-supplied buffer - the string view of a value.
  * Transparent through a resolved VarRef, same as anvil_value_get_type.
  *
