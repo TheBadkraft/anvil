@@ -58,6 +58,8 @@ ANVL is meant to be a genuine contender against JSON/YAML/TOML/etc. as *the* for
 
    `overflowed` covers both directions: an integral literal too large for `int64_t` (`strtoll` + `ERANGE`), and a decimal/exponent literal whose magnitude overflows `double` itself (`strtod` producing `HUGE_VAL`/`inf`). Underflow-to-zero on a vanishingly small exponent is explicitly not handled by `overflowed` — out of scope for this amendment, not an oversight. Non-`NUMERIC` values report `is_integral = false, overflowed = true` (nothing valid to read; same "fall back to `get_text()`" instruction applies, trivially).
 
+   **Implemented 2026-10-09**: `anvil_numeric_t` lives in `anvil_types.h`, `anvil_value_get_numeric` in `anvil_flat.h`, and `Value.get_numeric` is appended as the **last** field of `anvil_value_i` (existing field offsets unchanged, so a binding bound to the older struct keeps working). Integral text is parsed digit by digit with overflow detection - not `strtoll` - because the span isn't NUL-terminated and may be arbitrarily long (leading zeros are legal, so a 70-digit literal can still be `1`); decimal/exponent text goes through `strtod` on a NUL-terminated copy. Tests: `ANV38`/`ANV39` (`test_anvil_native.c`), `VT03` (`test_anvil_vtable.c`).
+
    Originating request: `anvil.java/FR/FR-2609-anvl-codec-001-java.md` — kept open there pending re-evaluation once this lands, not resolved by this amendment alone.
 
 ## Implementation

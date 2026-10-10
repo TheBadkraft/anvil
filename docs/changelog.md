@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disposal. Tests: `test_builder`, `test_builder_roundtrip` (random trees must match the writer
   byte for byte).
 - `anvil.java` wraps both (`AnvilWriter`, `AnvilBuilder`); other bindings to follow.
+- **`anvil_value_get_numeric`** (flat + `Value.get_numeric`, appended last in the vtable): a NUMERIC value as an exact `int64_t` (integral text, including values past a double's 53-bit mantissa) or a `double`, with `overflowed` as the fall-back-to-`get_text` signal. Amends decision #6 of `FR-2609-anvl-public-api-001`; `anvil_numeric_t` is in `anvil_types.h`.
 
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
