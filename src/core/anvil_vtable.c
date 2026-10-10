@@ -77,4 +77,5 @@ const anvil_value_i Value = {
    .get_element = anvil_value_get_element,
    .get_statement = anvil_value_get_statement,
    .find_statement = anvil_value_find_statement,
+   .get_numeric = anvil_value_get_numeric,
 };

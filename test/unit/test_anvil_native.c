@@ -18,6 +18,8 @@
 // ----------------
 #include "../utilities/helpers.h"
 #include <sigma.core/allocator.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 static void th(void) {
@@ -970,6 +972,106 @@ static void test_anv37_value_find_statement(void) {
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- *
+ * ANV38 — anvil_value_get_numeric: exact int64 for integral text (incl.
+ * beyond a double's 53-bit mantissa), double otherwise, overflowed as the
+ * fall-back-to-get_text signal
+ * ---------------------------------------------------------------------- */
+static anvil_numeric_t numeric_of(const char *literal) {
+   char source[512];
+   int n = snprintf(source, sizeof source, "#!aml\n\nx := %s;\n", literal);
+   anvil_document doc = anvil_load_buffer(source, (size_t)n);
+   anvil_numeric_t result = {.is_integral = false, .overflowed = true};
+   if (doc) {
+      anvil_statement stmt = anvil_document_find_statement(doc, "x");
+      if (stmt && !anvil_has_errors(doc)) {
+         result = anvil_value_get_numeric(anvil_statement_get_value(stmt));
+      }
+      anvil_dispose(doc);
+   }
+   Registry.clear(); // the next call may load byte-identical text
+   return result;
+}
+
+static void expect_int(const char *literal, int64_t expected) {
+   anvil_numeric_t n = numeric_of(literal);
+   TestBit.is_true(n.is_integral, literal);
+   TestBit.is_false(n.overflowed, literal);
+   TestBit.is_true(n.as_int64 == expected, literal);
+}
+
+static void expect_double(const char *literal, double expected) {
+   anvil_numeric_t n = numeric_of(literal);
+   TestBit.is_false(n.is_integral, literal);
+   TestBit.is_false(n.overflowed, literal);
+   TestBit.is_true(n.as_double == expected, literal);
+}
+
+static void expect_overflow(const char *literal, bool integral) {
+   anvil_numeric_t n = numeric_of(literal);
+   TestBit.is_true(n.overflowed, literal);
+   TestBit.is_equal_int(integral, n.is_integral, literal);
+}
+
+static void test_anv38_value_get_numeric(void) {
+   expect_int("0", 0);
+   expect_int("-0", 0);
+   expect_int("42", 42);
+   expect_int("-1285", -1285);
+   expect_int("007", 7); // base 10, never octal
+   expect_int("9007199254740993", 9007199254740993LL); // 2^53 + 1: not representable as a double
+   expect_int("-9007199254740993", -9007199254740993LL);
+   expect_int("9223372036854775807", INT64_MAX);
+   expect_int("-9223372036854775808", INT64_MIN);
+   expect_int("00000000000000000000000000000000000000000000000000000000000000000000001", 1);
+
+   expect_double("3.14", 3.14);
+   expect_double("-2.5", -2.5);
+   expect_double("1e+3", 1000.0);
+   expect_double("5E-1", 0.5);
+   expect_double("1.7976931348623157e+308", 1.7976931348623157e308);
+   expect_double("0.0", 0.0);
+
+   expect_overflow("9223372036854775808", true);
+   expect_overflow("-9223372036854775809", true);
+   expect_overflow("18446744073709551615", true); // UINT64_MAX
+   expect_overflow("123456789012345678901234567890123456789012345678901234567890", true);
+   expect_overflow("1e+999", false);
+   expect_overflow("-1e+999", false);
+   expect_overflow("1.7976931348623159e+308", false); // rounds past DBL_MAX
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV39 — anvil_value_get_numeric on anything that isn't NUMERIC reports
+ * "nothing valid to read" (is_integral=false, overflowed=true); NULL-safe;
+ * transparent through a resolved VarRef
+ * ---------------------------------------------------------------------- */
+static void test_anv39_value_get_numeric_non_numeric(void) {
+   const char source[] =
+      "#!aml\n\nn := 5;\nalias := $n;\ns := \"7\";\nw := seven;\nb := true;\nz := null;\n"
+      "a := [1, 2];\no := { k := 1; };\n";
+   anvil_document doc = anvil_load_buffer(source, sizeof source - 1);
+   TestBit.is_not_null(doc, "ANV39: document loaded");
+   if (!doc) {
+      return;
+   }
+   const char *non_numeric[] = {"s", "w", "b", "z", "a", "o"};
+   for (size_t i = 0; i < sizeof non_numeric / sizeof *non_numeric; i++) {
+      anvil_value v = anvil_statement_get_value(anvil_document_find_statement(doc, non_numeric[i]));
+      anvil_numeric_t r = anvil_value_get_numeric(v);
+      TestBit.is_false(r.is_integral, non_numeric[i]);
+      TestBit.is_true(r.overflowed, non_numeric[i]);
+   }
+   anvil_numeric_t viaref = anvil_value_get_numeric(
+      anvil_statement_get_value(anvil_document_find_statement(doc, "alias")));
+   TestBit.is_true(viaref.is_integral && !viaref.overflowed && viaref.as_int64 == 5,
+                   "ANV39: a resolved VarRef reads through to its target's number");
+   anvil_numeric_t none = anvil_value_get_numeric(NULL);
+   TestBit.is_false(none.is_integral, "ANV39: NULL value is not integral");
+   TestBit.is_true(none.overflowed, "ANV39: NULL value reports overflowed");
+   anvil_dispose(doc);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1017,6 +1119,9 @@ int main(void) {
    TestBit.run_ex("ANV35_string_no_escapes", NULL, test_anv35_string_no_escapes, th);
    TestBit.run_ex("ANV36_string_truncated_buffer", NULL, test_anv36_string_truncated_buffer, th);
    TestBit.run_ex("ANV37_value_find_statement", NULL, test_anv37_value_find_statement, th);
+   TestBit.run_ex("ANV38_value_get_numeric", NULL, test_anv38_value_get_numeric, th);
+   TestBit.run_ex("ANV39_value_get_numeric_non_numeric", NULL,
+                  test_anv39_value_get_numeric_non_numeric, th);
 
    return TestBit.report();
 }

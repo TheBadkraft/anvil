@@ -19,6 +19,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /**
  * @brief Opaque handle to a loaded, fully-resolved Anvil document.
@@ -125,6 +126,21 @@ typedef enum {
    ANVIL_VALUE_TUPLE,
    ANVIL_VALUE_OBJECT,
 } anvil_value_type;
+
+/**
+ * @brief A NUMERIC value read as a machine number - see anvil_value_get_numeric.
+ *
+ * Returned by value (24 bytes, no ownership). Exactly one of `as_int64`/`as_double` is
+ * meaningful, and only when `overflowed` is false: `as_int64` when `is_integral`, `as_double`
+ * otherwise. The other field is 0.
+ */
+typedef struct anvil_numeric_t {
+   bool is_integral; // the source text had no '.' and no exponent
+   bool overflowed;  // doesn't fit the representation below - fall back to anvil_value_get_text()
+                     // and parse it as a bignum/arbitrary-precision number
+   int64_t as_int64; // valid when is_integral && !overflowed
+   double as_double; // valid when !is_integral && !overflowed
+} anvil_numeric_t;
 
 /**
  * @brief Stable, deliberately small public error category.

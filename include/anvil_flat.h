@@ -256,6 +256,24 @@ anvil_value_type anvil_value_get_type(anvil_value val);
 size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen);
 
 /**
+ * @brief A NUMERIC value as a machine number, without the precision loss of routing it through
+ * a double. Alongside anvil_value_get_text, not instead of it: `get_text` stays the raw-span
+ * escape hatch for every kind.
+ *
+ * Integral text (no '.' and no exponent, e.g. `9007199254740993`, which a double cannot hold)
+ * is read exactly as an int64_t; anything else is read with strtod as a double.
+ * `overflowed` is set when the value doesn't fit: an integral literal outside int64_t, or a
+ * decimal/exponent literal whose magnitude overflows a double (`1e+999`). Underflow of a tiny
+ * exponent to zero is not reported. In both cases `anvil_value_get_text` still has the exact text
+ * for a binding to parse as a bignum.
+ *
+ * Transparent through a resolved VarRef, like every other accessor.
+ * @param val The value to read. NULL, an unresolved VarRef, or any kind other than NUMERIC
+ * returns `{is_integral = false, overflowed = true}` - nothing valid to read.
+ */
+anvil_numeric_t anvil_value_get_numeric(anvil_value val);
+
+/**
  * @brief Element count for an ARRAY/TUPLE, or statement count for an
  * OBJECT. Transparent through a resolved VarRef.
  * @param val The value to check. NULL, or anything else, returns 0.

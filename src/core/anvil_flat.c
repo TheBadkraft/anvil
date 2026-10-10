@@ -28,6 +28,9 @@
 #include <sigma.core/allocator.h>
 #include <sigma/farray.h>
 #include <sigma/list.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sigma/map.h>
 #include <sigma/query.h>
 #include <stddef.h>
@@ -570,6 +573,77 @@ size_t anvil_value_get_text(anvil_value val, char *buf, size_t buflen) {
       needed = resolve_string_escapes(v->text.start, (size_t)raw_len, NULL, 0);
    }
    return needed;
+}
+
+// Reads `text` (an integral numeric literal: -?digits) into an int64_t without strtoll, because
+// the span isn't NUL-terminated and may be arbitrarily long (leading zeros are legal, so a
+// 70-digit literal can still be 1). Returns false if the value doesn't fit.
+static bool parse_integral(const char *text, size_t len, int64_t *out) {
+   size_t i = 0;
+   bool negative = len > 0 && text[0] == '-';
+   if (negative) {
+      i = 1;
+   }
+   const uint64_t limit = negative ? (uint64_t)INT64_MAX + 1u : (uint64_t)INT64_MAX;
+   uint64_t magnitude = 0;
+   for (; i < len; i++) {
+      unsigned digit = (unsigned)(text[i] - '0');
+      if (magnitude > (limit - digit) / 10u) {
+         return false;
+      }
+      magnitude = magnitude * 10u + digit;
+   }
+   *out = negative ? (int64_t)(0u - magnitude) : (int64_t)magnitude;
+   return true;
+}
+
+anvil_numeric_t anvil_value_get_numeric(anvil_value val) {
+   anvil_numeric_t none = {.is_integral = false, .overflowed = true};
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || v->type != ANVL_VALUE_NUMERIC) {
+      return none;
+   }
+   const char *text = v->text.start;
+   size_t len = (size_t)Source.slice_length(v->text);
+   if (!text || len == 0) {
+      return none;
+   }
+
+   bool integral = true;
+   for (size_t i = 0; i < len; i++) {
+      if (text[i] == '.' || text[i] == 'e' || text[i] == 'E') {
+         integral = false;
+         break;
+      }
+   }
+
+   anvil_numeric_t result = {.is_integral = integral, .overflowed = false};
+   if (integral) {
+      result.overflowed = !parse_integral(text, len, &result.as_int64);
+      if (result.overflowed) {
+         result.as_int64 = 0;
+      }
+      return result;
+   }
+
+   // strtod needs a NUL-terminated copy; a stack buffer covers every ordinary literal.
+   char stack_buf[64];
+   char *buf = len < sizeof stack_buf ? stack_buf : malloc(len + 1);
+   if (!buf) {
+      return none;
+   }
+   memcpy(buf, text, len);
+   buf[len] = '\0';
+   double d = strtod(buf, NULL);
+   if (buf != stack_buf) {
+      free(buf);
+   }
+   if (isinf(d)) {
+      result.overflowed = true;
+   } else {
+      result.as_double = d;
+   }
+   return result;
 }
 
 size_t anvil_value_get_count(anvil_value val) {
