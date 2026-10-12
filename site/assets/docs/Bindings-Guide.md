@@ -252,7 +252,12 @@ non-disposable view tied to that document's lifetime — never valid after it's 
 | `this[string key]` | `AnvlValue?` | Object field's value directly, not the statement. `null` if `key` isn't present or this isn't object-shaped. |
 | `.Has(key)` | `bool` | Shares the same lazy per-key cache as the indexer above — a repeated lookup of the same key on the same instance costs one native call total, not one per access. |
 | `.Entries()` | `IEnumerable<KeyValuePair<string, AnvlValue>>` | Declaration order. Empty for a non-object value. |
-| `.AsString()` / `.AsBool()` / `.AsInt()` | `string?` / `bool?` / `int?` | Each `null` unless `.Type` matches (`String` or `Bare` / `Bool` / `Numeric`) — a bare, unquoted literal like `host := localhost;` reads as a string; `AsInt()` truncates toward zero. |
+| `.AsString()` / `.AsBool()` | `string?` / `bool?` | Each `null` unless `.Type` matches (`String` or `Bare` / `Bool`) — a bare, unquoted literal like `host := localhost;` reads as a string. |
+| `.AsInt()` / `.AsLong()` | `int?` / `long?` | `Numeric` only. **Exact or `null` — never a wrapped or saturated number** (`9007199254740993` is exact through `AsLong()`; `AsInt()` is `null` because it doesn't fit). A decimal/exponent literal truncates toward zero. |
+| `.AsBigInteger()` | `BigInteger?` | `Numeric` only. Exact for an integral literal of *any* size; `null` only when the value overflows a double (`1e+999`). |
+| `.AsDouble()` / `.AsNumericText()` / `.IsIntegral()` | `double?` / `string?` / `bool?` | `Numeric` only: the nearest double, the exact source text (`"007"`, `"1e+3"`, a bignum), and whether it was authored as an integer (`5` vs `5.0`). |
+| `.AsBytes()` / `.BlobTag()` | `byte[]?` / `string?` | `Blob` only: its exact content, and its `@tag` (`null` when untagged). Blob content is arbitrary bytes, so it is not `.AsString()`. |
+| `.RawBytes()` | `byte[]?` | The exact, uninterpreted source span of **any scalar** — a string's escapes stay as written. `null` for an array, tuple or object. |
 
 ### `AnvlStatement` and `AnvilAttribute`
 
@@ -274,6 +279,32 @@ if (frag?.FragmentValue is { Type: AnvilValueType.Array } rows)
     int? first = rows[0]![0]!.AsInt(); // 1 -- rows[0] is the Tuple, [0] its first element
 }
 ```
+
+### Writing: `AnvilWriter` and `AnvilBuilder`
+
+```csharp
+using var w = AnvilWriter.Create(AnvilDialect.Aml);        // streaming: forward-only, chainable
+string text = w.Statement("server").BeginObject()
+    .Statement("host").Bare("localhost")
+    .Statement("port").Value(8080L)
+    .EndObject().Finish();
+
+using var b = AnvilBuilder.Create(AnvilDialect.Aml);       // builder: attach in any order, re-emit at will
+AnvilNode server = b.Object();
+server.Add("host", b.Bare("localhost"));
+b.Add("server", server).Attribute("env", "production");
+string text2 = b.Emit();
+```
+
+| Member | Notes |
+|---|---|
+| `AnvilWriter.Create(dialect)` / `AnvilBuilder.Create(dialect)` | `AnvilDialect.Aml` or `.Amp`. `IDisposable`; `Dispose()` is idempotent and use afterwards throws `ObjectDisposedException`. |
+| `.Statement(name, base?)`, `.Attribute(key, value?)`, `.Include(path)` | Writer header/statement calls (`AttributeString` for a quoted value). |
+| `.Value(x)` | `bool`, `long`, `ulong`, `BigInteger` or `double` — an integer past `long` is written exactly. Text is `.String()` (quoted) or `.Bare()`; bytes are `.Blob(tag, data)`; a reference is `.VarRef(name)`. |
+| `.BeginArray()/.EndArray()`, `.BeginTuple()/.EndTuple()`, `.BeginObject()/.EndObject()` | Writer collections. |
+| `.Finish()` / `.FinishBytes()` | Writer output as `string` / exact `byte[]` (use bytes for non-UTF-8 blob content, and read it back with `AnvilDocument.LoadBuffer(byte[])`). |
+| `AnvilBuilder.Add(name, node)` / `.Find(name)`, `AnvilNode.Append(el)` / `.Add(name, node)`, `AnvilMember.SetBase(...)` / `.Attribute(...)` | Builder structure. Values are created detached (`.Object()`, `.Array()`, `.Tuple()`, `.String()`, …) and attached exactly once. `.Emit()` / `.EmitBytes()` / `.Write(writer)` produce output. |
+| `AnvilWriterException.Code` | An `AnvilWriterErrorCode`. The writer's first error is sticky; the builder's are not (a failed call changes nothing). A null argument throws `ArgumentNullException`, an embedded NUL or a node from another builder `ArgumentException`, before reaching native code. |
 
 ### `AnvilDocument.GetVersion()`
 

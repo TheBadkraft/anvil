@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   streaming writer; same grammar rules (`src/writer/grammar.c`); depth-limited and non-recursive on
   disposal. Tests: `test_builder`, `test_builder_roundtrip` (random trees must match the writer
   byte for byte).
-- `anvil.java` wraps both (`AnvilWriter`, `AnvilBuilder`); other bindings to follow.
+- `anvil.java`, `anvil.py` and `anvil.net` wrap both (`AnvilWriter`, `AnvilBuilder`) and read numbers/blobs exactly; `anvil.node`/`anvil.wasm` to follow (behind the `sigma.system.alloc` vendor bump).
 - **`anvil_value_get_numeric`** (flat + `Value.get_numeric`, appended last in the vtable): a NUMERIC value as an exact `int64_t` (integral text, including values past a double's 53-bit mantissa) or a `double`, with `overflowed` as the fall-back-to-`get_text` signal. Amends decision #6 of `FR-2609-anvl-public-api-001`; `anvil_numeric_t` is in `anvil_types.h`.
 - **`anvil_value_get_bytes`** (flat + `Value.get_bytes`, appended last): the exact, uninterpreted source span of any scalar kind (a `STRING`'s escapes unresolved, a `BLOB` byte for byte, no NUL terminator); 0 for collections. The primitive that `get_text` is a view of, and the fallback for a number `get_numeric` can't hold. `get_text` is unchanged (still total) and re-documented as the string view. See decision #6 of `FR-2609-anvl-public-api-001`.
 - **`anvil_value_get_blob_tag`** (flat + `Value.get_blob_tag`, the 9th and last `Value` field): a blob's `@tag`, which no accessor exposed before (the content readers return only what is between the backticks). Text buffer convention; 0 for an untagged blob or any other kind. The writer/builder round-trip suites now carry tags through a reader→writer copy.
