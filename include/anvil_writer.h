@@ -45,6 +45,12 @@
 
 #include "anvil_writer_types.h"
 
+// See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
+// pragma keeps every declaration below exported exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /** @brief Create a writer for a dialect; its shebang line is emitted immediately. NULL on failure. */
 anvil_writer anvil_writer_new(anvil_writer_dialect dialect);
 
@@ -134,3 +140,7 @@ bool anvil_writer_finish(anvil_writer w);
  * after a successful anvil_writer_finish; NULL otherwise. Borrowed: valid until the writer is disposed.
  */
 const char *anvil_writer_data(anvil_writer w, size_t *length);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif

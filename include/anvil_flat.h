@@ -24,6 +24,14 @@
 #include "anvil_types.h"
 #include <stddef.h>
 
+// The library is built with -fvisibility=hidden (src/sigma/* and other internals must never
+// leak into a consumer's global dynamic symbol table -- see notes/symbol-visibility.md); this
+// pragma pins every declaration below back to default visibility so the public ABI stays
+// exported from libanvil.so/anvil_node.node exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /**
  * @brief Load, scan, include, parse, and resolve a document from a file path.
  * @param filepath Path to the root .anvl/.aml/.amp source file.
@@ -421,3 +429,7 @@ size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen);
  * @param attr The attribute to read. NULL writes nothing and returns 0.
  */
 size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif

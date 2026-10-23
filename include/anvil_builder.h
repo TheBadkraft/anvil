@@ -41,6 +41,12 @@
 #include "anvil_builder_types.h"
 #include "anvil_writer_types.h"
 
+// See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
+// pragma keeps every declaration below exported exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /** @brief Deepest array/tuple/object nesting emit will write (ANVIL_WRITER_ERR_DEPTH_EXCEEDED beyond). */
 #define ANVIL_BUILDER_MAX_DEPTH 256
 
@@ -118,3 +124,7 @@ bool anvil_builder_write(anvil_builder b, anvil_writer w);
  * again after changing the builder.
  */
 const char *anvil_builder_emit(anvil_builder b, size_t *length);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif
