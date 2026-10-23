@@ -21,6 +21,12 @@
 
 #include "anvil_writer_types.h"
 
+// See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
+// pragma keeps the vtable global below exported exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 typedef struct anvil_writer_i {
    anvil_writer (*create)(anvil_writer_dialect dialect);
    void (*dispose)(anvil_writer w);
@@ -49,3 +55,7 @@ typedef struct anvil_writer_i {
    const char *(*data)(anvil_writer w, size_t *length);
 } anvil_writer_i;
 extern const anvil_writer_i Writer;
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif

@@ -84,8 +84,16 @@ RELEASE_OBJ  = build/release
 # against an old header layout can silently link into the archive/.so alongside fresh ones,
 # producing a corrupted artifact with no build error (found the hard way: a new anvl_source_i
 # vtable field left non-recompiled objects reading every later field one slot off).
-DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
-RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
+# -fvisibility=hidden: internal implementation symbols (src/sigma/*'s Math/List/Map/... vtable
+# globals, mod_*/doc_*/collection_*/array_*/etc.) have no business in a consumer's dynamic
+# symbol table at all -- a native addon process hosting anvil_node.node alongside unrelated
+# other native code found this out the hard way (a same-named global in another addon silently
+# won symbol resolution over one of these, segfaulting on a bogus pointer). The public ABI
+# (anvil_flat.h, anvil_vtable.h, anvil_writer*.h, anvil_builder*.h) stays exported exactly as
+# before via `#pragma GCC visibility push(default)/pop` wrapping each of those headers' own
+# declarations -- see notes/symbol-visibility.md.
+DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -fvisibility=hidden -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
+RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -fvisibility=hidden -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 
 DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)
 RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)

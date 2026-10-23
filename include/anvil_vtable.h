@@ -38,6 +38,12 @@ extern "C" {
 #include "anvil_types.h"
 #include <stddef.h>
 
+// See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
+// pragma keeps every vtable global below exported exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 typedef struct anvil_i {
    anvil_document (*load)(const char *filepath);
    anvil_document (*load_buffer)(const char *source, size_t length);
@@ -109,6 +115,10 @@ typedef struct anvil_value_i {
    size_t (*get_blob_tag)(anvil_value val, char *buf, size_t buflen); // appended last, same reason
 } anvil_value_i;
 extern const anvil_value_i Value;
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }
