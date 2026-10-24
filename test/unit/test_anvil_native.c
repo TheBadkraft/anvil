@@ -1266,6 +1266,41 @@ static void test_anv43_value_get_blob_tag(void) {
    anvil_dispose(doc);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV44 — this build's WITH_ASL setting is reported correctly. Default
+ * test build is WITH_ASL=0 (see test/unit/Makefile); building this suite
+ * with WITH_ASL=1 should flip the expectation accordingly.
+ * ---------------------------------------------------------------------- */
+static void test_anv44_script_enabled_reports_build_flag(void) {
+#if WITH_ASL
+   TestBit.is_true(anvil_is_script_enabled(), "ANV44: script support reported enabled (WITH_ASL=1)");
+#else
+   TestBit.is_false(anvil_is_script_enabled(),
+                     "ANV44: script support reported disabled (WITH_ASL=0)");
+#endif
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV45 — a '#!asl' document is rejected loudly, at header-scan time,
+ * when this build has no AnvlScript support (WITH_ASL=0) — regardless of
+ * whether the document contains a function declaration at all.
+ * ---------------------------------------------------------------------- */
+static void test_anv45_asl_rejected_without_with_asl(void) {
+#if !WITH_ASL
+   anvil_document doc = anvil_load(fixture_path("anvil_err_header_asl_not_supported.anvl"));
+   TestBit.is_not_null(doc, "ANV45: document handle still returned despite the error");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(anvil_has_errors(doc), "ANV45: errors recorded");
+   TestBit.is_equal_int(ANVIL_ERR_HEADER, anvil_get_error(doc),
+                        "ANV45: error category is ANVIL_ERR_HEADER");
+   anvil_dispose(doc);
+#else
+   TestBit.skip("ANV45: this build has WITH_ASL=1, nothing to reject");
+#endif
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1321,6 +1356,10 @@ int main(void) {
                   test_anv41_value_get_bytes_buffer_convention, th);
    TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
    TestBit.run_ex("ANV43_value_get_blob_tag", NULL, test_anv43_value_get_blob_tag, th);
+   TestBit.run_ex("ANV44_script_enabled_reports_build_flag", NULL,
+                  test_anv44_script_enabled_reports_build_flag, th);
+   TestBit.run_ex("ANV45_asl_rejected_without_with_asl", NULL,
+                  test_anv45_asl_rejected_without_with_asl, th);
 
    return TestBit.report();
 }

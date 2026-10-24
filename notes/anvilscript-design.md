@@ -2,9 +2,29 @@
 
 ## Status
 
-**Design only — nothing implemented, no source being written against this note.** A prior ASL existed once (v0.4.0-alpha: `include/asl.h`/`src/asl/asl.c`, a Pratt-style parser plus a tree-walk evaluator over a tagged-union `asl_value_t`, flat scope, control flow, external module dispatch, 25 tests — see `docs/changelog.md`'s `[v0.4.0-alpha]` entry) but predates the module-context architecture rewrite and was removed from the tree under the "legacy `_*.c` reference sources" cleanup (`d8e5984`, repo owner's own deletion). Nothing of that implementation survives to build on directly. This note starts the design conversation fresh — what ASL *is*, what problem it solves that AML/AMP deliberately don't, and what extensibility means for it — informed by that history and by the fragments of policy already decided elsewhere (below), but not bound by the old implementation's choices.
+A prior ASL existed once (v0.4.0-alpha: `include/asl.h`/`src/asl/asl.c`, a Pratt-style parser plus a tree-walk evaluator over a tagged-union `asl_value_t`, flat scope, control flow, external module dispatch, 25 tests — see `docs/changelog.md`'s `[v0.4.0-alpha]` entry) but predates the module-context architecture rewrite and was removed from the tree under the "legacy `_*.c` reference sources" cleanup (`d8e5984`, repo owner's own deletion). Nothing of that implementation survives to build on directly. Design started fresh from there — what ASL *is*, what problem it solves that AML/AMP deliberately don't, and what extensibility means for it (see [Decisions](#decisions)) — and implementation is now genuinely underway, in small, test-first slices. See **Implementation** below for exactly what's landed and what the honest progression ahead looks like — check it before assuming a design-doc sketch (the full EBNF, the full `asl_ast_node` enum, bytecode, etc.) already exists in code.
 
-**Initial design forks settled** (see [Decisions](#decisions) below). The remaining work is to produce the detailed MVP specification.
+## Implementation
+
+**Landed — the ANVL-owned signature (`src/core/asl_parser.c`, always compiled, gated internally by `#if WITH_ASL`):** the full signature EBNF from this doc. Dialect gate (ASL-exclusive, loud rejection of `#!asl` itself when `WITH_ASL=0`, at header-scan time — `ANVL_ERR_HEADER_ASL_NOT_SUPPORTED`), name + attributes (free via `parse_statement`'s existing mechanism), a parameter list of plain identifiers with optional literal defaults (any scalar — numeric/string/bool/null, reusing `parse_scalar_value`) or a trailing `[]` parameter-array marker on the last parameter only, `=>`, and a brace-depth-aware body-span capture (string/comment content doesn't miscount a `{`/`}` inside it). `anvl_asl_param_t`/`ANVL_STMT_FUNCTION`/`ANVL_VALUE_FUNCTION` are all real. Tested: `test_body_asl.c`, `ASL01`–`19`.
+
+**Landed — the real body/AST parser (`src/asl/asl_body_parser.c`, the actual ScriptEngine, file-excluded entirely when `WITH_ASL=0`):** `asl_ast_node` (`include/internal/asl_ast.h`) exists with 8 kinds — `ASL_STMT_BLOCK`, `ASL_STMT_VAR_DECL`, `ASL_STMT_ASSIGN`, `ASL_STMT_RETURN`, `ASL_EXPR_LITERAL`, `ASL_EXPR_IDENTIFIER`, `ASL_EXPR_BINARY`, `ASL_EXPR_UNARY` — enough to parse a body with `var` declarations, plain reassignment, the full arithmetic/comparison/logic expression grammar (`+ - * / %`, the compound-assignment/increment family desugared with no dedicated node kinds, `== != < > <= >=`, `&& ||`, all with correct precedence and left-associative chaining through 7 stacked tiers), prefix unary (`- ! +`, right-recursive on itself so `--x`/`!-x` chain correctly, sitting between `primary` and `multiplicative`), parenthesized grouping (`(expr)`, recursing back to the top of the expression grammar and returning the inner node directly — no node of its own), and `return`, into a real, arena-allocated tree. `asl_parse_body(body_slice, arena, &err) -> asl_ast_node` is a pure function, independent of the original document's `anvl_source` (deliberately — a lazily-compiled function body is parsed long after that source may be gone). Its own cursor (`asl_cursor_t`) is genuinely new code, not a reuse of ANVL's scanner — the two grammars share no tokens. Every binary precedence tier shares one generic left-associative loop (`asl_body_parse_binary_level`, maximal-munch over multi-character operators); both assignment forms share one tail helper (`asl_body_parse_assign_tail`). Tested: `test_asl_ast.c`, `ASLAST01`–`11`.
+
+**Everything past that is not yet written.** The honest progression, in the order each piece is actually needed (each a candidate for its own small RED-first slice, not one big push):
+
+1. **Arithmetic** — **fully landed** (`ASLAST02`–`05`, `test_asl_ast.c`): `+`/`-`/`*`/`/`/`%` with correct precedence and left-associativity, plus the compound-assignment and increment/decrement family (`+=`/`-=`/`*=`/`/=`/`%=`, `++`/`--`, statement-only — not yet usable as a sub-expression like `y = x++`). `ASL_EXPR_BINARY` is real; both precedence tiers share one generic left-associative loop (`asl_body_parse_binary_level`, parameterized by operand-parser + operator set) rather than a copy per tier. Compound-assignment/increment turned out to need #6 (`ASL_STMT_ASSIGN`) as a genuine prerequisite, pulled forward — see #6's own note. Correction to an earlier claim here: `++`/`--` did *not* end up needing `ASL_STMT_EXPR` after all — both desugar directly into `ASL_STMT_ASSIGN` wrapping a synthesized `ASL_EXPR_BINARY` (`x++;` → the same tree as `x = x + 1;`), so the evaluator never needs special-casing for them. `ASL_STMT_EXPR` stays unneeded until something genuinely can't be expressed as an assignment (a bare function call statement, once #9 lands, is the likely trigger).
+2. **Unary** (`-x`, `!x`, `+x`) — **fully landed** (`ASLAST07`–`08`): `ASL_EXPR_UNARY`, prefix, right-recursive on itself (not built from `asl_body_parse_binary_level` — there's no left operand to fold against, just a chain of prefixes) so `--x`/`!-x` chain correctly as `-(-(x))`/`!(-(x))`. Binds tighter than multiplicative: `asl_body_parse_unary` is now multiplicative's own operand parser, replacing bare `primary`. No interaction with the existing statement-level `++`/`--` increment/decrement forms — those are matched at statement-start, before expression parsing ever begins, so `--5` as an expression is unambiguously two chained unary minuses, never a decrement.
+3. **Comparison and logic** — **fully landed** (`ASLAST06`): `==`/`!=`/`<`/`>`/`<=`/`>=`, `&&`/`||`, four new precedence tiers (`comparison` → `equality` → `logical_and` → `logical_or`) stacked on top of additive, all sharing the same `asl_body_parse_binary_level`. Was mostly repetition as predicted, with one real generalization needed: `asl_body_parse_binary_level` only handled single-character operators before this (`+`/`-`/`*`/`/`/`%`); multi-character operators (`==`, `<=`, `&&`, etc.) needed it extended to maximal-munch matching against an ordered array of operator strings (`asl_body_match_operator`, longer forms checked first so `<=` is never mistaken for `<` with a dangling `=`) — confirmed by `ASLAST06`'s own `3 <= 4` case. `asl_body_parse_expr` (the public entry point every statement form already calls) is now `logical_or`, not `additive` — transparent to every existing caller, since the function's signature and role never changed, only what it delegates through internally.
+4. **Parenthesized grouping** (`(expr)`) — **fully landed** (`ASLAST09`–`11`): handled inside `asl_body_parse_primary`, which now forward-declares and recurses back into `asl_body_parse_expr` on seeing `(`, then expects and consumes `)` — full precedence applies again inside the parens, and the inner node is returned directly with no wrapper node of its own, so a grouped-then-regrouped literal (`((3))`) collapses straight to the bare literal. Composes with unary (`-(1 + 2)`) and with the existing precedence tiers (`(1 + 2) * 3`) with no special-casing needed anywhere else. A missing closing `)` fails cleanly (reuses `ANVL_ERR_PARSER_EXPECTED_VALUE` — no new error code; it's genuinely the same "expected a complete value here" condition), not a crash and not a silently-accepted tree — `ASLAST11`.
+5. **More literal kinds** in `asl_body_parse_expr` — string, bool, null, float — today only bare non-negative integers scan at all.
+6. **Plain assignment** — **bare syntax landed** (`ASLAST04`, pulled forward from its original position as a prerequisite for #1's compound-assignment family): `x = expr;` (no `var`) is `ASL_STMT_ASSIGN`, sharing the `assign` union member `ASL_STMT_VAR_DECL` already uses, via one shared tail helper (`asl_body_parse_assign_tail`) for both. Declare-before-assign is confirmed (see "Variable scope and mutability" above) — the parser accepts the syntax regardless of whether `x` was actually declared; that check is still unimplemented, a name-resolution question for a later phase, not this one's.
+7. **Control flow** — `if`/`else` (`ASL_STMT_IF`) first, since it's the simplest new statement shape and everything after it leans on comparisons already existing (#3).
+8. **Loops** — `while` (`ASL_STMT_WHILE`) before `for` (`ASL_STMT_FOR`, more moving parts: init/cond/step). `break`/`continue` land alongside whichever loop needs them first.
+9. **Function calls as expressions** (`ASL_EXPR_CALL`) and **qualified names** (`math.abs`, `ASL_EXPR_QUALIFIED_NAME`) — these need at least a stubbed function registry to resolve against, not just grammar.
+10. **AML-compatible collection/object literals inside function bodies** (`ASL_EXPR_ARRAY_INIT`/`TUPLE_INIT`/`OBJECT_INIT`) and **string interpolation** (`ASL_EXPR_INTERPOLATED`, ASL-exclusive) — later; nothing upstream depends on these.
+11. **`extend` declarations** (`ASL_STMT_EXTEND`) — extension methods (`extend array { first_where(pred) => { ... }; }`, "AnvlScript built-ins" § *Extension methods* above). Deliberately last among statement kinds; meaningless before the function registry and extension-method dispatch exist. Full semantics tabled for discussion when this item is actually reached, not decided now.
+
+**Past the parser entirely, still just design** (notes above, nothing started): the function registry, host callback binding, the tree-walk-vs-bytecode evaluation question (still "tentative" either way — the AST is the common IR regardless), the lazy-compile trigger wiring `function.ast`, and `anvil_call`/`anvil_function_find`'s real implementation.
 
 ## Context — what's already decided or implied elsewhere
 
@@ -23,6 +43,16 @@ Three questions, deliberately mirroring how `public-api.md` opened its own desig
 1. **What is ASL for, concretely?** What can a user do in ASL that they cannot do in AML/AMP, and why does that capability belong in a *separate dialect* rather than as an AML extension? (`build.anvl`'s comment above was the only concrete use case on record when design started; it is now treated as one capability among many.)
 2. **What is ASL's relationship to AML?** A shared grammar core with extra productions layered on top (one scanner/parser, dialect-gated per the ownership-matrix model already sketched), a genuinely separate grammar that happens to interoperate, or something else? This determines a lot of downstream structure (shared `anvl_value`/`anvl_statement` representation vs. its own AST, as the old `asl_node_t`/`asl_value_t` had).
 3. **What does extensibility mean for this language?** The old ASL had `asl_module_t` external-module dispatch (a callback-based FFI-into-the-script mechanism) and a `$varref` external-lookup callback — is "extensibility" about a host application injecting functions/values into a running script, embedding ASL as a scripting layer the way Lua is embedded, something narrower (e.g. just AML's own `include` mechanism reused), or something not yet imagined?
+
+## Design goals (repo owner, verbatim/near-verbatim, 2026-10-17 review)
+
+A pre-implementation review pass, checked against every decision above for conflicts before MVP work begins. None found; two of the five were already fully covered, one raised a wording check that resolved as a non-issue, and two needed a genuinely new decision (now Decision 16, below).
+
+1. External hooks into ASL (events, delegates, etc.) — **library-level, not a new language primitive**; see Decision 16.
+2. ASL hooks into external source (events, delegates, etc.) — same answer, same Decision 16.
+3. ASL code starts as basic logic and control flow — already the MVP feature set, Decision 3.
+4. AnvilScript is an extensible DSL framework — functions and method derivatives addable to the core whenever decided — already Decision 1 (purpose/scope) and the "Extension methods" section. Checked against Decision 11 (built-ins distributed as downloadable `.anvs`, kept out of the compiled core library) for a conflict over what "into the core" meant; resolved as none — Decision 11 is today's working choice, not a constraint on this goal, and is explicitly revisitable whenever it stops fitting.
+5. An external lib should be able to register functions with the ScriptingEngine (Runtime), callable from ASL — already fully decided, Design Thread #3 (Host Callback Binding).
 
 ## Decisions
 
@@ -48,6 +78,7 @@ Forks resolved during initial design conversations.
 13. **Error handling** — Context-local error state. Each `anvil_document` / evaluation context carries a last-error field; host code checks after a call. ASL functions may also return error values for in-language handling. The existing 5101–5105 codes are a starting point and will be expanded as the runtime grows.
 14. **Parser technology** — AnvilScript uses the same hand-written parser approach as the rest of Anvil Native (recursive-descent / Pratt-style), producing a dedicated runtime AST for function bodies. No external parser generator.
 15. **Dialect name and extension** — Name: **AnvilScript** (abbreviated **ASL**). File extension: `.anvs`.
+16. **Events/delegates — library-level, not a language primitive.** Both directions (a host attaching to an event ASL raises; ASL attaching to an event the host raises) are modeled as an `events` built-in module (`events.on`/`events.emit`/`events.off` — see "AnvilScript built-ins" below), built entirely on primitives already decided: first-class function values (the existing "Delegate variable" row) as handlers, plus the existing host-callback-registration path (`import` / `anvil_register_function`) for host-side handlers. No new grammar and no VM-level lifecycle-hook mechanism for MVP — that alternative (a C-level hook into VM lifecycle events: function enter/exit, exception raised, script loaded — the same shape as the existing `anvl_parser_set_hook` precedent) was considered and set aside, not ruled out permanently; revisit only if a real instrumentation/debugging use case asks for it, not speculatively.
 
 ## Variable scope and mutability
 
@@ -64,9 +95,12 @@ Proposed model, pending confirmation.
 
 Inside function bodies, declaration uses `var ... = ...` and assignment uses `=`. Top-level ANVL declarations continue to use `:=` and inheritance clauses.
 
+**Declare-before-assign, confirmed.** Plain assignment (`x = expr;`) requires `x` to already be bound — by an earlier `var`, a function parameter, or an enclosing scope — in the same spirit as every variable in the table above. There is no implicit declare-on-assign; assigning to a name that was never declared is an error, not a fresh module-global binding. (This is the exact footgun JS is famous for — forgetting `var`/`let` silently creates a global — and deliberately not repeated here.) What's still open: *enforcing* this is a name-resolution concern, not the parser's — `asl_parse_stmt` only needs to recognize `identifier = expr;` as syntax; whether that identifier was actually declared is for whatever later phase does scope/binding resolution to catch, mirroring how AML keeps parsing and its own Resolution phase (`notes/resolution-phase.md`) strictly separate. Whether ASL gets an equivalent dedicated resolution pass over the AST, or this check happens at evaluation time instead, is undecided — pick up when statement #6 in the Implementation roadmap above is actually reached.
+
 ## Function semantics
 
 - **Declaration**: `foo (a, b, c) => { ... };` binds `foo` as an immutable function in the module namespace.
+- **Attributes**: `foo @[attrib] (a, b, c) => { ... };` — same `@[...]` mechanism every other statement form already has, in the same grammatical slot (immediately after the identifier, immediately before the value — here, the parameter list/arrow/body). No new storage: a `FUNCTION` statement is still an `anvl_statement_t`, so it carries `.attributes` for free. Semantics of any particular attribute key (e.g. a future `@[host]` marking a host-bound stub, as hinted at in "Built-in distribution formats" below) are not decided here — this only settles that the mechanism applies to functions, not what any specific key means.
 - **First-class value**: Functions can be assigned to variables as delegates: `var fn = foo;`.
 - **Dynamic resolution**: The `$` sigil resolves a name to its current value, just like dynamic var-refs. `$foo` retrieves the function value; `$foo(1, 2, 3)` calls it. `foo` alone is a literal identifier/string.
 - **Qualified calls**: `$math.abs(-5)` resolves `math` as a namespace/module and `abs` as a function within it. If `math` is imported and `abs` is unambiguous in the current scope, `$abs(-5)` may also be valid.
@@ -78,12 +112,14 @@ Inside function bodies, declaration uses `var ... = ...` and assignment uses `=`
 ASL function declarations use the same surface syntax at the ANVL layer:
 
 ```ebnf
-function_decl = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
-param_list    = parameter , { "," , parameter } ;
-parameter     = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
+function_decl  = identifier , [ "@[" , attribute_list , "]" ] , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
+attribute_list = attribute , { "," , attribute } ;
+attribute      = identifier , [ "=" , literal ] ;
+param_list     = parameter , { "," , parameter } ;
+parameter      = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
 ```
 
-The ANVL parser owns this production, validates parameter uniqueness, and passes the parameter names (and any default literals) to the ScriptEngine along with the body slice.
+The ANVL parser owns this production, validates parameter uniqueness, and passes the parameter names (and any default literals) to the ScriptEngine along with the body slice. Attributes, if present, are collected into the function statement's own `.attributes` — the same step and storage every `ASSIGN`/`OBJECT_BLOCK` statement already uses, just gated on the same dispatch point recognizing a following `(` as a function declaration rather than `:=`/`{`.
 
 **Varargs**: a final parameter may be marked as a parameter-array by following its name with `[]`. The caller packs all arguments provided for that parameter into an AML array, and the function receives the array:
 
@@ -165,9 +201,11 @@ The function declaration *signature* (`foo (a, b, c) => { ... }`) is owned by th
 
 ```ebnf
 (* === Function declaration boundary (shown for context; parsed by ANVL parser) === *)
-function_decl = identifier , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
-param_list    = parameter , { "," , parameter } ;
-parameter     = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
+function_decl  = identifier , [ "@[" , attribute_list , "]" ] , "(" , [ param_list ] , ")" , "=>" , "{" , stmt_list , "}" , ";" ;
+attribute_list = attribute , { "," , attribute } ;
+attribute      = identifier , [ "=" , literal ] ;
+param_list     = parameter , { "," , parameter } ;
+parameter      = identifier , [ "=" , literal ] | identifier , "[" , "]" ;
 
 (* === Function-body statements === *)
 stmt_list         = { stmt } ;
@@ -249,6 +287,7 @@ digit             = "0" ... "9" ;
 ### Notes on the grammar
 
 - This grammar describes only what appears inside the `{ ... }` function body. The surrounding ANVL document grammar handles `#!asl`, includes, `import`, `vars`, object blocks, attributes, and the function signature itself.
+- A function declaration may carry `@[...]` attributes between its name and its parameter list (`foo @[attrib] (a, b, c) => { ... };`) — the same position every other AML statement form already uses (after any `base` clause, which functions don't have, and before the value). No new storage or parse step: the collected attributes land on the `FUNCTION` statement's own `.attributes`, identical to `ASSIGN`/`OBJECT_BLOCK`.
 - Inside function bodies, bare identifiers are variable/function references. The `$` sigil appears **only** in string interpolation (`$"...{var}..."`); it is not used for var-refs or function calls inside function bodies.
 - Assignment is `=` and local declaration is `var ... = ...`. Object literal entries retain ANVL's `:=` because they construct AML values, not execute assignments.
 - Function calls may be bare (`foo(1, 2, 3)`) or qualified (`math.abs(-5)`). The grammar allows both forms. At runtime, an unqualified call is resolved to its fully qualified form whenever possible; the namespace prefix is required only when the name would otherwise be ambiguous. Member access without a call (e.g., `math.abs` as a value) is not in MVP.
@@ -539,6 +578,18 @@ string.split(s, sep) // -> array of strings
 string.join(parts, sep) // -> string
 string.trim(s)       // -> string
 ```
+
+#### `events` — publish/subscribe (Decision 16)
+
+```anvs
+events.on(name, handler)   // -> subscription id; registers handler for `name`
+events.emit(name, ...)     // -> invokes every handler registered for `name`, in registration order
+events.off(name, handler)  // -> bool; removes a specific handler
+```
+
+`handler` is an ordinary function value — an ASL function, a delegate variable, or a host callback reached via `import`. `events` adds no new value type or grammar; it's a named multicast registry layered on the function registry already designed (Design Thread #3). Firing is synchronous on the context's own thread (matches the single-threaded-per-context constraint, `public-api.md` Decision 3) — a handler that raises an exception propagates through the ordinary exception pipeline and aborts the `emit` in progress, same as any other call.
+
+This is the mechanism for both directions in Decision 16: a host subscribes to an ASL-raised event by registering a host callback via `events.on` (reachable because `import` already put it in the registry); ASL subscribes to a host-raised event the same way, from the script side, once the host's own code calls `events.emit` for something it wants scripts to observe.
 
 #### `math`, `time`, `io`
 

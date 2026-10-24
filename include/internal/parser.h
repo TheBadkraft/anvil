@@ -73,3 +73,30 @@ anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value
                                       anvl_err_code *out_err_code);
 void anvl_cleanup(void);
 anvl_err_code anvl_get_error(void);
+
+/**
+ * @brief Records a parse error on `src`'s error state, computing line/column
+ * from the source's current position. Shared with src/core/asl_parser.c
+ * (WITH_ASL only) so AnvlScript's own signature-grammar errors go through
+ * the exact same path as every other parser error, rather than a second,
+ * separately-maintained copy.
+ */
+void parser_set_error(anvl_source src, anvl_err_code code);
+
+/**
+ * @brief Parses a bare identifier at the source's current position --
+ * shared with src/core/asl_parser.c (WITH_ASL only) for parameter-name
+ * parsing, so a keyword is rejected there exactly as it is everywhere
+ * else, rather than a second, separately-maintained copy of this rule.
+ */
+bool parse_identifier(anvl_source src, anvl_slice *out_identifier);
+
+/**
+ * @brief Parses one scalar value (reserved literal, numeric, string, blob,
+ * or bare) at the source's current position -- shared with
+ * src/core/asl_parser.c (WITH_ASL only) for parameter default literals, so
+ * a default reuses exactly the same literal forms every other scalar
+ * value in this grammar already accepts, rather than a second, narrower
+ * literal parser.
+ */
+bool parse_scalar_value(anvl_source src, anvl_value *out_value);

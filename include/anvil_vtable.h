@@ -46,6 +46,7 @@ typedef struct anvil_i {
    anvil_err_code (*get_error)(anvil_document doc);
    const char *(*get_version)(void);
    anvil_document (*parse_value_fragment)(const char *text, size_t length);
+   bool (*is_script_enabled)(void);
 } anvil_i;
 extern const anvil_i Anvil;
 

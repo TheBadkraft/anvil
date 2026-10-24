@@ -91,6 +91,14 @@ anvil_err_code anvil_get_error(anvil_document doc);
 const char *anvil_get_version(void);
 
 /**
+ * @brief Whether this build of Anvil Native was compiled with AnvilScript
+ * (ASL) support (`WITH_ASL=1`). A compile-time constant, not a runtime
+ * toggle — lets a caller tell the two build configurations apart without
+ * needing compile-time knowledge of which one it linked against.
+ */
+bool anvil_is_script_enabled(void);
+
+/**
  * @brief The diagnostic detail behind this document's recorded error, if
  * any — richer than anvil_get_error()'s stable category alone.
  * @param doc The document to check. NULL, or a document with no recorded

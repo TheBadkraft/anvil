@@ -387,6 +387,16 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
       goto error;
    }
 
+   // '#!asl' is a real, recognized dialect token -- but this build has no AnvlScript support
+   // at all (WITH_ASL=0). Reject loudly here, before any body content is read, rather than
+   // silently parsing as if nothing were different and only failing later if a function
+   // declaration happens to appear (or not failing at all, if the document has none).
+   if (!WITH_ASL && Source.is_shebang(doc->source) &&
+       Source.dialect(doc->source) == ANVL_DIALECT_ASL) {
+      err_code = ANVL_ERR_HEADER_ASL_NOT_SUPPORTED;
+      goto error;
+   }
+
    if (!doc->header->includes) {
       doc->header->includes = List.new(4, list_ptr_size);
    }

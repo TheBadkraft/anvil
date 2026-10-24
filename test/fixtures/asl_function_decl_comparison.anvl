@@ -1,0 +1,8 @@
+#!asl
+
+foo () => {
+   var x = 1 < 2 == 0;
+   var y = 3 <= 4;
+   var z = 1 == 1 && 2 == 2;
+   return z;
+};

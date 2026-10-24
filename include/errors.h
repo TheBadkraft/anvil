@@ -50,6 +50,12 @@ typedef enum {
    ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE = 2009,
    ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_FRAGMENT = 2010,
    ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT = 2011,
+   // Document declares '#!asl' -- a real, recognized dialect token (unlike
+   // ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT's unrecognized-token case) -- but this build was
+   // compiled with WITH_ASL=0. Deliberately loud/immediate: checked at header-scan time,
+   // before any body content is read, so an ANVL-only build never silently parses an #!asl
+   // document just because it happens to contain no function declarations.
+   ANVL_ERR_HEADER_ASL_NOT_SUPPORTED = 2012,
 
    // Object Parsing (300x)
    ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD = 3001,
@@ -138,6 +144,18 @@ typedef enum {
       4605, // data field value type does not match schema field type
    ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD =
       4606, // data field not declared in schema type (strict mode)
+
+   // AnvlScript Function Errors (47xx)
+   ANVL_ERR_ASL_DUPLICATE_PARAMETER = 4701, // two parameters in the same function declaration
+                                             // share a name -- notes/anvilscript-design.md's
+                                             // "the ANVL parser... validates parameter
+                                             // uniqueness"
+   ANVL_ERR_ASL_VARARG_NOT_LAST = 4702, // a '[]' parameter-array marker appeared on a
+                                         // parameter that isn't the last one -- "a final
+                                         // parameter may be marked as a parameter-array",
+                                         // notes/anvilscript-design.md
+   ANVL_ERR_ASL_UNTERMINATED_BODY = 4703, // source ran out before the function body's
+                                           // matching '}' was found
 
    // Lexer/Scanner Errors (50xx)
    ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,

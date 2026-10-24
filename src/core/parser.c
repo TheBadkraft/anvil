@@ -30,6 +30,7 @@
  * to the same proprietary license as the rest of the Anvil project.
  */
 
+#include "internal/asl_parser.h"
 #include "internal/module.h"
 #include "internal/parser.h"
 #include "internal/source.h"
@@ -98,10 +99,14 @@ static bool parse_statement(anvl_source, anvl_statement *);
 static bool parse_statement_list(anvl_source, list *);
 static bool parse_attribute_list(anvl_source, list *);
 static void dispose_attribute_list(list);
-static bool parse_identifier(anvl_source, anvl_slice *);
+// Not static: shared with src/core/asl_parser.c (WITH_ASL only) for parameter-name parsing --
+// see parser_set_error's own declaration just below for why.
+bool parse_identifier(anvl_source, anvl_slice *);
 static bool parse_value(anvl_source, anvl_value *);
 static bool parse_value_body(anvl_source, anvl_value *);
-static bool parse_scalar_value(anvl_source, anvl_value *);
+// Not static: shared with src/core/asl_parser.c (WITH_ASL only) for parameter default
+// literals -- see parser_set_error's own declaration below for why.
+bool parse_scalar_value(anvl_source, anvl_value *);
 static bool parse_reserved_literal(anvl_source, anvl_value *);
 static bool parse_numeric_literal(anvl_source, anvl_value *);
 static bool parse_string_literal(anvl_source, anvl_value *);
@@ -114,7 +119,10 @@ static bool parse_object_value(anvl_source, anvl_value *);
 static bool parse_varref(anvl_source, anvl_value *);
 static bool is_value_boundary(anvl_source);
 static void skip_same_line_whitespace(anvl_source);
-static void parser_set_error(anvl_source, anvl_err_code);
+// Not static: shared with src/core/asl_parser.c (WITH_ASL only), declared non-static here and
+// in internal/parser.h so asl_parse_function_decl can record its own parse errors through the
+// exact same line/col computation, rather than duplicating it.
+void parser_set_error(anvl_source, anvl_err_code);
 
 /* ----------------------------------------------------------------- *
  * Parser Function Implementations
@@ -658,6 +666,15 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
       }
       Source.consume(src, 1);
       Source.skip_whitespace_and_comments(src);
+#if WITH_ASL
+      // - a direct '(' is AnvlScript's own function declaration (dialect-gated inside
+      // asl_parse_function_decl itself -- AML/AMP both fall through to the generic
+      // ANVL_ERR_PARSER_EXPECTED_ASSIGN error below, same as today). Built only when
+      // WITH_ASL=1; an ANVL-only build has no branch, no symbol, and no grammar for this
+      // at all -- see include/internal/asl_parser.h.
+   } else if (Source.peek(src) == ANVL_TOK_LPAREN) {
+      return asl_parse_function_decl(src, out_stmt);
+#endif
    } else {
       parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_ASSIGN);
       return false;
@@ -666,7 +683,7 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
    return true;
 }
 // Parse an identifier
-static bool parse_identifier(anvl_source src, anvl_slice *out_identifier) {
+bool parse_identifier(anvl_source src, anvl_slice *out_identifier) {
    // initialize the slice
    Source.init_slice(src, out_identifier);
    out_identifier->start = NULL;
@@ -776,7 +793,7 @@ static bool is_value_boundary(anvl_source src) {
           c == ',' || c == ANVL_TOK_RBRACKET || c == ANVL_TOK_RPAREN || c == ANVL_TOK_RBRACE;
 }
 // Parse a scalar value
-static bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
+bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
    // 1. check for reserved literals - true, false, null
    if (parse_reserved_literal(src, out_value)) {
       return true; // Successfully parsed reserved literal
@@ -1254,7 +1271,7 @@ static bool parse_object_value(anvl_source src, anvl_value *out_value) {
    return true; // Successfully parsed object value
 }
 // Parse an error and record it in the source's error state
-static void parser_set_error(anvl_source src, anvl_err_code code) {
+void parser_set_error(anvl_source src, anvl_err_code code) {
    // Captured *before* Source.set_error runs — its own out-param reports whether *recording*
    // the error succeeded (ANVL_ERR_NONE on success, including a first-error-wins no-op inside
    // anvl_error_set), not the error itself, so the call below always leaves parser.err_code as

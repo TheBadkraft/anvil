@@ -27,6 +27,7 @@ const anvil_i Anvil = {
    .get_error = anvil_get_error,
    .get_version = anvil_get_version,
    .parse_value_fragment = anvil_parse_value_fragment,
+   .is_script_enabled = anvil_is_script_enabled,
 };
 
 const anvil_statement_i Statement = {

@@ -4,16 +4,25 @@ ANVL   = ../..
 TESTBIT = ../../../testbit
 
 BUILD_NUM := $(shell git rev-list --count HEAD)
-CFLAGS  = -Wall -Wextra -g -std=$(STD) \
+
+# See root Makefile: off by default, always defined (0 or 1).
+WITH_ASL ?= 0
+
+# Split out so test_body_asl (always ASL-enabled, regardless of the ambient WITH_ASL) can
+# override just the one define without redefining it twice on the same command line.
+BASE_CFLAGS = -Wall -Wextra -g -std=$(STD) \
           -I$(ANVL)/include \
           -I/usr/local/include \
           -I$(TESTBIT)/include \
           -D_POSIX_C_SOURCE=200809L \
           -DANVL_BUILD=$(BUILD_NUM)
 
+CFLAGS = $(BASE_CFLAGS) -DWITH_ASL=$(WITH_ASL)
+
 ANVIL_SRCS = $(ANVL)/src/core/anvil.c \
 			 $(ANVL)/src/core/anvil_flat.c \
 			 $(ANVL)/src/core/anvil_vtable.c \
+			 $(ANVL)/src/core/asl_parser.c \
 			 $(ANVL)/src/core/document.c \
 			 $(ANVL)/src/core/errors.c \
 			 $(ANVL)/src/core/files.c \
@@ -117,8 +126,8 @@ endef
 .PHONY: all clean val build test test_release
 .PHONY: build_test_writer build_test_writer_roundtrip build_test_builder build_test_builder_roundtrip
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
-.PHONY: build_test_body_amp build_test_body_aml build_test_types build_test_schema
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types test_schema $(UNIT_CASES)
+.PHONY: build_test_body_amp build_test_body_aml build_test_body_asl build_test_asl_ast build_test_types build_test_schema
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_body_asl test_asl_ast test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types test_schema $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -128,6 +137,8 @@ all: $(BIN)/test_version \
 	$(BIN)/test_source \
 	$(BIN)/test_body_amp \
 	$(BIN)/test_body_aml \
+	$(BIN)/test_body_asl \
+	$(BIN)/test_asl_ast \
 	$(BIN)/test_resolver \
 	$(BIN)/test_anvil_native \
 	$(BIN)/test_anvil_vtable \
@@ -298,6 +309,38 @@ build_test_body_aml: $(BIN)/test_body_aml
 
 test_body_aml: $(BIN)/test_version $(BIN)/test_body_aml
 	$(call run_test_bin,test_body_aml)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+# AnvlScript-only suite: always built with ASL support regardless of the ambient WITH_ASL
+# value, since there's nothing to exercise here otherwise (the '#!asl' guard rejects every
+# fixture in this suite before body-parse even runs -- see test_anvil_native.c's ANV45). Uses
+# BASE_CFLAGS (no WITH_ASL define yet) plus its own, so the macro is only ever defined once.
+$(BIN)/test_body_asl: test_body_asl.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(BASE_CFLAGS) -DWITH_ASL=1 $^ -o $@
+
+build_test_body_asl: $(BIN)/test_body_asl
+
+test_body_asl: $(BIN)/test_version $(BIN)/test_body_asl
+	$(call run_test_bin,test_body_asl)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+# The real ScriptEngine body/AST parser -- also always ASL-enabled, and the only test target
+# that pulls in src/asl/asl_body_parser.c (not part of the shared $(ANVIL_SRCS), since every
+# other target would fail to compile it under the default WITH_ASL=0 -- see that file's own
+# header comment on why it has no internal #if WITH_ASL guard to fall back on).
+$(BIN)/test_asl_ast: test_asl_ast.c $(ANVIL_SRCS) $(ANVL)/src/asl/asl_body_parser.c $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(BASE_CFLAGS) -DWITH_ASL=1 $^ -o $@
+
+build_test_asl_ast: $(BIN)/test_asl_ast
+
+test_asl_ast: $(BIN)/test_version $(BIN)/test_asl_ast
+	$(call run_test_bin,test_asl_ast)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

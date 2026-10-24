@@ -14,7 +14,14 @@ BUILD_NUM := $(shell git rev-list --count HEAD)
 # where this repo is checked out, matching the sigma.* ecosystem's own existing package
 # convention (sigma.memory's config.sh already references /usr/local/packages/sigma.core.o).
 INCLUDE = -Iinclude -I/usr/local/include
-DEFS    = -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM)
+
+# AnvilScript (ASL) opt-in: off by default, matching notes/anvilscript-design.md Decision 11 —
+# object-model-only consumers shouldn't pay for scripting they never use. Always defined (0 or
+# 1), never left undefined, so `#if WITH_ASL` in source can't silently take "off" by omission.
+# `anvil_is_script_enabled()` is the runtime-queryable mirror of this same build-time constant.
+WITH_ASL ?= 0
+
+DEFS = -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM) -DWITH_ASL=$(WITH_ASL)
 
 # Full ANVL bundle for this milestone: core parser + resolver (src/core, src/sigma),
 # the opt-in type registry (src/anvil_types.c), and the schema add-on (src/schema/schema.c) —
@@ -23,6 +30,7 @@ DEFS    = -D_POSIX_C_SOURCE=200809L -DANVL_BUILD=$(BUILD_NUM)
 CORE_SRCS = src/core/anvil.c \
             src/core/anvil_flat.c \
             src/core/anvil_vtable.c \
+            src/core/asl_parser.c \
             src/core/document.c \
             src/core/errors.c \
             src/core/files.c \
@@ -63,9 +71,18 @@ WRITER_SRCS = src/writer/grammar.c \
               src/writer/builder.c \
               src/writer/builder_vtable.c
 
+# The real ScriptEngine (body/AST parser, eventually the compiler/VM/registry/built-ins) --
+# unlike src/core/asl_parser.c (the signature parser, always in CORE_SRCS), this is excluded
+# at the file level when WITH_ASL=0, not just inert behind an internal #if: nothing in a
+# WITH_ASL=0 build ever calls into it, so there's no call site forcing it to always compile.
+ASL_SRCS = src/asl/asl_body_parser.c
+
 LIB_SRCS = $(CORE_SRCS) $(TYPES_SRCS) $(SCHEMA_SRCS)
 ifeq ($(WITH_WRITER),1)
 LIB_SRCS += $(WRITER_SRCS)
+endif
+ifeq ($(WITH_ASL),1)
+LIB_SRCS += $(ASL_SRCS)
 endif
 
 DEBUG_DIR    = lib/debug

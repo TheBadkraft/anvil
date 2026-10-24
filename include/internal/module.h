@@ -113,6 +113,7 @@ typedef enum {
    ANVL_VALUE_OBJECT,     // nested statement list, not key/value pairs
    ANVL_VALUE_BARE, // bare symbol: an ordinary literal string (e.g. `name := David;`) - no implicit resolution
    ANVL_VALUE_VARREF,     // `$identifier`: static, resolve-once reference - see notes/document-body-parse.md
+   ANVL_VALUE_FUNCTION,   // AnvlScript function: ident (params) => { body }; - see ANVL_STMT_FUNCTION
 } anvl_value_type;
 
 typedef struct anvl_value_t {
@@ -139,6 +140,16 @@ typedef struct anvl_value_t {
                               // module_context shares one arena, disposed as a single block —
                               // see notes/resolution-phase.md "VarRef resolution").
       } varref;
+      struct {
+         list params;     // list of anvl_slice* parameter names; empty is NULL, matching
+                           // anvl_statement_t.attributes' own "NULL means none" convention.
+         anvl_slice body;  // raw source span of the '{ ... }' interior -- AnvlScript's own
+                           // grammar, never parsed by the ANVL parser itself. See
+                           // notes/anvilscript-design.md Open Question #1.
+         struct asl_ast_node *ast; // lazily-parsed runtime AST; NULL until the ScriptEngine
+                           // first compiles this function. Always NULL when WITH_ASL=0 --
+                           // nothing exists to ever set it.
+      } function;
    };
 } anvl_value_t;
 typedef anvl_value_t *anvl_value;
@@ -153,6 +164,9 @@ typedef enum {
    ANVL_STMT_OBJECT_BLOCK, // ident [: base] [@[...]] { statements };
    ANVL_STMT_VARS,         // vars { ... }
    ANVL_STMT_IMPORT,       // import "path"; (AnvlScript's foreign-code-bridge construct)
+   ANVL_STMT_FUNCTION,     // ident [@[...]] (params) => { body }; (AnvlScript-only; see
+                           // src/core/asl_parser.c, built only when WITH_ASL=1 -- this tag
+                           // itself always exists, but nothing ever produces one otherwise)
 } anvl_stmt_kind;
 
 /* ---------------------------------------------------------------------- *

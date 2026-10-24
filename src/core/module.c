@@ -15,6 +15,7 @@
  * File: src/core/module.c                                                 *
  * *********************************************************************** */
 
+#include "internal/asl_parser.h"
 #include "internal/constants.h"
 #include "internal/module.h"
 #include "internal/source.h"
@@ -321,6 +322,25 @@ void mod_ctx_dispose(module_context ctx) {
          List.dispose(val->collection.items);
       } else if (val->type == ANVL_VALUE_OBJECT) {
          List.dispose(val->object.statements);
+#if WITH_ASL
+      } else if (val->type == ANVL_VALUE_FUNCTION) {
+         // Same reasoning as .attributes elsewhere in this pass: each anvl_asl_param is its
+         // own individual heap allocation (not arena-owned), so each needs disposing before
+         // the list container itself. This whole branch is WITH_ASL-only: anvl_asl_param
+         // isn't even declared otherwise (include/internal/asl_parser.h), consistent with
+         // nothing ever producing an ANVL_VALUE_FUNCTION value in that build either. Each
+         // param's own default_value (if any) is NOT disposed here -- it's an arena-owned
+         // anvl_value, already reachable through this same pass as an ordinary ctx->values
+         // entry (or, on a mid-parse failure, released by the arena itself), not a second,
+         // separately-owned allocation.
+         usize param_count = List.size(val->function.params);
+         for (usize j = 0; j < param_count; j++) {
+            anvl_asl_param param = NULL;
+            List.get(val->function.params, j, (object *)&param);
+            Allocator.dispose(param);
+         }
+         List.dispose(val->function.params);
+#endif
       }
    }
 

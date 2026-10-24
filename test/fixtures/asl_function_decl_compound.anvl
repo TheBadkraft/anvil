@@ -1,0 +1,8 @@
+#!asl
+
+foo () => {
+   var x = 1;
+   x += 3;
+   x++;
+   return x;
+};

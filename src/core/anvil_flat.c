@@ -285,6 +285,10 @@ const char *anvil_get_version(void) {
    return Anvl.get_version();
 }
 
+bool anvil_is_script_enabled(void) {
+   return WITH_ASL ? true : false;
+}
+
 anvil_statement anvil_document_find_statement(anvil_document doc, const char *name) {
    if (!doc || !doc->ctx || !doc->ctx->identifiers || !name) {
       return NULL;

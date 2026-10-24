@@ -59,6 +59,8 @@
 #define ANVL_TOK_SHEBANG_PREFIX_LEN (sizeof(ANVL_TOK_SHEBANG_PREFIX) - 1)
 #define ANVL_TOK_ASSIGN ":="
 #define ANVL_TOK_ASSIGN_LEN (sizeof(ANVL_TOK_ASSIGN) - 1)
+#define ANVL_TOK_ARROW "=>" // AnvlScript function declaration: ident (params) => { body };
+#define ANVL_TOK_ARROW_LEN (sizeof(ANVL_TOK_ARROW) - 1)
 #define ANVL_TOK_STMT_TERMINATOR ';'
 #define ANVL_TOK_QUOTE '"'
 #define ANVL_TOK_BACKTICK '`'

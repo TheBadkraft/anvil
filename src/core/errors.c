@@ -48,6 +48,9 @@ static const char *error_messages[] = {
    [ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE] = "'$' VarRef sigil is not allowed in an attribute value",
    [ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_FRAGMENT] = "'$' VarRef sigil is not allowed in a Value Fragment, at any nesting depth",
    [ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT] = "Shebang dialect not recognized (must be #!aml, #!amp, or #!asl)",
+   [ANVL_ERR_HEADER_ASL_NOT_SUPPORTED] =
+      "Document declares '#!asl' but this build of Anvil Native was compiled without "
+      "AnvilScript support (WITH_ASL=0)",
 
    [ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD] = "Expected object key",
    [ANVL_ERR_PARSER_EXPECTED_OBJECT_VALUE] = "Expected object content after ':='",
@@ -131,6 +134,13 @@ static const char *error_messages[] = {
    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] =
       "Data document contains a field not declared in the schema type",
 
+   [ANVL_ERR_ASL_DUPLICATE_PARAMETER] =
+      "Two parameters in the same function declaration share a name",
+   [ANVL_ERR_ASL_VARARG_NOT_LAST] =
+      "A '[]' parameter-array marker may only appear on the last parameter",
+   [ANVL_ERR_ASL_UNTERMINATED_BODY] =
+      "Function body has no matching '}'",
+
    [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "Unexpected character",
    [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "Unterminated string literal",
    [ANVL_ERR_PARSER_UNTERMINATED_BLOB] = "Unterminated blob literal",
@@ -170,6 +180,7 @@ static const char *error_names[] = {
    [ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE] = "ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE",
    [ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_FRAGMENT] = "ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_FRAGMENT",
    [ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT] = "ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT",
+   [ANVL_ERR_HEADER_ASL_NOT_SUPPORTED] = "ANVL_ERR_HEADER_ASL_NOT_SUPPORTED",
 
    [ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD] = "ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD",
    [ANVL_ERR_PARSER_EXPECTED_OBJECT_VALUE] = "ANVL_ERR_PARSER_EXPECTED_OBJECT_VALUE",
@@ -236,6 +247,9 @@ static const char *error_names[] = {
    [ANVL_ERR_SCHEMA_VALIDATION_REQUIRED] = "ANVL_ERR_SCHEMA_VALIDATION_REQUIRED",
    [ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH] = "ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH",
    [ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD] = "ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD",
+   [ANVL_ERR_ASL_DUPLICATE_PARAMETER] = "ANVL_ERR_ASL_DUPLICATE_PARAMETER",
+   [ANVL_ERR_ASL_VARARG_NOT_LAST] = "ANVL_ERR_ASL_VARARG_NOT_LAST",
+   [ANVL_ERR_ASL_UNTERMINATED_BODY] = "ANVL_ERR_ASL_UNTERMINATED_BODY",
 
    [ANVL_ERR_PARSER_UNEXPECTED_CHAR] = "ANVL_ERR_PARSER_UNEXPECTED_CHAR",
    [ANVL_ERR_PARSER_UNTERMINATED_STRING] = "ANVL_ERR_PARSER_UNTERMINATED_STRING",

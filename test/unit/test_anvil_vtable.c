@@ -42,6 +42,8 @@ static void test_vt01_anvil_matches_flat(void) {
                    "VT01: Anvil.get_version is anvil_get_version");
    TestBit.is_true(Anvil.parse_value_fragment == anvil_parse_value_fragment,
                    "VT01: Anvil.parse_value_fragment is anvil_parse_value_fragment");
+   TestBit.is_true(Anvil.is_script_enabled == anvil_is_script_enabled,
+                   "VT01: Anvil.is_script_enabled is anvil_is_script_enabled");
 }
 /* ---------------------------------------------------------------------- *
  * VT02 — every Statement vtable field is pointer-identical to its flat
