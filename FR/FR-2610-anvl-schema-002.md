@@ -58,7 +58,7 @@ None. Composes with FR-2610-anvl-schema-001: nested rules apply equally under `v
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-schema-002`, merged to `main`. Tests SCH33–SCH40 (`test_schema.c`). Full
+Branch `feat/FR-2610-anvl-schema-002`, commit `108416e`, merged to `main`. Tests SCH33–SCH40 (`test_schema.c`). Full
 unit regression green with unchanged counts elsewhere (the existing SCH01–SCH32 are the regression
 for `anvil_schema_validate`), `test_release` green, Valgrind-clean on schema, types, anvil_native,
 anvil_vtable, document, resolver.
