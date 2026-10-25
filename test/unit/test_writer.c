@@ -16,6 +16,7 @@
 #include "anvil_writer.h"
 #include "anvil_writer_vtable.h"
 #include "testbit.h"
+#include "../../src/writer/grammar.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -734,6 +735,39 @@ static void test_w17_duplicate_names(void) {
    anvil_writer_dispose(w);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * W18 (BR-2610-anvl-writer-001) - the name-set hash is true 64-bit FNV-1a, whatever size_t is
+ * ---------------------------------------------------------------------- */
+static void test_w18_hash_is_fnv1a_64(void) {
+   TestBit.is_true(wg_hash_name("") == UINT64_C(0xcbf29ce484222325), "W18: FNV-1a(\"\") offset basis");
+   TestBit.is_true(wg_hash_name("a") == UINT64_C(0xaf63dc4c8601ec8c), "W18: FNV-1a(\"a\")");
+   TestBit.is_true(wg_hash_name("foobar") == UINT64_C(0x85944171f73967e8), "W18: FNV-1a(\"foobar\")");
+   TestBit.is_true(wg_hash_name("a") != wg_hash_name("b"), "W18: different names hash differently");
+}
+
+// Enough names to force several nameset_grow passes (64 -> 128 -> ... -> 4096): every name stays
+// found, a repeat is a duplicate, and a new name is new.
+static void test_w19_nameset_survives_growth(void) {
+   wg_nameset set = {0};
+   char name[32];
+   bool all_added = true, all_duplicates = true;
+   for (int i = 0; i < 1500; i++) {
+      snprintf(name, sizeof(name), "field_%d", i);
+      all_added = all_added && wg_nameset_add(&set, name) == 1;
+   }
+   for (int i = 0; i < 1500; i++) {
+      snprintf(name, sizeof(name), "field_%d", i);
+      all_duplicates = all_duplicates && wg_nameset_add(&set, name) == 0;
+   }
+   TestBit.is_true(all_added, "W19: 1500 distinct names are all added");
+   TestBit.is_true(all_duplicates, "W19: every repeat, after several grows, is a duplicate");
+   TestBit.is_equal_int(1500, (long long)set.count, "W19: the count is exact");
+   TestBit.is_true(set.capacity >= 4096, "W19: the set grew past 64 several times");
+   TestBit.is_equal_int(1, wg_nameset_add(&set, "brand_new"), "W19: a new name is still new");
+   wg_nameset_free(&set);
+}
+
 int main(void) {
    TestBit.run_ex("W01_lifecycle", NULL, test_w01_lifecycle, th);
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
@@ -753,5 +787,7 @@ int main(void) {
    TestBit.run_ex("W15_data_and_growth", NULL, test_w15_data_and_growth, th);
    TestBit.run_ex("W16_vtable_matches_flat", NULL, test_w16_vtable_matches_flat, th);
    TestBit.run_ex("W17_duplicate_names", NULL, test_w17_duplicate_names, th);
+   TestBit.run_ex("W18_hash_is_fnv1a_64", NULL, test_w18_hash_is_fnv1a_64, th);
+   TestBit.run_ex("W19_nameset_survives_growth", NULL, test_w19_nameset_survives_growth, th);
    return TestBit.report();
 }

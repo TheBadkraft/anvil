@@ -172,6 +172,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
+  `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
+  constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`
+  warning in every `anvil.wasm` build. It now accumulates in `uint64_t` with `UINT64_C` constants (as
+  `src/sigma/map.c` does) and folds to `size_t` only to pick a slot. Bit-identical on 64-bit targets;
+  duplicate-name detection is unchanged. New `make check-32bit` compiles the writer grammar with `-m32
+  -Werror` (skips with a message when the 32-bit headers aren't installed).
 - **`anvil_document_get_path` is now in the `Document` vtable** (`BR-2610-anvl-vtable-001`): it was
   added to the flat API only, so bindings that bind the vtable struct (`anvil.py`, `anvil.net`,
   `anvil.java`) could not reach it. `get_path` is appended last in `anvil_document_i`, so existing
