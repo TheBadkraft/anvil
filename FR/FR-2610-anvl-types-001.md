@@ -64,7 +64,7 @@ None. BR-2610-anvl-types-001 is related: a non-numeric constraint becomes a
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-types-001`, merged to `main`. Tests TYP13–TYP21 (`test_types.c`), fixtures
+Branch `feat/FR-2610-anvl-types-001`, commit `d588597`, merged to `main`. Tests TYP13–TYP21 (`test_types.c`), fixtures
 `types_dup_{a,b,consumer}.anvl` and `types_clean_consumer.anvl`. Full unit regression green with
 unchanged counts elsewhere, `test_release` green, Valgrind-clean on types, schema, anvil_native,
 anvil_vtable, document, resolver, module. Docs: `docs/types-reference.md` gains a Diagnostics section
