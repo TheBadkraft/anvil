@@ -158,6 +158,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **`anvil_document_get_path` is now in the `Document` vtable** (`BR-2610-anvl-vtable-001`): it was
+  added to the flat API only, so bindings that bind the vtable struct (`anvil.py`, `anvil.net`,
+  `anvil.java`) could not reach it. `get_path` is appended last in `anvil_document_i`, so existing
+  member offsets don't move. A new completeness test (VT11) fails when any function declared in
+  `anvil_flat.h` has no vtable member and isn't listed flat-only with a reason.
 - **`libanvil.so` now exports the schema and type-registry API** (`BR-2610-anvl-visibility-001`):
   `anvil_schema.h` and `anvil_type_registry.h` lacked the `visibility push(default)` wrapper the other
   public headers carry, so with `-fvisibility=hidden` every `anvil_schema_*` / `anvil_type_*` function
