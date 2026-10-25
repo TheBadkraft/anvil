@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent (roadmap addendum A2)
 **Filed:** 2026-10-25
 **Filed by:** anvil (planning), from the coder agent's finding in FR-2610-anvl-types-001
-**Status:** open
+**Status:** resolved
 **Blocks:** the `anvil.py`/`anvil.net`/`anvil.java` bindings reaching a document's path
 **Tags:** abi, vtable, document, rivet-readiness
 
@@ -45,3 +45,22 @@ Do this together with BR-2610-anvl-visibility-001 (addendum A1). Both are ABI-co
 and both need closing before the Bindings agent's py/net/java slices bind the native surface.
 FR-2610-anvl-public-api-003 (`Schema`/`TypeRegistry` vtables) should reuse the same completeness
 test for its two headers.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-vtable-001`, commit `1c34198`, merged to `main`. Tests VT10 and VT11 in `test_anvil_vtable.c`.
+Unit suites green (counts unchanged elsewhere), `test_release`, `check-exports`, `check-reader-only`
+green, Valgrind-clean on vtable, native, schema, types.
+
+- `get_path` appended last in `anvil_document_i` and wired in `anvil_vtable.c`.
+- **VT11, the completeness test:** reads `include/anvil_flat.h`, extracts every declared `anvil_*`
+  function, and requires each to appear in a table of (flat function, vtable member) pairs, checked
+  pointer-identical, or in the flat-only list (empty today; each entry needs a reason). It also fails
+  if the table names a function the header no longer declares. Verified by hand: deleting the
+  `get_path` row makes VT11 fail naming `anvil_document_get_path`; removing the member from the
+  struct is a compile error. The table is built inside the test because vtable members are not
+  constant expressions in C. FR-2610-anvl-public-api-003 should add its two headers the same way.
+- **Test case 1 correction:** the ticket says a buffer-loaded document returns 0 from `get_path`. It
+  doesn't: `anvil_load_buffer` registers the fixed label `<buffer>`, and that is what the flat call
+  returns (documented in FR-2610-anvl-types-001's header comment). VT10 asserts the vtable result equals
+  the flat result for both file and buffer documents, which is the actual contract.

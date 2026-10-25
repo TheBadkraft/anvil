@@ -46,6 +46,7 @@ const anvil_document_i Document = {
    .get_statements = anvil_document_get_statements,
    .get_includes = anvil_document_get_includes,
    .get_error = anvil_document_get_error,
+   .get_path = anvil_document_get_path,
 };
 
 const anvil_statement_iterator_i StatementIterator = {

@@ -73,6 +73,8 @@ typedef struct anvil_document_i {
    anvil_statement_iterator (*get_statements)(anvil_document doc);
    anvil_document_iterator (*get_includes)(anvil_document doc);
    anvil_error (*get_error)(anvil_document doc);
+   size_t (*get_path)(anvil_document doc, char *buf, size_t buflen); // appended last: existing
+                                                                     // field offsets are unchanged
 } anvil_document_i;
 extern const anvil_document_i Document;
 
