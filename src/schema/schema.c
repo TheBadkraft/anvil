@@ -19,6 +19,7 @@
 #include "anvil_flat.h"
 #include "anvil_schema.h"
 #include "anvil_type_registry.h"
+#include "internal/numeric_bound.h"
 // ----------------
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
@@ -37,9 +38,9 @@ struct anvil_schema_field_t {
    bool has_size;
    long long size;
    bool has_min;
-   long long min;
+   anvil_numeric_t min;
    bool has_max;
-   long long max;
+   anvil_numeric_t max;
    list values; // list of individually-allocated char* labels; NULL if no values constraint
                 // (own inline declaration or inherited from a resolved custom type)
 };
@@ -56,14 +57,6 @@ static const char *strip_types_prefix(const char *text) {
       return text + prefix_len;
    }
    return text;
-}
-
-// Mirrors anvil_types.c's own strtoll-based numeric reader — there's no numeric accessor on
-// anvil_value, so every consumer reads the raw text itself.
-static long long read_numeric(anvil_value val) {
-   char text[32] = {0};
-   anvil_value_get_text(val, text, sizeof(text));
-   return strtoll(text, NULL, 10);
 }
 
 // Mirrors anvil_types.c's own values-array reader — bare identifiers or quoted strings both
@@ -160,14 +153,11 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          anvil_value_get_text(fval, text, sizeof(text));
          field->required = (strcmp(text, "true") == 0);
       } else if (strcmp(fname, "size") == 0) {
-         field->has_size = true;
-         field->size = read_numeric(fval);
+         field->has_size = anvil_numeric_read_size(fval, &field->size);
       } else if (strcmp(fname, "min") == 0) {
-         field->has_min = true;
-         field->min = read_numeric(fval);
+         field->has_min = anvil_numeric_read_bound(fval, &field->min);
       } else if (strcmp(fname, "max") == 0) {
-         field->has_max = true;
-         field->max = read_numeric(fval);
+         field->has_max = anvil_numeric_read_bound(fval, &field->max);
       } else if (strcmp(fname, "values") == 0) {
          field->values = read_values_list(fval);
       }
@@ -182,10 +172,10 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          field->has_size = anvil_type_def_get_size(resolved, &field->size);
       }
       if (!field->has_min) {
-         field->has_min = anvil_type_def_get_min(resolved, &field->min);
+         field->has_min = anvil_type_def_numeric_min(resolved, &field->min);
       }
       if (!field->has_max) {
-         field->has_max = anvil_type_def_get_max(resolved, &field->max);
+         field->has_max = anvil_type_def_numeric_max(resolved, &field->max);
       }
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
@@ -376,8 +366,8 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
          }
       }
       if ((field->has_min || field->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
-         long long value = read_numeric(data_val);
-         if ((field->has_min && value < field->min) || (field->has_max && value > field->max)) {
+         if ((field->has_min && anvil_numeric_compare(data_val, field->min) < 0) ||
+             (field->has_max && anvil_numeric_compare(data_val, field->max) > 0)) {
             add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
                           "field value is outside the declared min/max range");
          }

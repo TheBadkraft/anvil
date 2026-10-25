@@ -22,6 +22,7 @@
 
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
+#include "internal/numeric_bound.h"
 // ----------------
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
@@ -37,9 +38,9 @@ struct anvil_type_def_t {
    bool has_size;
    long long size;
    bool has_min;
-   long long min;
+   anvil_numeric_t min;
    bool has_max;
-   long long max;
+   anvil_numeric_t max;
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
 };
@@ -93,14 +94,52 @@ static struct anvil_type_def_t *native_def_for_kind(anvil_type_kind kind) {
    }
 }
 
-// Reads a numeric field's raw text ("17", "1900") and converts it — anvil_value_get_text is
-// the only way to read a scalar's content through the public flat API; there's no numeric
-// accessor, so every consumer of a numeric field (this module included) parses it itself, same
-// as anvil.node's own JS binding does with strtod.
-static long long read_numeric(anvil_value val) {
-   char text[32] = {0};
-   anvil_value_get_text(val, text, sizeof(text));
-   return strtoll(text, NULL, 10);
+// An int64 against a double, exactly - converting the int64 to double would round above 2^53.
+static int compare_int_double(int64_t i, double d) {
+   if (d >= 9223372036854775808.0) return -1;
+   if (d < -9223372036854775808.0) return 1;
+   int64_t t = (int64_t)d; // truncates toward zero; step down to the floor for negatives
+   if ((double)t > d) t--;
+   if (i < t) return -1;
+   if (i > t) return 1;
+   return d > (double)t ? -1 : 0; // i == floor(d): equal only if d has no fractional part
+}
+
+static int compare_numeric(anvil_numeric_t a, anvil_numeric_t b) {
+   if (a.is_integral && b.is_integral) {
+      return a.as_int64 < b.as_int64 ? -1 : a.as_int64 > b.as_int64;
+   }
+   if (a.is_integral) return compare_int_double(a.as_int64, b.as_double);
+   if (b.is_integral) return -compare_int_double(b.as_int64, a.as_double);
+   return a.as_double < b.as_double ? -1 : a.as_double > b.as_double;
+}
+
+bool anvil_numeric_read_bound(anvil_value val, anvil_numeric_t *out) {
+   anvil_numeric_t n = anvil_value_get_numeric(val); // overflowed for NULL/non-numeric too
+   if (n.overflowed) {
+      return false;
+   }
+   *out = n;
+   return true;
+}
+
+bool anvil_numeric_read_size(anvil_value val, long long *out) {
+   anvil_numeric_t n;
+   if (!anvil_numeric_read_bound(val, &n) || !n.is_integral || n.as_int64 < 0) {
+      return false;
+   }
+   *out = n.as_int64;
+   return true;
+}
+
+int anvil_numeric_compare(anvil_value data, anvil_numeric_t bound) {
+   anvil_numeric_t n = anvil_value_get_numeric(data);
+   if (n.overflowed) {
+      char lead[2] = {0};
+      anvil_value_get_text(data, lead, sizeof(lead));
+      return lead[0] == '-' ? -1 : 1;
+   }
+   return compare_numeric(n, bound);
 }
 
 // Reads an enum type's `values := [ ... ]` array — bare, unquoted identifiers, per
@@ -133,7 +172,8 @@ static list read_values_list(anvil_value val) {
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) {
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
-   def->size = def->min = def->max = 0;
+   def->size = 0;
+   def->min = def->max = (anvil_numeric_t){0};
    def->values = NULL;
 
    size_t count = anvil_value_get_count(obj_val);
@@ -148,14 +188,11 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) 
          anvil_value_get_text(fval, text, sizeof(text));
          def->kind = parse_type_kind(text);
       } else if (strcmp(fname, "size") == 0) {
-         def->has_size = true;
-         def->size = read_numeric(fval);
+         def->has_size = anvil_numeric_read_size(fval, &def->size);
       } else if (strcmp(fname, "min") == 0) {
-         def->has_min = true;
-         def->min = read_numeric(fval);
+         def->has_min = anvil_numeric_read_bound(fval, &def->min);
       } else if (strcmp(fname, "max") == 0) {
-         def->has_max = true;
-         def->max = read_numeric(fval);
+         def->has_max = anvil_numeric_read_bound(fval, &def->max);
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
       }
@@ -316,19 +353,37 @@ bool anvil_type_def_get_size(anvil_type_def def, long long *out_size) {
 
 bool anvil_type_def_get_min(anvil_type_def def, long long *out_min) {
    struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
-   if (!d || !out_min || !d->has_min) {
+   if (!d || !out_min || !d->has_min || !d->min.is_integral) {
+      return false; // a fractional bound is never truncated to fit a long long
+   }
+   *out_min = d->min.as_int64;
+   return true;
+}
+
+bool anvil_type_def_numeric_min(anvil_type_def def, anvil_numeric_t *out) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !out || !d->has_min) {
       return false;
    }
-   *out_min = d->min;
+   *out = d->min;
    return true;
 }
 
 bool anvil_type_def_get_max(anvil_type_def def, long long *out_max) {
    struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
-   if (!d || !out_max || !d->has_max) {
+   if (!d || !out_max || !d->has_max || !d->max.is_integral) {
+      return false; // a fractional bound is never truncated to fit a long long
+   }
+   *out_max = d->max.as_int64;
+   return true;
+}
+
+bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !out || !d->has_max) {
       return false;
    }
-   *out_max = d->max;
+   *out = d->max;
    return true;
 }
 

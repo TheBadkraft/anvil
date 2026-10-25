@@ -309,6 +309,51 @@ static void test_typ10_resolve_null_safety(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * TYP11 (BR-2610-anvl-types-001) — numeric constraints are never truncated:
+ * a fractional bound is not reported through the long long getters, a
+ * malformed one is "not declared"
+ * ---------------------------------------------------------------------- */
+static void test_typ11_numeric_constraints_not_truncated(void) {
+   const char *src =
+      "#!aml\n@[types]\n"
+      "Half := { type := Numeric; min := 0.5; max := 10; };\n"
+      "Exp := { type := Numeric; max := 1e+3; };\n"
+      "Bad := { type := Numeric; min := \"abc\"; max := 1e+999; size := 2.5; };\n";
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(doc, "TYP11: document loaded");
+   anvil_type_registry reg = doc ? anvil_type_registry_load(doc) : NULL;
+   TestBit.is_not_null(reg, "TYP11: registry loaded");
+   if (reg) {
+      long long v = -1;
+      anvil_type_def half = anvil_type_registry_find(reg, "Half");
+      TestBit.is_not_null(half, "TYP11: 'Half' found");
+      if (half) {
+         TestBit.is_false(anvil_type_def_get_min(half, &v),
+                          "TYP11: fractional min is not reported as a truncated integer");
+         TestBit.is_true(anvil_type_def_get_max(half, &v), "TYP11: integral max is reported");
+         TestBit.is_equal_int(10, v, "TYP11: max is 10");
+      }
+      anvil_type_def ex = anvil_type_registry_find(reg, "Exp");
+      if (ex) {
+         TestBit.is_false(anvil_type_def_get_max(ex, &v),
+                          "TYP11: exponent-form max is not reported as 1");
+      }
+      anvil_type_def bad = anvil_type_registry_find(reg, "Bad");
+      TestBit.is_not_null(bad, "TYP11: 'Bad' found");
+      if (bad) {
+         TestBit.is_false(anvil_type_def_get_min(bad, &v), "TYP11: non-numeric min not declared");
+         TestBit.is_false(anvil_type_def_get_max(bad, &v), "TYP11: overflowing max not declared");
+         TestBit.is_false(anvil_type_def_get_size(bad, &v), "TYP11: fractional size not declared");
+      }
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -325,6 +370,8 @@ int main(void) {
    TestBit.run_ex("TYP09_resolve_custom_falls_through", NULL,
                   test_typ09_resolve_custom_falls_through, th);
    TestBit.run_ex("TYP10_resolve_null_safety", NULL, test_typ10_resolve_null_safety, th);
+   TestBit.run_ex("TYP11_numeric_constraints_not_truncated", NULL,
+                  test_typ11_numeric_constraints_not_truncated, th);
 
    return TestBit.report();
 }
