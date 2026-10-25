@@ -80,7 +80,7 @@ already does:
 
 ## Resolution
 
-Branch `fix/BR-2610-anvl-writer-001`, merged to `main`. Tests W18-W19 in `test_writer.c`. Full unit regression
+Branch `fix/BR-2610-anvl-writer-001`, commit `9635f58`, merged to `main`. Tests W18-W19 in `test_writer.c`. Full unit regression
 green with unchanged counts elsewhere (writer 17 -> 19), `test_release`, `check-exports`,
 `check-reader-only` green, Valgrind-clean on writer, writer_roundtrip and builder.
 
