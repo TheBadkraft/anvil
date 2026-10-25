@@ -88,6 +88,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Inherited from a `@[types]` definition (a field's own `nullable := false` overrides it) and applied
   at every depth, array items included. A malformed `nullable` is a `MALFORMED_CONSTRAINT` diagnostic.
 
+- **`integer` constraint and fractional bound getters** (`FR-2610-anvl-types-005`): `integer := true`
+  requires a numeric value to be whole, judged by value (roadmap decision D2): `2`, `2.0` and `1e+3`
+  pass, `2.5` fails with a `TYPE_MISMATCH` saying "value must be an integer" (no new category).
+  Inherited from a type; a field's own `integer := false` overrides it; applied at every depth.
+  `anvil_type_def_get_min_numeric` / `anvil_type_def_get_max_numeric` expose fractional and exponent
+  bounds exactly; the `long long` getters keep their signatures and return false for such a bound
+  instead of truncating. Appended API only.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

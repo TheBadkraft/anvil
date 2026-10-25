@@ -47,6 +47,8 @@ struct anvil_type_def_t {
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
    char *source; // path of the document that defined it (for collision reports); NULL for natives
+   bool integer_declared; // `integer := true|false` was present and well-formed
+   bool integer;
    bool nullable_declared; // `nullable := true|false` was present and well-formed
    bool nullable;
    char *fields_text; // source text of `fields := { ... }` (copied), NULL if none - see
@@ -194,7 +196,7 @@ static list read_values_list(anvil_value val) {
 struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
-   bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable;
+   bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable, bad_integer;
 };
 
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
@@ -203,6 +205,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
    def->source = NULL;
    def->fields_text = NULL;
    def->nullable_declared = def->nullable = false;
+   def->integer_declared = def->integer = false;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -239,6 +242,15 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
          issues->bad_values = (def->values == NULL);
+      } else if (strcmp(fname, "integer") == 0) {
+         char *text = anvil_text_alloc(fval);
+         if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
+            def->integer_declared = true;
+            def->integer = (strcmp(text, "true") == 0);
+         } else {
+            issues->bad_integer = true;
+         }
+         Allocator.dispose(text);
       } else if (strcmp(fname, "nullable") == 0) {
          char *text = anvil_text_alloc(fval);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
@@ -364,6 +376,11 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       if (issues.bad_max) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'max' is not a valid number; treated as not declared", def->name);
+      }
+      if (issues.bad_integer) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'integer' must be true or false; treated as not declared",
+                  def->name);
       }
       if (issues.bad_nullable) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
@@ -595,30 +612,12 @@ bool anvil_type_def_get_min(anvil_type_def def, long long *out_min) {
    return true;
 }
 
-bool anvil_type_def_numeric_min(anvil_type_def def, anvil_numeric_t *out) {
-   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
-   if (!d || !out || !d->has_min) {
-      return false;
-   }
-   *out = d->min;
-   return true;
-}
-
 bool anvil_type_def_get_max(anvil_type_def def, long long *out_max) {
    struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
    if (!d || !out_max || !d->has_max || !d->max.is_integral) {
       return false; // a fractional bound is never truncated to fit a long long
    }
    *out_max = d->max.as_int64;
-   return true;
-}
-
-bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out) {
-   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
-   if (!d || !out || !d->has_max) {
-      return false;
-   }
-   *out = d->max;
    return true;
 }
 
@@ -702,4 +701,42 @@ bool anvil_type_def_nullable(anvil_type_def def, bool *out_declared) {
       *out_declared = d && d->nullable_declared;
    }
    return d && d->nullable_declared && d->nullable;
+}
+
+bool anvil_type_def_get_min_numeric(anvil_type_def def, anvil_numeric_t *out_min) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !out_min || !d->has_min) {
+      return false;
+   }
+   *out_min = d->min;
+   return true;
+}
+
+bool anvil_type_def_get_max_numeric(anvil_type_def def, anvil_numeric_t *out_max) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !out_max || !d->has_max) {
+      return false;
+   }
+   *out_max = d->max;
+   return true;
+}
+
+bool anvil_type_def_integer(anvil_type_def def, bool *out_declared) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (out_declared) {
+      *out_declared = d && d->integer_declared;
+   }
+   return d && d->integer_declared && d->integer;
+}
+
+bool anvil_numeric_is_whole(anvil_value data) {
+   anvil_numeric_t n = anvil_value_get_numeric(data);
+   if (n.overflowed || n.is_integral) {
+      return true; // beyond double range every value is whole; an integral literal is whole
+   }
+   double d = n.as_double;
+   if (d >= 9223372036854775808.0 || d <= -9223372036854775808.0) {
+      return true; // at or beyond 2^63 a double has no fractional bits left
+   }
+   return (double)(int64_t)d == d;
 }

@@ -36,6 +36,8 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   bool integer;          // a numeric value must be whole (value-based: 2.0 and 1e+3 pass)
+   bool integer_declared; // the rule said so itself, so it overrides the resolved type's
    bool nullable;          // an explicit `null` is a legal value (absent is governed by required)
    bool nullable_declared; // the rule said so itself, so it overrides the resolved type's
    bool has_size;
@@ -348,6 +350,16 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
                      "field '%s': 'required' must be true or false", path);
          }
          Allocator.dispose(text);
+      } else if (strcmp(fname, "integer") == 0) {
+         char *text = anvil_text_alloc(fval);
+         if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
+            field->integer_declared = true;
+            field->integer = (strcmp(text, "true") == 0);
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'integer' must be true or false; treated as false", path);
+         }
+         Allocator.dispose(text);
       } else if (strcmp(fname, "nullable") == 0) {
          char *text = anvil_text_alloc(fval);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
@@ -436,13 +448,20 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
          field->has_size = anvil_type_def_get_size(resolved, &field->size);
       }
       if (!field->has_min) {
-         field->has_min = anvil_type_def_numeric_min(resolved, &field->min);
+         field->has_min = anvil_type_def_get_min_numeric(resolved, &field->min);
       }
       if (!field->has_max) {
-         field->has_max = anvil_type_def_numeric_max(resolved, &field->max);
+         field->has_max = anvil_type_def_get_max_numeric(resolved, &field->max);
       }
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
+      }
+      if (!field->integer_declared) {
+         bool declared = false;
+         bool value = anvil_type_def_integer(resolved, &declared);
+         if (declared) {
+            field->integer = value;
+         }
       }
       if (!field->nullable_declared) {
          bool declared = false;
@@ -792,6 +811,10 @@ static void check_value(struct anvil_schema_t *s, const struct anvil_schema_fiel
          add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
                        "field value exceeds the declared size");
       }
+   }
+   if (rule->integer && data_val && actual == ANVIL_VALUE_NUMERIC && !anvil_numeric_is_whole(data_val)) {
+      add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                    "value must be an integer");
    }
    if ((rule->has_min || rule->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
       if ((rule->has_min && anvil_numeric_compare(data_val, rule->min) < 0) ||

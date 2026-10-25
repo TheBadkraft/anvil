@@ -809,6 +809,78 @@ static void test_typ28_nullable_declaration(void) {
    }
 }
 
+
+static void test_typ29_numeric_bound_getters(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Frac := { type := Numeric; min := 0.25; max := 1e+3; };\n"
+      "Whole := { type := Numeric; min := 1; max := 9; };\n"
+      "None := { type := Numeric; };\n"
+      "Bad := { type := Numeric; min := \"x\"; max := 1e+999; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP29: registry loaded");
+   if (reg) {
+      anvil_numeric_t n = {0};
+      long long ll = -1;
+      anvil_type_def frac = anvil_type_registry_find(reg, "Frac");
+      TestBit.is_true(anvil_type_def_get_min_numeric(frac, &n) && !n.is_integral && n.as_double == 0.25,
+                      "TYP29: min := 0.25 reads exactly through the numeric getter");
+      TestBit.is_false(anvil_type_def_get_min(frac, &ll), "TYP29: and not through the long long one");
+      TestBit.is_true(anvil_type_def_get_max_numeric(frac, &n) && n.as_double == 1000.0,
+                      "TYP29: max := 1e+3 reads as 1000");
+      TestBit.is_false(anvil_type_def_get_max(frac, &ll), "TYP29: exponent form is not truncated");
+
+      anvil_type_def whole = anvil_type_registry_find(reg, "Whole");
+      TestBit.is_true(anvil_type_def_get_min_numeric(whole, &n) && n.is_integral && n.as_int64 == 1,
+                      "TYP29: min := 1 via the numeric getter");
+      TestBit.is_true(anvil_type_def_get_min(whole, &ll) && ll == 1, "TYP29: and the long long one");
+      TestBit.is_true(anvil_type_def_get_max_numeric(whole, &n) && n.as_int64 == 9, "TYP29: max");
+      TestBit.is_true(anvil_type_def_get_max(whole, &ll) && ll == 9, "TYP29: max long long");
+
+      anvil_type_def none = anvil_type_registry_find(reg, "None");
+      TestBit.is_false(anvil_type_def_get_min_numeric(none, &n), "TYP29: undeclared min");
+      TestBit.is_false(anvil_type_def_get_max_numeric(none, &n), "TYP29: undeclared max");
+      anvil_type_def bad = anvil_type_registry_find(reg, "Bad");
+      TestBit.is_false(anvil_type_def_get_min_numeric(bad, &n), "TYP29: malformed min is not declared");
+      TestBit.is_false(anvil_type_def_get_max_numeric(bad, &n), "TYP29: overflowing max is not declared");
+      TestBit.is_false(anvil_type_def_get_min_numeric(NULL, &n), "TYP29: NULL def (min)");
+      TestBit.is_false(anvil_type_def_get_max_numeric(NULL, &n), "TYP29: NULL def (max)");
+      TestBit.is_false(anvil_type_def_get_min_numeric(whole, NULL), "TYP29: NULL out (min)");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ30_integer_declaration(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Yes := { type := Numeric; integer := true; };\n"
+      "No := { type := Numeric; integer := false; };\n"
+      "Unset := { type := Numeric; };\n"
+      "Bad := { type := Numeric; integer := maybe; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP30: registry loaded");
+   if (reg) {
+      bool declared = false;
+      TestBit.is_true(anvil_type_def_integer(anvil_type_registry_find(reg, "Yes"), &declared) && declared,
+                      "TYP30: integer := true");
+      TestBit.is_true(!anvil_type_def_integer(anvil_type_registry_find(reg, "No"), &declared) && declared,
+                      "TYP30: integer := false is declared and false");
+      TestBit.is_true(!anvil_type_def_integer(anvil_type_registry_find(reg, "Unset"), &declared) && !declared,
+                      "TYP30: absent");
+      TestBit.is_true(!anvil_type_def_integer(anvil_type_registry_find(reg, "Bad"), &declared) && !declared,
+                      "TYP30: malformed is not declared");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP30: and reported once");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -854,6 +926,9 @@ int main(void) {
    TestBit.run_ex("TYP27_object_type_fields", NULL, test_typ27_object_type_fields, th);
 
    TestBit.run_ex("TYP28_nullable_declaration", NULL, test_typ28_nullable_declaration, th);
+
+   TestBit.run_ex("TYP29_numeric_bound_getters", NULL, test_typ29_numeric_bound_getters, th);
+   TestBit.run_ex("TYP30_integer_declaration", NULL, test_typ30_integer_declaration, th);
 
    return TestBit.report();
 }
