@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load time and outlive the source documents. Also adds `anvil_document_get_path` (flat API) so a
   diagnostic can name the document it came from. No existing signature changed.
 
+- **Transitive `@[types]` resolution** (`FR-2610-anvl-types-002`): `anvil_type_registry_load_from_includes`
+  now follows the whole include graph (depth-first, each document once) instead of only direct
+  includes, so a schema that includes `ticket.types.anvl` sees the types `ticket.types.anvl` itself
+  includes. A non-`@[types]` document in the chain is walked through. Deeper definitions merge
+  first, so one closer to the consumer overrides it, reported as a `NAME_COLLISION`. The old
+  direct-only behavior is not kept as a mode. `docs/types-reference.md` (and its site mirror,
+  which also picks up the diagnostics section from `FR-2610-anvl-types-001`) describes it.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

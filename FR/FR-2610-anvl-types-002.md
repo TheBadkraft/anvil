@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** types, registry, includes, rivet-readiness
 
 ---
@@ -52,3 +52,24 @@ the whole include chain is fragile, and it gets worse each time a domain file ad
 ## Dependencies
 
 Soft: FR-2610-anvl-types-001 (diagnostics for collisions). Can land first without it.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-types-002`, merged to `main`. Tests TYP22–TYP26 (`test_types.c`) with fixtures
+`trans_*`, `cyc_*`, `ovr_*`, `dia_*`. Full unit regression green with unchanged counts elsewhere,
+`test_release` green, Valgrind-clean on types, schema, anvil_native, anvil_vtable, document, resolver,
+module, header. Docs: `docs/types-reference.md` and `site/assets/docs/types-reference.md` (SR-2610-anvl-docs-001 item 5).
+
+Finding - **test case 2's premise is wrong.** The ticket says "the core already resolves include
+cycles at load time". It doesn't: an include cycle is a load *error* (`ANVL_ERR_INCLUDE_CYCLIC`,
+"Cyclic include detected" on the requesting document), and the bodies of a cyclic graph are never
+parsed, so `Alpha`/`Beta` in A -> B -> A cannot be registered by any registry code. TYP23 therefore
+asserts what is achievable and true: the walk terminates, doesn't crash, invents no collision, and
+registers nothing from the unparsed graph. The visited set (keyed by document path) is still
+there, so the walk doesn't depend on the core's behavior; it is also what makes a diamond include
+contribute once (TYP26). If A -> B -> A should yield both types, that is a core include-loader
+change, not a registry one.
+
+Also: the entry document's own definitions are still not merged (unchanged behavior; it is the
+consumer, not an include). The mirror in `site/assets/docs/` was missing the FR-2610-anvl-types-001
+diagnostics section; it is synced here.

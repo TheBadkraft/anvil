@@ -148,12 +148,20 @@ vin_serial := { type := types.VIN; required := true; };
 has nothing to do with that file's own name. Two different `.types.anvl` files could both define
 types reachable as `types.X`, `types.Y` regardless of which physical file each include came from.
 
-*Runtime support: implemented (`anvil_type_registry_load_from_includes`) — walks `doc`'s own
-direct includes (not the whole transitive graph) and merges every `@[types]`-carrying one's
-definitions into a single combined registry, keyed by bare name. `types.` really is a flat
-namespace: two different included files could each define types reachable this same way,
-regardless of which file each name actually came from. A name collision between two includes
-resolves last-write-wins, and is reported (see Diagnostics below).*
+Includes are followed **transitively**. If `ticket.types.anvl` includes `common.types.anvl`, a
+schema that includes only `ticket.types.anvl` still sees `types.Timestamp` from `common.types.anvl`;
+it does not have to repeat the chain. A document without `@[types]` in the middle of a chain is
+walked through (its own includes may be types files) but contributes no definitions.
+
+*Runtime support: implemented (`anvil_type_registry_load_from_includes`) — walks `doc`'s include
+graph depth-first in include order, visiting each document once, and merges every
+`@[types]`-carrying document's definitions into a single combined registry, keyed by bare name.
+Deeper includes merge first and the including document's own definitions after, so a definition
+closer to the consumer overrides a deeper one. `types.` really is a flat namespace, regardless of
+which file each name actually came from. Any name collision resolves last-write-wins, and is
+reported (see Diagnostics below). An include cycle is a load error in the core
+(`ANVL_ERR_INCLUDE_CYCLIC`) and its bodies are never parsed, so a cyclic graph yields no
+definitions; the walk itself still terminates.*
 
 ## Diagnostics
 

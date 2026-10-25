@@ -1,0 +1,6 @@
+#!aml
+@[types]
+
+Shared := {
+   type := String;
+};
