@@ -133,6 +133,30 @@ Non-sequential ordinals (matching a database enum with intentional gaps) and fla
 *Runtime support: implemented (`anvil_type_def_get_value_count`/`get_value`) — each member's own
 label text is readable by its ordinal (array index).*
 
+## Object types with `fields`
+
+An `Object` type may describe its own shape, reusable by every schema field that references it:
+
+```anvl
+@[types]
+
+Person := {
+   type := Object;
+   fields := {
+      id   := { type := Numeric; required := true; };
+      name := { type := String; size := 40; };
+   };
+};
+```
+
+A schema field `owner := { type := types.Person; };` then validates the nested contents of `owner`
+(`owner.id` is required, `owner.name` is size-checked, any other member is an unknown field).
+The nested rules use the same vocabulary as top-level rules (and nest further, including
+`type := Array` with `items := { ... }`, `min_items` and `max_items`). If the schema field declares
+its own `fields`, they replace the type's; the two are never merged. A type whose `fields` refer back
+to itself (directly or through another type) is reported by the schema as a `SELF_REFERENCE`
+diagnostic and is not expanded. Violations name the full path, e.g. `links[2].target`.
+
 ## Using a type from another document
 
 A schema, or any other document, brings a type into scope by including the file that defines it,

@@ -64,6 +64,7 @@ typedef enum {
    ANVIL_SCHEMA_ERR_VALIDATION_RANGE,         // a numeric field's value is outside its declared min/max
    ANVIL_SCHEMA_ERR_VALIDATION_VALUES,        // a field's value isn't one of its declared values
    ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, // a data field isn't declared in the schema
+   ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,    // an array has fewer than min_items / more than max_items
 } anvil_schema_err_code;
 
 /**
@@ -77,7 +78,12 @@ typedef enum {
  * `types.X` namespace any other document would see. A field rule with no
  * recognized `type :=` (including none at all — e.g. a FlyWire-style
  * `pooled` field) is still registered, just with no type to check against;
- * its `required :=` (if any) is still enforced. A malformed schema is still
+ * its `required :=` (if any) is still enforced. A rule is an ordinary nested object, so shape nests the same way:
+ * `type := Object` may carry `fields := { name := { <rule> }; ... }` (recursively, unknown-field
+ * checking included), and `type := Array` may carry `items := { <rule> }` for every element plus
+ * `min_items` / `max_items`. A `@[types]` Object type may carry `fields` too, reusable by any field
+ * that references it (an inline `fields` replaces the type's, never merges). Violations name the
+ * full path, e.g. `links[2].target`; a top-level field reads exactly as its bare name. A malformed schema is still
  * returned, never rejected: what is wrong with it (an unknown type, a
  * malformed constraint, a top-level statement that isn't a rule, min > max,
  * and the type registry's own diagnostics) is reported through

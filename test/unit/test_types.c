@@ -11,6 +11,7 @@
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
 #include "anvil_types.h"
+#include "internal/numeric_bound.h"
 #include "internal/source_registry.h"
 #include "testbit.h"
 // ----------------
@@ -740,6 +741,36 @@ static void test_typ26_shared_include_visited_once(void) {
    }
 }
 
+
+static void test_typ27_object_type_fields(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Good := { type := Object; fields := { id := { type := Numeric; }; }; };\n"
+      "Plain := { type := Object; };\n"
+      "Bad := { type := Object; fields := 5; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP27: registry loaded");
+   if (reg) {
+      const char *text = anvil_type_def_fields_text(anvil_type_registry_find(reg, "Good"));
+      TestBit.is_true(text != NULL && strstr(text, "id") != NULL,
+                      "TYP27: a type's `fields` source text is kept");
+      TestBit.is_true(anvil_type_def_fields_text(anvil_type_registry_find(reg, "Plain")) == NULL,
+                      "TYP27: a type without `fields` has none");
+      TestBit.is_true(anvil_type_def_fields_text(NULL) == NULL, "TYP27: NULL def has none");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP27: only the malformed `fields` is reported");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, anvil_type_diagnostic_get_category(d),
+                           "TYP27: as MALFORMED_CONSTRAINT");
+      TestBit.is_true(anvil_type_def_fields_text(anvil_type_registry_find(reg, "Bad")) == NULL,
+                      "TYP27: and carries no fields");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -781,6 +812,8 @@ int main(void) {
    TestBit.run_ex("TYP24_NON_TYPES_DOCUMENT_IS_TRAVERSED", NULL, test_typ24_non_types_document_is_traversed, th);
    TestBit.run_ex("TYP25_CLOSER_DEFINITION_OVERRIDES_DEEPER", NULL, test_typ25_closer_definition_overrides_deeper, th);
    TestBit.run_ex("TYP26_SHARED_INCLUDE_VISITED_ONCE", NULL, test_typ26_shared_include_visited_once, th);
+
+   TestBit.run_ex("TYP27_object_type_fields", NULL, test_typ27_object_type_fields, th);
 
    return TestBit.report();
 }

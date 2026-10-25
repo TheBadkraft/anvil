@@ -44,6 +44,16 @@ struct anvil_schema_field_t {
    anvil_numeric_t max;
    list values; // list of individually-allocated char* labels; NULL if no values constraint
                 // (own inline declaration or inherited from a resolved custom type)
+
+   // Nested shape: a rule is an ordinary object, so it nests the same way a document does.
+   bool has_fields;   // an Object rule declared `fields` (inline, or inherited from its type)
+   list children;     // struct anvil_schema_field_t* - the nested rules, in order
+   map child_by_name; // child->name -> child
+   struct anvil_schema_field_t *items; // an Array rule's element rule (name is ""), or NULL
+   bool has_min_items;
+   long long min_items;
+   bool has_max_items;
+   long long max_items;
 };
 
 // A `type :=` field's text names either a bare native/enum kind ("Numeric", "enum") or a
@@ -151,19 +161,155 @@ static void add_diag(struct anvil_schema_t *schema, anvil_schema_diag_code code,
    List.append(schema->diagnostics, d);
 }
 
+// Type definitions being expanded into nested rules right now, innermost first: a type whose
+// `fields` reach itself (directly or through another type) would expand forever.
+struct expand_frame {
+   anvil_type_def def;
+   const struct expand_frame *up;
+};
+
+// `prefix.name`, or just `name` at the top level. Paths are built to length: nesting has no bound.
+static char *path_join(const char *prefix, const char *name) {
+   if (!prefix || !*prefix) {
+      return anvil_text_dup(name);
+   }
+   size_t plen = strlen(prefix), nlen = strlen(name);
+   char *out = Allocator.alloc(plen + 1 + nlen + 1);
+   if (out) {
+      memcpy(out, prefix, plen);
+      out[plen] = '.';
+      memcpy(out + plen + 1, name, nlen + 1);
+   }
+   return out;
+}
+
+// `prefix[index]`.
+static char *path_index(const char *prefix, size_t index) {
+   int ilen = snprintf(NULL, 0, "%zu", index);
+   size_t plen = strlen(prefix);
+   char *out = Allocator.alloc(plen + (size_t)ilen + 3);
+   if (out) {
+      memcpy(out, prefix, plen);
+      snprintf(out + plen, (size_t)ilen + 3, "[%zu]", index);
+   }
+   return out;
+}
+
+static struct anvil_schema_field_t *new_field(char *name) {
+   struct anvil_schema_field_t *f = Allocator.alloc(sizeof(struct anvil_schema_field_t));
+   if (!f) {
+      Allocator.dispose(name);
+      return NULL;
+   }
+   memset(f, 0, sizeof(*f));
+   f->kind = ANVIL_TYPE_UNKNOWN;
+   f->name = name;
+   return f;
+}
+
+static void dispose_field_values(list values);
+
+static void field_dispose(struct anvil_schema_field_t *f) {
+   if (!f) {
+      return;
+   }
+   dispose_field_values(f->values);
+   if (f->children) {
+      for (usize i = 0, n = List.size(f->children); i < n; i++) {
+         struct anvil_schema_field_t *c = NULL;
+         List.get(f->children, i, (object *)&c);
+         field_dispose(c);
+      }
+      List.dispose(f->children);
+   }
+   if (f->child_by_name) {
+      Map.dispose(f->child_by_name);
+   }
+   field_dispose(f->items);
+   Allocator.dispose(f->name);
+   Allocator.dispose(f);
+}
+
+static void build_rule(anvil_value obj_val, anvil_type_registry types,
+                       struct anvil_schema_field_t *field, struct anvil_schema_t *schema,
+                       const char *path, const struct expand_frame *stack);
+
+// Builds the nested rules of a `fields := { name := { <rule> }; ... }` object into field.
+static void build_children(anvil_value fields_obj, anvil_type_registry types,
+                           struct anvil_schema_field_t *field, struct anvil_schema_t *schema,
+                           const char *path, const struct expand_frame *stack) {
+   field->has_fields = true;
+   if (!field->children) {
+      field->children = List.new(4, sizeof(struct anvil_schema_field_t *));
+      field->child_by_name = Map.new(8);
+   }
+   size_t count = anvil_value_get_count(fields_obj);
+   for (size_t i = 0; i < count; i++) {
+      anvil_statement stmt = anvil_value_get_statement(fields_obj, i);
+      char *name = anvil_name_alloc(stmt);
+      if (!name) {
+         continue;
+      }
+      anvil_value val = anvil_statement_get_value(stmt);
+      char *child_path = path_join(path, name);
+      if (!child_path) {
+         Allocator.dispose(name);
+         continue;
+      }
+      if (!val || anvil_value_get_type(val) != ANVIL_VALUE_OBJECT) {
+         add_diag(schema, ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT, ANVIL_TYPE_DIAG_NONE, child_path,
+                  "'%s' is not a field rule (expected a '{ ... }' object); skipped", child_path);
+         Allocator.dispose(name);
+         Allocator.dispose(child_path);
+         continue;
+      }
+      struct anvil_schema_field_t *child = new_field(name);
+      if (child) {
+         build_rule(val, types, child, schema, child_path, stack);
+         List.append(field->children, child);
+         Map.set(field->child_by_name, child->name, strlen(child->name), (addr)child);
+      }
+      Allocator.dispose(child_path);
+   }
+}
+
+// A field referencing an Object type that declares `fields` inherits that shape, unless it
+// declared its own (inline replaces, never merges - same rule as every other constraint). The
+// registry keeps the nested rules as source text and stays ignorant of the rule vocabulary, so
+// the text is re-parsed here as a standalone value.
+static void expand_type_fields(anvil_type_def def, anvil_type_registry types,
+                               struct anvil_schema_field_t *field, struct anvil_schema_t *schema,
+                               const char *path, const struct expand_frame *stack) {
+   const char *text = anvil_type_def_fields_text(def);
+   if (!text) {
+      return;
+   }
+   for (const struct expand_frame *f = stack; f; f = f->up) {
+      if (f->def == def) {
+         add_diag(schema, ANVIL_SCHEMA_DIAG_SELF_REFERENCE, ANVIL_TYPE_DIAG_NONE, path,
+                  "field '%s': its type's 'fields' refer back to the type itself; not expanded",
+                  path);
+         return;
+      }
+   }
+   anvil_document frag = anvil_parse_value_fragment(text, strlen(text));
+   anvil_value obj = frag ? anvil_document_get_fragment_value(frag) : NULL;
+   if (obj && anvil_value_get_type(obj) == ANVIL_VALUE_OBJECT) {
+      struct expand_frame frame = {def, stack};
+      build_children(obj, types, field, schema, path, &frame);
+   }
+   if (frag) {
+      anvil_dispose(frag);
+   }
+}
+
 // A schema field's declared kind is transparent-through: a bare native primitive, a bare
 // `enum`, or a types.X custom type all resolve to the same anvil_type_kind, so validation
-// never needs to know which of the three produced it — see anvil_type_resolve.
-static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
-                            struct anvil_schema_field_t *field, struct anvil_schema_t *schema) {
-   field->has_kind = false;
-   field->kind = ANVIL_TYPE_UNKNOWN;
-   field->required = false;
-   field->has_size = false;
-   field->has_min = false;
-   field->has_max = false;
-   field->values = NULL;
-
+// never needs to know which of the three produced it — see anvil_type_resolve. `path` is the
+// rule's full path (`links[].target`), used only for diagnostics.
+static void build_rule(anvil_value obj_val, anvil_type_registry types,
+                       struct anvil_schema_field_t *field, struct anvil_schema_t *schema,
+                       const char *path, const struct expand_frame *stack) {
    anvil_type_def resolved = NULL;
 
    // First pass: read exactly what the field itself declares, inline — never consulting the
@@ -181,9 +327,9 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          char *text = anvil_text_alloc(fval);
          resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
          if (!resolved) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, field->name,
-                     "field '%s': type '%s' is neither a native type nor a known types.X",
-                     field->name, text ? text : "");
+            add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': type '%s' is neither a native type nor a known types.X", path,
+                     text ? text : "");
          }
          Allocator.dispose(text);
          if (resolved) {
@@ -196,37 +342,74 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          char *text = anvil_text_alloc(fval);
          field->required = text && strcmp(text, "true") == 0;
          if (!text || (strcmp(text, "true") != 0 && strcmp(text, "false") != 0)) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
-                     field->name, "field '%s': 'required' must be true or false", field->name);
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'required' must be true or false", path);
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "size") == 0) {
          field->has_size = anvil_numeric_read_size(fval, &field->size);
          if (!field->has_size) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
-                     field->name,
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
                      "field '%s': 'size' is not a non-negative integer; treated as not declared",
-                     field->name);
+                     path);
          }
       } else if (strcmp(fname, "min") == 0) {
          field->has_min = anvil_numeric_read_bound(fval, &field->min);
          if (!field->has_min) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
-                     field->name, "field '%s': 'min' is not a valid number; treated as not declared",
-                     field->name);
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'min' is not a valid number; treated as not declared", path);
          }
       } else if (strcmp(fname, "max") == 0) {
          field->has_max = anvil_numeric_read_bound(fval, &field->max);
          if (!field->has_max) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
-                     field->name, "field '%s': 'max' is not a valid number; treated as not declared",
-                     field->name);
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'max' is not a valid number; treated as not declared", path);
          }
       } else if (strcmp(fname, "values") == 0) {
          field->values = read_values_list(fval);
          if (!field->values) {
-            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
-                     field->name, "field '%s': 'values' must be an array of labels", field->name);
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'values' must be an array of labels", path);
+         }
+      } else if (strcmp(fname, "min_items") == 0) {
+         field->has_min_items = anvil_numeric_read_size(fval, &field->min_items);
+         if (!field->has_min_items) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'min_items' is not a non-negative integer; treated as not "
+                     "declared", path);
+         }
+      } else if (strcmp(fname, "max_items") == 0) {
+         field->has_max_items = anvil_numeric_read_size(fval, &field->max_items);
+         if (!field->has_max_items) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'max_items' is not a non-negative integer; treated as not "
+                     "declared", path);
+         }
+      } else if (strcmp(fname, "fields") == 0) {
+         if (fval && anvil_value_get_type(fval) == ANVIL_VALUE_OBJECT) {
+            build_children(fval, types, field, schema, path, stack);
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'fields' must be an object of field rules", path);
+         }
+      } else if (strcmp(fname, "items") == 0) {
+         char *items_path = NULL;
+         if (fval && anvil_value_get_type(fval) == ANVIL_VALUE_OBJECT) {
+            size_t plen = strlen(path);
+            items_path = Allocator.alloc(plen + 3);
+            if (items_path) {
+               memcpy(items_path, path, plen);
+               memcpy(items_path + plen, "[]", 3);
+               field_dispose(field->items); // a repeated `items` replaces the earlier one
+               field->items = new_field(anvil_text_dup(""));
+               if (field->items) {
+                  build_rule(fval, types, field->items, schema, items_path, stack);
+               }
+            }
+            Allocator.dispose(items_path);
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'items' must be a field rule object", path);
          }
       }
       Allocator.dispose(fname);
@@ -249,13 +432,20 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
       }
+      if (!field->has_fields) {
+         expand_type_fields(resolved, types, field, schema, path, stack);
+      }
    }
 
    // Effective (inline or inherited) bounds that nothing can satisfy.
    if (field->has_min && field->has_max && anvil_numeric_compare_bounds(field->min, field->max) > 0) {
-      add_diag(schema, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, ANVIL_TYPE_DIAG_NONE,
-               field->name, "field '%s': 'min' is greater than 'max'; no value can satisfy it",
-               field->name);
+      add_diag(schema, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, ANVIL_TYPE_DIAG_NONE, path,
+               "field '%s': 'min' is greater than 'max'; no value can satisfy it", path);
+   }
+   if (field->has_min_items && field->has_max_items && field->min_items > field->max_items) {
+      add_diag(schema, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, ANVIL_TYPE_DIAG_NONE, path,
+               "field '%s': 'min_items' is greater than 'max_items'; no array can satisfy it",
+               path);
    }
 }
 
@@ -311,17 +501,12 @@ anvil_schema anvil_schema_load(anvil_document doc) {
             }
             continue; // not a field rule - skipped, and reported above
          }
-         struct anvil_schema_field_t *field =
-            Allocator.alloc(sizeof(struct anvil_schema_field_t));
-         if (!field) {
+         struct anvil_schema_field_t *field = new_field(anvil_name_alloc(stmt));
+         if (!field || !field->name) {
+            field_dispose(field);
             continue;
          }
-         field->name = anvil_name_alloc(stmt);
-         if (!field->name) {
-            Allocator.dispose(field);
-            continue;
-         }
-         read_field_rule(val, types, field, schema);
+         build_rule(val, types, field, schema, field->name, NULL);
 
          List.append(schema->fields, field);
          Map.set(schema->by_name, field->name, strlen(field->name), (addr)field);
@@ -386,13 +571,7 @@ void anvil_schema_dispose(anvil_schema schema) {
       for (usize i = 0; i < n; i++) {
          struct anvil_schema_field_t *f = NULL;
          List.get(s->fields, i, (object *)&f);
-         if (f) {
-            dispose_field_values(f->values);
-         }
-         if (f) {
-            Allocator.dispose(f->name);
-         }
-         Allocator.dispose(f);
+         field_dispose(f);
       }
       List.dispose(s->fields);
    }
@@ -503,89 +682,151 @@ static void reset_violations(struct anvil_schema_t *s) {
    s->violations = List.new(4, sizeof(struct anvil_schema_violation_t *));
 }
 
-// The one validation pass: every declared field against the view, then every view statement the
-// schema doesn't declare. Both the document form and the value form land here.
-static bool validate_view(struct anvil_schema_t *s, const struct data_view *view,
-                          const anvil_schema_options *opts) {
-   reset_violations(s);
-   bool skip_required = OPT_FLAG(opts, skip_required);
-   bool allow_unknown = OPT_FLAG(opts, allow_unknown);
+// The two options validation reads, resolved once from the caller's (possibly shorter) struct.
+struct vopts {
+   bool skip_required;
+   bool allow_unknown;
+};
 
-   usize field_count = List.size(s->fields);
-   for (usize i = 0; i < field_count; i++) {
-      struct anvil_schema_field_t *field = NULL;
-      List.get(s->fields, i, (object *)&field);
-      if (!field) {
+static void check_value(struct anvil_schema_t *s, const struct anvil_schema_field_t *rule,
+                        const char *path, anvil_value data_val, const struct vopts *vo);
+
+// Validates one level of members: every declared rule against the view, then every view statement
+// the level doesn't declare. Violations are depth first in schema order: a rule's own violations,
+// then its nested ones, before the next rule; unknown members of a level come after its rules.
+static void validate_members(struct anvil_schema_t *s, list rules, map rules_by_name,
+                             const struct data_view *view, const char *prefix,
+                             const struct vopts *vo) {
+   usize rule_count = rules ? List.size(rules) : 0;
+   for (usize i = 0; i < rule_count; i++) {
+      struct anvil_schema_field_t *rule = NULL;
+      List.get(rules, i, (object *)&rule);
+      if (!rule) {
+         continue;
+      }
+      char *path = path_join(prefix, rule->name);
+      if (!path) {
          continue;
       }
 
       addr found = 0;
-      if (!Map.get(view->first, field->name, strlen(field->name), &found) || !found) {
-         if (field->required && !skip_required) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+      if (!Map.get(view->first, rule->name, strlen(rule->name), &found) || !found) {
+         if (rule->required && !vo->skip_required) {
+            add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
                           "required field is missing");
          }
-         continue;
+      } else {
+         anvil_statement data_stmt = ((struct data_entry *)found)->stmt;
+         check_value(s, rule, path, anvil_statement_get_value(data_stmt), vo);
       }
-      anvil_statement data_stmt = ((struct data_entry *)found)->stmt;
-      anvil_value data_val = anvil_statement_get_value(data_stmt);
-      anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
-
-      if (field->has_kind && !kind_matches(field->kind, actual)) {
-         add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
-                       "field value does not match the declared type");
-         continue; // a value of the wrong kind can't be meaningfully checked against
-                   // size/min/max/values too — one violation, not a confusing pile of them
-      }
-
-      if (field->has_size && data_val) {
-         size_t len = anvil_value_get_text(data_val, NULL, 0);
-         if ((long long)len > field->size) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
-                          "field value exceeds the declared size");
-         }
-      }
-      if ((field->has_min || field->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
-         if ((field->has_min && anvil_numeric_compare(data_val, field->min) < 0) ||
-             (field->has_max && anvil_numeric_compare(data_val, field->max) > 0)) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
-                          "field value is outside the declared min/max range");
-         }
-      }
-      if (field->values && data_val) {
-         char *text = anvil_text_alloc(data_val);
-         bool member = false;
-         usize value_count = List.size(field->values);
-         for (usize vi = 0; vi < value_count; vi++) {
-            char *label = NULL;
-            List.get(field->values, vi, (object *)&label);
-            if (label && text && strcmp(label, text) == 0) {
-               member = true;
-               break;
-            }
-         }
-         Allocator.dispose(text);
-         if (!member) {
-            add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
-                          "field value is not one of the declared values");
-         }
-      }
+      Allocator.dispose(path);
    }
 
-   // Every data field not declared in the schema is a violation of its own — checked as a
-   // second pass over the statements, independent of the pass above.
-   if (!allow_unknown) {
+   // Every member not declared at this level is a violation of its own - a second pass over the
+   // statements, independent of the pass above.
+   if (!vo->allow_unknown) {
       for (usize i = 0, n = List.size(view->entries); i < n; i++) {
          struct data_entry *e = NULL;
          List.get(view->entries, i, (object *)&e);
          addr unused = 0;
-         if (e && !Map.get(s->by_name, e->name, strlen(e->name), &unused)) {
-            add_violation(s->violations, e->name, ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
-                          "field is not declared in the schema");
+         if (e && (!rules_by_name || !Map.get(rules_by_name, e->name, strlen(e->name), &unused))) {
+            char *path = path_join(prefix, e->name);
+            if (path) {
+               add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                             "field is not declared in the schema");
+               Allocator.dispose(path);
+            }
          }
       }
    }
+}
 
+// One present value against one rule - a declared field's value, or an array element against its
+// array's `items` rule - then, if the rule has a shape, into it.
+static void check_value(struct anvil_schema_t *s, const struct anvil_schema_field_t *rule,
+                        const char *path, anvil_value data_val, const struct vopts *vo) {
+   anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
+
+   if (rule->has_kind && !kind_matches(rule->kind, actual)) {
+      add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                    "field value does not match the declared type");
+      return; // a value of the wrong kind can't be meaningfully checked against
+              // size/min/max/values too — one violation, not a confusing pile of them
+   }
+
+   if (rule->has_size && data_val) {
+      size_t len = anvil_value_get_text(data_val, NULL, 0);
+      if ((long long)len > rule->size) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
+                       "field value exceeds the declared size");
+      }
+   }
+   if ((rule->has_min || rule->has_max) && data_val && actual == ANVIL_VALUE_NUMERIC) {
+      if ((rule->has_min && anvil_numeric_compare(data_val, rule->min) < 0) ||
+          (rule->has_max && anvil_numeric_compare(data_val, rule->max) > 0)) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
+                       "field value is outside the declared min/max range");
+      }
+   }
+   if (rule->values && data_val) {
+      char *text = anvil_text_alloc(data_val);
+      bool member = false;
+      usize value_count = List.size(rule->values);
+      for (usize vi = 0; vi < value_count; vi++) {
+         char *label = NULL;
+         List.get(rule->values, vi, (object *)&label);
+         if (label && text && strcmp(label, text) == 0) {
+            member = true;
+            break;
+         }
+      }
+      Allocator.dispose(text);
+      if (!member) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
+                       "field value is not one of the declared values");
+      }
+   }
+
+   // Shape: an object's declared `fields`, an array's `items` and item count.
+   if (rule->has_fields && actual == ANVIL_VALUE_OBJECT) {
+      struct data_view inner;
+      data_view_init(&inner);
+      size_t count = anvil_value_get_count(data_val);
+      for (size_t i = 0; i < count; i++) {
+         data_view_add(&inner, anvil_value_get_statement(data_val, i));
+      }
+      validate_members(s, rule->children, rule->child_by_name, &inner, path, vo);
+      data_view_dispose(&inner);
+   }
+   if (actual == ANVIL_VALUE_ARRAY) {
+      size_t count = anvil_value_get_count(data_val);
+      if (rule->has_min_items && (long long)count < rule->min_items) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,
+                       "array has fewer items than min_items");
+      }
+      if (rule->has_max_items && (long long)count > rule->max_items) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,
+                       "array has more items than max_items");
+      }
+      if (rule->items) {
+         for (size_t i = 0; i < count; i++) {
+            char *item_path = path_index(path, i);
+            if (item_path) {
+               check_value(s, rule->items, item_path, anvil_value_get_element(data_val, i), vo);
+               Allocator.dispose(item_path);
+            }
+         }
+      }
+   }
+}
+
+// The one validation pass. Both the document form and the value form land here.
+static bool validate_view(struct anvil_schema_t *s, const struct data_view *view,
+                          const anvil_schema_options *opts) {
+   reset_violations(s);
+   struct vopts vo = {.skip_required = OPT_FLAG(opts, skip_required),
+                      .allow_unknown = OPT_FLAG(opts, allow_unknown)};
+   validate_members(s, s->fields, s->by_name, view, "", &vo);
    return List.size(s->violations) == 0;
 }
 

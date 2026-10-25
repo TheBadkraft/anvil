@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** schema, nested, arrays, objects, violations, rivet-readiness
 
 ---
@@ -62,3 +62,33 @@ No new grammar: rules are ordinary nested objects, exactly like top-level rules.
 ## Dependencies
 
 None hard. Nested `fields` inherits the BR-2610-anvl-types-001 and BR-2610-anvl-schema-001 fixes.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-schema-001`, merged to `main`. Tests SCH41–SCH50 (`test_schema.c`) and TYP27
+(`test_types.c`); fixtures `schema_nested_*`, `schema_selfref_*`. Full unit regression green with
+unchanged counts elsewhere (SCH01–SCH40 are the regression for top-level behavior and path strings),
+`test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
+
+Design:
+- Schema fields are now a tree (`children` + `items`); one recursive `build_rule` reads a rule and
+  one `validate_members` / `check_value` pair checks it, so the later per-rule tickets (nullable,
+  integer, format, ...) slot into `check_value` once.
+- **A type's `fields` is stored as source text** in the registry (internal accessor
+  `anvil_type_def_fields_text`) and re-parsed by the schema with `anvil_parse_value_fragment`. This
+  keeps the registry independent of the rule vocabulary and of document lifetimes (the registry
+  contract is that it outlives its documents). Cost: one small re-parse per referencing field.
+- Self-reference is caught with an expansion stack of type defs, so mutual recursion (A -> B -> A)
+  is caught too, not only direct.
+- `required`, `skip_required` and `allow_unknown` apply at every depth. An array element rule is
+  checked with the same `check_value` as a declared field (it just has no `required`).
+- `fields` on a rule that isn't `type := Object` (or `items` on a non-array) still applies when the
+  data value is an object/array; the kind check is separate.
+
+Findings:
+- The AML grammar rejects an empty array literal (`labels := [];` is a parse error), so the
+  "too few items" case is exercised with one element against `min_items := 2`.
+- A type's `items` / `min_items` / `max_items` are not inherited (the ticket only specifies `fields`
+  for types). Tuples are not given `items` rules.
+- Vtable/binding exposure of the new category and any introspection of nested rules: FR-2610-anvl-schema-005
+  and FR-2610-anvl-public-api-003.

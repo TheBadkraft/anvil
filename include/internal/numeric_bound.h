@@ -40,3 +40,9 @@ int anvil_numeric_compare_bounds(anvil_numeric_t a, anvil_numeric_t b);
 /// A type definition's declared bound, fractional or not. False when not declared.
 bool anvil_type_def_numeric_min(anvil_type_def def, anvil_numeric_t *out);
 bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out);
+
+/// The source text of an Object type's `fields := { ... }` (the OBJECT value's span, copied at
+/// load so it outlives the document), or NULL if the type declares none. schema.c re-parses it
+/// with anvil_parse_value_fragment to build the nested rules a field referencing the type
+/// inherits - the registry stays ignorant of the rule vocabulary.
+const char *anvil_type_def_fields_text(anvil_type_def def);

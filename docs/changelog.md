@@ -70,6 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shares one validation pass with the value form. This is what lets FlyWire validate through
   AnvilSchema instead of its own JavaScript validator.
 
+- **Nested schema validation** (`FR-2610-anvl-schema-001`): a schema rule is an ordinary nested object,
+  so `type := Object` may carry `fields := { name := { <rule> }; ... }` (recursive, unknown-field
+  checking included) and `type := Array` may carry `items := { <rule> }` for every element plus
+  `min_items` / `max_items`. A `@[types]` Object type may carry `fields` and is reusable by every field
+  referencing it (an inline `fields` replaces it, never merges); a self-referential type is reported
+  as `SELF_REFERENCE` and not expanded. Violations now name the full path (`links[2].target`,
+  `assignee.id`); top-level fields read exactly as before. New category
+  `ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT` (appended). Violation order is schema order, depth first.
+  Nested rules also produce load diagnostics with paths, and honour `anvil_schema_validate_value`'s
+  `skip_required` / `allow_unknown` at every depth.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
