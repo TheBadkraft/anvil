@@ -37,6 +37,8 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   char *type_name;       // the `type :=` text as written ("types.Id32"); NULL if none
+   list extras;           // struct schema_extra* - rule keys the schema didn't consume, in order
    char *format;          // a known lexical format the text must match; NULL if none
    char *tag;             // a blob must carry exactly this @tag; NULL if unconstrained
    bool integer;          // a numeric value must be whole (value-based: 2.0 and 1e+3 pass)
@@ -202,6 +204,75 @@ static char *path_index(const char *prefix, size_t index) {
    return out;
 }
 
+// A rule key the schema doesn't consume (a consumer's annotation, e.g. FlyWire's `pooled`). The
+// value is copied into a schema-owned standalone value (a fragment document) so it outlives the
+// schema's source document.
+struct schema_extra {
+   char *name;
+   anvil_document frag; // owns `value`
+   anvil_value value;   // NULL if the value couldn't be copied
+};
+
+// The source text of a value that anvil_parse_value_fragment will read back as the same value.
+// Collections: their raw span (nested quoting intact). Scalars: a string's and a blob's content
+// are delimiter-free in the public API, so they are re-wrapped from the exact bytes.
+static char *value_source_text(anvil_value v) {
+   anvil_value_type t = anvil_value_get_type(v);
+   if (t != ANVIL_VALUE_STRING && t != ANVIL_VALUE_BLOB) {
+      return anvil_text_alloc(v);
+   }
+   size_t blen = anvil_value_get_bytes(v, NULL, 0);
+   size_t tlen = t == ANVIL_VALUE_BLOB ? anvil_value_get_blob_tag(v, NULL, 0) : 0;
+   char *out = Allocator.alloc(blen + tlen + 4);
+   if (!out) {
+      return NULL;
+   }
+   size_t at = 0;
+   if (tlen) {
+      out[at++] = '@';
+      anvil_value_get_blob_tag(v, out + at, tlen + 1);
+      at += tlen;
+   }
+   out[at++] = t == ANVIL_VALUE_BLOB ? '`' : '"';
+   anvil_value_get_bytes(v, out + at, blen);
+   at += blen;
+   out[at++] = t == ANVIL_VALUE_BLOB ? '`' : '"';
+   out[at] = '\0';
+   return out;
+}
+
+static void add_extra(struct anvil_schema_field_t *field, const char *name, anvil_value val) {
+   struct schema_extra *e = Allocator.alloc(sizeof(struct schema_extra));
+   if (!e) {
+      return;
+   }
+   memset(e, 0, sizeof(*e));
+   e->name = anvil_text_dup(name);
+   char *text = val ? value_source_text(val) : NULL;
+   if (text) {
+      e->frag = anvil_parse_value_fragment(text, strlen(text));
+      if (e->frag && !anvil_has_errors(e->frag)) {
+         e->value = anvil_document_get_fragment_value(e->frag);
+      }
+      if (!e->value && e->frag) {
+         anvil_dispose(e->frag);
+         e->frag = NULL;
+      }
+   }
+   Allocator.dispose(text);
+   if (!e->name) {
+      if (e->frag) {
+         anvil_dispose(e->frag);
+      }
+      Allocator.dispose(e);
+      return;
+   }
+   if (!field->extras) {
+      field->extras = List.new(2, sizeof(struct schema_extra *));
+   }
+   List.append(field->extras, e);
+}
+
 static struct anvil_schema_field_t *new_field(char *name) {
    struct anvil_schema_field_t *f = Allocator.alloc(sizeof(struct anvil_schema_field_t));
    if (!f) {
@@ -223,6 +294,21 @@ static void field_dispose(struct anvil_schema_field_t *f) {
    dispose_field_values(f->values);
    Allocator.dispose(f->tag);
    Allocator.dispose(f->format);
+   Allocator.dispose(f->type_name);
+   if (f->extras) {
+      for (usize i = 0, n = List.size(f->extras); i < n; i++) {
+         struct schema_extra *e = NULL;
+         List.get(f->extras, i, (object *)&e);
+         if (e) {
+            if (e->frag) {
+               anvil_dispose(e->frag);
+            }
+            Allocator.dispose(e->name);
+         }
+         Allocator.dispose(e);
+      }
+      List.dispose(f->extras);
+   }
    if (f->children) {
       for (usize i = 0, n = List.size(f->children); i < n; i++) {
          struct anvil_schema_field_t *c = NULL;
@@ -334,6 +420,8 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
 
       if (strcmp(fname, "type") == 0) {
          char *text = anvil_text_alloc(fval);
+         Allocator.dispose(field->type_name);
+         field->type_name = text ? anvil_text_dup(text) : NULL;
          resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
          if (!resolved) {
             add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, path,
@@ -462,6 +550,8 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
             add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
                      "field '%s': 'items' must be a field rule object", path);
          }
+      } else {
+         add_extra(field, fname, fval); // not ours: passed on to the consumer, never diagnosed
       }
       Allocator.dispose(fname);
    }
@@ -1094,4 +1184,169 @@ size_t anvil_schema_diagnostic_get_field(anvil_schema_diagnostic diag, char *buf
 
 size_t anvil_schema_diagnostic_get_message(anvil_schema_diagnostic diag, char *buf, size_t buflen) {
    return diag ? copy_diag_text(diag->message, buf, buflen) : 0;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Introspection (read-only)
+ * ---------------------------------------------------------------------- */
+static size_t copy_text(const char *text, char *buf, size_t buflen) {
+   size_t len = strlen(text);
+   if (buf && buflen > 0) {
+      size_t n = len < buflen - 1 ? len : buflen - 1;
+      memcpy(buf, text, n);
+      buf[n] = '\0';
+   }
+   return len;
+}
+
+size_t anvil_schema_get_field_count(anvil_schema schema) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   return s && s->fields ? (size_t)List.size(s->fields) : 0;
+}
+
+anvil_schema_field anvil_schema_get_field(anvil_schema schema, size_t index) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   if (!s || !s->fields || index >= (size_t)List.size(s->fields)) {
+      return NULL;
+   }
+   struct anvil_schema_field_t *f = NULL;
+   List.get(s->fields, index, (object *)&f);
+   return (anvil_schema_field)f;
+}
+
+anvil_schema_field anvil_schema_find_field(anvil_schema schema, const char *name) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   addr found = 0;
+   if (!s || !name || !s->by_name || !Map.get(s->by_name, name, strlen(name), &found)) {
+      return NULL;
+   }
+   return (anvil_schema_field)found;
+}
+
+size_t anvil_schema_field_get_name(anvil_schema_field field, char *buf, size_t buflen) {
+   return field && field->name ? copy_text(field->name, buf, buflen) : 0;
+}
+
+anvil_type_kind anvil_schema_field_get_kind(anvil_schema_field field) {
+   return field && field->has_kind ? field->kind : ANVIL_TYPE_UNKNOWN;
+}
+
+size_t anvil_schema_field_get_type_name(anvil_schema_field field, char *buf, size_t buflen) {
+   return field && field->type_name ? copy_text(field->type_name, buf, buflen) : 0;
+}
+
+bool anvil_schema_field_is_required(anvil_schema_field field) { return field && field->required; }
+bool anvil_schema_field_is_nullable(anvil_schema_field field) { return field && field->nullable; }
+bool anvil_schema_field_is_integer(anvil_schema_field field) { return field && field->integer; }
+
+bool anvil_schema_field_get_size(anvil_schema_field field, long long *out_size) {
+   if (!field || !out_size || !field->has_size) {
+      return false;
+   }
+   *out_size = field->size;
+   return true;
+}
+
+bool anvil_schema_field_get_min_numeric(anvil_schema_field field, anvil_numeric_t *out_min) {
+   if (!field || !out_min || !field->has_min) {
+      return false;
+   }
+   *out_min = field->min;
+   return true;
+}
+
+bool anvil_schema_field_get_max_numeric(anvil_schema_field field, anvil_numeric_t *out_max) {
+   if (!field || !out_max || !field->has_max) {
+      return false;
+   }
+   *out_max = field->max;
+   return true;
+}
+
+bool anvil_schema_field_get_min_items(anvil_schema_field field, long long *out) {
+   if (!field || !out || !field->has_min_items) {
+      return false;
+   }
+   *out = field->min_items;
+   return true;
+}
+
+bool anvil_schema_field_get_max_items(anvil_schema_field field, long long *out) {
+   if (!field || !out || !field->has_max_items) {
+      return false;
+   }
+   *out = field->max_items;
+   return true;
+}
+
+size_t anvil_schema_field_get_value_count(anvil_schema_field field) {
+   return field && field->values ? (size_t)List.size(field->values) : 0;
+}
+
+size_t anvil_schema_field_get_value(anvil_schema_field field, size_t index, char *buf,
+                                    size_t buflen) {
+   if (!field || !field->values || index >= (size_t)List.size(field->values)) {
+      return 0;
+   }
+   char *label = NULL;
+   List.get(field->values, index, (object *)&label);
+   return label ? copy_text(label, buf, buflen) : 0;
+}
+
+size_t anvil_schema_field_get_format(anvil_schema_field field, char *buf, size_t buflen) {
+   return field && field->format ? copy_text(field->format, buf, buflen) : 0;
+}
+
+size_t anvil_schema_field_get_tag(anvil_schema_field field, char *buf, size_t buflen) {
+   return field && field->tag ? copy_text(field->tag, buf, buflen) : 0;
+}
+
+size_t anvil_schema_field_get_nested_count(anvil_schema_field field) {
+   return field && field->children ? (size_t)List.size(field->children) : 0;
+}
+
+anvil_schema_field anvil_schema_field_get_nested(anvil_schema_field field, size_t index) {
+   if (!field || !field->children || index >= (size_t)List.size(field->children)) {
+      return NULL;
+   }
+   struct anvil_schema_field_t *c = NULL;
+   List.get(field->children, index, (object *)&c);
+   return (anvil_schema_field)c;
+}
+
+anvil_schema_field anvil_schema_field_find_nested(anvil_schema_field field, const char *name) {
+   addr found = 0;
+   if (!field || !name || !field->child_by_name ||
+       !Map.get(field->child_by_name, name, strlen(name), &found)) {
+      return NULL;
+   }
+   return (anvil_schema_field)found;
+}
+
+anvil_schema_field anvil_schema_field_get_items(anvil_schema_field field) {
+   return field ? (anvil_schema_field)field->items : NULL;
+}
+
+size_t anvil_schema_field_get_extra_count(anvil_schema_field field) {
+   return field && field->extras ? (size_t)List.size(field->extras) : 0;
+}
+
+static struct schema_extra *extra_at(anvil_schema_field field, size_t index) {
+   if (!field || !field->extras || index >= (size_t)List.size(field->extras)) {
+      return NULL;
+   }
+   struct schema_extra *e = NULL;
+   List.get(field->extras, index, (object *)&e);
+   return e;
+}
+
+size_t anvil_schema_field_get_extra_name(anvil_schema_field field, size_t index, char *buf,
+                                         size_t buflen) {
+   struct schema_extra *e = extra_at(field, index);
+   return e ? copy_text(e->name, buf, buflen) : 0;
+}
+
+anvil_value anvil_schema_field_get_extra_value(anvil_schema_field field, size_t index) {
+   struct schema_extra *e = extra_at(field, index);
+   return e ? e->value : NULL;
 }

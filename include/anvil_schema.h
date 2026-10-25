@@ -250,3 +250,109 @@ size_t anvil_schema_diagnostic_get_field(anvil_schema_diagnostic diag, char *buf
  * @brief A human-readable description. Same buffer convention as get_field.
  */
 size_t anvil_schema_diagnostic_get_message(anvil_schema_diagnostic diag, char *buf, size_t buflen);
+
+/* ---------------------------------------------------------------------- *
+ * Introspection - read a loaded schema's rules back (read-only)
+ * ---------------------------------------------------------------------- */
+
+/**
+ * @brief Opaque handle to one field rule of a loaded schema (a top-level field, an Object rule's
+ * nested field, or an Array rule's element rule). Lifetime is tied to the schema it came from, and
+ * independent of the document the schema was loaded from.
+ */
+typedef struct anvil_schema_field_t *anvil_schema_field;
+
+/**
+ * @brief How many field rules the schema declares at its top level (a top-level statement that
+ * isn't a `{ ... }` rule is skipped, and reported as a diagnostic).
+ * @param schema The schema to read. NULL returns 0.
+ */
+size_t anvil_schema_get_field_count(anvil_schema schema);
+
+/**
+ * @brief The field rule at `index`, in declaration order.
+ * @return The handle, or NULL if schema is NULL or index is out of bounds.
+ */
+anvil_schema_field anvil_schema_get_field(anvil_schema schema, size_t index);
+
+/**
+ * @brief The top-level field rule named `name`.
+ * @return The handle, or NULL if schema or name is NULL, or there is no such field.
+ */
+anvil_schema_field anvil_schema_find_field(anvil_schema schema, const char *name);
+
+/**
+ * @brief The rule's name (for an Array's element rule, the empty string).
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full length (excluding NUL), regardless of buflen - same snprintf-style convention
+ * as anvil_statement_get_name. 0 if field is NULL.
+ *
+ * Every accessor below reports the EFFECTIVE rule: what the field declared inline, with whatever
+ * it didn't declare filled in from its resolved `types.X` - exactly what validation enforces.
+ */
+size_t anvil_schema_field_get_name(anvil_schema_field field, char *buf, size_t buflen);
+
+/**
+ * @brief The resolved kind (`Numeric`, `String`, ...). ANVIL_TYPE_UNKNOWN if the rule declares no
+ * `type :=`, or names one that doesn't resolve (that is also a load diagnostic).
+ */
+anvil_type_kind anvil_schema_field_get_kind(anvil_schema_field field);
+
+/**
+ * @brief The `type :=` as written, e.g. `Numeric` or `types.Int32` - how a consumer learns which
+ * custom type a field uses. Same buffer convention as get_name; 0 if none was declared.
+ */
+size_t anvil_schema_field_get_type_name(anvil_schema_field field, char *buf, size_t buflen);
+
+/// `required := true` (false for NULL).
+bool anvil_schema_field_is_required(anvil_schema_field field);
+/// `nullable := true`, declared or inherited (false for NULL).
+bool anvil_schema_field_is_nullable(anvil_schema_field field);
+/// `integer := true`, declared or inherited (false for NULL).
+bool anvil_schema_field_is_integer(anvil_schema_field field);
+
+/// Each constraint getter returns whether the constraint is declared (inline or inherited), the
+/// same "declared, not a default" convention as the type getters; `out` is untouched otherwise.
+bool anvil_schema_field_get_size(anvil_schema_field field, long long *out_size);
+bool anvil_schema_field_get_min_numeric(anvil_schema_field field, anvil_numeric_t *out_min);
+bool anvil_schema_field_get_max_numeric(anvil_schema_field field, anvil_numeric_t *out_max);
+bool anvil_schema_field_get_min_items(anvil_schema_field field, long long *out_min_items);
+bool anvil_schema_field_get_max_items(anvil_schema_field field, long long *out_max_items);
+
+/// The `values` labels. 0 / 0 when none are declared; same buffer convention as get_name.
+size_t anvil_schema_field_get_value_count(anvil_schema_field field);
+size_t anvil_schema_field_get_value(anvil_schema_field field, size_t index, char *buf, size_t buflen);
+
+/// The `format` name and the required blob `tag`; 0 when not declared. Same buffer convention.
+size_t anvil_schema_field_get_format(anvil_schema_field field, char *buf, size_t buflen);
+size_t anvil_schema_field_get_tag(anvil_schema_field field, char *buf, size_t buflen);
+
+/// An Object rule's nested field rules (`fields`), in declaration order; find by name. 0 / NULL
+/// when the rule declares none.
+size_t anvil_schema_field_get_nested_count(anvil_schema_field field);
+anvil_schema_field anvil_schema_field_get_nested(anvil_schema_field field, size_t index);
+anvil_schema_field anvil_schema_field_find_nested(anvil_schema_field field, const char *name);
+
+/// An Array rule's element rule (`items`), or NULL.
+anvil_schema_field anvil_schema_field_get_items(anvil_schema_field field);
+
+/**
+ * @brief Extension keys: every rule key the schema did not itself consume (a consumer's own
+ * annotations such as FlyWire's `pooled` and `mask`), in declaration order. They are never
+ * diagnostics - the schema reads what it knows and passes the rest on.
+ */
+size_t anvil_schema_field_get_extra_count(anvil_schema_field field);
+
+/// The key's name at `index`. Same buffer convention as get_name; 0 if out of bounds.
+size_t anvil_schema_field_get_extra_name(anvil_schema_field field, size_t index, char *buf,
+                                         size_t buflen);
+
+/**
+ * @brief The key's value, readable with the ordinary anvil_value accessors. It is a copy owned by
+ * the schema (so it stays valid after the source document is disposed) and lives until the schema
+ * is disposed - never dispose it.
+ * @return The value, or NULL if index is out of bounds or the value could not be copied (a
+ * `$variable` reference cannot be, since a copy has no document to resolve it against).
+ */
+anvil_value anvil_schema_field_get_extra_value(anvil_schema_field field, size_t index);

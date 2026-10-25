@@ -2006,6 +2006,286 @@ static void test_sch73_format_nested_and_nullable(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-schema-005 — introspection
+ * ---------------------------------------------------------------------- */
+static void fname_is(anvil_schema_field f, const char *expected, const char *label) {
+   char buf[64] = {0};
+   size_t len = anvil_schema_field_get_name(f, buf, sizeof(buf));
+   TestBit.is_true(f != NULL && strcmp(buf, expected) == 0 && len == strlen(expected), label);
+}
+
+static void test_sch74_fields_in_order_and_find(void) {
+   anvil_document sdoc = anvil_load_buffer(
+      "#!aml\n@[schema]\na := { type := Numeric; };\nb := { type := String; };\nc := { required := true; };\nnot_a_rule := 5;\n",
+      strlen("#!aml\n@[schema]\na := { type := Numeric; };\nb := { type := String; };\nc := { required := true; };\nnot_a_rule := 5;\n"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH74: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(3, (long long)anvil_schema_get_field_count(schema),
+                           "SCH74: three rules (the non-rule statement is skipped)");
+      fname_is(anvil_schema_get_field(schema, 0), "a", "SCH74: first is a");
+      fname_is(anvil_schema_get_field(schema, 1), "b", "SCH74: second is b");
+      fname_is(anvil_schema_get_field(schema, 2), "c", "SCH74: third is c");
+      TestBit.is_true(anvil_schema_find_field(schema, "b") == anvil_schema_get_field(schema, 1),
+                      "SCH74: find_field(\"b\") is index 1's handle");
+      TestBit.is_true(anvil_schema_find_field(schema, "nope") == NULL, "SCH74: find of a missing name");
+      TestBit.is_true(anvil_schema_find_field(schema, "not_a_rule") == NULL,
+                      "SCH74: a skipped statement is not a field");
+      TestBit.is_true(anvil_schema_get_field(schema, 3) == NULL, "SCH74: out-of-bounds index");
+      TestBit.is_equal_int(ANVIL_TYPE_NUMERIC, anvil_schema_field_get_kind(anvil_schema_get_field(schema, 0)),
+                           "SCH74: a is Numeric");
+      TestBit.is_equal_int(ANVIL_TYPE_UNKNOWN, anvil_schema_field_get_kind(anvil_schema_get_field(schema, 2)),
+                           "SCH74: an untyped rule has no kind");
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_type_name(anvil_schema_get_field(schema, 2), NULL, 0),
+                           "SCH74: and no type name");
+      TestBit.is_true(!anvil_schema_field_is_required(anvil_schema_get_field(schema, 0)) &&
+                         anvil_schema_field_is_required(anvil_schema_get_field(schema, 2)),
+                      "SCH74: required reads back");
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch75_null_safety(void) {
+   char buf[8] = "x";
+   anvil_numeric_t n;
+   long long ll;
+   TestBit.is_equal_int(0, (long long)anvil_schema_get_field_count(NULL), "SCH75: count(NULL)");
+   TestBit.is_true(anvil_schema_get_field(NULL, 0) == NULL, "SCH75: get_field(NULL)");
+   TestBit.is_true(anvil_schema_find_field(NULL, "a") == NULL, "SCH75: find_field(NULL)");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_name(NULL, buf, sizeof(buf)), "SCH75: name");
+   TestBit.is_equal_int(ANVIL_TYPE_UNKNOWN, anvil_schema_field_get_kind(NULL), "SCH75: kind");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_type_name(NULL, buf, sizeof(buf)), "SCH75: type name");
+   TestBit.is_true(!anvil_schema_field_is_required(NULL) && !anvil_schema_field_is_nullable(NULL) &&
+                      !anvil_schema_field_is_integer(NULL), "SCH75: flags");
+   TestBit.is_true(!anvil_schema_field_get_size(NULL, &ll) && !anvil_schema_field_get_min_numeric(NULL, &n) &&
+                      !anvil_schema_field_get_max_numeric(NULL, &n) &&
+                      !anvil_schema_field_get_min_items(NULL, &ll) && !anvil_schema_field_get_max_items(NULL, &ll),
+                   "SCH75: constraint getters");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_value_count(NULL), "SCH75: value count");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_value(NULL, 0, buf, sizeof(buf)), "SCH75: value");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_format(NULL, buf, sizeof(buf)), "SCH75: format");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_tag(NULL, buf, sizeof(buf)), "SCH75: tag");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_nested_count(NULL), "SCH75: nested count");
+   TestBit.is_true(anvil_schema_field_get_nested(NULL, 0) == NULL && anvil_schema_field_find_nested(NULL, "a") == NULL &&
+                      anvil_schema_field_get_items(NULL) == NULL, "SCH75: nested/items");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_extra_count(NULL), "SCH75: extra count");
+   TestBit.is_equal_int(0, (long long)anvil_schema_field_get_extra_name(NULL, 0, buf, sizeof(buf)), "SCH75: extra name");
+   TestBit.is_true(anvil_schema_field_get_extra_value(NULL, 0) == NULL, "SCH75: extra value");
+}
+
+static void test_sch76_constraints_read_back_as_enforced(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_introspect_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH76: schema loaded");
+   if (schema) {
+      char buf[64];
+      long long ll = 0;
+      anvil_numeric_t n;
+
+      anvil_schema_field id = anvil_schema_find_field(schema, "id");
+      TestBit.is_equal_int(ANVIL_TYPE_NUMERIC, anvil_schema_field_get_kind(id), "SCH76: id kind from its type");
+      anvil_schema_field_get_type_name(id, buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "types.Id32") == 0, "SCH76: id's type name as written");
+      TestBit.is_true(anvil_schema_field_is_required(id) && anvil_schema_field_is_integer(id) &&
+                         !anvil_schema_field_is_nullable(id), "SCH76: required inline, integer inherited");
+      TestBit.is_true(anvil_schema_field_get_min_numeric(id, &n) && n.is_integral && n.as_int64 == 0,
+                      "SCH76: inherited min");
+      TestBit.is_true(anvil_schema_field_get_max_numeric(id, &n) && n.as_int64 == 2147483647,
+                      "SCH76: inherited max");
+      TestBit.is_false(anvil_schema_field_get_size(id, &ll), "SCH76: undeclared size is not a default");
+
+      anvil_schema_field status = anvil_schema_find_field(schema, "status");
+      TestBit.is_equal_int(ANVIL_TYPE_ENUM, anvil_schema_field_get_kind(status), "SCH76: enum kind");
+      TestBit.is_true(anvil_schema_field_is_nullable(status), "SCH76: nullable inline");
+      TestBit.is_equal_int(2, (long long)anvil_schema_field_get_value_count(status), "SCH76: two inherited values");
+      TestBit.is_equal_int(6, (long long)anvil_schema_field_get_value(status, 1, buf, sizeof(buf)),
+                           "SCH76: value 1 length");
+      TestBit.is_true(strcmp(buf, "closed") == 0, "SCH76: value 1 is closed");
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_value(status, 2, buf, sizeof(buf)),
+                           "SCH76: value index out of bounds");
+
+      anvil_schema_field created = anvil_schema_find_field(schema, "created");
+      TestBit.is_equal_int(16, (long long)anvil_schema_field_get_format(created, buf, sizeof(buf)),
+                           "SCH76: inherited format length");
+      TestBit.is_true(strcmp(buf, "iso8601_datetime") == 0, "SCH76: inherited format");
+
+      anvil_schema_field img = anvil_schema_find_field(schema, "img");
+      TestBit.is_equal_int(ANVIL_TYPE_BLOB, anvil_schema_field_get_kind(img), "SCH76: blob kind");
+      anvil_schema_field_get_tag(img, buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "png") == 0, "SCH76: inherited tag");
+      TestBit.is_true(anvil_schema_field_get_size(img, &ll) && ll == 100, "SCH76: inline size");
+
+      anvil_schema_field score = anvil_schema_find_field(schema, "score");
+      TestBit.is_true(anvil_schema_field_get_min_numeric(score, &n) && !n.is_integral && n.as_double == 0.5,
+                      "SCH76: fractional min");
+      TestBit.is_true(anvil_schema_field_get_max_numeric(score, &n) && n.as_double == 1000.0,
+                      "SCH76: exponent max");
+
+      anvil_schema_field labels = anvil_schema_find_field(schema, "labels");
+      TestBit.is_true(anvil_schema_field_get_min_items(labels, &ll) && ll == 1, "SCH76: min_items");
+      TestBit.is_true(anvil_schema_field_get_max_items(labels, &ll) && ll == 5, "SCH76: max_items");
+      TestBit.is_false(anvil_schema_field_get_min_items(score, &ll), "SCH76: undeclared min_items");
+
+      // Agreement with validation: what reads back as min is what validation enforces.
+      const char *bad = "#!aml\nid := -1;\n";
+      anvil_document ddoc = anvil_load_buffer(bad, strlen(bad));
+      if (ddoc) {
+         anvil_schema_validate(schema, ddoc);
+         char path[16] = {0};
+         anvil_schema_violation_get_field(anvil_schema_get_violation(schema, 0), path, sizeof(path));
+         TestBit.is_true(strcmp(path, "id") == 0 &&
+                            anvil_schema_violation_get_category(anvil_schema_get_violation(schema, 0)) ==
+                               ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
+                         "SCH76: -1 violates the min that introspection reported");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch77_extension_keys(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_introspect_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH77: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH77: extension keys are not diagnostics");
+      anvil_schema_field id = anvil_schema_find_field(schema, "id");
+      TestBit.is_equal_int(2, (long long)anvil_schema_field_get_extra_count(id),
+                           "SCH77: pooled and mask are the extras (type/required are not)");
+      char name[32] = {0};
+      anvil_schema_field_get_extra_name(id, 0, name, sizeof(name));
+      TestBit.is_true(strcmp(name, "pooled") == 0, "SCH77: first extra is pooled");
+      anvil_value pooled = anvil_schema_field_get_extra_value(id, 0);
+      char text[32] = {0};
+      anvil_value_get_text(pooled, text, sizeof(text));
+      TestBit.is_true(pooled && anvil_value_get_type(pooled) == ANVIL_VALUE_BOOL && strcmp(text, "true") == 0,
+                      "SCH77: pooled := true is a readable BOOL");
+      anvil_schema_field_get_extra_name(id, 1, name, sizeof(name));
+      TestBit.is_true(strcmp(name, "mask") == 0, "SCH77: second extra is mask");
+      anvil_value mask = anvil_schema_field_get_extra_value(id, 1);
+      TestBit.is_true(mask && anvil_value_get_type(mask) == ANVIL_VALUE_ARRAY &&
+                         anvil_value_get_count(mask) == 3, "SCH77: mask is a 3-element ARRAY");
+      anvil_numeric_t third = anvil_value_get_numeric(anvil_value_get_element(mask, 2));
+      TestBit.is_true(third.is_integral && third.as_int64 == 4, "SCH77: mask[2] reads as 4");
+      TestBit.is_true(anvil_schema_field_get_extra_value(id, 2) == NULL, "SCH77: extra index out of bounds");
+
+      anvil_schema_field bare = anvil_schema_find_field(schema, "bare");
+      TestBit.is_equal_int(1, (long long)anvil_schema_field_get_extra_count(bare),
+                           "SCH77: an untyped FlyWire-style rule is all extras");
+      TestBit.is_equal_int(ANVIL_TYPE_UNKNOWN, anvil_schema_field_get_kind(bare), "SCH77: with no kind");
+
+      anvil_schema_field items = anvil_schema_field_get_items(anvil_schema_find_field(schema, "labels"));
+      TestBit.is_equal_int(1, (long long)anvil_schema_field_get_extra_count(items),
+                           "SCH77: extras on a nested (items) rule too");
+      anvil_value note = anvil_schema_field_get_extra_value(items, 0);
+      anvil_value_get_text(note, text, sizeof(text));
+      TestBit.is_true(note && anvil_value_get_type(note) == ANVIL_VALUE_STRING && strcmp(text, "item") == 0,
+                      "SCH77: a string extra keeps its content (unquoted)");
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch78_nested_rules_reachable(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_introspect_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH78: schema loaded");
+   if (schema) {
+      anvil_schema_field owner = anvil_schema_find_field(schema, "owner");
+      TestBit.is_equal_int(2, (long long)anvil_schema_field_get_nested_count(owner), "SCH78: two nested fields");
+      fname_is(anvil_schema_field_get_nested(owner, 0), "uid", "SCH78: first nested is uid");
+      fname_is(anvil_schema_field_get_nested(owner, 1), "nick", "SCH78: second nested is nick");
+      anvil_schema_field uid = anvil_schema_field_find_nested(owner, "uid");
+      TestBit.is_true(uid == anvil_schema_field_get_nested(owner, 0) && anvil_schema_field_is_required(uid),
+                      "SCH78: find_nested and nested rule flags");
+      TestBit.is_true(anvil_schema_field_find_nested(owner, "zzz") == NULL, "SCH78: missing nested name");
+      TestBit.is_true(anvil_schema_field_get_nested(owner, 2) == NULL, "SCH78: nested index out of bounds");
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_nested_count(anvil_schema_find_field(schema, "name")),
+                           "SCH78: a scalar rule has no nested fields");
+
+      anvil_schema_field labels = anvil_schema_find_field(schema, "labels");
+      anvil_schema_field items = anvil_schema_field_get_items(labels);
+      TestBit.is_not_null(items, "SCH78: the Array rule exposes its items rule");
+      TestBit.is_equal_int(ANVIL_TYPE_STRING, anvil_schema_field_get_kind(items), "SCH78: items kind");
+      TestBit.is_equal_int(2, (long long)anvil_schema_field_get_value_count(items), "SCH78: items values");
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_name(items, NULL, 0), "SCH78: items rule name is empty");
+      TestBit.is_true(anvil_schema_field_get_items(anvil_schema_find_field(schema, "name")) == NULL,
+                      "SCH78: a scalar rule has no items rule");
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch79_introspection_outlives_the_documents(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_introspect_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   if (sdoc) {
+      anvil_dispose(sdoc); // the schema must not lean on it
+   }
+   TestBit.is_not_null(schema, "SCH79: schema loaded");
+   if (schema) {
+      anvil_schema_field id = anvil_schema_find_field(schema, "id");
+      anvil_value mask = anvil_schema_field_get_extra_value(id, 1);
+      char buf[32] = {0};
+      TestBit.is_true(mask && anvil_value_get_count(mask) == 3, "SCH79: extras readable after disposal");
+      anvil_schema_field_get_type_name(id, buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "types.Id32") == 0, "SCH79: type name readable");
+      anvil_schema_field_get_format(anvil_schema_find_field(schema, "created"), buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "iso8601_datetime") == 0, "SCH79: format readable");
+      anvil_schema_field_get_value(anvil_schema_find_field(schema, "status"), 0, buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "open") == 0, "SCH79: values readable");
+      anvil_schema_dispose(schema);
+   }
+}
+
+static void test_sch80_extra_value_kinds(void) {
+   const char *src =
+      "#!aml\n@[schema]\n"
+      "f := { n := 7; s := \"a b\\\"c\"; b := @png`bytes here`; o := { k := 1; }; t := ( 1, 2 ); z := null; w := bareword; };\n";
+   anvil_document sdoc = anvil_load_buffer(src, strlen(src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+   TestBit.is_not_null(schema, "SCH80: schema loaded");
+   if (schema) {
+      anvil_schema_field f = anvil_schema_find_field(schema, "f");
+      TestBit.is_equal_int(7, (long long)anvil_schema_field_get_extra_count(f), "SCH80: seven extras");
+      const anvil_value_type want[] = {ANVIL_VALUE_NUMERIC, ANVIL_VALUE_STRING, ANVIL_VALUE_BLOB,
+                                       ANVIL_VALUE_OBJECT, ANVIL_VALUE_TUPLE, ANVIL_VALUE_NULL,
+                                       ANVIL_VALUE_BARE};
+      for (size_t i = 0; i < 7; i++) {
+         anvil_value v = anvil_schema_field_get_extra_value(f, i);
+         TestBit.is_true(v && anvil_value_get_type(v) == want[i], "SCH80: each extra keeps its kind");
+      }
+      char tag[16] = {0}, bytes[32] = {0};
+      anvil_value b = anvil_schema_field_get_extra_value(f, 2);
+      anvil_value_get_blob_tag(b, tag, sizeof(tag));
+      size_t blen = anvil_value_get_bytes(b, bytes, sizeof(bytes));
+      TestBit.is_true(strcmp(tag, "png") == 0 && blen == 10 && memcmp(bytes, "bytes here", 10) == 0,
+                      "SCH80: a blob extra keeps its tag and payload");
+      char sbytes[32] = {0};
+      anvil_value_get_bytes(anvil_schema_field_get_extra_value(f, 1), sbytes, sizeof(sbytes));
+      TestBit.is_true(strcmp(sbytes, "a b\\\"c") == 0, "SCH80: a string extra keeps its escapes verbatim");
+      TestBit.is_equal_int(1, (long long)anvil_value_get_count(anvil_schema_field_get_extra_value(f, 3)),
+                           "SCH80: an object extra keeps its members");
+      anvil_schema_dispose(schema);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -2153,6 +2433,21 @@ int main(void) {
                   test_sch72_unknown_format_is_a_diagnostic, th);
    TestBit.run_ex("SCH73_FORMAT_NESTED_AND_NULLABLE", NULL,
                   test_sch73_format_nested_and_nullable, th);
+
+   TestBit.run_ex("SCH74_FIELDS_IN_ORDER_AND_FIND", NULL,
+                  test_sch74_fields_in_order_and_find, th);
+   TestBit.run_ex("SCH75_NULL_SAFETY", NULL,
+                  test_sch75_null_safety, th);
+   TestBit.run_ex("SCH76_CONSTRAINTS_READ_BACK_AS_ENFORCED", NULL,
+                  test_sch76_constraints_read_back_as_enforced, th);
+   TestBit.run_ex("SCH77_EXTENSION_KEYS", NULL,
+                  test_sch77_extension_keys, th);
+   TestBit.run_ex("SCH78_NESTED_RULES_REACHABLE", NULL,
+                  test_sch78_nested_rules_reachable, th);
+   TestBit.run_ex("SCH79_INTROSPECTION_OUTLIVES_THE_DOCUMENTS", NULL,
+                  test_sch79_introspection_outlives_the_documents, th);
+   TestBit.run_ex("SCH80_EXTRA_VALUE_KINDS", NULL,
+                  test_sch80_extra_value_kinds, th);
 
    return TestBit.report();
 }

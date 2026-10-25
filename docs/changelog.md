@@ -114,6 +114,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic (`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the
   constraint is treated as not declared. New `anvil_type_def_get_format`.
 
+- **Schema introspection** (`FR-2610-anvl-schema-005`): a loaded schema can be read back, read-only.
+  `anvil_schema_get_field_count` / `get_field` / `find_field` (declaration order) and
+  `anvil_schema_field_get_*`: name, kind, the `type :=` as written (`types.Id32`), `required`,
+  `nullable`, `integer`, and every constraint (`size`, `min`/`max` in numeric form, `min_items` /
+  `max_items`, `values`, `format`, `tag`) with the "declared, not a default" convention. Settings are
+  the effective ones - what validation enforces, inherited constraints included. Nested rules are
+  reachable through `get_nested` / `find_nested` / `get_items`. Rule keys the schema doesn't consume
+  (FlyWire's `pooled`, `mask`) are exposed as extras (`get_extra_count/_name/_value`) on any rule at
+  any depth; each value is a schema-owned copy readable with the ordinary `anvil_value` accessors and
+  valid after the source document is disposed. This lets FlyWire stop parsing the schema document
+  in parallel with AnvilSchema.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
