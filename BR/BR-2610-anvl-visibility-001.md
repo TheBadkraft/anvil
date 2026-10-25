@@ -58,7 +58,7 @@ Checked against `main` at `1ed7e1c`. `make so-release` into a scratch directory,
 
 ## Resolution
 
-Branch `fix/BR-2610-anvl-visibility-001`, merged to `main`.
+Branch `fix/BR-2610-anvl-visibility-001`, commit `003e843`, merged to `main`.
 
 - Both headers carry the `push(default)` / `pop` wrapper and comment.
 - `make check-exports` (builds `so-release`, then `scripts/check-exports.sh`): every function declared
