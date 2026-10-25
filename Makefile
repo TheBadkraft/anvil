@@ -104,7 +104,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports
 
 all: lib so
 
@@ -129,13 +129,13 @@ $(LIB_RELEASE): $(RELEASE_OBJS)
 	$(AR) rcs $@ $^
 	$(STRIP) --strip-debug --strip-unneeded $@
 
-$(SO_DEBUG): $(DEBUG_OBJS)
+$(SO_DEBUG): $(DEBUG_OBJS) libanvil.exports
 	@mkdir -p $(DEBUG_DIR)
-	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
+	$(CC) -shared -Wl,-soname,libanvil.so -Wl,--version-script=libanvil.exports -o $@ $(filter-out libanvil.exports,$^)
 
-$(SO_RELEASE): $(RELEASE_OBJS)
+$(SO_RELEASE): $(RELEASE_OBJS) libanvil.exports
 	@mkdir -p $(RELEASE_DIR)
-	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
+	$(CC) -shared -Wl,-soname,libanvil.so -Wl,--version-script=libanvil.exports -o $@ $(filter-out libanvil.exports,$^)
 	$(STRIP) --strip-debug --strip-unneeded $@
 
 $(DEBUG_OBJ)/%.o: src/%.c
@@ -153,6 +153,11 @@ $(RELEASE_OBJ)/%.o: src/%.c
 # anvil_writer_*/anvil_builder_* function or `Writer`/`Builder` vtable symbol, and a program using only the reader API links
 # against it. The full bundle must still carry both.
 READER_ONLY_DIR = build/reader-only
+# Every function declared in a public header must be exported from the release shared object, and
+# no internal symbol may be (scripts/check-exports.sh).
+check-exports: so-release
+	sh scripts/check-exports.sh $(SO_RELEASE) include
+
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release
 	$(MAKE) WITH_WRITER=1 RELEASE_DIR=$(READER_ONLY_DIR)/full-lib RELEASE_OBJ=$(READER_ONLY_DIR)/full-obj lib-release

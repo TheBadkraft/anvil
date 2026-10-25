@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent (roadmap addendum A1)
 **Filed:** 2026-10-25
 **Filed by:** anvil (planning), from the coder agent's own finding in FR-2610-anvl-types-001
-**Status:** open
+**Status:** resolved
 **Blocks:** FR-2610-anvl-public-api-003, the `anvil.py`/`anvil.net`/`anvil.java` slices of
 FR-2610-anvl-bindings-001, and any release that ships `libanvil.so`
 **Tags:** abi, visibility, shared-library, schema, types, rivet-readiness
@@ -55,3 +55,25 @@ Checked against `main` at `1ed7e1c`. `make so-release` into a scratch directory,
    (the guarantee from `d27bdaf`).
 4. Full unit suite green; `test_release` green; Valgrind-clean on schema and types.
 5. Changelog entry under `## [Unreleased]` → `### Fixed`.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-visibility-001`, merged to `main`.
+
+- Both headers carry the `push(default)` / `pop` wrapper and comment.
+- `make check-exports` (builds `so-release`, then `scripts/check-exports.sh`): every function declared
+  in `include/anvil_*.h` (declarations starting in column 0, plus the `extern const` vtable objects) must
+  appear in `nm -D --defined-only`, and no internal symbol may. Test case 2 verified by hand: with the
+  schema header's pragma changed to `hidden` the gate fails listing every `anvil_schema_*` symbol;
+  restored, it passes (161 public symbols).
+- **Test case 3 needed more than the wrapper.** `Allocator` (a sigma global from the prebuilt
+  `/usr/local/packages/sigma.system.alloc.o`, outside `-fvisibility=hidden`'s reach) was exported from
+  `libanvil.so`: the cross-addon collision risk `d27bdaf` fixed, still open for that one symbol. A
+  version script `libanvil.exports` (global: `anvil_*` and the ten vtable objects; local: everything else)
+  now defines the exported set. A new public vtable object (e.g. FR-2610-anvl-public-api-003's
+  `Schema`/`TypeRegistry`) must be added to the map, and `check-exports` fails until it is.
+- `include/anvil.h` is not scanned: it declares only the legacy internal `Anvl` vtable, which must stay hidden.
+- Real-consumer check: a C program linked against `libanvil.so` loads a schema, validates, and reads a
+  violation.
+- Unit suites green (counts unchanged), `test_release`, `check-reader-only`, Valgrind-clean on
+  schema and types. Debug and release `.so` both link with the map.
