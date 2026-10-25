@@ -62,7 +62,7 @@ Soft: FR-2610-anvl-types-001 (pass-through of registry diagnostics).
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-schema-004`, merged to `main`. Tests SCH25–SCH32 (`test_schema.c`), fixture
+Branch `feat/FR-2610-anvl-schema-004`, commit `c60eaed`, merged to `main`. Tests SCH25–SCH32 (`test_schema.c`), fixture
 `schema_dup_types_consumer.anvl`. Full unit regression green with unchanged counts elsewhere,
 `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
 
