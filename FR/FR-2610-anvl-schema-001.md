@@ -65,7 +65,7 @@ None hard. Nested `fields` inherits the BR-2610-anvl-types-001 and BR-2610-anvl-
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-schema-001`, merged to `main`. Tests SCH41–SCH50 (`test_schema.c`) and TYP27
+Branch `feat/FR-2610-anvl-schema-001`, commit `4477bc1`, merged to `main`. Tests SCH41–SCH50 (`test_schema.c`) and TYP27
 (`test_types.c`); fixtures `schema_nested_*`, `schema_selfref_*`. Full unit regression green with
 unchanged counts elsewhere (SCH01–SCH40 are the regression for top-level behavior and path strings),
 `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
