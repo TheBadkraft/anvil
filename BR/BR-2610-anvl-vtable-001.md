@@ -48,7 +48,7 @@ test for its two headers.
 
 ## Resolution
 
-Branch `fix/BR-2610-anvl-vtable-001`, merged to `main`. Tests VT10 and VT11 in `test_anvil_vtable.c`.
+Branch `fix/BR-2610-anvl-vtable-001`, commit `1c34198`, merged to `main`. Tests VT10 and VT11 in `test_anvil_vtable.c`.
 Unit suites green (counts unchanged elsewhere), `test_release`, `check-exports`, `check-reader-only`
 green, Valgrind-clean on vtable, native, schema, types.
 
