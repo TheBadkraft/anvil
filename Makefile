@@ -104,7 +104,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit
 
 all: lib so
 
@@ -157,6 +157,15 @@ READER_ONLY_DIR = build/reader-only
 # no internal symbol may be (scripts/check-exports.sh).
 check-exports: so-release
 	sh scripts/check-exports.sh $(SO_RELEASE) include
+
+# Compile-only check of the code that must be correct where size_t is 32 bits (wasm32, 32-bit ARM):
+# -Werror turns any silent 64->32 constant truncation into a failure. Needs the 32-bit libc headers
+# (gcc-multilib); skips with a message when they are absent. Emscripten reproduces it too.
+check-32bit:
+	@if echo '#include <stdint.h>' | $(CC) -m32 -E -x c - >/dev/null 2>&1; then \
+		$(CC) -m32 -std=$(STD) -Wall -Wextra -Werror -Woverflow $(INCLUDE) $(DEFS) -c src/writer/grammar.c -o /dev/null && \
+		echo "check-32bit OK: src/writer/grammar.c compiles clean with -m32"; \
+	else echo "check-32bit SKIPPED: no -m32 headers here (install gcc-multilib, or build with emcc)"; fi
 
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release

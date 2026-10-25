@@ -5,7 +5,7 @@
 **Owner:** anvl, to be worked by the ANVL coder agent
 **Filed:** 2026-10-25
 **Filed by:** ANVL Bindings agent, found building `anvil.wasm` against `e6a86b0` (SR-2610-anvl-vendor-bump-001)
-**Status:** open
+**Status:** resolved
 **Blocks:** nothing today; should land before FR-2610-anvl-bindings-002 exposes the writer to JS and before SR-2610-anvl-distribution-001 publishes `anvil-wasm`
 **Tags:** writer, portability, wasm, hash
 
@@ -77,3 +77,27 @@ already does:
   that warning, so it is probably fine, but nobody has checked what the value does on 32-bit.
 - Verification path for the Bindings agent afterwards: bump `anvil.wasm`'s pin, rebuild on the
   Linode box (`build.sh`), and confirm the warning is gone.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-writer-001`, commit `9635f58`, merged to `main`. Tests W18-W19 in `test_writer.c`. Full unit regression
+green with unchanged counts elsewhere (writer 17 -> 19), `test_release`, `check-exports`,
+`check-reader-only` green, Valgrind-clean on writer, writer_roundtrip and builder.
+
+- `hash_name` is now `uint64_t wg_hash_name` (declared in `src/writer/grammar.h` as the test seam):
+  `UINT64_C` constants, `uint64_t` accumulator, and `slot_for()` folds to `size_t` only to index the
+  table, in both `wg_nameset_add` and `nameset_grow`. A `_Static_assert(sizeof(uint64_t) == 8)` guards it.
+- **W18** pins the published vectors (`""` = `0xcbf29ce484222325`, `"a"` = `0xaf63dc4c8601ec8c`, plus
+  `"foobar"` = `0x85944171f73967e8`); as the ticket says, it passes before and after on a 64-bit build.
+  **W19** inserts 1500 names (several `nameset_grow` passes, capacity >= 4096), then re-inserts all of
+  them: every repeat is a duplicate, the count is exact.
+- **The bug is not reproducible on this machine.** There are no 32-bit libc headers (`-m32` fails at
+  `stdint.h`), no `clang`, no `emcc`. What I did instead: compiled the *old* function body against a
+  32-bit stand-in for `size_t` with `-Wall -Wextra -Werror -Woverflow`, which fails with "changes value
+  from 14695981039346656037 to 2216829733"; the new shape compiles clean. `make check-32bit` runs the
+  real file with `-m32 -Werror` wherever the headers exist and prints SKIPPED otherwise. **Final proof
+  is the Bindings agent's rebuild of `anvil.wasm` on the Linode box: the warning should be gone.**
+- **Notes item (source.c):** `Source.hash`, `anvl_source_t.hash` and the registry keys are `uint64_t`
+  end to end (`source_registry.c` keys on `sizeof(uint64_t)` bytes), and `source_compute_hash` uses
+  `UINT64_C` constants and `uint64_t`/`memcpy`. Nothing is narrowed to `size_t`, so it behaves the same
+  on 32-bit. No change needed.
