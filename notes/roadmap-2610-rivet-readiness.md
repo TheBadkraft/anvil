@@ -1,8 +1,8 @@
 # Roadmap: rivet-readiness (types, schema, bindings)
 
 > **NOTE to the ANVL coder agent: follow this roadmap strictly.**
-> - Your scope is **Phases 1–3 plus Addendum A1**: the native tickets numbered 1–12 below, in
->   that order, then A1,
+> - Your scope is **Phases 1–3 plus Addendum A1–A2**: the native tickets numbered 1–12 below, in
+>   that order, then A1 and A2,
 >   plus the `SR-2610-anvl-docs-001` items mapped to them. Phases 4–5 are listed for sequencing
 >   only. They belong to the ANVL Bindings agent, so don't start them.
 > - Work **only** on tickets named in Phases 1–3. If a ticket in `BR/`, `FR/` or `SR/` isn't listed
@@ -109,6 +109,11 @@ A1. **BR-2610-anvl-visibility-001**: `anvil_schema.h`/`anvil_type_registry.h` ge
     `visibility push(default)` wrapper, plus a `make check-exports` gate. Found in the coder's own
     FR-2610-anvl-types-001 findings. It blocks `FR-2610-anvl-public-api-003` and the
     py/net/java binding slices. It doesn't block `anvil.node`/`anvil.wasm`.
+A2. **BR-2610-anvl-vtable-001**: append `get_path` to the `Document` vtable, plus a vtable
+    completeness test (every flat function has a member). Also from FR-2610-anvl-types-001's
+    findings.
+
+Both must be merged before the Bindings agent starts Phase 4.
 
 ## Phase 4: bindings (separate repos; can overlap Phase 3) [ANVL Bindings agent, not the coder agent]
 
