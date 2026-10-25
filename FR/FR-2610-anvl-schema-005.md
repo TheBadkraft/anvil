@@ -58,7 +58,7 @@ gain accessors here as they land).
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-schema-005`, merged to `main`. Tests SCH74-SCH80 (`test_schema.c`); fixtures
+Branch `feat/FR-2610-anvl-schema-005`, commit `b0cc952`, merged to `main`. Tests SCH74-SCH80 (`test_schema.c`); fixtures
 `schema_introspect_*`. Full unit regression green with unchanged counts elsewhere, `test_release`
 and `make check-reader-only` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable,
 document, resolver (SCH79/SCH80 read everything after the source document is disposed). Docs:
