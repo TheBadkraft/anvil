@@ -24,6 +24,15 @@
 #include "anvil_types.h"
 #include <stddef.h>
 
+// The library is built with -fvisibility=hidden (src/sigma/* and other internals must never
+// leak into a consumer's global dynamic symbol table -- see notes/symbol-visibility.md); this
+// pragma pins every declaration below back to default visibility so the public ABI stays
+// exported from libanvil.so exactly as before. `make check-exports` fails if a public header
+// forgets it.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /**
  * @brief Opaque handle to a loaded schema — a ruleset built from a
  * @[schema]-attributed document's own top-level statements, each treated
@@ -356,3 +365,7 @@ size_t anvil_schema_field_get_extra_name(anvil_schema_field field, size_t index,
  * `$variable` reference cannot be, since a copy has no document to resolve it against).
  */
 anvil_value anvil_schema_field_get_extra_value(anvil_schema_field field, size_t index);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif

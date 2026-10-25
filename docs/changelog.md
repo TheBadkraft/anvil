@@ -158,6 +158,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **`libanvil.so` now exports the schema and type-registry API** (`BR-2610-anvl-visibility-001`):
+  `anvil_schema.h` and `anvil_type_registry.h` lacked the `visibility push(default)` wrapper the other
+  public headers carry, so with `-fvisibility=hidden` every `anvil_schema_*` / `anvil_type_*` function
+  was missing from the shared object, and `anvil.py`/`anvil.net`/`anvil.java` could parse but not use
+  types or schema. Both headers now carry it. New `make check-exports` (`scripts/check-exports.sh`)
+  fails when any function or vtable object declared in a public header is not exported, or when an
+  internal symbol is. A linker version script (`libanvil.exports`) now defines the exported set exactly,
+  which also hides `Allocator`, a global from the precompiled `sigma.system.alloc.o` that
+  `-fvisibility=hidden` cannot reach.
 - **Numeric constraints and values are no longer truncated** (`BR-2610-anvl-types-001`): schema and
   type `min`/`max` were read with `strtoll`, so `min := 0.5` became `0`, data `3.7` passed
   `max := 3`, `5e+10` read as `5`, and text past 31 characters was cut. Both now read through

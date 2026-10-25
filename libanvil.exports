@@ -1,0 +1,13 @@
+/* Linker version script for libanvil.so: the exported ABI is exactly the public functions and
+ * vtable objects. -fvisibility=hidden already hides our own internals; this also hides what it
+ * cannot reach - symbols from precompiled objects such as sigma.system.alloc.o's `Allocator`
+ * (BR-2610-anvl-visibility-001). A new public vtable object must be added here; `make
+ * check-exports` fails until it is. */
+{
+  global:
+    anvil_*;
+    Anvil; Attribute; Builder; Document; DocumentIterator; Error;
+    Statement; StatementIterator; Value; Writer;
+  local:
+    *;
+};
