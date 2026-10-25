@@ -881,6 +881,37 @@ static void test_typ30_integer_declaration(void) {
    }
 }
 
+
+static void test_typ31_blob_primitive(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Raw := { type := Blob; };\n"
+      "Png := { type := Blob; tag := png; };\n"
+      "Quoted := { type := Blob; tag := \"jpg\"; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP31: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(ANVIL_TYPE_BLOB, anvil_type_def_get_kind(anvil_type_registry_find(reg, "Raw")),
+                           "TYP31: `type := Blob` in a @[types] document is ANVIL_TYPE_BLOB");
+      anvil_type_def native = anvil_type_resolve(NULL, "Blob");
+      TestBit.is_not_null(native, "TYP31: Blob is a native primitive, resolvable without a registry");
+      TestBit.is_equal_int(ANVIL_TYPE_BLOB, anvil_type_def_get_kind(native), "TYP31: of kind BLOB");
+      TestBit.is_true(anvil_type_def_tag(anvil_type_registry_find(reg, "Raw")) == NULL,
+                      "TYP31: no tag declared");
+      const char *tag = anvil_type_def_tag(anvil_type_registry_find(reg, "Png"));
+      TestBit.is_true(tag && strcmp(tag, "png") == 0, "TYP31: tag := png (bare)");
+      tag = anvil_type_def_tag(anvil_type_registry_find(reg, "Quoted"));
+      TestBit.is_true(tag && strcmp(tag, "jpg") == 0, "TYP31: tag := \"jpg\" (quoted)");
+      TestBit.is_true(anvil_type_def_tag(NULL) == NULL, "TYP31: NULL def");
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP31: no diagnostics");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -929,6 +960,8 @@ int main(void) {
 
    TestBit.run_ex("TYP29_numeric_bound_getters", NULL, test_typ29_numeric_bound_getters, th);
    TestBit.run_ex("TYP30_integer_declaration", NULL, test_typ30_integer_declaration, th);
+
+   TestBit.run_ex("TYP31_blob_primitive", NULL, test_typ31_blob_primitive, th);
 
    return TestBit.report();
 }

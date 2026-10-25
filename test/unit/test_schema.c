@@ -1732,6 +1732,157 @@ static void test_sch61_integer_nested_and_malformed(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-types-003 — Blob (decision D1: String accepts blobs, Blob is its own primitive)
+ * ---------------------------------------------------------------------- */
+static void test_sch62_string_accepts_blob(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\nbody := { type := String; };\n";
+   bool ok = nested_validate(src, "#!aml\nbody := `multi-line\ntext`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH62: a blob satisfies type := String");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nbody := \"quoted\";\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH62: a quoted string still passes (regression)");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nbody := bare;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH62: a bare word still passes (regression)");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nbody := 5;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && !ok, "SCH62: a number still fails (regression)");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate("#!aml\n@[schema]\ne := { type := enum; values := [ a, b ]; };\n",
+                        "#!aml\ne := `a`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && !ok, "SCH62: an enum does not accept a blob");
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch63_string_size_measures_blob_payload(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\nbody := { type := String; size := 5; };\n";
+   bool ok = nested_validate(src, "#!aml\nbody := `abcdef`;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH63: a 6-byte blob exceeds size := 5");
+      NESTED_PATH_IS(0, "body", ANVIL_SCHEMA_ERR_VALIDATION_SIZE, "SCH63: SIZE at body");
+   } else {
+      TestBit.is_not_null(schema, "SCH63: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nbody := @txt`abcde`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH63: a 5-byte payload fits (the tag is not payload)");
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch64_blob_accepts_only_blobs(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\nb := { type := Blob; };\n";
+   bool ok = nested_validate(src, "#!aml\nb := \"quoted\";\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH64: a quoted string fails type := Blob");
+      NESTED_PATH_IS(0, "b", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "SCH64: TYPE_MISMATCH");
+   } else {
+      TestBit.is_not_null(schema, "SCH64: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := bare;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && !ok, "SCH64: a bare word fails type := Blob");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := `payload`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH64: a blob passes");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := @png`payload`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH64: a tagged blob passes when no tag is required");
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch65_blob_tag_constraint(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\nb := { type := Blob; tag := png; };\n";
+   bool ok = nested_validate(src, "#!aml\nb := @png`x`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH65: an @png blob satisfies tag := png");
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := `x`;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH65: an untagged blob fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH65: one violation");
+      NESTED_PATH_IS(0, "b", ANVIL_SCHEMA_ERR_VALIDATION_TAG, "SCH65: TAG at b");
+   } else {
+      TestBit.is_not_null(schema, "SCH65: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := @jpg`x`;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH65: an @jpg blob fails");
+      NESTED_PATH_IS(0, "b", ANVIL_SCHEMA_ERR_VALIDATION_TAG, "SCH65: TAG for the wrong tag");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nb := @pngx`x`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && !ok, "SCH65: tags compare in full, not by prefix");
+   nested_free(schema, sdoc, ddoc);
+   // A quoted tag value reads the same as a bare one.
+   ok = nested_validate("#!aml\n@[schema]\nb := { type := Blob; tag := \"png\"; };\n",
+                        "#!aml\nb := @png`x`;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH65: tag := \"png\" (quoted) works too");
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch66_blob_size_and_inheritance(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\nb := { type := Blob; size := 3; };\n",
+                             "#!aml\nb := `abcd`;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH66: a Blob's size is its payload byte length");
+      NESTED_PATH_IS(0, "b", ANVIL_SCHEMA_ERR_VALIDATION_SIZE, "SCH66: SIZE");
+   } else {
+      TestBit.is_not_null(schema, "SCH66: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   anvil_document tdoc = anvil_load(fixture_path("schema_blob_consumer.anvl"));
+   anvil_schema tschema = tdoc ? anvil_schema_load(tdoc) : NULL;
+   TestBit.is_not_null(tschema, "SCH66: type-based schema loaded");
+   if (tschema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(tschema),
+                           "SCH66: no diagnostics");
+      const char *data = "#!aml\nimage := @png`x`;\nbad_image := @jpg`x`;\nother := @jpg`x`;\n";
+      anvil_document d = anvil_load_buffer(data, strlen(data));
+      if (d) {
+         TestBit.is_false(anvil_schema_validate(tschema, d), "SCH66: one tag mismatch");
+         TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(tschema),
+                              "SCH66: only `bad_image`");
+         anvil_schema_violation v = anvil_schema_get_violation(tschema, 0);
+         char path[32] = {0};
+         anvil_schema_violation_get_field(v, path, sizeof(path));
+         TestBit.is_true(strcmp(path, "bad_image") == 0 &&
+                            anvil_schema_violation_get_category(v) == ANVIL_SCHEMA_ERR_VALIDATION_TAG,
+                         "SCH66: TAG at bad_image (inherited from the type); `other` overrides it");
+         anvil_dispose(d);
+      }
+      anvil_schema_dispose(tschema);
+   }
+   if (tdoc) {
+      anvil_dispose(tdoc);
+   }
+}
+
+static void test_sch67_blob_nested_and_nullable(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "files := { type := Array; items := { type := Blob; tag := png; nullable := true; }; };\n",
+      "#!aml\nfiles := [ @png`a`, null, @gif`b` ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH67: the @gif element fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH67: only the gif; the null is nullable");
+      NESTED_PATH_IS(0, "files[2]", ANVIL_SCHEMA_ERR_VALIDATION_TAG, "SCH67: TAG at files[2]");
+   } else {
+      TestBit.is_not_null(schema, "SCH67: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1853,6 +2004,19 @@ int main(void) {
                   test_sch60_integer_inherited_from_type, th);
    TestBit.run_ex("SCH61_INTEGER_NESTED_AND_MALFORMED", NULL,
                   test_sch61_integer_nested_and_malformed, th);
+
+   TestBit.run_ex("SCH62_STRING_ACCEPTS_BLOB", NULL,
+                  test_sch62_string_accepts_blob, th);
+   TestBit.run_ex("SCH63_STRING_SIZE_MEASURES_BLOB_PAYLOAD", NULL,
+                  test_sch63_string_size_measures_blob_payload, th);
+   TestBit.run_ex("SCH64_BLOB_ACCEPTS_ONLY_BLOBS", NULL,
+                  test_sch64_blob_accepts_only_blobs, th);
+   TestBit.run_ex("SCH65_BLOB_TAG_CONSTRAINT", NULL,
+                  test_sch65_blob_tag_constraint, th);
+   TestBit.run_ex("SCH66_BLOB_SIZE_AND_INHERITANCE", NULL,
+                  test_sch66_blob_size_and_inheritance, th);
+   TestBit.run_ex("SCH67_BLOB_NESTED_AND_NULLABLE", NULL,
+                  test_sch67_blob_nested_and_nullable, th);
 
    return TestBit.report();
 }

@@ -77,24 +77,30 @@ reads its `type :=` field.*
 
 ## The native primitives
 
-Every type definition's `type :=` field names one of six native primitives, or the special `enum`
-kind:
+Every type definition's `type :=` field names one of seven native primitives, or the special
+`enum` kind:
 
 | Primitive | Meaning |
 |---|---|
 | `Numeric` | Any ANVL numeric value |
-| `String` | Any ANVL string value |
+| `String` | Textual content, however it is written: a quoted string, a bare word, or a backtick blob |
+| `Blob` | A backtick blob only; may require a tag with `tag := png;` |
 | `Bool` | A boolean value |
 | `Object` | A nested object shape |
 | `Tuple` | A fixed tuple shape |
 | `Array` | A variable-length array |
 | `enum` | An engine-understood enumeration — see below |
 
-Whether `Blob` becomes its own distinct primitive, or stays folded into `String` (structurally,
-today, a blob is already a string with a tag attribute), is still an open design question.
+**Blob.** A blob is structurally a string with a tag, so both readings are supported. `String`
+accepts a blob, which makes `type := String` mean "textual content" for a multi-line description or
+comment body written between backticks. `Blob` is stricter: it accepts only blobs, rejecting a
+quoted string or a bare word, and may declare `tag := png;` (an identifier or a string), in which
+case the data blob's `@tag` must equal it exactly. An untagged blob, or a different tag, is a
+`ANVIL_SCHEMA_ERR_VALIDATION_TAG` violation. For both, `size` counts the blob's **payload bytes**
+(the tag is not payload). An `enum` does not accept a blob.
 
-*Runtime support: implemented (`anvil_type_kind` / `anvil_type_def_get_kind`) for all seven kinds
-listed above.*
+*Runtime support: implemented (`anvil_type_kind` / `anvil_type_def_get_kind`, with
+`ANVIL_TYPE_BLOB` appended last) for all eight kinds listed above.*
 
 ## Constraints
 

@@ -47,6 +47,7 @@ struct anvil_type_def_t {
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
    char *source; // path of the document that defined it (for collision reports); NULL for natives
+   char *tag; // a Blob type's required `tag := ...`; NULL if none
    bool integer_declared; // `integer := true|false` was present and well-formed
    bool integer;
    bool nullable_declared; // `nullable := true|false` was present and well-formed
@@ -80,6 +81,7 @@ static anvil_type_kind parse_type_kind(const char *text) {
    if (strcmp(text, "Tuple") == 0) return ANVIL_TYPE_TUPLE;
    if (strcmp(text, "Array") == 0) return ANVIL_TYPE_ARRAY;
    if (strcmp(text, "enum") == 0) return ANVIL_TYPE_ENUM;
+   if (strcmp(text, "Blob") == 0) return ANVIL_TYPE_BLOB;
    return ANVIL_TYPE_UNKNOWN;
 }
 
@@ -96,6 +98,7 @@ static struct anvil_type_def_t NATIVE_OBJECT  = { .name = "Object",  .kind = ANV
 static struct anvil_type_def_t NATIVE_TUPLE   = { .name = "Tuple",   .kind = ANVIL_TYPE_TUPLE };
 static struct anvil_type_def_t NATIVE_ARRAY   = { .name = "Array",   .kind = ANVIL_TYPE_ARRAY };
 static struct anvil_type_def_t NATIVE_ENUM    = { .name = "enum",    .kind = ANVIL_TYPE_ENUM };
+static struct anvil_type_def_t NATIVE_BLOB    = { .name = "Blob",    .kind = ANVIL_TYPE_BLOB };
 
 // Maps a recognized native/enum kind to its static definition — the other half of
 // parse_type_kind, shared so anvil_type_resolve doesn't duplicate the kind-to-instance mapping.
@@ -108,6 +111,7 @@ static struct anvil_type_def_t *native_def_for_kind(anvil_type_kind kind) {
    case ANVIL_TYPE_TUPLE:   return &NATIVE_TUPLE;
    case ANVIL_TYPE_ARRAY:   return &NATIVE_ARRAY;
    case ANVIL_TYPE_ENUM:    return &NATIVE_ENUM;
+   case ANVIL_TYPE_BLOB:    return &NATIVE_BLOB;
    case ANVIL_TYPE_UNKNOWN: default: return NULL;
    }
 }
@@ -196,7 +200,7 @@ static list read_values_list(anvil_value val) {
 struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
-   bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable, bad_integer;
+   bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable, bad_integer, bad_tag;
 };
 
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
@@ -206,6 +210,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
    def->fields_text = NULL;
    def->nullable_declared = def->nullable = false;
    def->integer_declared = def->integer = false;
+   def->tag = NULL;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -242,6 +247,14 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
          issues->bad_values = (def->values == NULL);
+      } else if (strcmp(fname, "tag") == 0) {
+         anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
+         if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
+            Allocator.dispose(def->tag);
+            def->tag = anvil_text_alloc(fval);
+         } else {
+            issues->bad_tag = true;
+         }
       } else if (strcmp(fname, "integer") == 0) {
          char *text = anvil_text_alloc(fval);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
@@ -377,6 +390,11 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'max' is not a valid number; treated as not declared", def->name);
       }
+      if (issues.bad_tag) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'tag' must be an identifier or string; treated as not declared",
+                  def->name);
+      }
       if (issues.bad_integer) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'integer' must be true or false; treated as not declared",
@@ -416,6 +434,7 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       Allocator.dispose(def->name);
       Allocator.dispose(def->source);
       Allocator.dispose(def->fields_text);
+      Allocator.dispose(def->tag);
       Allocator.dispose(def);
    }
    Allocator.dispose(path);
@@ -535,6 +554,7 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
             Allocator.dispose(def->name);
             Allocator.dispose(def->source);
             Allocator.dispose(def->fields_text);
+            Allocator.dispose(def->tag);
          }
          Allocator.dispose(def);
       }
@@ -739,4 +759,9 @@ bool anvil_numeric_is_whole(anvil_value data) {
       return true; // at or beyond 2^63 a double has no fractional bits left
    }
    return (double)(int64_t)d == d;
+}
+
+const char *anvil_type_def_tag(anvil_type_def def) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   return d ? d->tag : NULL;
 }

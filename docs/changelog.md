@@ -96,6 +96,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bounds exactly; the `long long` getters keep their signatures and return false for such a bound
   instead of truncating. Appended API only.
 
+- **`Blob` primitive** (`FR-2610-anvl-types-003`, roadmap decision D1: both): `type := Blob` is a new
+  native primitive (`ANVIL_TYPE_BLOB`, appended to `anvil_type_kind`) that accepts only backtick
+  blobs and may require a tag with `tag := png;` (new category
+  `ANVIL_SCHEMA_ERR_VALIDATION_TAG`, appended). `type := String` now also accepts a blob, so long
+  multi-line text validates as a string; an `enum` still does not. `size` on a blob counts payload
+  bytes (the tag is not payload). `tag` is inherited from a type and applied at every depth. Quoted
+  strings and bare words validate exactly as before. The open question in
+  `docs/types-reference.md` is replaced by the decision.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
