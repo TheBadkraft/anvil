@@ -61,7 +61,7 @@ None. Binding exposure follows via FR-2610-anvl-bindings-001.
 ## Resolution
 
 Decision **D1: both** (recorded in `notes/roadmap-2610-rivet-readiness.md`). Branch
-`feat/FR-2610-anvl-types-003`, merged to `main`. Tests SCH62–SCH67 (`test_schema.c`) and TYP31
+`feat/FR-2610-anvl-types-003`, commit `6f85bce`, merged to `main`. Tests SCH62–SCH67 (`test_schema.c`) and TYP31
 (`test_types.c`); fixtures `schema_blob_*`. Full unit regression green with unchanged counts elsewhere,
 `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
 Docs: `docs/types-reference.md` primitives table and Blob paragraph (and the site mirror).
