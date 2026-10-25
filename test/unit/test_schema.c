@@ -412,6 +412,153 @@ static void test_sch12_inline_constraint_overrides_type(void) {
    anvil_dispose(schema_doc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-types-001 — numeric constraints and data values keep their
+ * full magnitude: fractional, exponent, long and overflowed forms
+ * ---------------------------------------------------------------------- */
+
+// Validates `data` against a one-field schema built from `schema_src`; returns the field's
+// violation category, or 0 when the data passed. Keeps each numeric case to a single line.
+static int numeric_case(const char *schema_src, const char *data, const char *field) {
+   anvil_document sdoc = anvil_load_buffer(schema_src, strlen(schema_src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   int category = -1;
+   if (schema) {
+      anvil_document ddoc = anvil_load_buffer(data, strlen(data));
+      if (ddoc) {
+         bool ok = anvil_schema_validate(schema, ddoc);
+         anvil_schema_violation v = ok ? NULL : find_violation(schema, field);
+         category = ok ? 0 : (v ? (int)anvil_schema_violation_get_category(v) : -2);
+         if (!ok) {
+            TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                                 "numeric case: exactly one violation");
+         }
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+   return category;
+}
+
+#define SCHEMA_MAX3 "#!aml\n@[schema]\nscore := { type := Numeric; max := 3; };\n"
+#define RANGE ANVIL_SCHEMA_ERR_VALIDATION_RANGE
+
+static void test_sch13_fractional_data_vs_integral_bound(void) {
+   TestBit.is_equal_int(RANGE, numeric_case(SCHEMA_MAX3, "#!aml\nscore := 3.7;\n", "score"),
+                        "SCH13: 3.7 exceeds max := 3");
+   TestBit.is_equal_int(0, numeric_case(SCHEMA_MAX3, "#!aml\nscore := 3;\n", "score"),
+                        "SCH13: 3 satisfies max := 3");
+   TestBit.is_equal_int(0, numeric_case(SCHEMA_MAX3, "#!aml\nscore := 2.9;\n", "score"),
+                        "SCH13: 2.9 satisfies max := 3");
+}
+
+static void test_sch14_fractional_bound(void) {
+   const char *src = "#!aml\n@[schema]\nscore := { type := Numeric; min := 0.5; };\n";
+   TestBit.is_equal_int(RANGE, numeric_case(src, "#!aml\nscore := 0.2;\n", "score"),
+                        "SCH14: 0.2 is below min := 0.5");
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 0.6;\n", "score"),
+                        "SCH14: 0.6 satisfies min := 0.5");
+   TestBit.is_equal_int(RANGE, numeric_case(src, "#!aml\nscore := 0;\n", "score"),
+                        "SCH14: integral 0 is below min := 0.5");
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 1;\n", "score"),
+                        "SCH14: integral 1 satisfies min := 0.5");
+}
+
+static void test_sch15_exponent_bound(void) {
+   const char *src = "#!aml\n@[schema]\nscore := { type := Numeric; max := 1e+3; };\n";
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 999;\n", "score"),
+                        "SCH15: 999 satisfies max := 1e+3");
+   TestBit.is_equal_int(RANGE, numeric_case(src, "#!aml\nscore := 1001;\n", "score"),
+                        "SCH15: 1001 exceeds max := 1e+3");
+   TestBit.is_equal_int(RANGE, numeric_case(SCHEMA_MAX3, "#!aml\nscore := 5e+10;\n", "score"),
+                        "SCH15: data 5e+10 is not read as 5");
+}
+
+static void test_sch16_long_numeric_text(void) {
+   // 39 characters, real value 1e7: a 31-character cut reads it as 0.
+   TestBit.is_equal_int(RANGE,
+      numeric_case("#!aml\n@[schema]\nscore := { type := Numeric; max := 1000; };\n",
+                   "#!aml\nscore := 0.000000000000000000000000000000001e+40;\n", "score"),
+      "SCH16: a numeric longer than 31 chars is compared by real magnitude");
+}
+
+static void test_sch17_overflowed_data_compares_by_sign(void) {
+   const char *max_src = "#!aml\n@[schema]\nscore := { type := Numeric; max := 1000; };\n";
+   const char *min_src = "#!aml\n@[schema]\nscore := { type := Numeric; min := 0; };\n";
+   TestBit.is_equal_int(RANGE, numeric_case(max_src, "#!aml\nscore := 1e+999;\n", "score"),
+                        "SCH17: +overflow violates any max");
+   TestBit.is_equal_int(0, numeric_case(min_src, "#!aml\nscore := 1e+999;\n", "score"),
+                        "SCH17: +overflow satisfies any min");
+   TestBit.is_equal_int(RANGE, numeric_case(min_src, "#!aml\nscore := -1e+999;\n", "score"),
+                        "SCH17: -overflow violates any min");
+   TestBit.is_equal_int(0, numeric_case(max_src, "#!aml\nscore := -1e+999;\n", "score"),
+                        "SCH17: -overflow satisfies any max");
+   TestBit.is_equal_int(RANGE,
+                        numeric_case(max_src, "#!aml\nscore := 99999999999999999999;\n", "score"),
+                        "SCH17: an integral literal beyond int64 violates max");
+}
+
+static void test_sch18_exact_comparison_near_limits(void) {
+   const char *src = "#!aml\n@[schema]\nscore := { type := Numeric; max := 9007199254740992; };\n";
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 9007199254740992;\n", "score"),
+                        "SCH18: 2^53 satisfies max := 2^53");
+   TestBit.is_equal_int(RANGE, numeric_case(src, "#!aml\nscore := 9007199254740993;\n", "score"),
+                        "SCH18: 2^53+1 exceeds max := 2^53 (no double rounding)");
+   const char *big = "#!aml\n@[schema]\nscore := { type := Numeric; max := 9223372036854775807; };\n";
+   TestBit.is_equal_int(0, numeric_case(big, "#!aml\nscore := 9223372036854775806;\n", "score"),
+                        "SCH18: int64 max - 1 satisfies max := int64 max");
+   TestBit.is_equal_int(RANGE, numeric_case(big, "#!aml\nscore := 9.3e+18;\n", "score"),
+                        "SCH18: a fractional-form value above int64 max exceeds it");
+}
+
+static void test_sch19_fractional_bound_inherited_from_type(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_numeric_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH19: schema loaded");
+   if (schema) {
+      const char *low = "#!aml\nshare := 0.2;\n";
+      anvil_document ldoc = anvil_load_buffer(low, strlen(low));
+      if (ldoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ldoc),
+                          "SCH19: 0.2 is below the inherited min := 0.5");
+         TestBit.is_not_null(find_violation(schema, "share"), "SCH19: violation names 'share'");
+         anvil_dispose(ldoc);
+      }
+      const char *ok = "#!aml\nshare := 0.6;\n";
+      anvil_document odoc = anvil_load_buffer(ok, strlen(ok));
+      if (odoc) {
+         TestBit.is_true(anvil_schema_validate(schema, odoc),
+                         "SCH19: 0.6 satisfies the inherited min := 0.5");
+         anvil_dispose(odoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch20_malformed_constraints_are_not_declared(void) {
+   // A non-numeric or overflowing bound is "not declared", never silently 0.
+   TestBit.is_equal_int(0,
+      numeric_case("#!aml\n@[schema]\nscore := { type := Numeric; min := \"abc\"; };\n",
+                   "#!aml\nscore := -5;\n", "score"),
+      "SCH20: non-numeric min is not declared");
+   TestBit.is_equal_int(0,
+      numeric_case("#!aml\n@[schema]\nscore := { type := Numeric; max := 1e+999; };\n",
+                   "#!aml\nscore := 5;\n", "score"),
+      "SCH20: overflowing max is not declared");
+   // size stays integral: a fractional size is malformed, not truncated to 2.
+   TestBit.is_equal_int(0,
+      numeric_case("#!aml\n@[schema]\nname := { type := String; size := 2.5; };\n",
+                   "#!aml\nname := \"abcdef\";\n", "name"),
+      "SCH20: fractional size is not declared");
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -431,6 +578,20 @@ int main(void) {
                   test_sch11_constraint_inherited_from_type, th);
    TestBit.run_ex("SCH12_inline_constraint_overrides_type", NULL,
                   test_sch12_inline_constraint_overrides_type, th);
+
+   TestBit.run_ex("SCH13_fractional_data_vs_integral_bound", NULL,
+                  test_sch13_fractional_data_vs_integral_bound, th);
+   TestBit.run_ex("SCH14_fractional_bound", NULL, test_sch14_fractional_bound, th);
+   TestBit.run_ex("SCH15_exponent_bound", NULL, test_sch15_exponent_bound, th);
+   TestBit.run_ex("SCH16_long_numeric_text", NULL, test_sch16_long_numeric_text, th);
+   TestBit.run_ex("SCH17_overflowed_data_compares_by_sign", NULL,
+                  test_sch17_overflowed_data_compares_by_sign, th);
+   TestBit.run_ex("SCH18_exact_comparison_near_limits", NULL,
+                  test_sch18_exact_comparison_near_limits, th);
+   TestBit.run_ex("SCH19_fractional_bound_inherited_from_type", NULL,
+                  test_sch19_fractional_bound_inherited_from_type, th);
+   TestBit.run_ex("SCH20_malformed_constraints_are_not_declared", NULL,
+                  test_sch20_malformed_constraints_are_not_declared, th);
 
    return TestBit.report();
 }
