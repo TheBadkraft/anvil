@@ -61,7 +61,7 @@ unknown formats as "not declared" until then.
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-types-004`, merged to `main`. Tests TYP32-TYP33 (`test_types.c`, 42 table cases on
+Branch `feat/FR-2610-anvl-types-004`, commit `1ed0aec`, merged to `main`. Tests TYP32-TYP33 (`test_types.c`, 42 table cases on
 the validators plus the declaration/getter) and SCH68-SCH73 (`test_schema.c`); fixtures
 `schema_format_*`. Full unit regression green with unchanged counts elsewhere, `test_release`
 green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver. Docs:
