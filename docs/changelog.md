@@ -105,6 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strings and bare words validate exactly as before. The open question in
   `docs/types-reference.md` is replaced by the decision.
 
+- **`format` constraint for String** (`FR-2610-anvl-types-004`): `format := iso8601_date | iso8601_datetime |
+  uuid`, checked by hand-written validators (no regex engine). `iso8601_date` has a real calendar check
+  (month lengths, leap years); `iso8601_datetime` is the RFC 3339 profile with a mandatory offset;
+  `uuid` is 8-4-4-4-12 hex, any case and version. A mismatch is the new
+  `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field (appended). Inherited from a type,
+  applied at every depth, checked on string, bare and blob values. An unknown format is a load
+  diagnostic (`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the
+  constraint is treated as not declared. New `anvil_type_def_get_format`.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

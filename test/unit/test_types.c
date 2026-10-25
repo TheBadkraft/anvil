@@ -11,6 +11,7 @@
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
 #include "anvil_types.h"
+#include "internal/format.h"
 #include "internal/numeric_bound.h"
 #include "internal/source_registry.h"
 #include "testbit.h"
@@ -912,6 +913,105 @@ static void test_typ31_blob_primitive(void) {
    }
 }
 
+
+static void test_typ32_format_validators(void) {
+   const struct { const char *fmt; const char *text; bool ok; } cases[] = {
+      {"iso8601_date", "2026-02-28", true},
+      {"iso8601_date", "2026-02-29", false},      // 2026 is not a leap year
+      {"iso8601_date", "2028-02-29", true},
+      {"iso8601_date", "2100-02-29", false},      // divisible by 100, not 400
+      {"iso8601_date", "2000-02-29", true},       // divisible by 400
+      {"iso8601_date", "2026-13-01", false},
+      {"iso8601_date", "2026-00-10", false},
+      {"iso8601_date", "2026-04-31", false},
+      {"iso8601_date", "2026-04-30", true},
+      {"iso8601_date", "2026-12-31", true},
+      {"iso8601_date", "2026-1-01", false},
+      {"iso8601_date", "2026-01-1", false},
+      {"iso8601_date", "2026/01/01", false},
+      {"iso8601_date", "2026-01-011", false},
+      {"iso8601_date", "", false},
+      {"iso8601_date", "2026-01-0x", false},
+      {"iso8601_datetime", "2026-10-25T14:03:00Z", true},
+      {"iso8601_datetime", "2026-10-25T14:03:00.123-05:00", true},
+      {"iso8601_datetime", "2026-10-25T14:03:00+05:30", true},
+      {"iso8601_datetime", "2026-10-25T14:03:00.1Z", true},
+      {"iso8601_datetime", "2026-10-25T23:59:60Z", true},   // leap second
+      {"iso8601_datetime", "2026-10-25 14:03:00Z", false},  // space, not T
+      {"iso8601_datetime", "2026-10-25T14:03:00", false},   // no offset
+      {"iso8601_datetime", "2026-10-25T24:00:00Z", false},
+      {"iso8601_datetime", "2026-10-25T14:60:00Z", false},
+      {"iso8601_datetime", "2026-10-25T14:03:61Z", false},
+      {"iso8601_datetime", "2026-02-30T14:03:00Z", false},  // bad calendar date
+      {"iso8601_datetime", "2026-10-25T14:03:00.Z", false}, // empty fraction
+      {"iso8601_datetime", "2026-10-25T14:03:00+5:30", false},
+      {"iso8601_datetime", "2026-10-25T14:03:00+24:00", false},
+      {"iso8601_datetime", "2026-10-25T14:03:00+05:60", false},
+      {"iso8601_datetime", "2026-10-25T14:03:00Zjunk", false},
+      {"iso8601_datetime", "2026-10-25t14:03:00z", false},  // upper case only
+      {"iso8601_datetime", "2026-10-25", false},
+      {"uuid", "0f8fad5b-d9cb-469f-a165-70867728950e", true},
+      {"uuid", "0F8FAD5B-D9CB-469F-A165-70867728950E", true},
+      {"uuid", "0f8fad5b-d9cb-469f-a165-70867728950", false},   // 35 chars
+      {"uuid", "0f8fad5b-d9cb-469f-a165-70867728950ef", false}, // 37 chars
+      {"uuid", "0f8fad5bd9cb469fa16570867728950e", false},      // no hyphens
+      {"uuid", "0f8fad5b-d9cb-469f-a165-7086772895xx", false},  // not hex
+      {"uuid", "0f8fad5b_d9cb-469f-a165-70867728950e", false},
+      {"nope", "anything", false},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      TestBit.is_true(anvil_format_valid(cases[i].fmt, cases[i].text) == cases[i].ok, cases[i].text);
+   }
+   TestBit.is_true(anvil_format_known("iso8601_date") && anvil_format_known("iso8601_datetime") &&
+                      anvil_format_known("uuid"),
+                   "TYP32: the three formats are known");
+   TestBit.is_false(anvil_format_known("nope"), "TYP32: an unknown name is not known");
+   TestBit.is_false(anvil_format_known(NULL), "TYP32: NULL name");
+   TestBit.is_false(anvil_format_valid("uuid", NULL), "TYP32: NULL text");
+}
+
+static void test_typ33_format_declaration(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Ts := { type := String; format := iso8601_datetime; };\n"
+      "Quoted := { type := String; format := \"uuid\"; };\n"
+      "Plain := { type := String; };\n"
+      "Nope := { type := String; format := nope; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP33: registry loaded");
+   if (reg) {
+      char buf[64] = {0};
+      anvil_type_def ts = anvil_type_registry_find(reg, "Ts");
+      TestBit.is_equal_int(16, (long long)anvil_type_def_get_format(ts, NULL, 0),
+                           "TYP33: the full length is reported for a NULL buffer");
+      TestBit.is_equal_int(16, (long long)anvil_type_def_get_format(ts, buf, sizeof(buf)),
+                           "TYP33: and for a real one");
+      TestBit.is_true(strcmp(buf, "iso8601_datetime") == 0, "TYP33: format := iso8601_datetime");
+      char tiny[4] = {0};
+      anvil_type_def_get_format(ts, tiny, sizeof(tiny));
+      TestBit.is_true(strcmp(tiny, "iso") == 0, "TYP33: a short buffer is truncated and terminated");
+      anvil_type_def_get_format(anvil_type_registry_find(reg, "Quoted"), buf, sizeof(buf));
+      TestBit.is_true(strcmp(buf, "uuid") == 0, "TYP33: a quoted format name reads the same");
+      TestBit.is_equal_int(0, (long long)anvil_type_def_get_format(anvil_type_registry_find(reg, "Plain"), buf, sizeof(buf)),
+                           "TYP33: no format declared");
+      TestBit.is_equal_int(0, (long long)anvil_type_def_get_format(anvil_type_registry_find(reg, "Nope"), buf, sizeof(buf)),
+                           "TYP33: an unknown format is treated as not declared");
+      TestBit.is_equal_int(0, (long long)anvil_type_def_get_format(NULL, buf, sizeof(buf)), "TYP33: NULL def");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP33: the unknown format is reported once");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      char msg[256] = {0};
+      anvil_type_diagnostic_get_message(d, msg, sizeof(msg));
+      TestBit.is_true(anvil_type_diagnostic_get_category(d) == ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT &&
+                         strstr(msg, "nope") != NULL,
+                      "TYP33: as MALFORMED_CONSTRAINT naming the format");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -962,6 +1062,9 @@ int main(void) {
    TestBit.run_ex("TYP30_integer_declaration", NULL, test_typ30_integer_declaration, th);
 
    TestBit.run_ex("TYP31_blob_primitive", NULL, test_typ31_blob_primitive, th);
+
+   TestBit.run_ex("TYP32_format_validators", NULL, test_typ32_format_validators, th);
+   TestBit.run_ex("TYP33_format_declaration", NULL, test_typ33_format_declaration, th);
 
    return TestBit.report();
 }

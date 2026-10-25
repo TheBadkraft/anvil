@@ -22,6 +22,7 @@
 
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
+#include "internal/format.h"
 #include "internal/numeric_bound.h"
 #include "internal/text_alloc.h"
 // ----------------
@@ -47,6 +48,7 @@ struct anvil_type_def_t {
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
    char *source; // path of the document that defined it (for collision reports); NULL for natives
+   char *format; // a known lexical format (internal/format.h); NULL if none
    char *tag; // a Blob type's required `tag := ...`; NULL if none
    bool integer_declared; // `integer := true|false` was present and well-formed
    bool integer;
@@ -201,6 +203,7 @@ struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
    bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable, bad_integer, bad_tag;
+   char *bad_format_name; // an unknown `format := name`, for the report (allocated)
 };
 
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
@@ -211,6 +214,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
    def->nullable_declared = def->nullable = false;
    def->integer_declared = def->integer = false;
    def->tag = NULL;
+   def->format = NULL;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -247,6 +251,16 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
          issues->bad_values = (def->values == NULL);
+      } else if (strcmp(fname, "format") == 0) {
+         anvil_value_type ft = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
+         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_text_alloc(fval) : NULL;
+         if (name && anvil_format_known(name)) {
+            Allocator.dispose(def->format);
+            def->format = name;
+         } else {
+            Allocator.dispose(issues->bad_format_name);
+            issues->bad_format_name = name ? name : anvil_text_dup("");
+         }
       } else if (strcmp(fname, "tag") == 0) {
          anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
          if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
@@ -390,6 +404,11 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'max' is not a valid number; treated as not declared", def->name);
       }
+      if (issues.bad_format_name) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': unknown format '%s' (known: iso8601_date, iso8601_datetime, uuid); "
+                  "treated as not declared", def->name, issues.bad_format_name);
+      }
       if (issues.bad_tag) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'tag' must be an identifier or string; treated as not declared",
@@ -426,10 +445,13 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
                                                                        // a name collision
       List.append(reg->all_defs, def);
       Allocator.dispose(issues.type_text);
+      Allocator.dispose(issues.bad_format_name);
       continue;
 
    discard:
       Allocator.dispose(issues.type_text);
+      Allocator.dispose(issues.bad_format_name);
+      Allocator.dispose(def->format);
       dispose_def_values(def);
       Allocator.dispose(def->name);
       Allocator.dispose(def->source);
@@ -555,6 +577,7 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
             Allocator.dispose(def->source);
             Allocator.dispose(def->fields_text);
             Allocator.dispose(def->tag);
+            Allocator.dispose(def->format);
          }
          Allocator.dispose(def);
       }
@@ -764,4 +787,127 @@ bool anvil_numeric_is_whole(anvil_value data) {
 const char *anvil_type_def_tag(anvil_type_def def) {
    struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
    return d ? d->tag : NULL;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Lexical formats (internal/format.h): a closed set, hand-written.
+ * ---------------------------------------------------------------------- */
+static bool fmt_digits(const char *s, size_t n) {
+   for (size_t i = 0; i < n; i++) {
+      if (s[i] < '0' || s[i] > '9') {
+         return false;
+      }
+   }
+   return true;
+}
+
+static int fmt_num(const char *s, size_t n) {
+   int v = 0;
+   for (size_t i = 0; i < n; i++) {
+      v = v * 10 + (s[i] - '0');
+   }
+   return v;
+}
+
+// YYYY-MM-DD at the start of s (exactly 10 characters), with a real calendar check.
+static bool fmt_date10(const char *s) {
+   if (!fmt_digits(s, 4) || s[4] != '-' || !fmt_digits(s + 5, 2) || s[7] != '-' ||
+       !fmt_digits(s + 8, 2)) {
+      return false;
+   }
+   int year = fmt_num(s, 4), month = fmt_num(s + 5, 2), day = fmt_num(s + 8, 2);
+   if (month < 1 || month > 12 || day < 1) {
+      return false;
+   }
+   static const int days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+   int dim = days[month - 1];
+   bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+   if (month == 2 && leap) {
+      dim = 29;
+   }
+   return day <= dim;
+}
+
+static bool fmt_date(const char *s) {
+   return strlen(s) == 10 && fmt_date10(s);
+}
+
+// HH:MM:SS[.fraction](Z|+HH:MM|-HH:MM): the offset is required.
+static bool fmt_time_offset(const char *s) {
+   if (!fmt_digits(s, 2) || s[2] != ':' || !fmt_digits(s + 3, 2) || s[5] != ':' ||
+       !fmt_digits(s + 6, 2)) {
+      return false;
+   }
+   if (fmt_num(s, 2) > 23 || fmt_num(s + 3, 2) > 59 || fmt_num(s + 6, 2) > 60) { // 60: leap second
+      return false;
+   }
+   s += 8;
+   if (*s == '.') {
+      s++;
+      size_t n = 0;
+      while (s[n] >= '0' && s[n] <= '9') {
+         n++;
+      }
+      if (n == 0) {
+         return false;
+      }
+      s += n;
+   }
+   if (s[0] == 'Z') {
+      return s[1] == '\0';
+   }
+   if ((s[0] != '+' && s[0] != '-') || !fmt_digits(s + 1, 2) || s[3] != ':' ||
+       !fmt_digits(s + 4, 2) || s[6] != '\0') {
+      return false;
+   }
+   return fmt_num(s + 1, 2) <= 23 && fmt_num(s + 4, 2) <= 59;
+}
+
+static bool fmt_datetime(const char *s) {
+   return strlen(s) > 11 && fmt_date10(s) && s[10] == 'T' && fmt_time_offset(s + 11);
+}
+
+static bool fmt_uuid(const char *s) {
+   if (strlen(s) != 36) {
+      return false;
+   }
+   for (size_t i = 0; i < 36; i++) {
+      if (i == 8 || i == 13 || i == 18 || i == 23) {
+         if (s[i] != '-') {
+            return false;
+         }
+      } else if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f') ||
+                   (s[i] >= 'A' && s[i] <= 'F'))) {
+         return false;
+      }
+   }
+   return true;
+}
+
+bool anvil_format_known(const char *name) {
+   return name && (strcmp(name, "iso8601_date") == 0 || strcmp(name, "iso8601_datetime") == 0 ||
+                   strcmp(name, "uuid") == 0);
+}
+
+bool anvil_format_valid(const char *name, const char *text) {
+   if (!name || !text) {
+      return false;
+   }
+   if (strcmp(name, "iso8601_date") == 0) return fmt_date(text);
+   if (strcmp(name, "iso8601_datetime") == 0) return fmt_datetime(text);
+   if (strcmp(name, "uuid") == 0) return fmt_uuid(text);
+   return false;
+}
+
+size_t anvil_type_def_get_format(anvil_type_def def, char *buf, size_t buflen) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !d->format) {
+      return 0;
+   }
+   return copy_diag_text(d->format, buf, buflen);
+}
+
+const char *anvil_type_def_format(anvil_type_def def) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   return d ? d->format : NULL;
 }

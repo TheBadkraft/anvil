@@ -178,6 +178,18 @@ bool anvil_type_def_get_max(anvil_type_def def, long long *out_max);
 bool anvil_type_def_get_max_numeric(anvil_type_def def, anvil_numeric_t *out_max);
 
 /**
+ * @brief A type definition's declared `format` (a String constraint naming one of a small, closed
+ * set of lexical formats: `iso8601_date`, `iso8601_datetime`, `uuid`).
+ * @param def The definition to read.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full length (excluding NUL), regardless of buflen - same snprintf-style convention
+ * as anvil_statement_get_name. 0 if def is NULL or declares no (known) format; an unknown format
+ * name is reported as a diagnostic and treated as not declared.
+ */
+size_t anvil_type_def_get_format(anvil_type_def def, char *buf, size_t buflen);
+
+/**
  * @brief The number of enum member labels a type declared via `values`.
  * @param def The definition to read. NULL, or a non-ANVIL_TYPE_ENUM kind,
  * or one with no `values` array, all return 0.

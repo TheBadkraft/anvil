@@ -66,6 +66,7 @@ typedef enum {
    ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, // a data field isn't declared in the schema
    ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,    // an array has fewer than min_items / more than max_items
    ANVIL_SCHEMA_ERR_VALIDATION_TAG,           // a blob's @tag isn't the one the rule requires
+   ANVIL_SCHEMA_ERR_VALIDATION_FORMAT,        // a string doesn't match the rule's `format`
 } anvil_schema_err_code;
 
 /**
