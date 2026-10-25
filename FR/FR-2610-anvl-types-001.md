@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** types, registry, diagnostics, includes, rivet-readiness
 
 ---
@@ -61,3 +61,24 @@ consumer's call.
 
 None. BR-2610-anvl-types-001 is related: a non-numeric constraint becomes a
 `MALFORMED_CONSTRAINT` diagnostic here.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-types-001`, merged to `main`. Tests TYP13–TYP21 (`test_types.c`), fixtures
+`types_dup_{a,b,consumer}.anvl` and `types_clean_consumer.anvl`. Full unit regression green with
+unchanged counts elsewhere, `test_release` green, Valgrind-clean on types, schema, anvil_native,
+anvil_vtable, document, resolver, module. Docs: `docs/types-reference.md` gains a Diagnostics section
+and drops the collision item from "not built yet".
+
+Decisions and findings:
+- **New flat API `anvil_document_get_path`** was needed to name a diagnostic's source document (no
+  accessor existed). It is appended to `anvil_flat.h` only; the `Document` vtable is untouched.
+- A missing `type :=` is reported as `UNKNOWN_BASE_TYPE` (with its own message), not silently skipped.
+  A top-level statement that is not an object at all still has no category and is skipped quietly.
+- A def with a malformed constraint is still registered; only the constraint is dropped.
+- Diagnostics are not yet passed through `anvil_schema_load`: that is FR-2610-anvl-schema-004.
+- Vtable exposure of the diagnostics and of `get_path` belongs to FR-2610-anvl-public-api-003 (Bindings agent).
+- **Pre-existing, for the owner:** `anvil_type_registry.h` and `anvil_schema.h` have no
+  `#pragma GCC visibility push(default)` wrapper (the other public headers do), so with
+  `-fvisibility=hidden` their functions are not exported from a shared build. Statically linked
+  consumers are unaffected. I did not change it; it also applies to the new functions here.

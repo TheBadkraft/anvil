@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`anvil_value_get_bytes`** (flat + `Value.get_bytes`, appended last): the exact, uninterpreted source span of any scalar kind (a `STRING`'s escapes unresolved, a `BLOB` byte for byte, no NUL terminator); 0 for collections. The primitive that `get_text` is a view of, and the fallback for a number `get_numeric` can't hold. `get_text` is unchanged (still total) and re-documented as the string view. See decision #6 of `FR-2609-anvl-public-api-001`.
 - **`anvil_value_get_blob_tag`** (flat + `Value.get_blob_tag`, the 9th and last `Value` field): a blob's `@tag`, which no accessor exposed before (the content readers return only what is between the backticks). Text buffer convention; 0 for an untagged blob or any other kind. The writer/builder round-trip suites now carry tags through a reader→writer copy.
 
+- **Type-registry diagnostics** (`FR-2610-anvl-types-001`): `anvil_type_registry_get_diagnostic_count` /
+  `_get_diagnostic` and `anvil_type_diagnostic_get_category/_name/_source/_message` (new header
+  section in `anvil_type_registry.h`). The registry now reports what it used to resolve silently:
+  `NAME_COLLISION` (last-write-wins is unchanged; the message names both documents),
+  `UNKNOWN_BASE_TYPE`, `MALFORMED_CONSTRAINT` and `MALFORMED_ENUM_VALUES`. Diagnostics are copied at
+  load time and outlive the source documents. Also adds `anvil_document_get_path` (flat API) so a
+  diagnostic can name the document it came from. No existing signature changed.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

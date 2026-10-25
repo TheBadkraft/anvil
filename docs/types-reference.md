@@ -153,7 +153,23 @@ direct includes (not the whole transitive graph) and merges every `@[types]`-car
 definitions into a single combined registry, keyed by bare name. `types.` really is a flat
 namespace: two different included files could each define types reachable this same way,
 regardless of which file each name actually came from. A name collision between two includes
-currently resolves last-write-wins — no error reporting for that yet.*
+resolves last-write-wins, and is reported (see Diagnostics below).*
+
+## Diagnostics
+
+Loading a registry never fails on a bad definition; it records what it noticed, and the consumer
+decides whether that is fatal. `anvil_type_registry_get_diagnostic_count` /
+`anvil_type_registry_get_diagnostic` list them in the order found, and each diagnostic has a
+category, the type's name, the path of the document it came from, and a message
+(`anvil_type_diagnostic_get_*`, snprintf-style buffers). Diagnostics are copied out at load time,
+so they stay readable after the source documents are disposed.
+
+| Category | Meaning | Effect on the registry |
+|---|---|---|
+| `ANVIL_TYPE_DIAG_NAME_COLLISION` | a name was defined more than once; the message names both documents | the later definition wins |
+| `ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE` | `type :=` is missing or names no recognized kind | not registered |
+| `ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT` | `size`/`min`/`max` isn't a valid number (`size` must be a non-negative integer) | that constraint is treated as not declared, never as `0` |
+| `ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES` | `values` is not an array | no labels are declared |
 
 ## What's not built yet
 
@@ -164,8 +180,6 @@ For a complete picture, the pieces of this design that are settled but not yet i
   yet).
 - Type inference through inheritance (`base`) — architecturally free once built, since inherited
   fields already alias their ancestor's real statement object, attributes and all.
-- Reporting a name collision when two includes both define the same type name, instead of
-  silently taking the later one.
 - Everything about `@[schema]` and schema validation — a separate, not-yet-started module
   (`schema.c`) that will depend on `types.c`, never the reverse.
 
