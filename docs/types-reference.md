@@ -211,6 +211,24 @@ declared on a type, is inherited by a field that references it (a field's own `n
 overrides it), and applies at every depth, array items included. A field with no declared type has
 nothing for `null` to violate, so it accepts it either way.
 
+## Reading a schema back
+
+A loaded schema can be inspected, read-only: `anvil_schema_get_field_count` / `get_field` /
+`find_field` list the top-level rules in declaration order, and `anvil_schema_field_get_*` report each
+rule's effective settings - the kind, the `type :=` as written (`types.Id32`), `required`,
+`nullable`, `integer`, and every constraint (`size`, `min`/`max`, `min_items`/`max_items`,
+`values`, `format`, `tag`) with the usual "declared, not a default" return - exactly what
+validation enforces, with anything the rule left out filled in from its `types.X`. Nested rules are
+reachable through `get_nested` / `find_nested` (an Object's `fields`) and `get_items` (an Array's
+element rule).
+
+Rule keys the schema doesn't consume (a consumer's own annotations, such as FlyWire's `pooled` and
+`mask`) are exposed as **extras**: `get_extra_count`, `get_extra_name` and `get_extra_value`, in
+declaration order, on any rule at any depth. They are never diagnostics. Each value is a copy
+owned by the schema, readable with the ordinary `anvil_value` accessors, and stays valid after the
+source document is disposed (until the schema is disposed). A value containing a `$variable`
+reference can't be copied and reads as NULL.
+
 ## Using a type from another document
 
 A schema, or any other document, brings a type into scope by including the file that defines it,
