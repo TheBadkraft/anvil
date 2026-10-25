@@ -160,6 +160,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`BR-2610-anvl-vtable-001`** (filed): `anvil_document_get_path` exists only in the flat API, not
   the `Document` vtable, and no test checks vtable completeness. Roadmap addendum A2. Both A1 and A2
   must merge before the Bindings agent starts Phase 4.
+- **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
+  truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
+  differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
+  writer is exposed to JS.
 - **`agents/ANVL-RELEASE.agent.md`**: instructions for a new ANVL Release agent. It builds from
   tags only, packages with scripts rather than by hand, and runs release checks against the packaged
   artifact: a grammar check for `include`, plus version, install, export, checksum and post-deploy
