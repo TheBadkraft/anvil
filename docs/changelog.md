@@ -147,6 +147,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `anvil_type_registry_*` functions, because their headers lack the `visibility push(default)`
   wrapper. Shared-library consumers (`anvil.py`, `anvil.net`, `anvil.java`) can't reach schema or
   types until it's fixed. Added as roadmap addendum A1 for the coder agent.
+- **`agents/ANVL-RELEASE.agent.md`**: instructions for a new ANVL Release agent. It builds from
+  tags only, packages with scripts rather than by hand, and runs release checks against the packaged
+  artifact: a grammar check for `include`, plus version, install, export, checksum and post-deploy
+  checks. Deploys and tag pushes happen only on the owner's go. First assignment:
+  SR-2610-anvl-distribution-001 and BR-2610-anvl-distribution-001, starting with an audit of all
+  five published `0.8.0-rc` tarballs.
 
 ### Fixed
 - **Numeric constraints and values are no longer truncated** (`BR-2610-anvl-types-001`): schema and
