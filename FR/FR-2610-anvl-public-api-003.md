@@ -71,7 +71,7 @@ Follow the `Writer`/`Builder` precedent exactly:
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-public-api-003`, merged to `main`. Tests SCH82-SCH83 (`test_schema.c`) and
+Branch `feat/FR-2610-anvl-public-api-003`, commit `4176349`, merged to `main`. Tests SCH82-SCH83 (`test_schema.c`) and
 TYP34-TYP35 (`test_types.c`). Full unit regression green with unchanged counts elsewhere,
 `test_release`, `check-exports` (163 symbols, now including `Schema` and `TypeRegistry`) and
 `check-reader-only` green, Valgrind-clean on schema, types, vtable, native. Verified by hand: deleting a
