@@ -56,6 +56,7 @@ typedef enum {
    ANVIL_TYPE_TUPLE,
    ANVIL_TYPE_ARRAY,
    ANVIL_TYPE_ENUM,
+   ANVIL_TYPE_BLOB, // a backtick blob; may carry `tag :=`. Appended last - existing values unchanged.
 } anvil_type_kind;
 
 /**

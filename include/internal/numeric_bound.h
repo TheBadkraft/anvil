@@ -56,3 +56,6 @@ bool anvil_type_def_integer(anvil_type_def def, bool *out_declared);
 /// `2.0` and `1e+3` pass and `2.5` fails. A value beyond double range has no fractional part to
 /// speak of and passes. (anvil_numeric_t.is_integral follows the spelling and is not used.)
 bool anvil_numeric_is_whole(anvil_value data);
+
+/// A Blob type's declared `tag := ...` (copied at load), or NULL if it declares none.
+const char *anvil_type_def_tag(anvil_type_def def);

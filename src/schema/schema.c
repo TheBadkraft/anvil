@@ -36,6 +36,7 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   char *tag;             // a blob must carry exactly this @tag; NULL if unconstrained
    bool integer;          // a numeric value must be whole (value-based: 2.0 and 1e+3 pass)
    bool integer_declared; // the rule said so itself, so it overrides the resolved type's
    bool nullable;          // an explicit `null` is a legal value (absent is governed by required)
@@ -218,6 +219,7 @@ static void field_dispose(struct anvil_schema_field_t *f) {
       return;
    }
    dispose_field_values(f->values);
+   Allocator.dispose(f->tag);
    if (f->children) {
       for (usize i = 0, n = List.size(f->children); i < n; i++) {
          struct anvil_schema_field_t *c = NULL;
@@ -350,6 +352,16 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
                      "field '%s': 'required' must be true or false", path);
          }
          Allocator.dispose(text);
+      } else if (strcmp(fname, "tag") == 0) {
+         anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
+         if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
+            Allocator.dispose(field->tag);
+            field->tag = anvil_text_alloc(fval);
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'tag' must be an identifier or string; treated as not declared",
+                     path);
+         }
       } else if (strcmp(fname, "integer") == 0) {
          char *text = anvil_text_alloc(fval);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
@@ -455,6 +467,10 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
       }
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
+      }
+      if (!field->tag) {
+         const char *type_tag = anvil_type_def_tag(resolved);
+         field->tag = type_tag ? anvil_text_dup(type_tag) : NULL;
       }
       if (!field->integer_declared) {
          bool declared = false;
@@ -629,8 +645,11 @@ static bool kind_matches(anvil_type_kind expected, anvil_value_type actual) {
    switch (expected) {
    case ANVIL_TYPE_NUMERIC: return actual == ANVIL_VALUE_NUMERIC;
    case ANVIL_TYPE_STRING:
+      // "Textual content", whatever the spelling: a backtick blob is a string with a tag.
+      return actual == ANVIL_VALUE_STRING || actual == ANVIL_VALUE_BARE || actual == ANVIL_VALUE_BLOB;
    case ANVIL_TYPE_ENUM:
       return actual == ANVIL_VALUE_STRING || actual == ANVIL_VALUE_BARE;
+   case ANVIL_TYPE_BLOB:   return actual == ANVIL_VALUE_BLOB;
    case ANVIL_TYPE_BOOL:   return actual == ANVIL_VALUE_BOOL;
    case ANVIL_TYPE_OBJECT: return actual == ANVIL_VALUE_OBJECT;
    case ANVIL_TYPE_TUPLE:  return actual == ANVIL_VALUE_TUPLE;
@@ -806,10 +825,27 @@ static void check_value(struct anvil_schema_t *s, const struct anvil_schema_fiel
    }
 
    if (rule->has_size && data_val) {
-      size_t len = anvil_value_get_text(data_val, NULL, 0);
+      // A blob's size is its payload in bytes (the tag is not payload); everything else is the
+      // length of its text.
+      size_t len = actual == ANVIL_VALUE_BLOB ? anvil_value_get_bytes(data_val, NULL, 0)
+                                              : anvil_value_get_text(data_val, NULL, 0);
       if ((long long)len > rule->size) {
          add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
                        "field value exceeds the declared size");
+      }
+   }
+   if (rule->tag && actual == ANVIL_VALUE_BLOB) {
+      size_t tlen = anvil_value_get_blob_tag(data_val, NULL, 0);
+      char *tag = Allocator.alloc(tlen + 1);
+      bool match = false;
+      if (tag) {
+         anvil_value_get_blob_tag(data_val, tag, tlen + 1);
+         match = strcmp(tag, rule->tag) == 0;
+      }
+      Allocator.dispose(tag);
+      if (!match) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_TAG,
+                       "blob tag does not match the required tag");
       }
    }
    if (rule->integer && data_val && actual == ANVIL_VALUE_NUMERIC && !anvil_numeric_is_whole(data_val)) {

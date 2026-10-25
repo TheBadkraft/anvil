@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Png := {
+   type := Blob;
+   tag := png;
+};
