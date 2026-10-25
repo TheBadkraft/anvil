@@ -390,6 +390,250 @@ static void test_typ12_long_type_names(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-types-001 — registry diagnostics
+ * ---------------------------------------------------------------------- */
+
+// Loads a one-document registry from buffer source.
+static anvil_type_registry diag_registry(const char *src, anvil_document *out_doc) {
+   *out_doc = anvil_load_buffer(src, strlen(src));
+   return *out_doc ? anvil_type_registry_load(*out_doc) : NULL;
+}
+
+static size_t diag_text(size_t (*getter)(anvil_type_diagnostic, char *, size_t),
+                        anvil_type_diagnostic d, char *out, size_t cap) {
+   out[0] = '\0';
+   return getter(d, out, cap);
+}
+
+static void test_typ13_name_collision_reported(void) {
+   anvil_document consumer = anvil_load(fixture_path("types_dup_consumer.anvl"));
+   TestBit.is_not_null(consumer, "TYP13: consumer loaded");
+   anvil_type_registry reg = consumer ? anvil_type_registry_load_from_includes(consumer) : NULL;
+   TestBit.is_not_null(reg, "TYP13: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP13: exactly one diagnostic");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_not_null(d, "TYP13: diagnostic readable");
+      if (d) {
+         char out[512];
+         TestBit.is_equal_int(ANVIL_TYPE_DIAG_NAME_COLLISION, anvil_type_diagnostic_get_category(d),
+                              "TYP13: category is NAME_COLLISION");
+         diag_text(anvil_type_diagnostic_get_name, d, out, sizeof(out));
+         TestBit.is_true(strcmp(out, "VIN") == 0, "TYP13: names VIN");
+         diag_text(anvil_type_diagnostic_get_message, d, out, sizeof(out));
+         TestBit.is_true(strstr(out, "types_dup_a.anvl") && strstr(out, "types_dup_b.anvl"),
+                         "TYP13: message names both include paths");
+         diag_text(anvil_type_diagnostic_get_source, d, out, sizeof(out));
+         TestBit.is_true(strstr(out, "types_dup_b.anvl") != NULL,
+                         "TYP13: source is the later document");
+      }
+      // last-write-wins stays the behavior: the later include's VIN (size 20) is the one found.
+      long long size = 0;
+      anvil_type_def vin = anvil_type_resolve(reg, "VIN");
+      TestBit.is_true(vin && anvil_type_def_get_size(vin, &size) && size == 20,
+                      "TYP13: resolve returns the later include's definition");
+      // Plate (only in the first include) is unaffected.
+      TestBit.is_not_null(anvil_type_resolve(reg, "Plate"), "TYP13: non-colliding type resolves");
+      anvil_type_registry_dispose(reg);
+   }
+   if (consumer) {
+      anvil_dispose(consumer);
+   }
+}
+
+static void test_typ14_unknown_base_type(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\nFoo := { type := Strng; };\nBar := { size := 3; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP14: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(2, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP14: one diagnostic per bad definition");
+      char out[128];
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, anvil_type_diagnostic_get_category(d),
+                           "TYP14: misspelled base is UNKNOWN_BASE_TYPE");
+      diag_text(anvil_type_diagnostic_get_name, d, out, sizeof(out));
+      TestBit.is_true(strcmp(out, "Foo") == 0, "TYP14: names Foo");
+      d = anvil_type_registry_get_diagnostic(reg, 1);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, anvil_type_diagnostic_get_category(d),
+                           "TYP14: a missing `type :=` is UNKNOWN_BASE_TYPE too");
+      diag_text(anvil_type_diagnostic_get_name, d, out, sizeof(out));
+      TestBit.is_true(strcmp(out, "Bar") == 0, "TYP14: names Bar");
+      TestBit.is_true(anvil_type_registry_find(reg, "Foo") == NULL,
+                      "TYP14: an unknown-base definition is not registered");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ15_malformed_constraint(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\nFoo := { type := String; size := abc; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP15: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP15: one diagnostic");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT,
+                           anvil_type_diagnostic_get_category(d),
+                           "TYP15: category is MALFORMED_CONSTRAINT");
+      char out[128];
+      diag_text(anvil_type_diagnostic_get_name, d, out, sizeof(out));
+      TestBit.is_true(strcmp(out, "Foo") == 0, "TYP15: names Foo");
+      diag_text(anvil_type_diagnostic_get_message, d, out, sizeof(out));
+      TestBit.is_true(strstr(out, "size") != NULL, "TYP15: message names the constraint");
+      long long size = -1;
+      anvil_type_def foo = anvil_type_registry_find(reg, "Foo");
+      TestBit.is_not_null(foo, "TYP15: the definition itself is still registered");
+      TestBit.is_false(foo && anvil_type_def_get_size(foo, &size),
+                       "TYP15: the malformed size is not a declared 0");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ16_malformed_constraint_variants(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "A := { type := Numeric; min := \"x\"; max := 1e+999; };\n"
+      "B := { type := String; size := 2.5; };\n", &doc);
+   if (reg) {
+      TestBit.is_equal_int(3, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP16: min, max and fractional size each reported once");
+      for (size_t i = 0; i < anvil_type_registry_get_diagnostic_count(reg); i++) {
+         TestBit.is_equal_int(ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT,
+                              anvil_type_diagnostic_get_category(
+                                 anvil_type_registry_get_diagnostic(reg, i)),
+                              "TYP16: each is MALFORMED_CONSTRAINT");
+      }
+      anvil_type_registry_dispose(reg);
+   } else {
+      TestBit.is_not_null(reg, "TYP16: registry loaded");
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ17_malformed_enum_values(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\nE := { type := enum; values := red; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP17: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP17: one diagnostic");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES,
+                           anvil_type_diagnostic_get_category(d),
+                           "TYP17: category is MALFORMED_ENUM_VALUES");
+      char out[128];
+      diag_text(anvil_type_diagnostic_get_name, d, out, sizeof(out));
+      TestBit.is_true(strcmp(out, "E") == 0, "TYP17: names E");
+      anvil_type_def e = anvil_type_registry_find(reg, "E");
+      TestBit.is_equal_int(0, (long long)(e ? anvil_type_def_get_value_count(e) : 99),
+                           "TYP17: no labels are declared");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ18_clean_registry_has_no_diagnostics(void) {
+   anvil_document doc = anvil_load(fixture_path("types_basic.anvl"));
+   anvil_type_registry reg = doc ? anvil_type_registry_load(doc) : NULL;
+   TestBit.is_not_null(reg, "TYP18: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP18: a clean registry reports 0 diagnostics");
+      TestBit.is_true(anvil_type_registry_get_diagnostic(reg, 0) == NULL,
+                      "TYP18: get_diagnostic is NULL out of bounds");
+      anvil_type_registry_dispose(reg);
+   }
+   anvil_document consumer = anvil_load(fixture_path("types_clean_consumer.anvl"));
+   anvil_type_registry reg2 = consumer ? anvil_type_registry_load_from_includes(consumer) : NULL;
+   TestBit.is_not_null(reg2, "TYP18: include registry loaded");
+   if (reg2) {
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg2),
+                           "TYP18: clean includes report 0 diagnostics");
+      anvil_type_registry_dispose(reg2);
+   }
+   if (consumer) {
+      anvil_dispose(consumer);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ19_diagnostics_survive_document_disposal(void) {
+   anvil_document consumer = anvil_load(fixture_path("types_dup_consumer.anvl"));
+   anvil_type_registry reg = consumer ? anvil_type_registry_load_from_includes(consumer) : NULL;
+   TestBit.is_not_null(reg, "TYP19: registry loaded");
+   if (consumer) {
+      anvil_dispose(consumer);
+   }
+   if (reg) {
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_not_null(d, "TYP19: diagnostic still present after the documents are disposed");
+      if (d) {
+         char out[512];
+         diag_text(anvil_type_diagnostic_get_message, d, out, sizeof(out));
+         TestBit.is_true(strstr(out, "types_dup_a.anvl") && strstr(out, "types_dup_b.anvl"),
+                         "TYP19: message still names both paths");
+         TestBit.is_true(anvil_type_diagnostic_get_message(d, NULL, 0) == strlen(out),
+                         "TYP19: length query matches the full text");
+      }
+      anvil_type_registry_dispose(reg);
+   }
+}
+
+static void test_typ20_diagnostic_null_safety(void) {
+   char out[8] = "x";
+   TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(NULL),
+                        "TYP20: count(NULL) is 0");
+   TestBit.is_true(anvil_type_registry_get_diagnostic(NULL, 0) == NULL, "TYP20: get(NULL) is NULL");
+   TestBit.is_equal_int(ANVIL_TYPE_DIAG_NONE, anvil_type_diagnostic_get_category(NULL),
+                        "TYP20: category(NULL) is NONE");
+   TestBit.is_equal_int(0, (long long)anvil_type_diagnostic_get_name(NULL, out, sizeof(out)),
+                        "TYP20: name(NULL) is 0");
+   TestBit.is_equal_int(0, (long long)anvil_type_diagnostic_get_source(NULL, out, sizeof(out)),
+                        "TYP20: source(NULL) is 0");
+   TestBit.is_equal_int(0, (long long)anvil_type_diagnostic_get_message(NULL, out, sizeof(out)),
+                        "TYP20: message(NULL) is 0");
+}
+
+
+static void test_typ21_document_get_path(void) {
+   anvil_document doc = anvil_load(fixture_path("types_basic.anvl"));
+   TestBit.is_not_null(doc, "TYP21: document loaded");
+   if (doc) {
+      size_t len = anvil_document_get_path(doc, NULL, 0);
+      char out[512] = {0};
+      TestBit.is_true(len > 0 && len < sizeof(out), "TYP21: path length is reported");
+      TestBit.is_equal_int((long long)len, (long long)anvil_document_get_path(doc, out, sizeof(out)),
+                           "TYP21: copy returns the same length");
+      TestBit.is_true(strstr(out, "types_basic.anvl") != NULL, "TYP21: path names the file");
+      char tiny[4];
+      anvil_document_get_path(doc, tiny, sizeof(tiny));
+      TestBit.is_true(strlen(tiny) == 3, "TYP21: a short buffer is truncated and terminated");
+      anvil_dispose(doc);
+   }
+   TestBit.is_equal_int(0, (long long)anvil_document_get_path(NULL, NULL, 0),
+                        "TYP21: NULL document returns 0");
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -409,6 +653,23 @@ int main(void) {
    TestBit.run_ex("TYP11_numeric_constraints_not_truncated", NULL,
                   test_typ11_numeric_constraints_not_truncated, th);
    TestBit.run_ex("TYP12_long_type_names", NULL, test_typ12_long_type_names, th);
+   TestBit.run_ex("TYP13_name_collision_reported", NULL,
+                  test_typ13_name_collision_reported, th);
+   TestBit.run_ex("TYP14_unknown_base_type", NULL,
+                  test_typ14_unknown_base_type, th);
+   TestBit.run_ex("TYP15_malformed_constraint", NULL,
+                  test_typ15_malformed_constraint, th);
+   TestBit.run_ex("TYP16_malformed_constraint_variants", NULL,
+                  test_typ16_malformed_constraint_variants, th);
+   TestBit.run_ex("TYP17_malformed_enum_values", NULL,
+                  test_typ17_malformed_enum_values, th);
+   TestBit.run_ex("TYP18_clean_registry_has_no_diagnostics", NULL,
+                  test_typ18_clean_registry_has_no_diagnostics, th);
+   TestBit.run_ex("TYP19_diagnostics_survive_document_disposal", NULL,
+                  test_typ19_diagnostics_survive_document_disposal, th);
+   TestBit.run_ex("TYP20_diagnostic_null_safety", NULL,
+                  test_typ20_diagnostic_null_safety, th);
+   TestBit.run_ex("TYP21_document_get_path", NULL, test_typ21_document_get_path, th);
 
    return TestBit.report();
 }

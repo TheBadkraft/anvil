@@ -1,0 +1,4 @@
+#!aml
+include "types_dup_a.anvl";
+
+dummy := 1;

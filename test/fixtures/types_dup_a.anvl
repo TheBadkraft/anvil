@@ -1,0 +1,12 @@
+#!aml
+@[types]
+
+VIN := {
+   type := String;
+   size := 17;
+};
+
+Plate := {
+   type := String;
+   size := 8;
+};

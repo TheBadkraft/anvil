@@ -28,6 +28,8 @@
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -44,11 +46,20 @@ struct anvil_type_def_t {
    anvil_numeric_t max;
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
+   char *source; // path of the document that defined it (for collision reports); NULL for natives
+};
+
+struct anvil_type_diagnostic_t {
+   anvil_type_diag_code category;
+   char *name;    // the type the diagnostic is about
+   char *source;  // the document it was found in
+   char *message; // human-readable; all three allocated to their full length
 };
 
 struct anvil_type_registry_t {
    map by_name;   // def->name -> struct anvil_type_def_t* (lookup)
    list all_defs; // struct anvil_type_def_t* — every def owned by this registry, for disposal
+   list diagnostics; // struct anvil_type_diagnostic_t* — what loading noticed, in order found
 };
 
 // Maps a `type :=` field's raw text to a recognized kind — the six native primitives
@@ -170,7 +181,18 @@ static list read_values_list(anvil_value val) {
 // plus whatever constraints it declares (`size`/`min`/`max`/`values`). Walks the statement's
 // OBJECT value by index (the public flat API has no name-based nested-field lookup — see
 // notes/native-schema.md) since that's the only way to reach any of these fields at all.
-static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) {
+// What read_type_fields saw that the definition itself can't carry: reported by the caller as
+// diagnostics once it knows the definition's name.
+struct type_issues {
+   bool type_declared; // a `type :=` field was present
+   char *type_text;    // its text (allocated), for the report; NULL if absent
+   bool bad_size, bad_min, bad_max, bad_values;
+};
+
+static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
+                             struct type_issues *issues) {
+   *issues = (struct type_issues){0};
+   def->source = NULL;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -189,18 +211,24 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) 
 
       if (strcmp(fname, "type") == 0) {
          char *text = anvil_text_alloc(fval);
+         issues->type_declared = true;
          if (text) {
             def->kind = parse_type_kind(text);
-            Allocator.dispose(text);
+            Allocator.dispose(issues->type_text);
+            issues->type_text = text; // caller disposes
          }
       } else if (strcmp(fname, "size") == 0) {
          def->has_size = anvil_numeric_read_size(fval, &def->size);
+         issues->bad_size = !def->has_size;
       } else if (strcmp(fname, "min") == 0) {
          def->has_min = anvil_numeric_read_bound(fval, &def->min);
+         issues->bad_min = !def->has_min;
       } else if (strcmp(fname, "max") == 0) {
          def->has_max = anvil_numeric_read_bound(fval, &def->max);
+         issues->bad_max = !def->has_max;
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
+         issues->bad_values = (def->values == NULL);
       }
       Allocator.dispose(fname);
    }
@@ -221,42 +249,123 @@ static void dispose_def_values(struct anvil_type_def_t *def) {
    def->values = NULL;
 }
 
+// Records one diagnostic on reg. The message is formatted to its exact length - names and
+// paths have no fixed bound.
+static void add_diag(struct anvil_type_registry_t *reg, anvil_type_diag_code code,
+                     const char *name, const char *source, const char *fmt, ...) {
+   struct anvil_type_diagnostic_t *d = Allocator.alloc(sizeof(struct anvil_type_diagnostic_t));
+   if (!d) {
+      return;
+   }
+   va_list ap, ap2;
+   va_start(ap, fmt);
+   va_copy(ap2, ap);
+   int len = vsnprintf(NULL, 0, fmt, ap);
+   va_end(ap);
+   d->category = code;
+   d->name = anvil_text_dup(name);
+   d->source = anvil_text_dup(source);
+   d->message = len >= 0 ? Allocator.alloc((size_t)len + 1) : NULL;
+   if (d->message) {
+      vsnprintf(d->message, (size_t)len + 1, fmt, ap2);
+   }
+   va_end(ap2);
+   if (!d->name || !d->source || !d->message) {
+      Allocator.dispose(d->name);
+      Allocator.dispose(d->source);
+      Allocator.dispose(d->message);
+      Allocator.dispose(d);
+      return;
+   }
+   List.append(reg->diagnostics, d);
+}
+
 // Walks one document's own top-level statements into reg, registering each well-formed type
 // definition — shared by anvil_type_registry_load (doc itself is the definitions file) and
 // anvil_type_registry_load_from_includes (called once per @[types]-carrying direct include, so
-// several documents' definitions can land in the same combined registry).
+// several documents' definitions can land in the same combined registry). Anything wrong with
+// a definition is reported on reg's diagnostics; the registry itself stays best-effort.
 static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *reg) {
    anvil_statement_iterator it = anvil_document_get_statements(doc);
    if (!it) {
       return;
    }
+   size_t path_len = anvil_document_get_path(doc, NULL, 0);
+   char *path = Allocator.alloc(path_len + 1);
+   if (path) {
+      anvil_document_get_path(doc, path, path_len + 1);
+   }
+   const char *src = path ? path : "";
+
    anvil_statement stmt = NULL;
    while (anvil_statement_iterator_next(it, &stmt)) {
       anvil_value val = anvil_statement_get_value(stmt);
       if (!val || anvil_value_get_type(val) != ANVIL_VALUE_OBJECT) {
-         continue; // not a well-formed type definition — skip (first-slice scope, not yet
-                   // reported as a validation error; see anvil_type_registry_load's doc comment)
+         continue; // not a type-definition shape at all (a bare value) - no category fits it
       }
       struct anvil_type_def_t *def = Allocator.alloc(sizeof(struct anvil_type_def_t));
       if (!def) {
          continue;
       }
-      read_type_fields(val, def);
-      if (def->kind == ANVIL_TYPE_UNKNOWN) {
-         dispose_def_values(def);
-         Allocator.dispose(def); // no recognized `type :=` — skip, same reasoning as above
-         continue;
-      }
+      struct type_issues issues;
+      read_type_fields(val, def, &issues);
       def->name = anvil_name_alloc(stmt);
-      if (!def->name) {
-         dispose_def_values(def);
-         Allocator.dispose(def);
-         continue;
+      def->source = anvil_text_dup(src);
+      if (!def->name || !def->source) {
+         goto discard;
+      }
+
+      if (def->kind == ANVIL_TYPE_UNKNOWN) {
+         if (issues.type_declared) {
+            add_diag(reg, ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, def->name, src,
+                     "type '%s' has an unrecognized base type 'type := %s'", def->name,
+                     issues.type_text ? issues.type_text : "");
+         } else {
+            add_diag(reg, ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, def->name, src,
+                     "type '%s' declares no 'type :=' base type", def->name);
+         }
+         goto discard; // not registered
+      }
+
+      if (issues.bad_size) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'size' is not a non-negative integer; treated as not declared",
+                  def->name);
+      }
+      if (issues.bad_min) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'min' is not a valid number; treated as not declared", def->name);
+      }
+      if (issues.bad_max) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'max' is not a valid number; treated as not declared", def->name);
+      }
+      if (issues.bad_values) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES, def->name, src,
+                  "type '%s': 'values' must be an array of labels", def->name);
+      }
+
+      addr prior = 0;
+      if (Map.get(reg->by_name, def->name, strlen(def->name), &prior) && prior) {
+         const char *earlier = ((struct anvil_type_def_t *)prior)->source;
+         add_diag(reg, ANVIL_TYPE_DIAG_NAME_COLLISION, def->name, src,
+                  "type '%s' is defined in both '%s' and '%s'; the one in '%s' is used",
+                  def->name, earlier ? earlier : "", src, src);
       }
       Map.set(reg->by_name, def->name, strlen(def->name), (addr)def); // last-write-wins on
                                                                        // a name collision
       List.append(reg->all_defs, def);
+      Allocator.dispose(issues.type_text);
+      continue;
+
+   discard:
+      Allocator.dispose(issues.type_text);
+      dispose_def_values(def);
+      Allocator.dispose(def->name);
+      Allocator.dispose(def->source);
+      Allocator.dispose(def);
    }
+   Allocator.dispose(path);
    anvil_statement_iterator_dispose(it);
 }
 
@@ -267,6 +376,7 @@ static struct anvil_type_registry_t *new_empty_registry(void) {
    }
    reg->by_name = Map.new(8);
    reg->all_defs = List.new(8, sizeof(struct anvil_type_def_t *));
+   reg->diagnostics = List.new(4, sizeof(struct anvil_type_diagnostic_t *));
    return reg;
 }
 
@@ -320,6 +430,7 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
          if (def) {
             dispose_def_values(def);
             Allocator.dispose(def->name);
+            Allocator.dispose(def->source);
          }
          Allocator.dispose(def);
       }
@@ -327,6 +438,20 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
    }
    if (r->by_name) {
       Map.dispose(r->by_name);
+   }
+   if (r->diagnostics) {
+      usize n = List.size(r->diagnostics);
+      for (usize i = 0; i < n; i++) {
+         struct anvil_type_diagnostic_t *d = NULL;
+         List.get(r->diagnostics, i, (object *)&d);
+         if (d) {
+            Allocator.dispose(d->name);
+            Allocator.dispose(d->source);
+            Allocator.dispose(d->message);
+         }
+         Allocator.dispose(d);
+      }
+      List.dispose(r->diagnostics);
    }
    Allocator.dispose(r);
 }
@@ -435,4 +560,46 @@ size_t anvil_type_def_get_value(anvil_type_def def, size_t index, char *buf, siz
       buf[copy_len] = '\0';
    }
    return len;
+}
+
+size_t anvil_type_registry_get_diagnostic_count(anvil_type_registry reg) {
+   struct anvil_type_registry_t *r = (struct anvil_type_registry_t *)reg;
+   return r && r->diagnostics ? (size_t)List.size(r->diagnostics) : 0;
+}
+
+anvil_type_diagnostic anvil_type_registry_get_diagnostic(anvil_type_registry reg, size_t index) {
+   struct anvil_type_registry_t *r = (struct anvil_type_registry_t *)reg;
+   if (!r || !r->diagnostics || index >= (size_t)List.size(r->diagnostics)) {
+      return NULL;
+   }
+   struct anvil_type_diagnostic_t *d = NULL;
+   List.get(r->diagnostics, index, (object *)&d);
+   return (anvil_type_diagnostic)d;
+}
+
+anvil_type_diag_code anvil_type_diagnostic_get_category(anvil_type_diagnostic diag) {
+   return diag ? diag->category : ANVIL_TYPE_DIAG_NONE;
+}
+
+// snprintf-style: always the full length, writes at most buflen - 1 characters plus the NUL.
+static size_t copy_diag_text(const char *text, char *buf, size_t buflen) {
+   size_t len = strlen(text);
+   if (buf && buflen > 0) {
+      size_t n = len < buflen - 1 ? len : buflen - 1;
+      memcpy(buf, text, n);
+      buf[n] = '\0';
+   }
+   return len;
+}
+
+size_t anvil_type_diagnostic_get_name(anvil_type_diagnostic diag, char *buf, size_t buflen) {
+   return diag ? copy_diag_text(diag->name, buf, buflen) : 0;
+}
+
+size_t anvil_type_diagnostic_get_source(anvil_type_diagnostic diag, char *buf, size_t buflen) {
+   return diag ? copy_diag_text(diag->source, buf, buflen) : 0;
+}
+
+size_t anvil_type_diagnostic_get_message(anvil_type_diagnostic diag, char *buf, size_t buflen) {
+   return diag ? copy_diag_text(diag->message, buf, buflen) : 0;
 }

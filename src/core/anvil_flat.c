@@ -767,6 +767,13 @@ anvil_attribute anvil_document_get_attribute(anvil_document doc, size_t index) {
    return (anvil_attribute)attr;
 }
 
+size_t anvil_document_get_path(anvil_document doc, char *buf, size_t buflen) {
+   if (!doc || !doc->root || !doc->root->filepath) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   return copy_to_buffer(doc->root->filepath, strlen(doc->root->filepath), buf, buflen);
+}
+
 anvil_attribute anvil_document_find_attribute(anvil_document doc, const char *key) {
    if (!doc || !doc->root || !doc->root->header || !key) {
       return NULL;

@@ -393,6 +393,18 @@ anvil_attribute anvil_document_get_attribute(anvil_document doc, size_t index);
 anvil_attribute anvil_document_find_attribute(anvil_document doc, const char *key);
 
 /**
+ * @brief The path a document was loaded from, as registered with its context: the file path
+ * for anvil_load (and for each resolved include), a fixed placeholder label for
+ * anvil_load_buffer. Lets a consumer name the document a diagnostic came from.
+ * @param doc The document to read. NULL writes nothing and returns 0.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full path length (excluding NUL), regardless of buflen - same
+ * snprintf-style convention as anvil_statement_get_name.
+ */
+size_t anvil_document_get_path(anvil_document doc, char *buf, size_t buflen);
+
+/**
  * @brief A statement's own `@[...]` attribute count.
  * @param stmt The statement to check. NULL returns 0.
  */
