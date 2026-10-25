@@ -101,3 +101,22 @@ green with unchanged counts elsewhere (writer 17 -> 19), `test_release`, `check-
   end to end (`source_registry.c` keys on `sizeof(uint64_t)` bytes), and `source_compute_hash` uses
   `UINT64_C` constants and `uint64_t`/`memcpy`. Nothing is narrowed to `size_t`, so it behaves the same
   on 32-bit. No change needed.
+
+## Verification on the Linode box (emsdk 6.0.2, wasm32)
+
+Done after the fix merged (`7616a77`), in a throwaway directory on the build box (since removed); no
+project there was touched and nothing was published.
+
+- **Reproduced, then gone.** `emcc -Wall -Wextra` on the pre-fix `grammar.c` prints the exact warning
+  from the report (`implicit conversion from 'unsigned long long' to 'size_t' (aka 'unsigned long')
+  changes value from 14695981039346656037 to 2216829733 [-Wconstant-conversion]`). The merged
+  `grammar.c` compiles clean with `-Werror`.
+- **Correct on wasm32** (`sizeof(size_t) == 4`, run under node): `wg_hash_name` returns
+  `cbf29ce484222325` / `af63dc4c8601ec8c` / `85944171f73967e8` for `""` / `"a"` / `"foobar"` (the
+  published 64-bit FNV-1a values, identical to native), and 1500 inserts + 1500 re-inserts give 1500
+  adds, 1500 duplicates, count 1500, capacity 4096 (several grows).
+- **No other wasm32 warnings:** every source in `src/core`, `src/sigma` (except the superseded
+  `memory.c`), `src/anvil_types*.c`, `src/schema` and `src/writer` compiles with `emcc -Wall -Wextra` and
+  prints nothing.
+
+The Bindings agent's rebuild of `anvil.wasm` needs no further native change for this ticket.
