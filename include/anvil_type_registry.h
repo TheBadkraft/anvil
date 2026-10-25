@@ -72,15 +72,17 @@ typedef enum {
 anvil_type_registry anvil_type_registry_load(anvil_document doc);
 
 /**
- * @brief Build a registry from a document's own *direct* includes (not the
- * whole transitive graph — see anvil_document_get_includes), the mechanism
+ * @brief Build a registry from a document's include graph, the mechanism
  * behind the `types.X` namespace: `doc` itself does not need to carry
- * @[types] at all. Every direct include that does carry @[types] has its own
- * type definitions merged into one combined registry, keyed by bare name
- * (e.g. "VIN", not "types.VIN") — `types.` is a flat namespace, independent
- * of which included file a given name actually came from. If two includes
- * declare the same name, the later one wins (last-write) and the collision is reported
- * through the registry's diagnostics.
+ * @[types] at all. Includes are followed transitively, depth-first in
+ * include order, each document visited at most once; every document on the
+ * way that carries @[types] has its type definitions merged into one combined
+ * registry, keyed by bare name (e.g. "VIN", not "types.VIN"). A document
+ * without @[types] is walked through but contributes nothing. Deeper
+ * includes merge first, so a definition closer to `doc` overrides a deeper
+ * one - `types.` is a flat namespace, independent of which included file a
+ * given name actually came from. Any name declared twice resolves last-write
+ * and is reported through the registry's diagnostics.
  * @param doc The (typically non-@[types]) document whose includes to walk.
  * @return The registry handle (real but empty if `doc` has no @[types]
  * includes), or NULL only if doc itself is NULL. Dispose with

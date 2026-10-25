@@ -634,6 +634,112 @@ static void test_typ21_document_get_path(void) {
                         "TYP21: NULL document returns 0");
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-types-002 — @[types] resolution follows nested includes
+ * ---------------------------------------------------------------------- */
+static anvil_type_registry include_registry(const char *fixture, anvil_document *out_doc) {
+   *out_doc = anvil_load(fixture_path(fixture));
+   return *out_doc ? anvil_type_registry_load_from_includes(*out_doc) : NULL;
+}
+
+static void test_typ22_transitive_include(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("trans_consumer.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP22: registry loaded");
+   if (reg) {
+      TestBit.is_not_null(anvil_type_resolve(reg, "TicketId"), "TYP22: direct include's type resolves");
+      anvil_type_def id = anvil_type_resolve(reg, "Id");
+      TestBit.is_not_null(id, "TYP22: a type two includes deep resolves");
+      long long min = 0;
+      TestBit.is_true(id && anvil_type_def_get_min(id, &min) && min == 1,
+                      "TYP22: it is the deep definition, constraints intact");
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP22: no diagnostics");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+// The core treats an include cycle as a load error (ANVL_ERR_INCLUDE_CYCLIC) and never parses the
+// bodies of a cyclic graph, so no definition inside one is reachable; what the walk must guarantee
+// is that it terminates, doesn't crash, and invents no collision. (FR-2610-anvl-types-002 assumed
+// the core resolved cycles - see the ticket's Resolution.)
+static void test_typ23_include_cycle_terminates(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("cyc_consumer.anvl", &doc);
+   TestBit.is_not_null(doc, "TYP23: cyclic include graph loaded");
+   TestBit.is_not_null(reg, "TYP23: registry loaded (the walk terminated)");
+   if (reg) {
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP23: a cycle produces no self-collision");
+      TestBit.is_true(anvil_type_registry_find(reg, "Alpha") == NULL,
+                      "TYP23: nothing from an unparsed cyclic graph is registered");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ24_non_types_document_is_traversed(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("trans_via_mid_consumer.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP24: registry loaded");
+   if (reg) {
+      TestBit.is_not_null(anvil_type_resolve(reg, "Id"),
+                          "TYP24: Id resolves through a non-@[types] document");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ25_closer_definition_overrides_deeper(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("ovr_consumer.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP25: registry loaded");
+   if (reg) {
+      long long max = 0;
+      anvil_type_def id = anvil_type_resolve(reg, "Id");
+      TestBit.is_true(id && anvil_type_def_get_max(id, &max) && max == 5,
+                      "TYP25: the including document's Id (max 5) wins over the deeper one");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP25: the override is reported once");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_NAME_COLLISION, anvil_type_diagnostic_get_category(d),
+                           "TYP25: as a NAME_COLLISION");
+      char out[512] = {0};
+      anvil_type_diagnostic_get_message(d, out, sizeof(out));
+      TestBit.is_true(strstr(out, "ovr_a.types.anvl") && strstr(out, "ovr_b.types.anvl"),
+                      "TYP25: naming both documents");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ26_shared_include_visited_once(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("dia_consumer.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP26: registry loaded");
+   if (reg) {
+      TestBit.is_not_null(anvil_type_resolve(reg, "Shared"), "TYP26: the shared type resolves");
+      TestBit.is_not_null(anvil_type_resolve(reg, "X"), "TYP26: X resolves");
+      TestBit.is_not_null(anvil_type_resolve(reg, "Y"), "TYP26: Y resolves");
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP26: a diamond include is not a collision with itself");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -670,6 +776,11 @@ int main(void) {
    TestBit.run_ex("TYP20_diagnostic_null_safety", NULL,
                   test_typ20_diagnostic_null_safety, th);
    TestBit.run_ex("TYP21_document_get_path", NULL, test_typ21_document_get_path, th);
+   TestBit.run_ex("TYP22_TRANSITIVE_INCLUDE", NULL, test_typ22_transitive_include, th);
+   TestBit.run_ex("TYP23_INCLUDE_CYCLE_TERMINATES", NULL, test_typ23_include_cycle_terminates, th);
+   TestBit.run_ex("TYP24_NON_TYPES_DOCUMENT_IS_TRAVERSED", NULL, test_typ24_non_types_document_is_traversed, th);
+   TestBit.run_ex("TYP25_CLOSER_DEFINITION_OVERRIDES_DEEPER", NULL, test_typ25_closer_definition_overrides_deeper, th);
+   TestBit.run_ex("TYP26_SHARED_INCLUDE_VISITED_ONCE", NULL, test_typ26_shared_include_visited_once, th);
 
    return TestBit.report();
 }

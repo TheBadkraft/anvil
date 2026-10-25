@@ -380,6 +380,52 @@ static struct anvil_type_registry_t *new_empty_registry(void) {
    return reg;
 }
 
+// A document's path as a fresh, full-length string (NULL on allocation failure).
+static char *doc_path_alloc(anvil_document doc) {
+   size_t len = anvil_document_get_path(doc, NULL, 0);
+   char *path = Allocator.alloc(len + 1);
+   if (path) {
+      anvil_document_get_path(doc, path, len + 1);
+   }
+   return path;
+}
+
+// Takes ownership of path (kept in `paths` for the Map's key lifetime).
+static void mark_visited(map visited, list paths, char *path) {
+   List.append(paths, path);
+   Map.set(visited, path, strlen(path), (addr)1);
+}
+
+// Depth-first, in include order, deeper documents first: each include's own includes are
+// merged before its own definitions, so a definition closer to the consumer overrides a deeper
+// one (and collect_type_defs reports that as a NAME_COLLISION). Every document is visited at
+// most once. A document without @[types] is traversed - its includes may be types files - but
+// contributes no definitions.
+static void walk_includes(anvil_document doc, struct anvil_type_registry_t *reg, map visited,
+                          list visited_paths) {
+   anvil_document_iterator it = anvil_document_get_includes(doc);
+   if (!it) {
+      return;
+   }
+   anvil_document included = NULL;
+   while (anvil_document_iterator_next(it, &included)) {
+      char *path = doc_path_alloc(included);
+      addr seen = 0;
+      if (path && !Map.get(visited, path, strlen(path), &seen)) {
+         mark_visited(visited, visited_paths, path);
+         walk_includes(included, reg, visited, visited_paths);
+         if (anvil_document_find_attribute(included, "types")) {
+            collect_type_defs(included, reg);
+         }
+      } else {
+         Allocator.dispose(path);
+      }
+      anvil_dispose(included); // caller's own responsibility - safe, shares doc's context
+                               // (see anvil_document_iterator's own doc comment)
+   }
+   anvil_document_iterator_dispose(it);
+}
+
 anvil_type_registry anvil_type_registry_load(anvil_document doc) {
    if (!doc || !anvil_document_find_attribute(doc, "types")) {
       return NULL; // @[types] has exactly one meaning — see notes/native-schema.md
@@ -401,18 +447,22 @@ anvil_type_registry anvil_type_registry_load_from_includes(anvil_document doc) {
       return NULL;
    }
 
-   anvil_document_iterator it = anvil_document_get_includes(doc);
-   if (it) {
-      anvil_document included = NULL;
-      while (anvil_document_iterator_next(it, &included)) {
-         if (anvil_document_find_attribute(included, "types")) {
-            collect_type_defs(included, reg);
-         }
-         anvil_dispose(included); // caller's own responsibility — safe, shares doc's context
-                                   // (see anvil_document_iterator's own doc comment)
-      }
-      anvil_document_iterator_dispose(it);
+   // Visited set keyed by document path: a diamond include contributes once, and a cycle (the
+   // core reports one as a load error, but the walk must not depend on that) cannot loop.
+   map visited = Map.new(8);
+   list visited_paths = List.new(8, sizeof(char *)); // owns the key strings
+   char *root_path = doc_path_alloc(doc);
+   if (root_path) {
+      mark_visited(visited, visited_paths, root_path);
    }
+   walk_includes(doc, reg, visited, visited_paths);
+   for (usize i = 0, n = List.size(visited_paths); i < n; i++) {
+      char *p = NULL;
+      List.get(visited_paths, i, (object *)&p);
+      Allocator.dispose(p);
+   }
+   List.dispose(visited_paths);
+   Map.dispose(visited);
 
    return (anvil_type_registry)reg;
 }

@@ -1,0 +1,5 @@
+#!aml
+include "trans_mid.anvl";
+@[schema]
+
+ref := { type := types.Id; };
