@@ -143,6 +143,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work for the ANVL Bindings agent. Tickets and plan only; nothing implemented yet.
 - **`FR-2610-anvl-public-api-003`**: `Schema`/`TypeRegistry` vtables for the `anvil.py`/`anvil.net`
   bindings (roadmap decision D4). Owned by the Bindings agent, and starts after roadmap Phase 3.
+- **`BR-2610-anvl-visibility-001`** (filed): `libanvil.so` exports none of the `anvil_schema_*` /
+  `anvil_type_registry_*` functions, because their headers lack the `visibility push(default)`
+  wrapper. Shared-library consumers (`anvil.py`, `anvil.net`, `anvil.java`) can't reach schema or
+  types until it's fixed. Added as roadmap addendum A1 for the coder agent.
 
 ### Fixed
 - **Numeric constraints and values are no longer truncated** (`BR-2610-anvl-types-001`): schema and

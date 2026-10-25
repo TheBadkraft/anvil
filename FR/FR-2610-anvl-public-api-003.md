@@ -7,8 +7,9 @@ coder agent does not work this ticket.
 **Filed:** 2026-10-25
 **Filed by:** anvil (planning)
 **Requested by:** rivet, flywire (downstream consumers, through the `anvil.py`/`anvil.net` bindings)
-**Status:** open — not started; **start only after roadmap Phase 3 is merged to `main`** (last
-ticket: FR-2610-anvl-schema-005)
+**Status:** open — not started. Phase 3 is merged; **blocked on BR-2610-anvl-visibility-001**
+(schema/type-registry functions aren't exported from `libanvil.so`, so vtable instances over them
+would have nothing to bind through)
 **Decision:** roadmap D4, answered 2026-10-25: add the vtables after Phase 3
 **Tags:** public-api, vtable, schema, types, bindings, rivet-readiness
 
