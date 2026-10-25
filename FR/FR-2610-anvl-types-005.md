@@ -57,7 +57,7 @@ BR-2610-anvl-types-001 (must land first).
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-types-005`, merged to `main`. Tests TYP29–TYP30 (`test_types.c`) and SCH58–SCH61
+Branch `feat/FR-2610-anvl-types-005`, commit `62d6ad5`, merged to `main`. Tests TYP29–TYP30 (`test_types.c`) and SCH58–SCH61
 (`test_schema.c`); fixtures `schema_integer_*`. Full unit regression green with unchanged counts
 elsewhere, `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document,
 resolver. Docs: `docs/types-reference.md` Constraints section (and the site mirror).
