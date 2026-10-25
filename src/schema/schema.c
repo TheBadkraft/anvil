@@ -20,6 +20,7 @@
 #include "anvil_schema.h"
 #include "anvil_type_registry.h"
 #include "internal/numeric_bound.h"
+#include "internal/text_alloc.h"
 // ----------------
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
@@ -27,11 +28,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ANVIL_SCHEMA_NAME_MAX 65
-#define ANVIL_SCHEMA_MSG_MAX 128
-
 struct anvil_schema_field_t {
-   char name[ANVIL_SCHEMA_NAME_MAX];
+   char *name; // allocated to its full length
    bool has_kind;
    anvil_type_kind kind;
    bool required;
@@ -101,9 +99,9 @@ static list copy_values_from_type(anvil_type_def def) {
 }
 
 struct anvil_schema_violation_t {
-   char field[ANVIL_SCHEMA_NAME_MAX];
+   char *field; // allocated to its full length, never clipped to a fixed size
    anvil_schema_err_code category;
-   char message[ANVIL_SCHEMA_MSG_MAX];
+   char *message;
 };
 
 struct anvil_schema_t {
@@ -132,14 +130,16 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
    size_t count = anvil_value_get_count(obj_val);
    for (size_t i = 0; i < count; i++) {
       anvil_statement fstmt = anvil_value_get_statement(obj_val, i);
-      char fname[16] = {0};
-      anvil_statement_get_name(fstmt, fname, sizeof(fname));
+      char *fname = anvil_name_alloc(fstmt);
       anvil_value fval = anvil_statement_get_value(fstmt);
+      if (!fname) {
+         continue;
+      }
 
       if (strcmp(fname, "type") == 0) {
-         char text[64] = {0};
-         anvil_value_get_text(fval, text, sizeof(text));
-         resolved = anvil_type_resolve(types, strip_types_prefix(text));
+         char *text = anvil_text_alloc(fval);
+         resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
+         Allocator.dispose(text);
          if (resolved) {
             field->has_kind = true;
             field->kind = anvil_type_def_get_kind(resolved);
@@ -149,9 +149,9 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          // handling; no error-reporting design exists yet for a malformed *schema* field
          // itself (as opposed to a data document failing to satisfy a well-formed one).
       } else if (strcmp(fname, "required") == 0) {
-         char text[8] = {0};
-         anvil_value_get_text(fval, text, sizeof(text));
-         field->required = (strcmp(text, "true") == 0);
+         char *text = anvil_text_alloc(fval);
+         field->required = text && strcmp(text, "true") == 0;
+         Allocator.dispose(text);
       } else if (strcmp(fname, "size") == 0) {
          field->has_size = anvil_numeric_read_size(fval, &field->size);
       } else if (strcmp(fname, "min") == 0) {
@@ -161,6 +161,7 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
       } else if (strcmp(fname, "values") == 0) {
          field->values = read_values_list(fval);
       }
+      Allocator.dispose(fname);
    }
 
    // Constraint inheritance: whatever the field didn't declare inline falls back to the
@@ -215,7 +216,11 @@ anvil_schema anvil_schema_load(anvil_document doc) {
          if (!field) {
             continue;
          }
-         anvil_statement_get_name(stmt, field->name, sizeof(field->name));
+         field->name = anvil_name_alloc(stmt);
+         if (!field->name) {
+            Allocator.dispose(field);
+            continue;
+         }
          read_field_rule(val, types, field);
 
          List.append(schema->fields, field);
@@ -236,6 +241,10 @@ static void dispose_violations(list violations) {
    for (usize i = 0; i < n; i++) {
       struct anvil_schema_violation_t *v = NULL;
       List.get(violations, i, (object *)&v);
+      if (v) {
+         Allocator.dispose(v->field);
+         Allocator.dispose(v->message);
+      }
       Allocator.dispose(v);
    }
    List.dispose(violations);
@@ -267,6 +276,9 @@ void anvil_schema_dispose(anvil_schema schema) {
          List.get(s->fields, i, (object *)&f);
          if (f) {
             dispose_field_values(f->values);
+         }
+         if (f) {
+            Allocator.dispose(f->name);
          }
          Allocator.dispose(f);
       }
@@ -306,19 +318,15 @@ static void add_violation(list violations, const char *field_name, anvil_schema_
    if (!v) {
       return;
    }
-   size_t flen = strlen(field_name);
-   if (flen >= sizeof(v->field)) {
-      flen = sizeof(v->field) - 1;
-   }
-   memcpy(v->field, field_name, flen);
-   v->field[flen] = '\0';
+   v->field = anvil_text_dup(field_name);
+   v->message = anvil_text_dup(message);
    v->category = cat;
-   size_t mlen = strlen(message);
-   if (mlen >= sizeof(v->message)) {
-      mlen = sizeof(v->message) - 1;
+   if (!v->field || !v->message) {
+      Allocator.dispose(v->field);
+      Allocator.dispose(v->message);
+      Allocator.dispose(v);
+      return;
    }
-   memcpy(v->message, message, mlen);
-   v->message[mlen] = '\0';
    List.append(violations, v);
 }
 
@@ -373,18 +381,18 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
          }
       }
       if (field->values && data_val) {
-         char text[128] = {0};
-         anvil_value_get_text(data_val, text, sizeof(text));
+         char *text = anvil_text_alloc(data_val);
          bool member = false;
          usize value_count = List.size(field->values);
          for (usize vi = 0; vi < value_count; vi++) {
             char *label = NULL;
             List.get(field->values, vi, (object *)&label);
-            if (label && strcmp(label, text) == 0) {
+            if (label && text && strcmp(label, text) == 0) {
                member = true;
                break;
             }
          }
+         Allocator.dispose(text);
          if (!member) {
             add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
                           "field value is not one of the declared values");
@@ -398,13 +406,16 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
    if (dit) {
       anvil_statement dstmt = NULL;
       while (anvil_statement_iterator_next(dit, &dstmt)) {
-         char dname[ANVIL_SCHEMA_NAME_MAX] = {0};
-         anvil_statement_get_name(dstmt, dname, sizeof(dname));
+         char *dname = anvil_name_alloc(dstmt);
+         if (!dname) {
+            continue;
+         }
          addr unused = 0;
          if (!Map.get(s->by_name, dname, strlen(dname), &unused)) {
             add_violation(s->violations, dname, ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
                           "field is not declared in the schema");
          }
+         Allocator.dispose(dname);
       }
       anvil_statement_iterator_dispose(dit);
    }

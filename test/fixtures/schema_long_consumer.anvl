@@ -1,0 +1,6 @@
+#!aml
+include "schema_long_types.anvl";
+@[schema]
+
+ref_b := { type := types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxBBBBBBBBBBBBBBBBB; };
+ref_a := { type := types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxAAAAAAAAAAAAAAAAA; };

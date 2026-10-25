@@ -60,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data value compares by sign). A non-numeric, overflowing or fractional-`size` declaration is
   treated as not declared rather than as `0`. `anvil_type_def_get_min`/`_max` now return false for a
   fractional bound instead of a truncated integer.
+- **No fixed-buffer truncation in types and schema** (`BR-2610-anvl-schema-001`): type names, field
+  names, rule keys, `type :=` references, `required`, enum `values` comparisons and violation
+  `field`/`message` text were read through fixed stack buffers (16/64/65/128 bytes) and compared by
+  their clipped prefix, so two long type names sharing 63 characters collided, a 200-character enum
+  label never matched, and an undeclared field could hide behind a declared one with the same
+  64-character prefix. Everything is now read and stored at its full length. Also fixes a leak of an
+  enum type's `values` when its `type :=` was unrecognised.
 
 ---
 

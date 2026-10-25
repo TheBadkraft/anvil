@@ -354,6 +354,42 @@ static void test_typ11_numeric_constraints_not_truncated(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * TYP12 (BR-2610-anvl-schema-001) — type names are stored and looked up in
+ * full: two 80-char names sharing their first 63 chars stay distinct
+ * ---------------------------------------------------------------------- */
+static void test_typ12_long_type_names(void) {
+   char a[81], b[81], prefix[64], src[512];
+   memset(a, 'x', 63); memset(a + 63, 'A', 17); a[80] = '\0';
+   memset(b, 'x', 63); memset(b + 63, 'B', 17); b[80] = '\0';
+   memcpy(prefix, a, 63); prefix[63] = '\0';
+   snprintf(src, sizeof(src),
+            "#!aml\n@[types]\n%s := { type := String; size := 3; };\n%s := { type := Numeric; };\n",
+            b, a);
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   anvil_type_registry reg = doc ? anvil_type_registry_load(doc) : NULL;
+   TestBit.is_not_null(reg, "TYP12: registry loaded");
+   if (reg) {
+      anvil_type_def da = anvil_type_registry_find(reg, a);
+      anvil_type_def db = anvil_type_registry_find(reg, b);
+      TestBit.is_not_null(da, "TYP12: first 80-char name found");
+      TestBit.is_not_null(db, "TYP12: second 80-char name found");
+      if (da && db) {
+         TestBit.is_equal_int(ANVIL_TYPE_NUMERIC, anvil_type_def_get_kind(da),
+                              "TYP12: first name keeps its own kind");
+         TestBit.is_equal_int(ANVIL_TYPE_STRING, anvil_type_def_get_kind(db),
+                              "TYP12: second name is not overwritten by the first");
+      }
+      TestBit.is_true(anvil_type_registry_find(reg, prefix) == NULL,
+                      "TYP12: the shared 63-char prefix is not a type");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -372,6 +408,7 @@ int main(void) {
    TestBit.run_ex("TYP10_resolve_null_safety", NULL, test_typ10_resolve_null_safety, th);
    TestBit.run_ex("TYP11_numeric_constraints_not_truncated", NULL,
                   test_typ11_numeric_constraints_not_truncated, th);
+   TestBit.run_ex("TYP12_long_type_names", NULL, test_typ12_long_type_names, th);
 
    return TestBit.report();
 }
