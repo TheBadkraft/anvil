@@ -28,7 +28,7 @@ reflects what's real and verified today, not what's planned.
 | **AMP** (`#!amp`) — structured messaging, zero parser attack surface | ✅ Complete |
 | **Resolution** — `$identifier` VarRef, `base`/inheritance, field-merging | ✅ Complete |
 | **Public C API** — `anvil_flat.h` (flat) + `anvil_vtable.h` (vtable) | ✅ Complete |
-| **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented, first phase |
+| **Opt-in type system** (`@[types]`, `anvil_types.c`) | ✅ Implemented |
 | **AnvilSchema** (`@[schema]`, validating a document's shape, full constraint checking) | ✅ Implemented |
 | **Streaming writer & document builder** (`anvil_writer.h`, `anvil_builder.h` — emit canonical AML/AMP; separate add-on from the reader) | ✅ Implemented |
 | **Distributable library** (static `.a` + shared `.so`, debug/release, functional/e2e tests against all four) | ✅ Implemented |
@@ -67,7 +67,8 @@ that includes the file that defines it. Nothing about opting in changes the defa
 doesn't. See [`docs/types-reference.md`](docs/types-reference.md) for the full reference.
 
 Schema (validating a *data* document's shape against declared field types) builds on the same
-type system and is fully implemented, including constraint checking (`size`/`min`/`max`/`values`)
+type system and is fully implemented, including constraint checking (`size`/`min`/`max`/`values`),
+nested objects and arrays, `nullable`, `integer`, `format`, blobs, diagnostics, introspection,
 and type inheritance — see [`notes/native-schema.md`](notes/native-schema.md) for the design
 record. "ANVL proper" (core + types + schema) now builds as a real static library and is the
 project's current milestone before AnvilScript starts — see
@@ -227,8 +228,8 @@ Native parse a typical config," in isolation.
 - [`docs/types-reference.md`](docs/types-reference.md) — the opt-in type system: how to define
   types, the native primitive vocabulary, enums, cross-file resolution.
 - [`docs/schema/README.md`](docs/schema/README.md) — why AnvilSchema exists, and why it isn't a
-  bolt-on the way XSD/XSLT or JSON Schema are. `schema.c`'s first phase is now implemented — the
-  *why* was written before the code because it doesn't change once the code lands, and it hasn't.
+  bolt-on the way XSD/XSLT or JSON Schema are. `schema.c` is implemented — the *why* was written
+  before the code because it doesn't change once the code lands, and it hasn't.
 - [`docs/dialect-ownership-matrix.md`](docs/dialect-ownership-matrix.md) — which dialect owns
   which language feature.
 - [`notes/`](notes/) — design-thread records for anyone picking up active work; not user-facing,

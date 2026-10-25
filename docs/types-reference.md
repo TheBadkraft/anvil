@@ -1,11 +1,13 @@
 # Anvil Types — Language Reference
 
-Status: **partially implemented.** The grammar and semantics below are settled design (see
-`notes/native-schema.md` for the full design record); the runtime support column in each section
-says exactly what `types.c` (`src/anvil_types.c`, `include/anvil_type_registry.h`) can actually
-do today versus what's designed but not yet built. Schema (`@[schema]`, validating a *data*
-document's shape against a type-annotated field list) is design-only — nothing is implemented for
-it yet; this reference covers types only.
+Status: **implemented**, with the few items listed under "What's not built yet" still open. The
+grammar and semantics below are settled design (see `notes/native-schema.md` for the full design
+record); the runtime support note in each section says what `src/anvil_types.c`
+(`include/anvil_type_registry.h`) does today. AnvilSchema (`@[schema]`, validating a *data*
+document's shape against a type-annotated field list, `src/schema/schema.c`,
+`include/anvil_schema.h`) is implemented on top of it; this reference covers the type vocabulary
+and the schema behavior that depends on it (nested shapes, `nullable`, `integer`, `format`,
+diagnostics, introspection).
 
 ## What this is
 
@@ -117,7 +119,8 @@ VIN := {
 
 `min` and `max` may be fractional or in exponent form (`min := 0.25;`, `max := 1e+3;`), and
 comparisons are exact (an integer near 2^63 does not round). `size` counts **bytes** of the value's
-text and must be a non-negative integer. A constraint that is not a valid number is reported as a
+text, not characters, and must be a non-negative integer: `"héllo"` is 5 characters but 6 bytes
+(`é` is two in UTF-8), so it exceeds `size := 5`. (For a blob, `size` counts the payload bytes.) A constraint that is not a valid number is reported as a
 `MALFORMED_CONSTRAINT` diagnostic and treated as not declared, never as `0`.
 
 `integer := true` requires a numeric value to be whole. It is judged by the number's *value*, not
@@ -199,6 +202,14 @@ every depth. It is checked on string, bare-word and blob values (a blob's payloa
 number is not a format target. An unknown format name is a load-time diagnostic
 (`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the constraint is
 treated as not declared, not silently passed. `anvil_type_def_get_format` reads a type's format.
+
+## Closed schemas
+
+A schema is closed by default: a field in the data that the schema doesn't declare is an
+`UNKNOWN_FIELD` violation, at every depth. A caller that wants an open shape opts out per call with
+`anvil_schema_options.allow_unknown` (see `anvil_schema_validate_value`); a patch that omits
+required fields uses `skip_required`. Rule keys the *schema* doesn't know are the opposite case and
+are always allowed - see "Reading a schema back".
 
 ## Nullable values
 
@@ -293,8 +304,6 @@ For a complete picture, the pieces of this design that are settled but not yet i
   yet).
 - Type inference through inheritance (`base`) — architecturally free once built, since inherited
   fields already alias their ancestor's real statement object, attributes and all.
-- Everything about `@[schema]` and schema validation — a separate, not-yet-started module
-  (`schema.c`) that will depend on `types.c`, never the reverse.
 
 See `notes/native-schema.md` for the full design record, including the reasoning behind each
 decision above.

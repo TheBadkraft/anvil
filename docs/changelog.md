@@ -159,6 +159,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   label never matched, and an undeclared field could hide behind a declared one with the same
   64-character prefix. Everything is now read and stored at its full length. Also fixes a leak of an
   enum type's `values` when its `type :=` was unrecognised.
+- Documentation drift fixed (`SR-2610-anvl-docs-001`): `docs/types-reference.md` no longer says schema
+  is "design-only" (it describes the implemented type vocabulary and schema behavior, with a
+  "Closed schemas" section and a byte-length `size` example), and the README status lines for types and
+  schema agree with it. The stale "no numeric accessor" comments went away with
+  `BR-2610-anvl-types-001`.
 
 ---
 
