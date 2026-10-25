@@ -60,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FR-2610-anvl-types-004` and `-schema-001`. Unknown rule keys (FlyWire's `pooled`, `mask`) are
   deliberately not diagnostics. Gives CI a "schema is well-formed" gate: the count is 0.
 
+- **`anvil_schema_validate_value` + `anvil_schema_options`** (`FR-2610-anvl-schema-002`): validates an
+  OBJECT *value* (a request body such as `set := { ... };`, or one element of
+  `set := [ {...}, {...} ]`) against a schema exactly as if it were a document's top level. Options:
+  `skip_required` (patch semantics; every other check still runs on present fields) and
+  `allow_unknown`. The struct carries its own `size`, so it can grow without breaking compiled
+  callers. A non-object value yields one `TYPE_MISMATCH` with an empty field path. Each call replaces
+  the previous call's violations. `anvil_schema_validate` keeps its signature and results: it now
+  shares one validation pass with the value form. This is what lets FlyWire validate through
+  AnvilSchema instead of its own JavaScript validator.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
