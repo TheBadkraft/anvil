@@ -144,17 +144,37 @@ bool anvil_type_def_get_size(anvil_type_def def, long long *out_size);
  * @brief A type definition's declared `min`, if any.
  * @param def The definition to read.
  * @param out_min Set to the declared minimum on success; untouched otherwise.
- * @return true if `min` was declared; false if def is NULL or it wasn't.
+ * @return true if `min` was declared as an integral number that fits; false if def is NULL, it
+ * wasn't declared, or it is fractional/exponent-form (never truncated to fit - use
+ * anvil_type_def_get_min_numeric for those).
  */
 bool anvil_type_def_get_min(anvil_type_def def, long long *out_min);
+
+/**
+ * @brief A type definition's declared `min`, exactly - fractional and exponent forms included.
+ * @param def The definition to read.
+ * @param out_min Set to the declared minimum on success; untouched otherwise. See
+ * anvil_numeric_t: `is_integral` reflects the spelling, so `1e+3` reads as the double 1000.
+ * @return true if `min` was declared as a valid number; false if def is NULL, it wasn't
+ * declared, or it was malformed (reported as a MALFORMED_CONSTRAINT diagnostic).
+ */
+bool anvil_type_def_get_min_numeric(anvil_type_def def, anvil_numeric_t *out_min);
 
 /**
  * @brief A type definition's declared `max`, if any.
  * @param def The definition to read.
  * @param out_max Set to the declared maximum on success; untouched otherwise.
- * @return true if `max` was declared; false if def is NULL or it wasn't.
+ * @return true if `max` was declared as an integral number that fits; false if def is NULL, it
+ * wasn't declared, or it is fractional/exponent-form (never truncated - see
+ * anvil_type_def_get_max_numeric).
  */
 bool anvil_type_def_get_max(anvil_type_def def, long long *out_max);
+
+/**
+ * @brief A type definition's declared `max`, exactly. Same contract as
+ * anvil_type_def_get_min_numeric.
+ */
+bool anvil_type_def_get_max_numeric(anvil_type_def def, anvil_numeric_t *out_max);
 
 /**
  * @brief The number of enum member labels a type declared via `values`.

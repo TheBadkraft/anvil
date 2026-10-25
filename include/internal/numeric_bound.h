@@ -37,9 +37,6 @@ int anvil_numeric_compare(anvil_value data, anvil_numeric_t bound);
 /// Exact three-way comparison of two non-overflowed numbers (used to detect min > max).
 int anvil_numeric_compare_bounds(anvil_numeric_t a, anvil_numeric_t b);
 
-/// A type definition's declared bound, fractional or not. False when not declared.
-bool anvil_type_def_numeric_min(anvil_type_def def, anvil_numeric_t *out);
-bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out);
 
 /// The source text of an Object type's `fields := { ... }` (the OBJECT value's span, copied at
 /// load so it outlives the document), or NULL if the type declares none. schema.c re-parses it
@@ -50,3 +47,12 @@ const char *anvil_type_def_fields_text(anvil_type_def def);
 /// Whether a type definition declares `nullable := true`, and whether it declared the key at all
 /// (a field inherits it only when it didn't declare its own).
 bool anvil_type_def_nullable(anvil_type_def def, bool *out_declared);
+
+/// Whether a type definition declares `integer := true`, and whether it declared the key at all
+/// (a field inherits it only when it didn't declare its own).
+bool anvil_type_def_integer(anvil_type_def def, bool *out_declared);
+
+/// The `integer := true` rule, value-based: a number satisfies it when its value is whole, so `2`,
+/// `2.0` and `1e+3` pass and `2.5` fails. A value beyond double range has no fractional part to
+/// speak of and passes. (anvil_numeric_t.is_integral follows the spelling and is not used.)
+bool anvil_numeric_is_whole(anvil_value data);

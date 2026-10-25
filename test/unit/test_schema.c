@@ -1615,6 +1615,123 @@ static void test_sch57_untyped_field_and_malformed_nullable(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-types-005 — integer := true (value-based) and fractional bounds
+ * ---------------------------------------------------------------------- */
+#define INT_SCHEMA "#!aml\n@[schema]\nn := { type := Numeric; integer := true; };\n"
+
+static void test_sch58_integer_is_value_based(void) {
+   const struct { const char *data; bool ok; const char *label; } cases[] = {
+      {"#!aml\nn := 2;\n", true, "SCH58: 2 passes"},
+      {"#!aml\nn := -3;\n", true, "SCH58: -3 passes"},
+      {"#!aml\nn := 2.5;\n", false, "SCH58: 2.5 fails"},
+      {"#!aml\nn := 2.0;\n", true, "SCH58: 2.0 passes (value-based, decision D2)"},
+      {"#!aml\nn := 1e+3;\n", true, "SCH58: 1e+3 passes (value-based)"},
+      {"#!aml\nn := 1.5e+3;\n", true, "SCH58: 1.5e+3 is 1500, passes"},
+      {"#!aml\nn := 1e-1;\n", false, "SCH58: 1e-1 is 0.1, fails"},
+      {"#!aml\nn := 99999999999999999999;\n", true, "SCH58: an integer literal past int64 passes"},
+      {"#!aml\nn := 0.5;\n", false, "SCH58: 0.5 fails"},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      anvil_schema schema; anvil_document sdoc, ddoc;
+      bool ok = nested_validate(INT_SCHEMA, cases[i].data, &schema, &sdoc, &ddoc);
+      TestBit.is_true(schema != NULL && ok == cases[i].ok, cases[i].label);
+      if (schema && !ok) {
+         TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH58: exactly one violation");
+         NESTED_PATH_IS(0, "n", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                        "SCH58: TYPE_MISMATCH at n");
+         char msg[128] = {0};
+         anvil_schema_violation_get_message(anvil_schema_get_violation(schema, 0), msg, sizeof(msg));
+         TestBit.is_true(strstr(msg, "must be an integer") != NULL,
+                         "SCH58: with the distinct message");
+      }
+      nested_free(schema, sdoc, ddoc);
+   }
+}
+
+static void test_sch59_integer_with_range_and_null(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\npriority := { type := Numeric; integer := true; min := 1; max := 4; };\n";
+   bool ok = nested_validate(src, "#!aml\npriority := 2.5;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH59: 2.5 inside 1..4 still fails integer");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH59: only the integer violation");
+   } else {
+      TestBit.is_not_null(schema, "SCH59: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\npriority := 9.5;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH59: 9.5 fails");
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH59: integer and range are independent checks");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate("#!aml\n@[schema]\nn := { type := Numeric; integer := true; nullable := true; };\n",
+                        "#!aml\nn := null;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH59: a nullable null is not an integer check");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate("#!aml\n@[schema]\ns := { type := String; integer := true; };\n",
+                        "#!aml\ns := \"a.b\";\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH59: integer is ignored for a non-numeric value");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch60_integer_inherited_from_type(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_integer_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH60: schema loaded");
+   if (schema) {
+      const char *src = "#!aml\ninherits := 2.5;\nrelaxed := 2.5;\nrestated := 2.5;\n";
+      anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+      if (ddoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ddoc), "SCH60: violations found");
+         TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH60: inherits and restated fail; relaxed overrides");
+         NESTED_PATH_IS(0, "inherits", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                        "SCH60: `inherits` gets integer from its type");
+         NESTED_PATH_IS(1, "restated", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                        "SCH60: `restated` too");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch61_integer_nested_and_malformed(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\nids := { type := Array; items := { type := Numeric; integer := true; }; };\n",
+      "#!aml\nids := [ 1, 2.5, 3 ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH61: a fractional array element fails");
+      NESTED_PATH_IS(0, "ids[1]", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "SCH61: at ids[1]");
+   } else {
+      TestBit.is_not_null(schema, "SCH61: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate("#!aml\n@[schema]\nn := { type := Numeric; integer := maybe; };\n",
+                        "#!aml\nn := 2.5;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH61: a malformed integer is diagnosed");
+      TestBit.is_true(ok, "SCH61: and treated as not declared");
+   } else {
+      TestBit.is_not_null(schema, "SCH61: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1727,6 +1844,15 @@ int main(void) {
                   test_sch56_nullable_at_every_depth, th);
    TestBit.run_ex("SCH57_UNTYPED_FIELD_AND_MALFORMED_NULLABLE", NULL,
                   test_sch57_untyped_field_and_malformed_nullable, th);
+
+   TestBit.run_ex("SCH58_INTEGER_IS_VALUE_BASED", NULL,
+                  test_sch58_integer_is_value_based, th);
+   TestBit.run_ex("SCH59_INTEGER_WITH_RANGE_AND_NULL", NULL,
+                  test_sch59_integer_with_range_and_null, th);
+   TestBit.run_ex("SCH60_INTEGER_INHERITED_FROM_TYPE", NULL,
+                  test_sch60_integer_inherited_from_type, th);
+   TestBit.run_ex("SCH61_INTEGER_NESTED_AND_MALFORMED", NULL,
+                  test_sch61_integer_nested_and_malformed, th);
 
    return TestBit.report();
 }

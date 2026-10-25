@@ -109,9 +109,21 @@ VIN := {
 };
 ```
 
-*Runtime support: implemented (`anvil_type_def_get_size`/`get_min`/`get_max`). Each returns
-whether the constraint was actually declared, not just a default — a type with no `min` and one
-whose `min` happens to be 0 are distinguishable.*
+`min` and `max` may be fractional or in exponent form (`min := 0.25;`, `max := 1e+3;`), and
+comparisons are exact (an integer near 2^63 does not round). `size` counts **bytes** of the value's
+text and must be a non-negative integer. A constraint that is not a valid number is reported as a
+`MALFORMED_CONSTRAINT` diagnostic and treated as not declared, never as `0`.
+
+`integer := true` requires a numeric value to be whole. It is judged by the number's *value*, not
+how it is written: `2`, `2.0` and `1e+3` pass, `2.5` and `1e-1` fail (with a `TYPE_MISMATCH`
+violation saying "value must be an integer"). A field referencing the type inherits it, and may
+override it with its own `integer := false`.
+
+*Runtime support: implemented (`anvil_type_def_get_size`/`get_min`/`get_max`, plus
+`anvil_type_def_get_min_numeric`/`get_max_numeric` for fractional and exponent bounds). Each
+returns whether the constraint was actually declared, not just a default — a type with no `min` and
+one whose `min` happens to be 0 are distinguishable. The `long long` getters return false for a
+bound that is not a whole number rather than truncating it; use the `_numeric` ones for those.*
 
 ## Enums
 

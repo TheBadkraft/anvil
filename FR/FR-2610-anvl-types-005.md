@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** types, schema, numeric, public-api, rivet-readiness
 
 ---
@@ -54,3 +54,24 @@ are `integer`/`bigint`, so a fractional value fails at the database instead of i
 ## Dependencies
 
 BR-2610-anvl-types-001 (must land first).
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-types-005`, commit `62d6ad5`, merged to `main`. Tests TYP29–TYP30 (`test_types.c`) and SCH58–SCH61
+(`test_schema.c`); fixtures `schema_integer_*`. Full unit regression green with unchanged counts
+elsewhere, `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document,
+resolver. Docs: `docs/types-reference.md` Constraints section (and the site mirror).
+
+Decisions:
+- **D2 (value-based) as decided in the roadmap**, pinned by SCH58 (`2.0`, `1e+3`, `1.5e+3` pass;
+  `2.5`, `1e-1`, `0.5` fail). A value beyond double range, or an integral literal beyond int64, counts
+  as whole (a double that large has no fractional bits). `is_integral` is deliberately not used.
+- The internal `anvil_type_def_numeric_min/max` added under BR-2610-anvl-types-001 are gone: the
+  schema now reads fractional bounds through the new public `_numeric` getters. The `long long`
+  getters were already non-truncating (BR-001); their header docs are corrected here.
+- `integer` follows the same declared-ness rule as `nullable`: a field's own value, `true` or
+  `false`, wins over the type's. Applies only to NUMERIC data values; a null (nullable) or a
+  non-numeric value is not an integer-check target.
+- Not done: a `CONFLICTING_CONSTRAINTS` diagnostic for `integer := true` with bounds that admit no
+  whole number (e.g. `min := 0.2; max := 0.8`). Cheap to add later if wanted.
+- Vtable exposure of the new getters belongs to FR-2610-anvl-public-api-003 (Bindings agent).
