@@ -559,6 +559,108 @@ static void test_sch20_malformed_constraints_are_not_declared(void) {
       "SCH20: fractional size is not declared");
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-schema-001 — no fixed-buffer truncation: long type names,
+ * rule keys, enum labels, field names and violation text keep their full length
+ * ---------------------------------------------------------------------- */
+static void test_sch21_long_type_names_resolve_exactly(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_long_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH21: schema loaded");
+   if (schema) {
+      // ref_b -> 80-char String type, ref_a -> 80-char Numeric type; the two share their first 63.
+      const char *good = "#!aml\nref_b := \"abc\";\nref_a := 5;\n";
+      anvil_document gdoc = anvil_load_buffer(good, strlen(good));
+      if (gdoc) {
+         TestBit.is_true(anvil_schema_validate(schema, gdoc),
+                         "SCH21: each reference resolves to its own 80-char type");
+         anvil_dispose(gdoc);
+      }
+      const char *bad = "#!aml\nref_b := 5;\nref_a := \"abc\";\n";
+      anvil_document bdoc = anvil_load_buffer(bad, strlen(bad));
+      if (bdoc) {
+         TestBit.is_false(anvil_schema_validate(schema, bdoc), "SCH21: swapped kinds fail");
+         TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH21: both references are checked against their own type");
+         anvil_dispose(bdoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch22_long_enum_labels_compare_in_full(void) {
+   char label[201], same[201], diff[201], src[512], data[512];
+   memset(label, 'a', 200); label[200] = '\0';
+   memcpy(same, label, 201);
+   memcpy(diff, label, 201);
+   diff[150] = 'b'; // differs only at character 150, past any 127-char prefix
+   snprintf(src, sizeof(src),
+            "#!aml\n@[schema]\nstatus := { type := enum; values := [ \"%s\" ]; };\n", label);
+   snprintf(data, sizeof(data), "#!aml\nstatus := \"%s\";\n", same);
+   TestBit.is_equal_int(0, numeric_case(src, data, "status"),
+                        "SCH22: the identical 200-char label is accepted");
+   snprintf(data, sizeof(data), "#!aml\nstatus := \"%s\";\n", diff);
+   TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_VALUES, numeric_case(src, data, "status"),
+                        "SCH22: a value differing only at character 150 is rejected");
+}
+
+static void test_sch23_long_rule_key_is_not_a_known_key(void) {
+   const char *src =
+      "#!aml\n@[schema]\n"
+      "score := { type := Numeric; max := 3; maxxxxxxxxxxxxxxxxxxxxxx := 1; "
+      "required_by_flywire_extension := true; };\n";
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 3;\n", "score"),
+                        "SCH23: an extension key does not alter max or required");
+}
+
+static void test_sch24_long_field_and_violation_names(void) {
+   char a[81], b[81], src[512], data[512];
+   memset(a, 'f', 64); memset(a + 64, 'A', 16); a[80] = '\0'; // 64-char shared prefix
+   memset(b, 'f', 64); memset(b + 64, 'B', 16); b[80] = '\0';
+   snprintf(src, sizeof(src), "#!aml\n@[schema]\n%s := { type := Numeric; required := true; };\n", a);
+   anvil_document sdoc = anvil_load_buffer(src, strlen(src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH24: schema with an 80-char field name loaded");
+   if (schema) {
+      // Declared field present, plus an undeclared one sharing its first 64 chars.
+      snprintf(data, sizeof(data), "#!aml\n%s := 1;\n%s := 2;\n", a, b);
+      anvil_document ddoc = anvil_load_buffer(data, strlen(data));
+      if (ddoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ddoc), "SCH24: the undeclared field fails");
+         TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH24: exactly the undeclared field is reported");
+         anvil_schema_violation v = anvil_schema_get_violation(schema, 0);
+         TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                              anvil_schema_violation_get_category(v), "SCH24: it is UNKNOWN_FIELD");
+         char out[128] = {0};
+         TestBit.is_equal_int(80, (long long)anvil_schema_violation_get_field(v, NULL, 0),
+                              "SCH24: violation field reports its full length");
+         anvil_schema_violation_get_field(v, out, sizeof(out));
+         TestBit.is_true(strcmp(out, b) == 0, "SCH24: violation field is the full, exact name");
+         anvil_dispose(ddoc);
+      }
+      // Missing required 80-char field: the REQUIRED violation names it in full.
+      const char *none = "#!aml\n";
+      anvil_document ndoc = anvil_load_buffer(none, strlen(none));
+      if (ndoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ndoc), "SCH24: required field missing");
+         anvil_schema_violation v = anvil_schema_get_violation(schema, 0);
+         char out[128] = {0};
+         anvil_schema_violation_get_field(v, out, sizeof(out));
+         TestBit.is_true(strcmp(out, a) == 0, "SCH24: REQUIRED names the full 80-char field");
+         anvil_dispose(ndoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -592,6 +694,15 @@ int main(void) {
                   test_sch19_fractional_bound_inherited_from_type, th);
    TestBit.run_ex("SCH20_malformed_constraints_are_not_declared", NULL,
                   test_sch20_malformed_constraints_are_not_declared, th);
+
+   TestBit.run_ex("SCH21_long_type_names_resolve_exactly", NULL,
+                  test_sch21_long_type_names_resolve_exactly, th);
+   TestBit.run_ex("SCH22_long_enum_labels_compare_in_full", NULL,
+                  test_sch22_long_enum_labels_compare_in_full, th);
+   TestBit.run_ex("SCH23_long_rule_key_is_not_a_known_key", NULL,
+                  test_sch23_long_rule_key_is_not_a_known_key, th);
+   TestBit.run_ex("SCH24_long_field_and_violation_names", NULL,
+                  test_sch24_long_field_and_violation_names, th);
 
    return TestBit.report();
 }

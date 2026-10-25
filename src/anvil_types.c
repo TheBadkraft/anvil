@@ -23,6 +23,7 @@
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
 #include "internal/numeric_bound.h"
+#include "internal/text_alloc.h"
 // ----------------
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
@@ -30,10 +31,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ANVIL_TYPE_NAME_MAX 65
 
 struct anvil_type_def_t {
-   char name[ANVIL_TYPE_NAME_MAX];
+   char *name; // allocated to its full length for a registry-owned def; the native defs below
+               // point at string literals and are never freed
    anvil_type_kind kind;
    bool has_size;
    long long size;
@@ -175,18 +176,23 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) 
    def->size = 0;
    def->min = def->max = (anvil_numeric_t){0};
    def->values = NULL;
+   def->name = NULL;
 
    size_t count = anvil_value_get_count(obj_val);
    for (size_t i = 0; i < count; i++) {
       anvil_statement field = anvil_value_get_statement(obj_val, i);
-      char fname[16] = {0};
-      anvil_statement_get_name(field, fname, sizeof(fname));
+      char *fname = anvil_name_alloc(field);
       anvil_value fval = anvil_statement_get_value(field);
+      if (!fname) {
+         continue;
+      }
 
       if (strcmp(fname, "type") == 0) {
-         char text[32] = {0};
-         anvil_value_get_text(fval, text, sizeof(text));
-         def->kind = parse_type_kind(text);
+         char *text = anvil_text_alloc(fval);
+         if (text) {
+            def->kind = parse_type_kind(text);
+            Allocator.dispose(text);
+         }
       } else if (strcmp(fname, "size") == 0) {
          def->has_size = anvil_numeric_read_size(fval, &def->size);
       } else if (strcmp(fname, "min") == 0) {
@@ -196,7 +202,23 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def) 
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
       }
+      Allocator.dispose(fname);
    }
+}
+
+// Frees a registry-owned def's enum labels (the def itself and its name are the caller's).
+static void dispose_def_values(struct anvil_type_def_t *def) {
+   if (!def->values) {
+      return;
+   }
+   usize value_count = List.size(def->values);
+   for (usize j = 0; j < value_count; j++) {
+      char *label = NULL;
+      List.get(def->values, j, (object *)&label);
+      Allocator.dispose(label);
+   }
+   List.dispose(def->values);
+   def->values = NULL;
 }
 
 // Walks one document's own top-level statements into reg, registering each well-formed type
@@ -221,10 +243,16 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       }
       read_type_fields(val, def);
       if (def->kind == ANVIL_TYPE_UNKNOWN) {
+         dispose_def_values(def);
          Allocator.dispose(def); // no recognized `type :=` — skip, same reasoning as above
          continue;
       }
-      anvil_statement_get_name(stmt, def->name, sizeof(def->name));
+      def->name = anvil_name_alloc(stmt);
+      if (!def->name) {
+         dispose_def_values(def);
+         Allocator.dispose(def);
+         continue;
+      }
       Map.set(reg->by_name, def->name, strlen(def->name), (addr)def); // last-write-wins on
                                                                        // a name collision
       List.append(reg->all_defs, def);
@@ -289,14 +317,9 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
       for (usize i = 0; i < n; i++) {
          struct anvil_type_def_t *def = NULL;
          List.get(r->all_defs, i, (object *)&def);
-         if (def && def->values) {
-            usize value_count = List.size(def->values);
-            for (usize j = 0; j < value_count; j++) {
-               char *label = NULL;
-               List.get(def->values, j, (object *)&label);
-               Allocator.dispose(label);
-            }
-            List.dispose(def->values);
+         if (def) {
+            dispose_def_values(def);
+            Allocator.dispose(def->name);
          }
          Allocator.dispose(def);
       }

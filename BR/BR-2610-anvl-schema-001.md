@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open
+**Status:** resolved
 **Tags:** schema, buffers, truncation, correctness, rivet-readiness
 
 ---
@@ -58,3 +58,21 @@ never compares a truncated prefix.
 3. A rule key longer than 15 characters (e.g. a FlyWire-style extension key) isn't mistaken for a
    shorter known key.
 4. Valgrind-clean; full suite green.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-schema-001`, merged to `main`. Every site in the table is fixed, plus the
+matching sites in `anvil_types.c` (type-def name, rule key, `type :=` text). Reads go through
+`include/internal/text_alloc.h` (query the full length, allocate exactly); field names, type names and
+violation `field`/`message` are allocated to length, so FR-2610-anvl-schema-001's paths need no further
+change here. Tests: SCH21–SCH24 (`test_schema.c`), TYP12 (`test_types.c`); fixtures
+`schema_long_types.anvl`, `schema_long_consumer.anvl`.
+
+Findings:
+- Test case 3 (long rule key mistaken for a short one) could not fail before the fix: a clipped
+  prefix of a longer key never equals a shorter known key. SCH23 stands as a regression guard.
+- Also fixed in passing: `collect_type_defs` leaked the `values` list of a def whose `type :=` was
+  unrecognised.
+- `anvil_type_def_*` has no public name getter, so TYP12 checks long names via `find` and kind only.
+- Regression: all 19 unit suites and `test_release` pass with unchanged counts (plus the new tests);
+  Valgrind clean on schema, types, anvil_native, anvil_vtable, document, resolver.
