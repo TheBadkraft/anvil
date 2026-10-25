@@ -1159,6 +1159,321 @@ static void test_sch40_document_form_equals_value_form(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-schema-001 — nested validation, element rules, field paths
+ * ---------------------------------------------------------------------- */
+
+// Violation `index`'s field path and category, for compact assertions.
+static void violation_at(anvil_schema schema, size_t index, char *path, size_t cap, int *category) {
+   anvil_schema_violation v = anvil_schema_get_violation(schema, index);
+   path[0] = '\0';
+   *category = -1;
+   if (v) {
+      anvil_schema_violation_get_field(v, path, cap);
+      *category = (int)anvil_schema_violation_get_category(v);
+   }
+}
+
+// Validates `data` (a whole document) against a schema built from `schema_src`; leaves the schema
+// for the caller to inspect. Returns the validate result; *out_* receive what to dispose.
+static bool nested_validate(const char *schema_src, const char *data, anvil_schema *out_schema,
+                            anvil_document *out_sdoc, anvil_document *out_ddoc) {
+   *out_sdoc = anvil_load_buffer(schema_src, strlen(schema_src));
+   *out_schema = *out_sdoc ? anvil_schema_load(*out_sdoc) : NULL;
+   *out_ddoc = anvil_load_buffer(data, strlen(data));
+   if (!*out_schema || !*out_ddoc) {
+      return true;
+   }
+   return anvil_schema_validate(*out_schema, *out_ddoc);
+}
+
+static void nested_free(anvil_schema schema, anvil_document sdoc, anvil_document ddoc) {
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+}
+
+#define NESTED_PATH_IS(i, expected, cat, label)                                                  \
+   do {                                                                                          \
+      char p_[128];                                                                              \
+      int c_;                                                                                    \
+      violation_at(schema, (i), p_, sizeof(p_), &c_);                                            \
+      TestBit.is_true(strcmp(p_, (expected)) == 0 && c_ == (int)(cat), (label));                  \
+   } while (0)
+
+static void test_sch41_object_field_rules(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "assignee := { type := Object; fields := { id := { type := Numeric; required := true; }; }; };\n",
+      "#!aml\nassignee := { name := bob; };\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH41: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH41: a nested violation fails validation");
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH41: two violations");
+      NESTED_PATH_IS(0, "assignee.id", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+                     "SCH41: assignee.id is REQUIRED");
+      NESTED_PATH_IS(1, "assignee.name", ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                     "SCH41: assignee.name is UNKNOWN_FIELD");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch42_array_item_rules(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "labels := { type := Array; items := { type := String; values := [ bug, feature ]; }; };\n",
+      "#!aml\nlabels := [ bug, nope, feature ];\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH42: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH42: a bad element fails validation");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH42: exactly one violation");
+      NESTED_PATH_IS(0, "labels[1]", ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
+                     "SCH42: VALUES at labels[1]");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch43_array_of_objects(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "links := { type := Array; items := { type := Object; fields := {\n"
+      "   kind := { type := enum; values := [ blocks, relates ]; required := true; };\n"
+      "   target := { type := Numeric; required := true; };\n"
+      "}; }; };\n",
+      "#!aml\nlinks := [ { kind := blocks; target := 1; }, { kind := bogus; target := 2; },\n"
+      "                 { kind := relates; } ];\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH43: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH43: violations found");
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH43: two violations");
+      NESTED_PATH_IS(0, "links[1].kind", ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
+                     "SCH43: links[1].kind VALUES");
+      NESTED_PATH_IS(1, "links[2].target", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+                     "SCH43: links[2].target REQUIRED");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch44_item_count(void) {
+   const char *schema_src =
+      "#!aml\n@[schema]\n"
+      "labels := { type := Array; min_items := 2; max_items := 3; items := { type := String; }; };\n";
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(schema_src, "#!aml\nlabels := [ a, b, c, d ];\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH44: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH44: 4 items exceed max_items := 3");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH44: one violation");
+      NESTED_PATH_IS(0, "labels", ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,
+                     "SCH44: ITEM_COUNT at 'labels'");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   ok = nested_validate(schema_src, "#!aml\nlabels := [ a ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH44: 1 item is below min_items := 2");
+      NESTED_PATH_IS(0, "labels", ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT,
+                     "SCH44: ITEM_COUNT for too few");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   ok = nested_validate(schema_src, "#!aml\nlabels := [ a, b ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH44: 2 items are within 2..3");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch45_object_type_with_fields_is_reusable(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_nested_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH45: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH45: no diagnostics for the type's nested rules");
+      const char *src = "#!aml\nowner := { name := \"toolongname\"; };\n"
+                        "reporter := { id := 1; name := \"ok\"; };\n";
+      anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+      if (ddoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ddoc), "SCH45: violations found");
+         TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH45: owner.id and owner.name only; reporter is clean");
+         NESTED_PATH_IS(0, "owner.id", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+                        "SCH45: owner.id REQUIRED (from the type's fields)");
+         NESTED_PATH_IS(1, "owner.name", ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
+                        "SCH45: owner.name SIZE (from the type's fields)");
+         anvil_dispose(ddoc);
+      }
+      // The second reference validates its own nested contents too.
+      const char *src2 = "#!aml\nowner := { id := 1; };\nreporter := { name := \"x\"; };\n";
+      anvil_document d2 = anvil_load_buffer(src2, strlen(src2));
+      if (d2) {
+         anvil_schema_validate(schema, d2);
+         NESTED_PATH_IS(0, "reporter.id", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+                        "SCH45: reporter.id REQUIRED - the shape is reusable");
+         anvil_dispose(d2);
+      }
+      // An inline `fields` replaces the type's, never merges.
+      const char *src3 = "#!aml\noverride := { code := \"c\"; };\n";
+      anvil_document d3 = anvil_load_buffer(src3, strlen(src3));
+      if (d3) {
+         TestBit.is_true(anvil_schema_validate(schema, d3),
+                         "SCH45: inline fields replace the type's (no inherited required id)");
+         anvil_dispose(d3);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch46_top_level_paths_unchanged_and_order(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "a := { type := Object; fields := { x := { type := Numeric; }; y := { type := Numeric; }; }; };\n"
+      "b := { type := Numeric; };\n",
+      "#!aml\na := { y := hi; x := hi; z := 1; };\nb := hi;\nc := 1;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH46: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH46: violations found");
+      TestBit.is_equal_int(5, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH46: five violations");
+      NESTED_PATH_IS(0, "a.x", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                     "SCH46: schema order, depth first: a.x");
+      NESTED_PATH_IS(1, "a.y", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "SCH46: then a.y");
+      NESTED_PATH_IS(2, "a.z", ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                     "SCH46: a's unknown field right after a's declared ones");
+      NESTED_PATH_IS(3, "b", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                     "SCH46: a top-level field is its bare name, no leading dot");
+      NESTED_PATH_IS(4, "c", ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                     "SCH46: top-level unknown fields come last");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch47_scalar_item_rules(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\nscores := { type := Array; items := { type := Numeric; max := 3; }; };\n",
+      "#!aml\nscores := [ 1, 5, 2 ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH47: an out-of-range element fails");
+      NESTED_PATH_IS(0, "scores[1]", ANVIL_SCHEMA_ERR_VALIDATION_RANGE, "SCH47: RANGE at scores[1]");
+   } else {
+      TestBit.is_not_null(schema, "SCH47: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch48_self_reference_is_a_diagnostic(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_selfref_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH48: a self-referential type still loads (and terminates)");
+   if (schema) {
+      bool found = false;
+      for (size_t i = 0; i < anvil_schema_get_diagnostic_count(schema); i++) {
+         if (anvil_schema_diagnostic_get_category(anvil_schema_get_diagnostic(schema, i)) ==
+             ANVIL_SCHEMA_DIAG_SELF_REFERENCE) {
+            found = true;
+         }
+      }
+      TestBit.is_true(found, "SCH48: reported as SELF_REFERENCE");
+      const char *src = "#!aml\nroot := { label := 5; };\n";
+      anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+      if (ddoc) {
+         anvil_schema_validate(schema, ddoc);
+         NESTED_PATH_IS(0, "root.label", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                        "SCH48: the non-recursive part of the shape still validates");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch49_nested_diagnostics_carry_paths(void) {
+   anvil_document doc = NULL;
+   const char *src =
+      "#!aml\n@[schema]\n"
+      "a := { type := Object; fields := { bad := 5; ghost := { type := types.Nope; }; }; };\n"
+      "l := { type := Array; items := 5; min_items := abc; };\n";
+   doc = anvil_load_buffer(src, strlen(src));
+   anvil_schema schema = doc ? anvil_schema_load(doc) : NULL;
+   TestBit.is_not_null(schema, "SCH49: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(4, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH49: four diagnostics");
+      const struct { anvil_schema_diag_code code; const char *path; } want[] = {
+         {ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT, "a.bad"},
+         {ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, "a.ghost"},
+         {ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "l"},
+         {ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "l"},
+      };
+      for (size_t i = 0; i < 4; i++) {
+         anvil_schema_diagnostic d = anvil_schema_get_diagnostic(schema, i);
+         char path[64] = {0};
+         anvil_schema_diagnostic_get_field(d, path, sizeof(path));
+         TestBit.is_true(d && anvil_schema_diagnostic_get_category(d) == want[i].code &&
+                            strcmp(path, want[i].path) == 0,
+                         "SCH49: nested diagnostic has the right category and path");
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch50_nested_with_validate_value_options(void) {
+   const char *schema_src =
+      "#!aml\n@[schema]\n"
+      "assignee := { type := Object; required := true; fields := {\n"
+      "   id := { type := Numeric; required := true; }; }; };\n";
+   anvil_document sdoc = anvil_load_buffer(schema_src, strlen(schema_src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { assignee := { extra := 1; }; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH50: loaded");
+   if (schema && ddoc) {
+      anvil_statement st = anvil_document_find_statement(ddoc, "set");
+      anvil_value set = st ? anvil_statement_get_value(st) : NULL;
+      TestBit.is_false(anvil_schema_validate_value(schema, set, NULL), "SCH50: default fails");
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH50: assignee.id REQUIRED and assignee.extra UNKNOWN");
+      anvil_schema_options patch = {.size = sizeof(patch), .skip_required = true,
+                                    .allow_unknown = true};
+      TestBit.is_true(anvil_schema_validate_value(schema, set, &patch),
+                      "SCH50: skip_required and allow_unknown apply at every depth");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1235,6 +1550,27 @@ int main(void) {
                   test_sch39_options_forward_compatible_and_null_safety, th);
    TestBit.run_ex("SCH40_DOCUMENT_FORM_EQUALS_VALUE_FORM", NULL,
                   test_sch40_document_form_equals_value_form, th);
+
+   TestBit.run_ex("SCH41_OBJECT_FIELD_RULES", NULL,
+                  test_sch41_object_field_rules, th);
+   TestBit.run_ex("SCH42_ARRAY_ITEM_RULES", NULL,
+                  test_sch42_array_item_rules, th);
+   TestBit.run_ex("SCH43_ARRAY_OF_OBJECTS", NULL,
+                  test_sch43_array_of_objects, th);
+   TestBit.run_ex("SCH44_ITEM_COUNT", NULL,
+                  test_sch44_item_count, th);
+   TestBit.run_ex("SCH45_OBJECT_TYPE_WITH_FIELDS_IS_REUSABLE", NULL,
+                  test_sch45_object_type_with_fields_is_reusable, th);
+   TestBit.run_ex("SCH46_TOP_LEVEL_PATHS_UNCHANGED_AND_ORDER", NULL,
+                  test_sch46_top_level_paths_unchanged_and_order, th);
+   TestBit.run_ex("SCH47_SCALAR_ITEM_RULES", NULL,
+                  test_sch47_scalar_item_rules, th);
+   TestBit.run_ex("SCH48_SELF_REFERENCE_IS_A_DIAGNOSTIC", NULL,
+                  test_sch48_self_reference_is_a_diagnostic, th);
+   TestBit.run_ex("SCH49_NESTED_DIAGNOSTICS_CARRY_PATHS", NULL,
+                  test_sch49_nested_diagnostics_carry_paths, th);
+   TestBit.run_ex("SCH50_NESTED_WITH_VALIDATE_VALUE_OPTIONS", NULL,
+                  test_sch50_nested_with_validate_value_options, th);
 
    return TestBit.report();
 }

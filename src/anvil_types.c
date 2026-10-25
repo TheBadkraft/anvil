@@ -47,6 +47,8 @@ struct anvil_type_def_t {
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
    char *source; // path of the document that defined it (for collision reports); NULL for natives
+   char *fields_text; // source text of `fields := { ... }` (copied), NULL if none - see
+                      // anvil_type_def_fields_text
 };
 
 struct anvil_type_diagnostic_t {
@@ -190,13 +192,14 @@ static list read_values_list(anvil_value val) {
 struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
-   bool bad_size, bad_min, bad_max, bad_values;
+   bool bad_size, bad_min, bad_max, bad_values, bad_fields;
 };
 
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
                              struct type_issues *issues) {
    *issues = (struct type_issues){0};
    def->source = NULL;
+   def->fields_text = NULL;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -233,6 +236,12 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
          issues->bad_values = (def->values == NULL);
+      } else if (strcmp(fname, "fields") == 0) {
+         if (fval && anvil_value_get_type(fval) == ANVIL_VALUE_OBJECT) {
+            def->fields_text = anvil_text_alloc(fval);
+         } else {
+            issues->bad_fields = true;
+         }
       }
       Allocator.dispose(fname);
    }
@@ -344,6 +353,11 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'max' is not a valid number; treated as not declared", def->name);
       }
+      if (issues.bad_fields) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'fields' must be an object of field rules; treated as not declared",
+                  def->name);
+      }
       if (issues.bad_values) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES, def->name, src,
                   "type '%s': 'values' must be an array of labels", def->name);
@@ -367,6 +381,7 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       dispose_def_values(def);
       Allocator.dispose(def->name);
       Allocator.dispose(def->source);
+      Allocator.dispose(def->fields_text);
       Allocator.dispose(def);
    }
    Allocator.dispose(path);
@@ -485,6 +500,7 @@ void anvil_type_registry_dispose(anvil_type_registry reg) {
             dispose_def_values(def);
             Allocator.dispose(def->name);
             Allocator.dispose(def->source);
+            Allocator.dispose(def->fields_text);
          }
          Allocator.dispose(def);
       }
@@ -656,4 +672,9 @@ size_t anvil_type_diagnostic_get_source(anvil_type_diagnostic diag, char *buf, s
 
 size_t anvil_type_diagnostic_get_message(anvil_type_diagnostic diag, char *buf, size_t buflen) {
    return diag ? copy_diag_text(diag->message, buf, buflen) : 0;
+}
+
+const char *anvil_type_def_fields_text(anvil_type_def def) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   return d ? d->fields_text : NULL;
 }

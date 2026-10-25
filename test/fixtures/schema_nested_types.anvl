@@ -1,0 +1,10 @@
+#!aml
+@[types]
+
+Person := {
+   type := Object;
+   fields := {
+      id := { type := Numeric; required := true; };
+      name := { type := String; size := 5; };
+   };
+};
