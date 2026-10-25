@@ -157,6 +157,17 @@ its own `fields`, they replace the type's; the two are never merged. A type whos
 to itself (directly or through another type) is reported by the schema as a `SELF_REFERENCE`
 diagnostic and is not expanded. Violations name the full path, e.g. `links[2].target`.
 
+## Nullable values
+
+A field with a declared type rejects an explicit `null` (`note := null;`) as a type mismatch, the
+same as any other wrong-kind value. `nullable := true` makes `null` a legal value for it, and a
+`null` then skips every other constraint (`size`, `min`/`max`, `values`, nested `fields`). Absent and
+null stay different things: an absent field is governed only by `required`, so
+`required := true; nullable := true;` means "must be present, and may be null". `nullable` can be
+declared on a type, is inherited by a field that references it (a field's own `nullable := false`
+overrides it), and applies at every depth, array items included. A field with no declared type has
+nothing for `null` to violate, so it accepts it either way.
+
 ## Using a type from another document
 
 A schema, or any other document, brings a type into scope by including the file that defines it,

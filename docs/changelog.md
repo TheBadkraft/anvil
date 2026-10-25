@@ -81,6 +81,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nested rules also produce load diagnostics with paths, and honour `anvil_schema_validate_value`'s
   `skip_required` / `allow_unknown` at every depth.
 
+- **`nullable`** (`FR-2610-anvl-schema-003`): `nullable := true` makes an explicit `null` a legal value
+  for a declared field, so a patch that clears `assignee_id` validates. Without it, `null` for a typed
+  field is still `TYPE_MISMATCH`, now with the clearer message "field is not nullable". A nullable
+  `null` skips every other constraint; `required := true; nullable := true;` means present-and-may-be-null.
+  Inherited from a `@[types]` definition (a field's own `nullable := false` overrides it) and applied
+  at every depth, array items included. A malformed `nullable` is a `MALFORMED_CONSTRAINT` diagnostic.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

@@ -46,3 +46,7 @@ bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out);
 /// with anvil_parse_value_fragment to build the nested rules a field referencing the type
 /// inherits - the registry stays ignorant of the rule vocabulary.
 const char *anvil_type_def_fields_text(anvil_type_def def);
+
+/// Whether a type definition declares `nullable := true`, and whether it declared the key at all
+/// (a field inherits it only when it didn't declare its own).
+bool anvil_type_def_nullable(anvil_type_def def, bool *out_declared);

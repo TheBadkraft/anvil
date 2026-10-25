@@ -36,6 +36,8 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   bool nullable;          // an explicit `null` is a legal value (absent is governed by required)
+   bool nullable_declared; // the rule said so itself, so it overrides the resolved type's
    bool has_size;
    long long size;
    bool has_min;
@@ -346,6 +348,16 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
                      "field '%s': 'required' must be true or false", path);
          }
          Allocator.dispose(text);
+      } else if (strcmp(fname, "nullable") == 0) {
+         char *text = anvil_text_alloc(fval);
+         if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
+            field->nullable_declared = true;
+            field->nullable = (strcmp(text, "true") == 0);
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': 'nullable' must be true or false; treated as false", path);
+         }
+         Allocator.dispose(text);
       } else if (strcmp(fname, "size") == 0) {
          field->has_size = anvil_numeric_read_size(fval, &field->size);
          if (!field->has_size) {
@@ -431,6 +443,13 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
       }
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
+      }
+      if (!field->nullable_declared) {
+         bool declared = false;
+         bool value = anvil_type_def_nullable(resolved, &declared);
+         if (declared) {
+            field->nullable = value;
+         }
       }
       if (!field->has_fields) {
          expand_type_fields(resolved, types, field, schema, path, stack);
@@ -746,6 +765,19 @@ static void validate_members(struct anvil_schema_t *s, list rules, map rules_by_
 static void check_value(struct anvil_schema_t *s, const struct anvil_schema_field_t *rule,
                         const char *path, anvil_value data_val, const struct vopts *vo) {
    anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
+
+   // An explicit null: legal iff the rule says so, and then nothing else about the value is
+   // evaluated. An untyped rule has no declared type for null to violate.
+   if (actual == ANVIL_VALUE_NULL) {
+      if (rule->nullable) {
+         return;
+      }
+      if (rule->has_kind) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                       "field is not nullable");
+         return;
+      }
+   }
 
    if (rule->has_kind && !kind_matches(rule->kind, actual)) {
       add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,

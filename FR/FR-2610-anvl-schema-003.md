@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet, flywire (downstream consumers)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** schema, null, nullable, rivet-readiness
 
 ---
@@ -47,3 +47,20 @@ A patch that *clears* the assignee sends `assignee_id := null;`, and that must v
 ## Dependencies
 
 None.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-schema-003`, commit `3e3c497`, merged to `main`. Tests SCH51–SCH57 (`test_schema.c`) and TYP28
+(`test_types.c`); fixtures `schema_nullable_*`. Full unit regression green with unchanged counts
+elsewhere, `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable,
+document, resolver. Docs: `docs/types-reference.md` "Nullable values" (and the site mirror).
+
+Decisions:
+- A field's explicit `nullable := false` overrides a type's `true`: the rule is "inherit only what
+  the field didn't declare", so declared-ness is tracked, not just the value (`anvil_type_def_nullable`
+  returns the value and whether it was declared; internal accessor, like `fields_text`).
+- A field with **no declared type** accepts `null` either way (nothing for null to violate), which
+  keeps the existing behavior; the ticket's TYPE_MISMATCH applies to a field with a declared type.
+- A malformed `nullable` (neither `true` nor `false`) is `MALFORMED_CONSTRAINT` on both the type and
+  the schema side and is treated as not declared.
+- Public introspection of `nullable` is FR-2610-anvl-schema-005's job.
