@@ -1,0 +1,114 @@
+# Roadmap: rivet-readiness (types, schema, bindings)
+
+**Written:** 2026-10-25 (planning review)
+**For:** the ANVL coder agent picking up this ticket set, and the repo owner
+**Scope:** every open ticket tagged `rivet-readiness`, plus the two distribution SRs. It covers
+the gaps found while building Rivet, the in-house ticketing system (Postgres-backed, with FlyWire
+on the wire), against AnvilTypes and AnvilSchema.
+
+Out of scope: `FR-2610-anvl-asl-runtime-001` (its own agent), `FR-2603-sigma-collections-009/010`
+(Sigma backlog), and the `libanvlbind` versioning question (escalated to Q-OR).
+
+---
+
+## Working rules
+
+- **Branch off `main`, not `anvilscript-design`.** That branch belongs to the AnvilScript work.
+  Use one branch per ticket (`fix/BR-2610-anvl-types-001`, `feat/FR-2610-anvl-schema-002`, ...).
+  The planning session merges each branch back when the repo owner says it's ready.
+- **Strict TDD.** Write the full failing test set first. RED must be genuine: the suite builds and
+  runs, and every new case fails on an assertion. Then go test by test to GREEN. Run
+  `make <suite> <action>` (`make schema test`, `make schema val`), the full unit regression and
+  Valgrind before calling a ticket done.
+- **Close the loop in the ticket.** Set `Status:` and add a short Resolution section naming the
+  branch and commit. Update `notes/deferred-work.md` if anything was deferred.
+- **New public API is appended, never renumbered.** Enums only grow at the end. Existing
+  signatures and behavior stay identical, and every ticket has a regression case for that.
+- **Docs ride along.** Each `SR-2610-anvl-docs-001` item lands with the ticket that makes it
+  true (mapping below), not as a separate pass at the end.
+
+## Decisions needed before the phase that uses them
+
+| # | Ticket | Question | Recommendation |
+|---|---|---|---|
+| D1 | FR-2610-anvl-types-003 | Blob: its own primitive, folded into `String`, or both? | **Both.** `String` accepts blobs, and a separate `Blob` primitive adds `tag :=`. |
+| D2 | FR-2610-anvl-types-005 | Does `integer := true` accept `2.0`? (`is_integral` follows the *spelling*, so a spelling-based rule rejects it.) | **Value-based:** `2.0` and `1e3` pass. Pin it in a test either way. |
+| D3 | SR-2610-anvl-vendor-bump-001 | How does `anvil.wasm` get `sigma.system.alloc` under Emscripten? Does wasm carry types/schema? | Build the allocator from source with `emcc` on the Linode box. Carry types+schema, since FlyWire's browser side validates too. |
+| D4 | FR-2610-anvl-bindings-001 (py/net slices) | Add `Schema`/`TypeRegistry` vtables? Today both headers are flat-only, and py/net bind through vtables. | **Yes.** Add them once, after Phase 3 when the native surface has settled, the same way as `Writer`/`Builder`. |
+
+---
+
+## Phase 1: native correctness (do first, sequentially)
+
+Both bugs sit under every later feature, and both are in the same read paths of `schema.c` and
+`anvil_types.c`. They make a good warm-up for the codebase.
+
+1. **BR-2610-anvl-types-001**: numeric reads through `anvil_value_get_numeric`, exact
+   comparisons. Blocks FR-2610-anvl-types-005. *Docs: SR-docs item 3.*
+2. **BR-2610-anvl-schema-001**: no fixed-buffer truncation anywhere, including the field-name
+   and violation-storage sites added in review. Violation `field`/`message` must be allocated to
+   length *before* FR-2610-anvl-schema-001 introduces paths.
+
+## Phase 2: load-time diagnostics and the registry
+
+These give every later "this is malformed" case a real home. Doing them early means later FRs
+never need their interim "treat as not declared until diagnostics land" behavior.
+
+3. **FR-2610-anvl-types-001**: type-registry diagnostics.
+4. **FR-2610-anvl-types-002**: transitive `@[types]` includes. It's in the same loader as #3, so
+   collisions get reported as soon as they become possible. *Docs: SR-docs item 5.*
+5. **FR-2610-anvl-schema-004**: schema load diagnostics, passing the registry's through.
+
+## Phase 3: validation semantics (order matters)
+
+Today `anvil_schema_validate` is one flat loop over a flat rule list. The first two tickets here
+reshape it. Everything after them is a per-rule check slotted into the reshaped code once.
+
+6. **FR-2610-anvl-schema-002**: `validate_value` plus options. Extract "validate a set of
+   statements against a set of rules, with options" out of the document entry point. This
+   unblocks FlyWire's switch to AnvilSchema, so it has the most leverage in the set.
+7. **FR-2610-anvl-schema-001**: nested `fields`/`items`, paths, `min_items`/`max_items`. Rules
+   become a tree, and the per-field check from #6 recurses.
+8. **FR-2610-anvl-schema-003**: `nullable`.
+9. **FR-2610-anvl-types-005**: `integer` plus numeric bound getters. *(needs D2; after #1)*
+10. **FR-2610-anvl-types-003**: Blob. *(needs D1)*
+11. **FR-2610-anvl-types-004**: `format` (date, date-time, uuid).
+12. **FR-2610-anvl-schema-005**: introspection, including extension keys. It goes last because
+    it exposes an accessor for every constraint above. Doing it earlier means re-opening it
+    after each one.
+
+Then **D4**: add the `Schema`/`TypeRegistry` vtables over the finished surface.
+
+*Docs: SR-docs items 1, 2, 4 can land any time in Phase 1–3, but before the first binding release.*
+
+## Phase 4: bindings (separate repos; can overlap Phase 3)
+
+13. **SR-2610-anvl-vendor-bump-001**: bump `anvil.node` and `anvil.wasm` off `52f29bf`. *(needs
+    D3 for wasm)* Node can start as soon as Phase 1 is merged, so the fixes travel with it.
+14. **FR-2610-anvl-bindings-001, slice 1 (`anvil.node`)**: `TypeRegistry`/`Schema` over what's
+    landed. Re-bump and add accessors as Phase 3 tickets merge.
+15. **FR-2610-anvl-bindings-002**: writer/builder in `anvil.node`. *(after #13)*
+16. **FR-2610-anvl-bindings-001, slices 2–3 (`anvil.py`, `anvil.net`)**. *(after D4)*
+
+## Phase 5: release
+
+17. **SR-2610-anvl-distribution-001**: `anvil-node`/`anvil-wasm` 0.9.x on anvldata.com, built
+    from a recorded native commit, with 0.8.0-rc kept live. *(after #13 and #14)*
+
+---
+
+## Critical path for Rivet/FlyWire
+
+The shortest route to "FlyWire validates through AnvilSchema from Node" is:
+
+**#1 → #2 → #6 → #13 → #14 → #17**, then #7, #8 and #12 as Rivet's nested and nullable fields
+need them. Everything else improves correctness and coverage, but none of it blocks that first
+end-to-end path.
+
+## Housekeeping
+
+- **SR-2609-anvl-distribution-001** is effectively done: hosting is live and both tarballs are
+  npm-shaped and verified. All that's left is the deliberate Linux-x64-only scope for
+  `anvil-node`. Recommend closing it, with that deferral recorded as its resolution.
+- **FR-2609-anvl-writer-001** lists the `anvil.node`/`anvil.wasm` writer wrappers as not started.
+  FR-2610-anvl-bindings-002 now owns the Node half. Cross-reference it when that FR lands.
