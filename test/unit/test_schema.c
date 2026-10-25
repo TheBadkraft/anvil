@@ -2286,6 +2286,34 @@ static void test_sch80_extra_value_kinds(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * SR-2610-anvl-docs-001 item 4 — pin the documented constraint semantics
+ * ---------------------------------------------------------------------- */
+static void test_sch81_size_counts_bytes_and_schemas_are_closed(void) {
+   const char *src = "#!aml\n@[schema]\nname := { type := String; size := 5; };\n";
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   // "héllo" is 5 characters but 6 UTF-8 bytes (é is 2): size counts bytes.
+   bool ok = nested_validate(src, "#!aml\nname := \"h\xC3\xA9llo\";\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH81: 5 characters / 6 bytes exceeds size := 5");
+      NESTED_PATH_IS(0, "name", ANVIL_SCHEMA_ERR_VALIDATION_SIZE, "SCH81: SIZE at name");
+   } else {
+      TestBit.is_not_null(schema, "SCH81: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nname := \"hello\";\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema != NULL && ok, "SCH81: 5 ASCII bytes fit");
+   nested_free(schema, sdoc, ddoc);
+   // Closed by default: an undeclared field is a violation unless the caller opts out.
+   ok = nested_validate(src, "#!aml\nname := \"ok\";\nextra := 1;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH81: unknown data fields are violations by default");
+      NESTED_PATH_IS(0, "extra", ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, "SCH81: UNKNOWN_FIELD");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -2448,6 +2476,9 @@ int main(void) {
                   test_sch79_introspection_outlives_the_documents, th);
    TestBit.run_ex("SCH80_EXTRA_VALUE_KINDS", NULL,
                   test_sch80_extra_value_kinds, th);
+
+   TestBit.run_ex("SCH81_SIZE_COUNTS_BYTES_AND_SCHEMAS_ARE_CLOSED", NULL,
+                  test_sch81_size_counts_bytes_and_schemas_are_closed, th);
 
    return TestBit.report();
 }

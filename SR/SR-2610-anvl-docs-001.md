@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open
+**Status:** resolved
 **Tags:** docs, types, schema, maintenance, rivet-readiness
 
 ---
@@ -41,3 +41,23 @@ doesn't exist.
 3. The types-reference and README status lines for types and schema agree with each other.
 4. `docs/types-reference.md` states that `size` is a byte length, with a multi-byte UTF-8 example.
 5. `site/assets/docs/` mirrors match `docs/` for every file changed here.
+
+## Resolution
+
+Branch `docs/SR-2610-anvl-docs-001`, merged to `main`; items landed with the tickets they map to.
+
+1. `docs/types-reference.md` (and its site mirror): the "design-only" status and the "not-yet-started
+   schema module" bullet are replaced with the implemented state. Done here.
+2. `README.md`: "first phase" removed from the types row and the schema doc pointer; the schema paragraph
+   lists what is now implemented. Done here.
+3. Done with BR-2610-anvl-types-001 (both `read_numeric` helpers and their comments were removed);
+   `grep -rn "no numeric accessor" src docs notes site/assets/docs` finds nothing.
+4. `size` counts bytes (with the `"héllo"` example) and closed-schema semantics are documented, and
+   pinned by SCH81. Done here.
+5. Done with FR-2610-anvl-types-002 (transitive includes).
+
+Test cases 1-4 verified by grep/inspection. Case 5: `site/assets/docs/types-reference.md` is
+byte-identical to `docs/types-reference.md`. The site's `README.md` mirror is *generated* by
+`site/scripts/build-site.js` from the root README with text substitutions and was already out of step
+with it before this change (different title block), so it was not hand-edited; the next site build
+regenerates it. Not run here (needs the site toolchain and would rewrite unrelated files).
