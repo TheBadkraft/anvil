@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
 
+### Fixed
+- **Numeric constraints and values are no longer truncated** (`BR-2610-anvl-types-001`): schema and
+  type `min`/`max` were read with `strtoll`, so `min := 0.5` became `0`, data `3.7` passed
+  `max := 3`, `5e+10` read as `5`, and text past 31 characters was cut. Both now read through
+  `anvil_value_get_numeric` and compare exactly (no double rounding near 2^53/2^63; an overflowed
+  data value compares by sign). A non-numeric, overflowing or fractional-`size` declaration is
+  treated as not declared rather than as `0`. `anvil_type_def_get_min`/`_max` now return false for a
+  fractional bound instead of a truncated integer.
+
 ---
 
 ## [v0.9.0-rc] — (2026-10-09)
