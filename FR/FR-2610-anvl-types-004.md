@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** types, schema, constraints, datetime, uuid, rivet-readiness
 
 ---
@@ -58,3 +58,23 @@ hand-written validators (no regex engine; the core stays dependency-free).
 
 FR-2610-anvl-schema-004 (diagnostics) for unknown-format reporting; can land first and treat
 unknown formats as "not declared" until then.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-types-004`, merged to `main`. Tests TYP32-TYP33 (`test_types.c`, 42 table cases on
+the validators plus the declaration/getter) and SCH68-SCH73 (`test_schema.c`); fixtures
+`schema_format_*`. Full unit regression green with unchanged counts elsewhere, `test_release`
+green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver. Docs:
+`docs/types-reference.md` "Formats" (and the site mirror).
+
+Decisions:
+- The validators live in `anvil_types.c` behind `include/internal/format.h` (no new source file,
+  so no Makefile churn) and are shared with `schema.c`.
+- RFC 3339 strictness: `T` and `Z` are upper case only (a space or lower case fails), the offset is
+  mandatory, and seconds may be `60` (a leap second, which Postgres also accepts).
+- An unknown name on a *type* is `MALFORMED_CONSTRAINT` (the registry has no UNKNOWN_FORMAT category;
+  the schema one is reserved for schema fields) and arrives in the schema's list via pass-through.
+- `format` is checked on STRING, BARE and BLOB data (a blob's payload bytes); a payload with an
+  embedded NUL is invalid. Numbers are not a format target.
+- The public type-side getter is `anvil_type_def_get_format` as specified; the internal
+  `anvil_type_def_format` is the const-pointer form schema.c uses.

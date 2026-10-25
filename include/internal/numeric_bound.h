@@ -59,3 +59,6 @@ bool anvil_numeric_is_whole(anvil_value data);
 
 /// A Blob type's declared `tag := ...` (copied at load), or NULL if it declares none.
 const char *anvil_type_def_tag(anvil_type_def def);
+
+/// A type's declared (known) `format`, or NULL.
+const char *anvil_type_def_format(anvil_type_def def);

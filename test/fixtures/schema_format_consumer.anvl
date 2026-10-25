@@ -1,0 +1,9 @@
+#!aml
+include "schema_format_types.anvl";
+@[schema]
+
+created_at := { type := types.Timestamp; };
+other := { type := String; };
+body := { type := types.Timestamp; };
+bad_body := { type := types.Timestamp; };
+n := { type := Numeric; format := uuid; };

@@ -175,6 +175,31 @@ its own `fields`, they replace the type's; the two are never merged. A type whos
 to itself (directly or through another type) is reported by the schema as a `SELF_REFERENCE`
 diagnostic and is not expanded. Violations name the full path, e.g. `links[2].target`.
 
+## Formats
+
+A `String` can be required to be a well-known lexical format with `format := <name>`. The set is
+small and closed on purpose, checked by hand-written validators (no regular-expression engine, no
+time-zone database):
+
+| Format | Accepts |
+|---|---|
+| `iso8601_date` | `YYYY-MM-DD`, with a real calendar check (month 01-12, the month's length, leap years) |
+| `iso8601_datetime` | RFC 3339: `YYYY-MM-DDTHH:MM:SS[.fraction](Z\|+HH:MM\|-HH:MM)`. The offset is required, so a timestamp is never ambiguous; `T` and `Z` are upper case; seconds may be 60 (leap second) |
+| `uuid` | 8-4-4-4-12 hexadecimal digits, either case, any version |
+
+```anvl
+@[types]
+
+Timestamp := { type := String; format := iso8601_datetime; };
+```
+
+A mismatch is an `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field. `format` is
+inherited like the other constraints (a field's own `format` replaces the type's) and applies at
+every depth. It is checked on string, bare-word and blob values (a blob's payload is the text); a
+number is not a format target. An unknown format name is a load-time diagnostic
+(`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the constraint is
+treated as not declared, not silently passed. `anvil_type_def_get_format` reads a type's format.
+
 ## Nullable values
 
 A field with a declared type rejects an explicit `null` (`note := null;`) as a type mismatch, the

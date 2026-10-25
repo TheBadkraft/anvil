@@ -1883,6 +1883,129 @@ static void test_sch67_blob_nested_and_nullable(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-types-004 — format := iso8601_date | iso8601_datetime | uuid
+ * ---------------------------------------------------------------------- */
+// One data value against a one-field format schema: the violation category at `v`, 0 for none.
+static int format_case(const char *format, const char *value) {
+   char schema_src[256], data[512];
+   snprintf(schema_src, sizeof(schema_src),
+            "#!aml\n@[schema]\nv := { type := String; format := %s; };\n", format);
+   snprintf(data, sizeof(data), "#!aml\nv := \"%s\";\n", value);
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(schema_src, data, &schema, &sdoc, &ddoc);
+   int result = -1;
+   if (schema) {
+      if (ok) {
+         result = 0;
+      } else {
+         result = (int)anvil_schema_get_violation_count(schema) == 1
+                     ? (int)anvil_schema_violation_get_category(anvil_schema_get_violation(schema, 0))
+                     : -2;
+         char path[16] = {0};
+         anvil_schema_violation_get_field(anvil_schema_get_violation(schema, 0), path, sizeof(path));
+         if (strcmp(path, "v") != 0) {
+            result = -3;
+         }
+      }
+   }
+   nested_free(schema, sdoc, ddoc);
+   return result;
+}
+
+static void test_sch68_format_date(void) {
+   int F = ANVIL_SCHEMA_ERR_VALIDATION_FORMAT;
+   TestBit.is_equal_int(0, format_case("iso8601_date", "2026-02-28"), "SCH68: 2026-02-28 passes");
+   TestBit.is_equal_int(F, format_case("iso8601_date", "2026-02-29"),
+                        "SCH68: 2026-02-29 fails with exactly one FORMAT naming the field");
+   TestBit.is_equal_int(0, format_case("iso8601_date", "2028-02-29"), "SCH68: leap day passes");
+   TestBit.is_equal_int(F, format_case("iso8601_date", "2026-13-01"), "SCH68: month 13 fails");
+   TestBit.is_equal_int(F, format_case("iso8601_date", "yesterday"), "SCH68: free text fails");
+}
+
+static void test_sch69_format_datetime(void) {
+   int F = ANVIL_SCHEMA_ERR_VALIDATION_FORMAT;
+   TestBit.is_equal_int(0, format_case("iso8601_datetime", "2026-10-25T14:03:00Z"), "SCH69: Z");
+   TestBit.is_equal_int(0, format_case("iso8601_datetime", "2026-10-25T14:03:00.123-05:00"),
+                        "SCH69: fraction and offset");
+   TestBit.is_equal_int(F, format_case("iso8601_datetime", "2026-10-25 14:03:00Z"), "SCH69: space");
+   TestBit.is_equal_int(F, format_case("iso8601_datetime", "2026-10-25T14:03:00"), "SCH69: no offset");
+}
+
+static void test_sch70_format_uuid(void) {
+   int F = ANVIL_SCHEMA_ERR_VALIDATION_FORMAT;
+   TestBit.is_equal_int(0, format_case("uuid", "0f8fad5b-d9cb-469f-a165-70867728950e"), "SCH70: ok");
+   TestBit.is_equal_int(0, format_case("uuid", "0F8FAD5B-D9CB-469F-A165-70867728950E"), "SCH70: upper");
+   TestBit.is_equal_int(F, format_case("uuid", "0f8fad5b-d9cb-469f-a165-70867728950"), "SCH70: 35 chars");
+}
+
+static void test_sch71_format_inherited_and_scope(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_format_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH71: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH71: no diagnostics");
+      const char *src = "#!aml\ncreated_at := \"yesterday\";\nother := \"also bad\";\n"
+                        "body := `2026-10-25T14:03:00Z`;\nbad_body := `nope`;\nn := 5;\n";
+      anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+      if (ddoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ddoc), "SCH71: violations found");
+         TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH71: created_at (inherited) and bad_body (a blob's payload is "
+                              "text); nothing for `other` (no format) or the numeric `n`");
+         NESTED_PATH_IS(0, "created_at", ANVIL_SCHEMA_ERR_VALIDATION_FORMAT,
+                        "SCH71: created_at inherits the type's format");
+         NESTED_PATH_IS(1, "bad_body", ANVIL_SCHEMA_ERR_VALIDATION_FORMAT,
+                        "SCH71: a blob's payload is checked");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch72_unknown_format_is_a_diagnostic(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\nv := { type := String; format := nope; };\n",
+                             "#!aml\nv := \"anything\";\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH72: one load diagnostic");
+      anvil_schema_diagnostic d = anvil_schema_get_diagnostic(schema, 0);
+      char path[16] = {0};
+      anvil_schema_diagnostic_get_field(d, path, sizeof(path));
+      TestBit.is_true(anvil_schema_diagnostic_get_category(d) == ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT &&
+                         strcmp(path, "v") == 0,
+                      "SCH72: UNKNOWN_FORMAT at v");
+      TestBit.is_true(ok, "SCH72: and not a violation on every data document");
+   } else {
+      TestBit.is_not_null(schema, "SCH72: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch73_format_nested_and_nullable(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "ids := { type := Array; items := { type := String; format := uuid; nullable := true; }; };\n",
+      "#!aml\nids := [ \"0f8fad5b-d9cb-469f-a165-70867728950e\", null, \"nope\" ];\n",
+      &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH73: the bad element fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH73: only ids[2]; the null is nullable");
+      NESTED_PATH_IS(0, "ids[2]", ANVIL_SCHEMA_ERR_VALIDATION_FORMAT, "SCH73: FORMAT at ids[2]");
+   } else {
+      TestBit.is_not_null(schema, "SCH73: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -2017,6 +2140,19 @@ int main(void) {
                   test_sch66_blob_size_and_inheritance, th);
    TestBit.run_ex("SCH67_BLOB_NESTED_AND_NULLABLE", NULL,
                   test_sch67_blob_nested_and_nullable, th);
+
+   TestBit.run_ex("SCH68_FORMAT_DATE", NULL,
+                  test_sch68_format_date, th);
+   TestBit.run_ex("SCH69_FORMAT_DATETIME", NULL,
+                  test_sch69_format_datetime, th);
+   TestBit.run_ex("SCH70_FORMAT_UUID", NULL,
+                  test_sch70_format_uuid, th);
+   TestBit.run_ex("SCH71_FORMAT_INHERITED_AND_SCOPE", NULL,
+                  test_sch71_format_inherited_and_scope, th);
+   TestBit.run_ex("SCH72_UNKNOWN_FORMAT_IS_A_DIAGNOSTIC", NULL,
+                  test_sch72_unknown_format_is_a_diagnostic, th);
+   TestBit.run_ex("SCH73_FORMAT_NESTED_AND_NULLABLE", NULL,
+                  test_sch73_format_nested_and_nullable, th);
 
    return TestBit.report();
 }

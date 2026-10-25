@@ -19,6 +19,7 @@
 #include "anvil_flat.h"
 #include "anvil_schema.h"
 #include "anvil_type_registry.h"
+#include "internal/format.h"
 #include "internal/numeric_bound.h"
 #include "internal/text_alloc.h"
 // ----------------
@@ -36,6 +37,7 @@ struct anvil_schema_field_t {
    bool has_kind;
    anvil_type_kind kind;
    bool required;
+   char *format;          // a known lexical format the text must match; NULL if none
    char *tag;             // a blob must carry exactly this @tag; NULL if unconstrained
    bool integer;          // a numeric value must be whole (value-based: 2.0 and 1e+3 pass)
    bool integer_declared; // the rule said so itself, so it overrides the resolved type's
@@ -220,6 +222,7 @@ static void field_dispose(struct anvil_schema_field_t *f) {
    }
    dispose_field_values(f->values);
    Allocator.dispose(f->tag);
+   Allocator.dispose(f->format);
    if (f->children) {
       for (usize i = 0, n = List.size(f->children); i < n; i++) {
          struct anvil_schema_field_t *c = NULL;
@@ -352,6 +355,18 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
                      "field '%s': 'required' must be true or false", path);
          }
          Allocator.dispose(text);
+      } else if (strcmp(fname, "format") == 0) {
+         anvil_value_type ft = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
+         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_text_alloc(fval) : NULL;
+         if (name && anvil_format_known(name)) {
+            Allocator.dispose(field->format);
+            field->format = name;
+         } else {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT, ANVIL_TYPE_DIAG_NONE, path,
+                     "field '%s': unknown format '%s' (known: iso8601_date, iso8601_datetime, "
+                     "uuid); treated as not declared", path, name ? name : "");
+            Allocator.dispose(name);
+         }
       } else if (strcmp(fname, "tag") == 0) {
          anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
          if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
@@ -467,6 +482,10 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
       }
       if (!field->values) {
          field->values = copy_values_from_type(resolved);
+      }
+      if (!field->format) {
+         const char *type_format = anvil_type_def_format(resolved);
+         field->format = type_format ? anvil_text_dup(type_format) : NULL;
       }
       if (!field->tag) {
          const char *type_tag = anvil_type_def_tag(resolved);
@@ -832,6 +851,23 @@ static void check_value(struct anvil_schema_t *s, const struct anvil_schema_fiel
       if ((long long)len > rule->size) {
          add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_SIZE,
                        "field value exceeds the declared size");
+      }
+   }
+   if (rule->format && (actual == ANVIL_VALUE_STRING || actual == ANVIL_VALUE_BARE ||
+                        actual == ANVIL_VALUE_BLOB)) {
+      // The text to match: a string's content, or a blob's payload (get_bytes is not NUL-terminated).
+      size_t blen = anvil_value_get_bytes(data_val, NULL, 0);
+      char *text = Allocator.alloc(blen + 1);
+      bool valid = false;
+      if (text) {
+         anvil_value_get_bytes(data_val, text, blen);
+         text[blen] = '\0';
+         valid = strlen(text) == blen && anvil_format_valid(rule->format, text);
+      }
+      Allocator.dispose(text);
+      if (!valid) {
+         add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_FORMAT,
+                       "value does not match the declared format");
       }
    }
    if (rule->tag && actual == ANVIL_VALUE_BLOB) {
