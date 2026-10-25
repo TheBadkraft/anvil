@@ -875,6 +875,290 @@ static void test_sch32_diagnostics_outlive_documents_and_null_safety(void) {
                         "SCH32: message(NULL)");
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-schema-002 — anvil_schema_validate_value and options
+ * ---------------------------------------------------------------------- */
+#define SCHEMA_TICKET \
+   "#!aml\n@[schema]\n" \
+   "status := { type := enum; values := [ open, closed ]; required := true; };\n" \
+   "title := { type := String; };\n"
+
+// The value of the top-level statement `name` in doc.
+static anvil_value value_of(anvil_document doc, const char *name) {
+   anvil_statement st = anvil_document_find_statement(doc, name);
+   return st ? anvil_statement_get_value(st) : NULL;
+}
+
+static anvil_schema_options opts_of(bool skip_required, bool allow_unknown) {
+   anvil_schema_options o = {.size = sizeof(o)};
+   o.skip_required = skip_required;
+   o.allow_unknown = allow_unknown;
+   return o;
+}
+
+static void test_sch33_validate_object_value(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { status := open; title := \"x\"; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH33: schema and data loaded");
+   if (schema && ddoc) {
+      TestBit.is_true(anvil_schema_validate_value(schema, value_of(ddoc, "set"), NULL),
+                      "SCH33: the object under 'set' validates with default options");
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH33: zero violations");
+      anvil_schema_options zero = {.size = sizeof(zero)};
+      TestBit.is_true(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &zero),
+                      "SCH33: and with a zero-initialised options struct");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch34_skip_required(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { title := \"x\"; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH34: schema and data loaded");
+   if (schema && ddoc) {
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), NULL),
+                       "SCH34: a missing required field fails by default");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH34: one violation");
+      TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
+                           anvil_schema_violation_get_category(anvil_schema_get_violation(schema, 0)),
+                           "SCH34: it is REQUIRED");
+      anvil_schema_options patch = opts_of(true, false);
+      TestBit.is_true(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &patch),
+                      "SCH34: skip_required passes the same value");
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH34: and the previous violations were replaced");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch35_skip_required_still_checks_present_fields(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { status := bogus; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH35: schema and data loaded");
+   if (schema && ddoc) {
+      anvil_schema_options patch = opts_of(true, false);
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &patch),
+                       "SCH35: an invalid present field fails under skip_required");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH35: one violation");
+      TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_VALUES,
+                           anvil_schema_violation_get_category(anvil_schema_get_violation(schema, 0)),
+                           "SCH35: it is VALUES");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch36_allow_unknown(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { status := open; extra := 1; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH36: schema and data loaded");
+   if (schema && ddoc) {
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), NULL),
+                       "SCH36: an undeclared field fails by default");
+      TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+                           anvil_schema_violation_get_category(anvil_schema_get_violation(schema, 0)),
+                           "SCH36: as UNKNOWN_FIELD");
+      anvil_schema_options lax = opts_of(false, true);
+      TestBit.is_true(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &lax),
+                      "SCH36: allow_unknown suppresses it");
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH36: zero violations");
+      // allow_unknown does not relax anything else
+      const char *bad = "#!aml\nset := { extra := 1; };\n";
+      anvil_document bdoc = anvil_load_buffer(bad, strlen(bad));
+      if (bdoc) {
+         TestBit.is_false(anvil_schema_validate_value(schema, value_of(bdoc, "set"), &lax),
+                          "SCH36: a missing required field still fails under allow_unknown");
+         anvil_dispose(bdoc);
+      }
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch37_non_object_value(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nlist := [ 1, 2 ];\nnum := 5;\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH37: schema and data loaded");
+   if (schema && ddoc) {
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "list"), NULL),
+                       "SCH37: an ARRAY value fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH37: exactly one violation");
+      anvil_schema_violation v = anvil_schema_get_violation(schema, 0);
+      TestBit.is_equal_int(ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                           anvil_schema_violation_get_category(v), "SCH37: TYPE_MISMATCH");
+      TestBit.is_equal_int(0, (long long)anvil_schema_violation_get_field(v, NULL, 0),
+                           "SCH37: with an empty field path");
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "num"), NULL),
+                       "SCH37: a scalar fails too");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH37: still exactly one (replaced, not accumulated)");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch38_each_call_replaces_violations(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := [ { title := \"a\"; }, { status := open; } ];\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(schema && ddoc, "SCH38: schema and data loaded");
+   if (schema && ddoc) {
+      anvil_value arr = value_of(ddoc, "set");
+      TestBit.is_equal_int(2, (long long)anvil_value_get_count(arr), "SCH38: two elements");
+      TestBit.is_false(anvil_schema_validate_value(schema, anvil_value_get_element(arr, 0), NULL),
+                       "SCH38: the first element is missing 'status'");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH38: one violation after the first call");
+      TestBit.is_true(anvil_schema_validate_value(schema, anvil_value_get_element(arr, 1), NULL),
+                      "SCH38: the second element is valid");
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH38: the second call replaced the first call's violations");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch39_options_forward_compatible_and_null_safety(void) {
+   anvil_document sdoc = anvil_load_buffer(SCHEMA_TICKET, strlen(SCHEMA_TICKET));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   const char *src = "#!aml\nset := { title := \"x\"; };\n";
+   anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+   if (schema && ddoc) {
+      // A caller compiled against an older struct that ended before skip_required: size says so,
+      // and the (garbage) members past it must read as defaults.
+      anvil_schema_options old = opts_of(true, true);
+      old.size = sizeof(size_t);
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &old),
+                       "SCH39: members beyond opts->size are ignored (defaults apply)");
+      anvil_schema_options none = opts_of(true, true);
+      none.size = 0;
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &none),
+                       "SCH39: size 0 means all defaults");
+      anvil_value set = value_of(ddoc, "set");
+      TestBit.is_false(anvil_schema_validate_value(NULL, set, NULL), "SCH39: NULL schema");
+      TestBit.is_false(anvil_schema_validate_value(schema, NULL, NULL), "SCH39: NULL value");
+   } else {
+      TestBit.is_true(false, "SCH39: schema and data loaded");
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (ddoc) {
+      anvil_dispose(ddoc);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch40_document_form_equals_value_form(void) {
+   // The document form is the value form with default options: same violations, same order.
+   const char *schema_src = SCHEMA_TICKET;
+   const char *doc_src = "#!aml\nstatus := bogus;\ntitle := 5;\nextra := 1;\n";
+   const char *obj_src = "#!aml\nset := { status := bogus; title := 5; extra := 1; };\n";
+   anvil_document sdoc = anvil_load_buffer(schema_src, strlen(schema_src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   anvil_document d1 = anvil_load_buffer(doc_src, strlen(doc_src));
+   anvil_document d2 = anvil_load_buffer(obj_src, strlen(obj_src));
+   TestBit.is_true(schema && d1 && d2, "SCH40: loaded");
+   if (schema && d1 && d2) {
+      anvil_schema_validate_value(schema, value_of(d2, "set"), NULL);
+      size_t n1 = anvil_schema_get_violation_count(schema);
+      int cats[8] = {0};
+      char fields[8][16] = {{0}};
+      for (size_t i = 0; i < n1 && i < 8; i++) {
+         anvil_schema_violation v = anvil_schema_get_violation(schema, i);
+         cats[i] = (int)anvil_schema_violation_get_category(v);
+         anvil_schema_violation_get_field(v, fields[i], sizeof(fields[i]));
+      }
+      TestBit.is_equal_int(3, (long long)n1, "SCH40: three violations (values, type, unknown)");
+      anvil_schema_validate(schema, d1);
+      TestBit.is_equal_int((long long)n1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH40: the document form finds the same number");
+      for (size_t i = 0; i < n1 && i < 8; i++) {
+         anvil_schema_violation v = anvil_schema_get_violation(schema, i);
+         char f[16] = {0};
+         anvil_schema_violation_get_field(v, f, sizeof(f));
+         TestBit.is_true(cats[i] == (int)anvil_schema_violation_get_category(v) &&
+                            strcmp(fields[i], f) == 0,
+                         "SCH40: same category and field at each position");
+      }
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (d1) {
+      anvil_dispose(d1);
+   }
+   if (d2) {
+      anvil_dispose(d2);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -934,6 +1218,23 @@ int main(void) {
                   test_sch31_registry_diagnostics_pass_through, th);
    TestBit.run_ex("SCH32_DIAGNOSTICS_OUTLIVE_DOCUMENTS_AND_NULL_SAFETY", NULL,
                   test_sch32_diagnostics_outlive_documents_and_null_safety, th);
+
+   TestBit.run_ex("SCH33_VALIDATE_OBJECT_VALUE", NULL,
+                  test_sch33_validate_object_value, th);
+   TestBit.run_ex("SCH34_SKIP_REQUIRED", NULL,
+                  test_sch34_skip_required, th);
+   TestBit.run_ex("SCH35_SKIP_REQUIRED_STILL_CHECKS_PRESENT_FIELDS", NULL,
+                  test_sch35_skip_required_still_checks_present_fields, th);
+   TestBit.run_ex("SCH36_ALLOW_UNKNOWN", NULL,
+                  test_sch36_allow_unknown, th);
+   TestBit.run_ex("SCH37_NON_OBJECT_VALUE", NULL,
+                  test_sch37_non_object_value, th);
+   TestBit.run_ex("SCH38_EACH_CALL_REPLACES_VIOLATIONS", NULL,
+                  test_sch38_each_call_replaces_violations, th);
+   TestBit.run_ex("SCH39_OPTIONS_FORWARD_COMPATIBLE_AND_NULL_SAFETY", NULL,
+                  test_sch39_options_forward_compatible_and_null_safety, th);
+   TestBit.run_ex("SCH40_DOCUMENT_FORM_EQUALS_VALUE_FORM", NULL,
+                  test_sch40_document_form_equals_value_form, th);
 
    return TestBit.report();
 }

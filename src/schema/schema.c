@@ -27,6 +27,7 @@
 #include <sigma/map.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -441,14 +442,74 @@ static void add_violation(list violations, const char *field_name, anvil_schema_
    List.append(violations, v);
 }
 
-bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
-   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
-   if (!s || !data_doc) {
-      return false;
-   }
+// The statements being validated, whichever shape they came from (a document's top level or an
+// OBJECT value's members): every statement in order, plus a name -> first-statement map so the
+// per-field pass is a lookup, not a scan. Names are held at full length.
+struct data_view {
+   list entries; // struct data_entry* in source order
+   map first;    // name -> struct data_entry* of the first statement with that name
+};
 
+struct data_entry {
+   char *name;
+   anvil_statement stmt;
+};
+
+static void data_view_add(struct data_view *view, anvil_statement stmt) {
+   struct data_entry *e = Allocator.alloc(sizeof(struct data_entry));
+   if (!e) {
+      return;
+   }
+   e->name = anvil_name_alloc(stmt);
+   e->stmt = stmt;
+   if (!e->name) {
+      Allocator.dispose(e);
+      return;
+   }
+   List.append(view->entries, e);
+   addr prior = 0;
+   if (!Map.get(view->first, e->name, strlen(e->name), &prior)) {
+      Map.set(view->first, e->name, strlen(e->name), (addr)e);
+   }
+}
+
+static void data_view_init(struct data_view *view) {
+   view->entries = List.new(8, sizeof(struct data_entry *));
+   view->first = Map.new(8);
+}
+
+static void data_view_dispose(struct data_view *view) {
+   for (usize i = 0, n = List.size(view->entries); i < n; i++) {
+      struct data_entry *e = NULL;
+      List.get(view->entries, i, (object *)&e);
+      if (e) {
+         Allocator.dispose(e->name);
+      }
+      Allocator.dispose(e);
+   }
+   List.dispose(view->entries);
+   Map.dispose(view->first);
+}
+
+// Option flags honour opts->size, so a caller compiled against an older, shorter struct reads
+// every member past its end as the default.
+#define OPT_FLAG(opts, member) \
+   ((opts) && (opts)->size >= offsetof(anvil_schema_options, member) + sizeof((opts)->member) && \
+    (opts)->member)
+
+// Replaces the previous call's violations with a fresh, empty list.
+static void reset_violations(struct anvil_schema_t *s) {
    dispose_violations(s->violations);
    s->violations = List.new(4, sizeof(struct anvil_schema_violation_t *));
+}
+
+// The one validation pass: every declared field against the view, then every view statement the
+// schema doesn't declare. Both the document form and the value form land here.
+static bool validate_view(struct anvil_schema_t *s, const struct data_view *view,
+                          const anvil_schema_options *opts) {
+   reset_violations(s);
+   bool skip_required = OPT_FLAG(opts, skip_required);
+   bool allow_unknown = OPT_FLAG(opts, allow_unknown);
 
    usize field_count = List.size(s->fields);
    for (usize i = 0; i < field_count; i++) {
@@ -458,15 +519,15 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
          continue;
       }
 
-      anvil_statement data_stmt = anvil_document_find_statement(data_doc, field->name);
-      if (!data_stmt) {
-         if (field->required) {
+      addr found = 0;
+      if (!Map.get(view->first, field->name, strlen(field->name), &found) || !found) {
+         if (field->required && !skip_required) {
             add_violation(s->violations, field->name, ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED,
                           "required field is missing");
          }
          continue;
       }
-
+      anvil_statement data_stmt = ((struct data_entry *)found)->stmt;
       anvil_value data_val = anvil_statement_get_value(data_stmt);
       anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
 
@@ -512,26 +573,63 @@ bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
    }
 
    // Every data field not declared in the schema is a violation of its own — checked as a
-   // second pass over the data document's own statements, independent of the pass above.
-   anvil_statement_iterator dit = anvil_document_get_statements(data_doc);
-   if (dit) {
-      anvil_statement dstmt = NULL;
-      while (anvil_statement_iterator_next(dit, &dstmt)) {
-         char *dname = anvil_name_alloc(dstmt);
-         if (!dname) {
-            continue;
-         }
+   // second pass over the statements, independent of the pass above.
+   if (!allow_unknown) {
+      for (usize i = 0, n = List.size(view->entries); i < n; i++) {
+         struct data_entry *e = NULL;
+         List.get(view->entries, i, (object *)&e);
          addr unused = 0;
-         if (!Map.get(s->by_name, dname, strlen(dname), &unused)) {
-            add_violation(s->violations, dname, ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
+         if (e && !Map.get(s->by_name, e->name, strlen(e->name), &unused)) {
+            add_violation(s->violations, e->name, ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD,
                           "field is not declared in the schema");
          }
-         Allocator.dispose(dname);
       }
-      anvil_statement_iterator_dispose(dit);
    }
 
    return List.size(s->violations) == 0;
+}
+
+bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   if (!s || !data_doc) {
+      return false;
+   }
+   struct data_view view;
+   data_view_init(&view);
+   anvil_statement_iterator it = anvil_document_get_statements(data_doc);
+   if (it) {
+      anvil_statement stmt = NULL;
+      while (anvil_statement_iterator_next(it, &stmt)) {
+         data_view_add(&view, stmt);
+      }
+      anvil_statement_iterator_dispose(it);
+   }
+   bool ok = validate_view(s, &view, NULL);
+   data_view_dispose(&view);
+   return ok;
+}
+
+bool anvil_schema_validate_value(anvil_schema schema, anvil_value object_value,
+                                 const anvil_schema_options *opts) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   if (!s || !object_value) {
+      return false;
+   }
+   if (anvil_value_get_type(object_value) != ANVIL_VALUE_OBJECT) {
+      reset_violations(s);
+      add_violation(s->violations, "", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                    "value is not an object");
+      return false;
+   }
+   struct data_view view;
+   data_view_init(&view);
+   size_t count = anvil_value_get_count(object_value);
+   for (size_t i = 0; i < count; i++) {
+      data_view_add(&view, anvil_value_get_statement(object_value, i));
+   }
+   bool ok = validate_view(s, &view, opts);
+   data_view_dispose(&view);
+   return ok;
 }
 
 size_t anvil_schema_get_violation_count(anvil_schema schema) {

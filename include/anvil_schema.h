@@ -105,6 +105,34 @@ void anvil_schema_dispose(anvil_schema schema);
 bool anvil_schema_validate(anvil_schema schema, anvil_document data_doc);
 
 /**
+ * @brief Options for anvil_schema_validate_value. A zero-initialised struct (with `size` set) is
+ * exactly anvil_schema_validate's behavior. `size` is the caller's sizeof, so the struct can grow
+ * at the end without breaking compiled callers: members beyond `size` read as their defaults.
+ */
+typedef struct anvil_schema_options {
+   size_t size;        // sizeof(anvil_schema_options) as the caller compiled it
+   bool skip_required; // don't enforce required-presence (patch semantics); every other check
+                       // still applies to each field that IS present
+   bool allow_unknown; // don't report fields the schema doesn't declare
+} anvil_schema_options;
+
+/**
+ * @brief Validates an OBJECT *value*'s statements against a loaded schema exactly as if they were
+ * a document's top level - the form a request body takes (`set := { ... };`). Like
+ * anvil_schema_validate, collects every violation and replaces whatever the previous validate
+ * call (either form) on this schema collected - so validating the elements of
+ * `set := [ {...}, {...} ]` one by one means reading the violations between calls.
+ * @param schema The schema to validate against.
+ * @param object_value The value to check. A non-OBJECT value yields one
+ * ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH violation with an empty field path.
+ * @param opts Options, or NULL for the defaults.
+ * @return true if no violations were found; false otherwise (including if schema or
+ * object_value is NULL, in which case the previous violations are left untouched).
+ */
+bool anvil_schema_validate_value(anvil_schema schema, anvil_value object_value,
+                                 const anvil_schema_options *opts);
+
+/**
  * @brief The number of violations the most recent anvil_schema_validate
  * call against this schema found.
  * @param schema The schema to read. NULL, or one never validated against

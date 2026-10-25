@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet, flywire (downstream consumers)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** schema, public-api, flywire, partial-update, rivet-readiness
 
 ---
@@ -55,3 +55,23 @@ write operations, create-from-a-body and patch.
 ## Dependencies
 
 None. Composes with FR-2610-anvl-schema-001: nested rules apply equally under `validate_value`.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-schema-002`, commit `108416e`, merged to `main`. Tests SCH33–SCH40 (`test_schema.c`). Full
+unit regression green with unchanged counts elsewhere (the existing SCH01–SCH32 are the regression
+for `anvil_schema_validate`), `test_release` green, Valgrind-clean on schema, types, anvil_native,
+anvil_vtable, document, resolver.
+
+Shape: both entry points now gather their statements into one `data_view` (statements in order plus
+a name -> first-statement map, names at full length) and run a single `validate_view`. This is the
+reshape the roadmap calls for: FR-2610-anvl-schema-001 (nested rules), -003 (nullable) and the other
+per-rule checks slot into `validate_view` once.
+
+Decisions:
+- Option flags honour `opts->size` (members past it read as defaults); `size == 0` means all defaults.
+- NULL schema or NULL value returns false and leaves the previous violations untouched, matching
+  `anvil_schema_validate`'s NULL handling. A present non-object value resets the list and reports.
+- A name appearing twice in an object value: the first occurrence is the one checked (as for a
+  document); both are visited by the unknown-field pass.
+- Vtable exposure (and the options struct) belongs to FR-2610-anvl-public-api-003 (Bindings agent).
