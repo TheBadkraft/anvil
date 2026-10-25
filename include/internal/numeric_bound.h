@@ -34,6 +34,9 @@ bool anvil_numeric_read_size(anvil_value val, long long *out);
 /// (its magnitude exceeds every finite bound).
 int anvil_numeric_compare(anvil_value data, anvil_numeric_t bound);
 
+/// Exact three-way comparison of two non-overflowed numbers (used to detect min > max).
+int anvil_numeric_compare_bounds(anvil_numeric_t a, anvil_numeric_t b);
+
 /// A type definition's declared bound, fractional or not. False when not declared.
 bool anvil_type_def_numeric_min(anvil_type_def def, anvil_numeric_t *out);
 bool anvil_type_def_numeric_max(anvil_type_def def, anvil_numeric_t *out);

@@ -1,0 +1,6 @@
+#!aml
+include "types_dup_a.anvl";
+include "types_dup_b.anvl";
+@[schema]
+
+vin := { type := types.VIN; };

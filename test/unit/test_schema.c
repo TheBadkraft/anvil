@@ -661,6 +661,220 @@ static void test_sch24_long_field_and_violation_names(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-schema-004 — schema load diagnostics
+ * ---------------------------------------------------------------------- */
+
+// Loads a schema from buffer source and hands back both the schema and its document.
+static anvil_schema diag_schema(const char *src, anvil_document *out_doc) {
+   *out_doc = anvil_load_buffer(src, strlen(src));
+   return *out_doc ? anvil_schema_load(*out_doc) : NULL;
+}
+
+static void diag_expect(anvil_schema schema, size_t index, anvil_schema_diag_code code,
+                        const char *field, const char *msg_part, const char *label) {
+   anvil_schema_diagnostic d = anvil_schema_get_diagnostic(schema, index);
+   TestBit.is_not_null(d, label);
+   if (!d) {
+      return;
+   }
+   TestBit.is_equal_int(code, anvil_schema_diagnostic_get_category(d), label);
+   char out[512] = {0};
+   anvil_schema_diagnostic_get_field(d, out, sizeof(out));
+   TestBit.is_true(strcmp(out, field) == 0, label);
+   anvil_schema_diagnostic_get_message(d, out, sizeof(out));
+   TestBit.is_true(msg_part == NULL || strstr(out, msg_part) != NULL, label);
+}
+
+static void test_sch25_unknown_type(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema(
+      "#!aml\n@[schema]\npriority := { type := types.Prority; required := true; };\n", &doc);
+   TestBit.is_not_null(schema, "SCH25: the schema still loads");
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH25: one diagnostic");
+      diag_expect(schema, 0, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, "priority", "Prority",
+                  "SCH25: UNKNOWN_TYPE at 'priority' naming the type");
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch26_malformed_constraints(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema(
+      "#!aml\n@[schema]\n"
+      "a := { type := String; size := abc; };\n"
+      "b := { type := Numeric; min := \"x\"; };\n"
+      "c := { type := Numeric; max := 1e+999; };\n"
+      "d := { type := enum; values := red; };\n"
+      "e := { type := String; required := maybe; };\n", &doc);
+   TestBit.is_not_null(schema, "SCH26: the schema still loads");
+   if (schema) {
+      TestBit.is_equal_int(5, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH26: each malformed constraint is reported once");
+      diag_expect(schema, 0, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "a", "size",
+                  "SCH26: size := abc");
+      diag_expect(schema, 1, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "b", "min",
+                  "SCH26: non-numeric min");
+      diag_expect(schema, 2, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "c", "max",
+                  "SCH26: overflowing max");
+      diag_expect(schema, 3, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "d", "values",
+                  "SCH26: values that isn't an array");
+      diag_expect(schema, 4, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, "e", "required",
+                  "SCH26: required that isn't true/false");
+      // The weakened rules still validate: a malformed size is "not declared", never 0.
+      const char *data = "#!aml\na := \"anything at all\";\n";
+      anvil_document ddoc = anvil_load_buffer(data, strlen(data));
+      if (ddoc) {
+         anvil_schema_validate(schema, ddoc);
+         TestBit.is_true(find_violation(schema, "a") == NULL,
+                         "SCH26: the unreadable size does not become a size of 0");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch27_rule_not_object(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema("#!aml\n@[schema]\nbad := 5;\ngood := { type := Numeric; };\n",
+                                     &doc);
+   TestBit.is_not_null(schema, "SCH27: the schema still loads");
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH27: one diagnostic");
+      diag_expect(schema, 0, ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT, "bad", NULL,
+                  "SCH27: RULE_NOT_OBJECT naming 'bad'");
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch28_conflicting_constraints(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema(
+      "#!aml\n@[schema]\n"
+      "a := { type := Numeric; min := 10; max := 1; };\n"
+      "b := { type := Numeric; min := 1; max := 1; };\n"
+      "c := { type := Numeric; min := 0.5; max := 0.25; };\n", &doc);
+   if (schema) {
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH28: min > max reported (equal bounds are satisfiable)");
+      diag_expect(schema, 0, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, "a", NULL,
+                  "SCH28: integral min > max");
+      diag_expect(schema, 1, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, "c", NULL,
+                  "SCH28: fractional min > max");
+      anvil_schema_dispose(schema);
+   } else {
+      TestBit.is_not_null(schema, "SCH28: schema loaded");
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch29_extension_keys_are_not_diagnostics(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema(
+      "#!aml\n@[schema]\nname := { type := String; pooled := true; mask := \"***\"; };\n"
+      "bare := { pooled := true; };\n", &doc);
+   TestBit.is_not_null(schema, "SCH29: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH29: unknown rule keys and an untyped rule produce no diagnostics");
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch30_well_formed_fixtures_have_no_diagnostics(void) {
+   const char *fixtures[] = {"schema_basic.anvl", "schema_with_custom_type.anvl",
+                             "schema_numeric_consumer.anvl", "schema_long_consumer.anvl"};
+   for (size_t i = 0; i < sizeof(fixtures) / sizeof(fixtures[0]); i++) {
+      anvil_document doc = anvil_load(fixture_path(fixtures[i]));
+      anvil_schema schema = doc ? anvil_schema_load(doc) : NULL;
+      TestBit.is_not_null(schema, fixtures[i]);
+      if (schema) {
+         TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema), fixtures[i]);
+         anvil_schema_dispose(schema);
+      }
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+static void test_sch31_registry_diagnostics_pass_through(void) {
+   anvil_document doc = anvil_load(fixture_path("schema_dup_types_consumer.anvl"));
+   anvil_schema schema = doc ? anvil_schema_load(doc) : NULL;
+   TestBit.is_not_null(schema, "SCH31: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH31: the registry's collision appears in the schema's list");
+      anvil_schema_diagnostic d = anvil_schema_get_diagnostic(schema, 0);
+      if (d) {
+         TestBit.is_equal_int(ANVIL_SCHEMA_DIAG_TYPE_REGISTRY, anvil_schema_diagnostic_get_category(d),
+                              "SCH31: category is TYPE_REGISTRY");
+         TestBit.is_equal_int(ANVIL_TYPE_DIAG_NAME_COLLISION,
+                              anvil_schema_diagnostic_get_type_category(d),
+                              "SCH31: the registry's own category is preserved");
+         char out[512] = {0};
+         anvil_schema_diagnostic_get_field(d, out, sizeof(out));
+         TestBit.is_true(strcmp(out, "VIN") == 0, "SCH31: field is the type's name");
+         anvil_schema_diagnostic_get_message(d, out, sizeof(out));
+         TestBit.is_true(strstr(out, "types_dup_a.anvl") && strstr(out, "types_dup_b.anvl"),
+                         "SCH31: the message names both documents");
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_sch32_diagnostics_outlive_documents_and_null_safety(void) {
+   anvil_document doc = NULL;
+   anvil_schema schema = diag_schema("#!aml\n@[schema]\nbad := 5;\n", &doc);
+   if (doc) {
+      anvil_dispose(doc);
+   }
+   if (schema) {
+      anvil_schema_diagnostic d = anvil_schema_get_diagnostic(schema, 0);
+      TestBit.is_not_null(d, "SCH32: diagnostic survives disposal of the schema document");
+      char out[64] = {0};
+      TestBit.is_true(anvil_schema_diagnostic_get_field(d, out, sizeof(out)) == 3 &&
+                         strcmp(out, "bad") == 0,
+                      "SCH32: and is still readable");
+      TestBit.is_true(anvil_schema_get_diagnostic(schema, 1) == NULL,
+                      "SCH32: out-of-bounds index is NULL");
+      anvil_schema_dispose(schema);
+   } else {
+      TestBit.is_not_null(schema, "SCH32: schema loaded");
+   }
+   TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(NULL), "SCH32: count(NULL)");
+   TestBit.is_true(anvil_schema_get_diagnostic(NULL, 0) == NULL, "SCH32: get(NULL)");
+   TestBit.is_equal_int(ANVIL_SCHEMA_DIAG_NONE, anvil_schema_diagnostic_get_category(NULL),
+                        "SCH32: category(NULL)");
+   TestBit.is_equal_int(ANVIL_TYPE_DIAG_NONE, anvil_schema_diagnostic_get_type_category(NULL),
+                        "SCH32: type_category(NULL)");
+   TestBit.is_equal_int(0, (long long)anvil_schema_diagnostic_get_field(NULL, NULL, 0),
+                        "SCH32: field(NULL)");
+   TestBit.is_equal_int(0, (long long)anvil_schema_diagnostic_get_message(NULL, NULL, 0),
+                        "SCH32: message(NULL)");
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -703,6 +917,23 @@ int main(void) {
                   test_sch23_long_rule_key_is_not_a_known_key, th);
    TestBit.run_ex("SCH24_long_field_and_violation_names", NULL,
                   test_sch24_long_field_and_violation_names, th);
+
+   TestBit.run_ex("SCH25_UNKNOWN_TYPE", NULL,
+                  test_sch25_unknown_type, th);
+   TestBit.run_ex("SCH26_MALFORMED_CONSTRAINTS", NULL,
+                  test_sch26_malformed_constraints, th);
+   TestBit.run_ex("SCH27_RULE_NOT_OBJECT", NULL,
+                  test_sch27_rule_not_object, th);
+   TestBit.run_ex("SCH28_CONFLICTING_CONSTRAINTS", NULL,
+                  test_sch28_conflicting_constraints, th);
+   TestBit.run_ex("SCH29_EXTENSION_KEYS_ARE_NOT_DIAGNOSTICS", NULL,
+                  test_sch29_extension_keys_are_not_diagnostics, th);
+   TestBit.run_ex("SCH30_WELL_FORMED_FIXTURES_HAVE_NO_DIAGNOSTICS", NULL,
+                  test_sch30_well_formed_fixtures_have_no_diagnostics, th);
+   TestBit.run_ex("SCH31_REGISTRY_DIAGNOSTICS_PASS_THROUGH", NULL,
+                  test_sch31_registry_diagnostics_pass_through, th);
+   TestBit.run_ex("SCH32_DIAGNOSTICS_OUTLIVE_DOCUMENTS_AND_NULL_SAFETY", NULL,
+                  test_sch32_diagnostics_outlive_documents_and_null_safety, th);
 
    return TestBit.report();
 }

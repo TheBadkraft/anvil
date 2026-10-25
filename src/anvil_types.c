@@ -126,6 +126,10 @@ static int compare_numeric(anvil_numeric_t a, anvil_numeric_t b) {
    return a.as_double < b.as_double ? -1 : a.as_double > b.as_double;
 }
 
+int anvil_numeric_compare_bounds(anvil_numeric_t a, anvil_numeric_t b) {
+   return compare_numeric(a, b);
+}
+
 bool anvil_numeric_read_bound(anvil_value val, anvil_numeric_t *out) {
    anvil_numeric_t n = anvil_value_get_numeric(val); // overflowed for NULL/non-numeric too
    if (n.overflowed) {

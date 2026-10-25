@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** schema, diagnostics, public-api, rivet-readiness
 
 ---
@@ -59,3 +59,23 @@ Mirror FR-2610-anvl-types-001's shape so the two read the same:
 ## Dependencies
 
 Soft: FR-2610-anvl-types-001 (pass-through of registry diagnostics).
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-schema-004`, merged to `main`. Tests SCH25–SCH32 (`test_schema.c`), fixture
+`schema_dup_types_consumer.anvl`. Full unit regression green with unchanged counts elsewhere,
+`test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
+
+Decisions and findings:
+- The ticket's category list had no home for the registry's diagnostics, so there is one extra,
+  appended category, `ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`, with
+  `anvil_schema_diagnostic_get_type_category` returning the registry's own code. For those, "field"
+  is the type's name. They come first in the list.
+- `values` that isn't an array, and a `required` that isn't `true`/`false`, are reported as
+  `MALFORMED_CONSTRAINT` (no dedicated category exists, and the ticket's summary names `values`).
+- `CONFLICTING_CONSTRAINTS` uses the *effective* bounds (inline or inherited from the type) and
+  compares exactly, including fractional bounds; equal bounds are satisfiable and not reported.
+- `UNKNOWN_FORMAT` and `SELF_REFERENCE` exist in the enum (so the numbering is fixed) but nothing
+  produces them yet; they belong to FR-2610-anvl-types-004 and FR-2610-anvl-schema-001.
+- Field "path" is the top-level field name for now; nested paths arrive with FR-2610-anvl-schema-001.
+- Vtable exposure belongs to FR-2610-anvl-public-api-003 (Bindings agent).
