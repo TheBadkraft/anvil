@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
 
+### Added (planning)
+- **AnvilScript runtime: bytecode VM committed** (`FR-2610-anvl-asl-runtime-001`). The
+  tree-walk-vs-bytecode question in `notes/anvilscript-design.md` was tentative and is now decided:
+  bytecode, with the AST staying the canonical IR. The FR scopes the compiler, the VM, host
+  callback registration (Design Thread #3) and `import` with the `c:` resolver (Design Thread #1),
+  in six TDD slices. It pulls Threads #1 and #3 forward because embedding AnvilScript in a host
+  application such as Outpost needs both. The compiler+VM ships as an add-on behind the existing
+  `WITH_ASL` flag, in the same library, with its own vtable. Plan only; nothing implemented yet.
+
 ---
 
 ## [v0.9.0-rc] — (2026-10-09)
