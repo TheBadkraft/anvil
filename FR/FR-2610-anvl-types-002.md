@@ -55,7 +55,7 @@ Soft: FR-2610-anvl-types-001 (diagnostics for collisions). Can land first withou
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-types-002`, merged to `main`. Tests TYP22–TYP26 (`test_types.c`) with fixtures
+Branch `feat/FR-2610-anvl-types-002`, commit `43ee36b`, merged to `main`. Tests TYP22–TYP26 (`test_types.c`) with fixtures
 `trans_*`, `cyc_*`, `ovr_*`, `dia_*`. Full unit regression green with unchanged counts elsewhere,
 `test_release` green, Valgrind-clean on types, schema, anvil_native, anvil_vtable, document, resolver,
 module, header. Docs: `docs/types-reference.md` and `site/assets/docs/types-reference.md` (SR-2610-anvl-docs-001 item 5).
