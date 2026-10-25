@@ -47,6 +47,8 @@ struct anvil_type_def_t {
    list values; // list of individually-allocated char* labels — only meaningful for
                 // ANVIL_TYPE_ENUM; NULL if `values` wasn't declared
    char *source; // path of the document that defined it (for collision reports); NULL for natives
+   bool nullable_declared; // `nullable := true|false` was present and well-formed
+   bool nullable;
    char *fields_text; // source text of `fields := { ... }` (copied), NULL if none - see
                       // anvil_type_def_fields_text
 };
@@ -192,7 +194,7 @@ static list read_values_list(anvil_value val) {
 struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
-   bool bad_size, bad_min, bad_max, bad_values, bad_fields;
+   bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable;
 };
 
 static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
@@ -200,6 +202,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
    *issues = (struct type_issues){0};
    def->source = NULL;
    def->fields_text = NULL;
+   def->nullable_declared = def->nullable = false;
    def->kind = ANVIL_TYPE_UNKNOWN;
    def->has_size = def->has_min = def->has_max = false;
    def->size = 0;
@@ -236,6 +239,15 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       } else if (strcmp(fname, "values") == 0) {
          def->values = read_values_list(fval);
          issues->bad_values = (def->values == NULL);
+      } else if (strcmp(fname, "nullable") == 0) {
+         char *text = anvil_text_alloc(fval);
+         if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
+            def->nullable_declared = true;
+            def->nullable = (strcmp(text, "true") == 0);
+         } else {
+            issues->bad_nullable = true;
+         }
+         Allocator.dispose(text);
       } else if (strcmp(fname, "fields") == 0) {
          if (fval && anvil_value_get_type(fval) == ANVIL_VALUE_OBJECT) {
             def->fields_text = anvil_text_alloc(fval);
@@ -352,6 +364,11 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       if (issues.bad_max) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
                   "type '%s': 'max' is not a valid number; treated as not declared", def->name);
+      }
+      if (issues.bad_nullable) {
+         add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
+                  "type '%s': 'nullable' must be true or false; treated as not declared",
+                  def->name);
       }
       if (issues.bad_fields) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
@@ -677,4 +694,12 @@ size_t anvil_type_diagnostic_get_message(anvil_type_diagnostic diag, char *buf, 
 const char *anvil_type_def_fields_text(anvil_type_def def) {
    struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
    return d ? d->fields_text : NULL;
+}
+
+bool anvil_type_def_nullable(anvil_type_def def, bool *out_declared) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (out_declared) {
+      *out_declared = d && d->nullable_declared;
+   }
+   return d && d->nullable_declared && d->nullable;
 }

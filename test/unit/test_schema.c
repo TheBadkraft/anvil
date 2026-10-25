@@ -1474,6 +1474,147 @@ static void test_sch50_nested_with_validate_value_options(void) {
    }
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-schema-003 — nullable: an explicit null is legal when declared
+ * ---------------------------------------------------------------------- */
+static void test_sch51_null_without_nullable(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\nx := { type := Numeric; };\n",
+                             "#!aml\nx := null;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH51: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH51: null for a non-nullable typed field fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH51: one violation");
+      NESTED_PATH_IS(0, "x", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                     "SCH51: TYPE_MISMATCH at x");
+      char msg[128] = {0};
+      anvil_schema_violation_get_message(anvil_schema_get_violation(schema, 0), msg, sizeof(msg));
+      TestBit.is_true(strstr(msg, "not nullable") != NULL, "SCH51: the message says not nullable");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch52_nullable_accepts_null(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\nx := { type := Numeric; nullable := true; };\n",
+                             "#!aml\nx := null;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH52: schema loaded");
+   if (schema) {
+      TestBit.is_true(ok, "SCH52: null passes for a nullable field");
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH52: `nullable` is a known key, no diagnostic");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   // nullable only adds null: a wrong-kind non-null value is still a mismatch.
+   ok = nested_validate("#!aml\n@[schema]\nx := { type := Numeric; nullable := true; };\n",
+                        "#!aml\nx := hi;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH52: nullable does not relax the kind of non-null values");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch53_null_skips_other_constraints(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "s := { type := String; nullable := true; size := 1; values := [ a, b ]; };\n"
+      "n := { type := Numeric; nullable := true; min := 5; };\n",
+      "#!aml\ns := null;\nn := null;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH53: schema loaded");
+   if (schema) {
+      TestBit.is_true(ok, "SCH53: values, size and range are not evaluated for null");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch54_required_and_nullable(void) {
+   const char *src = "#!aml\n@[schema]\nx := { required := true; nullable := true; };\n";
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(src, "#!aml\nother := 1;\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH54: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH54: absent still fails a required field");
+      NESTED_PATH_IS(0, "x", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED, "SCH54: REQUIRED when absent");
+   }
+   nested_free(schema, sdoc, ddoc);
+   ok = nested_validate(src, "#!aml\nx := null;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH54: present-and-null satisfies required + nullable");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch55_nullable_inherited_from_type(void) {
+   anvil_document sdoc = anvil_load(fixture_path("schema_nullable_consumer.anvl"));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH55: schema loaded");
+   if (schema) {
+      const char *src = "#!aml\ninherits := null;\nstrict := null;\nrestated := null;\n";
+      anvil_document ddoc = anvil_load_buffer(src, strlen(src));
+      if (ddoc) {
+         TestBit.is_false(anvil_schema_validate(schema, ddoc), "SCH55: one field rejects null");
+         TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                              "SCH55: exactly one violation");
+         NESTED_PATH_IS(0, "strict", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH,
+                        "SCH55: `strict` declares nullable := false over the type's true");
+         anvil_dispose(ddoc);
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch56_nullable_at_every_depth(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "o := { type := Object; fields := { a := { type := Numeric; nullable := true; };\n"
+      "                                   b := { type := Numeric; }; }; };\n"
+      "l := { type := Array; items := { type := String; nullable := true; }; };\n",
+      "#!aml\no := { a := null; b := null; };\nl := [ x, null, y ];\n", &schema, &sdoc, &ddoc);
+   TestBit.is_not_null(schema, "SCH56: schema loaded");
+   if (schema) {
+      TestBit.is_false(ok, "SCH56: o.b rejects null");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH56: only o.b; o.a and l[1] accept null");
+      NESTED_PATH_IS(0, "o.b", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "SCH56: o.b");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch57_untyped_field_and_malformed_nullable(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   // No declared type: there is nothing for null to violate (unchanged behavior).
+   bool ok = nested_validate("#!aml\n@[schema]\nx := { pooled := true; };\n",
+                             "#!aml\nx := null;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH57: null for an untyped field is not a violation");
+   } else {
+      TestBit.is_not_null(schema, "SCH57: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   ok = nested_validate("#!aml\n@[schema]\nx := { type := Numeric; nullable := maybe; };\n",
+                        "#!aml\nx := 1;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH57: a malformed nullable is diagnosed");
+      TestBit.is_equal_int(ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT,
+                           anvil_schema_diagnostic_get_category(anvil_schema_get_diagnostic(schema, 0)),
+                           "SCH57: as MALFORMED_CONSTRAINT");
+      TestBit.is_true(ok, "SCH57: and the field stays non-nullable but validates");
+   } else {
+      TestBit.is_not_null(schema, "SCH57: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1571,6 +1712,21 @@ int main(void) {
                   test_sch49_nested_diagnostics_carry_paths, th);
    TestBit.run_ex("SCH50_NESTED_WITH_VALIDATE_VALUE_OPTIONS", NULL,
                   test_sch50_nested_with_validate_value_options, th);
+
+   TestBit.run_ex("SCH51_NULL_WITHOUT_NULLABLE", NULL,
+                  test_sch51_null_without_nullable, th);
+   TestBit.run_ex("SCH52_NULLABLE_ACCEPTS_NULL", NULL,
+                  test_sch52_nullable_accepts_null, th);
+   TestBit.run_ex("SCH53_NULL_SKIPS_OTHER_CONSTRAINTS", NULL,
+                  test_sch53_null_skips_other_constraints, th);
+   TestBit.run_ex("SCH54_REQUIRED_AND_NULLABLE", NULL,
+                  test_sch54_required_and_nullable, th);
+   TestBit.run_ex("SCH55_NULLABLE_INHERITED_FROM_TYPE", NULL,
+                  test_sch55_nullable_inherited_from_type, th);
+   TestBit.run_ex("SCH56_NULLABLE_AT_EVERY_DEPTH", NULL,
+                  test_sch56_nullable_at_every_depth, th);
+   TestBit.run_ex("SCH57_UNTYPED_FIELD_AND_MALFORMED_NULLABLE", NULL,
+                  test_sch57_untyped_field_and_malformed_nullable, th);
 
    return TestBit.report();
 }

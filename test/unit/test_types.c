@@ -771,6 +771,44 @@ static void test_typ27_object_type_fields(void) {
    }
 }
 
+
+static void test_typ28_nullable_declaration(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = diag_registry(
+      "#!aml\n@[types]\n"
+      "Yes := { type := Numeric; nullable := true; };\n"
+      "No := { type := Numeric; nullable := false; };\n"
+      "Unset := { type := Numeric; };\n"
+      "Bad := { type := Numeric; nullable := maybe; };\n", &doc);
+   TestBit.is_not_null(reg, "TYP28: registry loaded");
+   if (reg) {
+      bool declared = false;
+      TestBit.is_true(anvil_type_def_nullable(anvil_type_registry_find(reg, "Yes"), &declared) &&
+                         declared,
+                      "TYP28: nullable := true is declared and true");
+      TestBit.is_true(!anvil_type_def_nullable(anvil_type_registry_find(reg, "No"), &declared) &&
+                         declared,
+                      "TYP28: nullable := false is declared and false");
+      TestBit.is_true(!anvil_type_def_nullable(anvil_type_registry_find(reg, "Unset"), &declared) &&
+                         !declared,
+                      "TYP28: an absent nullable is not declared");
+      TestBit.is_true(!anvil_type_def_nullable(anvil_type_registry_find(reg, "Bad"), &declared) &&
+                         !declared,
+                      "TYP28: a malformed nullable is not declared");
+      TestBit.is_true(!anvil_type_def_nullable(NULL, &declared) && !declared,
+                      "TYP28: NULL def");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP28: only the malformed one is reported");
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT,
+                           anvil_type_diagnostic_get_category(anvil_type_registry_get_diagnostic(reg, 0)),
+                           "TYP28: as MALFORMED_CONSTRAINT");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -814,6 +852,8 @@ int main(void) {
    TestBit.run_ex("TYP26_SHARED_INCLUDE_VISITED_ONCE", NULL, test_typ26_shared_include_visited_once, th);
 
    TestBit.run_ex("TYP27_object_type_fields", NULL, test_typ27_object_type_fields, th);
+
+   TestBit.run_ex("TYP28_nullable_declaration", NULL, test_typ28_nullable_declaration, th);
 
    return TestBit.report();
 }
