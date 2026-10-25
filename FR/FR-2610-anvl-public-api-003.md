@@ -66,3 +66,5 @@ Follow the `Writer`/`Builder` precedent exactly:
 
 - `anvil.py` and `anvil.net` slices of FR-2610-anvl-bindings-001 bind these structs.
 - `site/assets/docs/Bindings-Guide.md` lists the two new vtables alongside `Writer`/`Builder`.
+- `docs/changelog.md` gets an `## [Unreleased]` → `### Added` entry naming this FR. This is part
+  of "done", not a follow-up.

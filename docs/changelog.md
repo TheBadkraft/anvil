@@ -38,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
 
+### Added (planning)
+- **Rivet-readiness ticket set.** These are the AnvilTypes/AnvilSchema/bindings gaps found while
+  building Rivet, the in-house ticketing system: `BR-2610-anvl-types-001`,
+  `BR-2610-anvl-schema-001`, `FR-2610-anvl-types-001`–`005`, `FR-2610-anvl-schema-001`–`005`,
+  `FR-2610-anvl-bindings-001`/`002`, `SR-2610-anvl-docs-001`, `SR-2610-anvl-distribution-001`,
+  and `SR-2610-anvl-vendor-bump-001`. That last one is new: `anvil.node`/`anvil.wasm` still pin
+  `vendor/anvil` 45 commits behind `main`. A planning review corrected four tickets, including
+  `is_integral`, which follows the number's spelling rather than its value, and three truncation
+  sites the schema-buffer BR had missed. Sequenced in `notes/roadmap-2610-rivet-readiness.md`:
+  Phases 1–3 are native work for the ANVL coder agent, and Phases 4–5 are bindings and release
+  work for the ANVL Bindings agent. Tickets and plan only; nothing implemented yet.
+- **`FR-2610-anvl-public-api-003`**: `Schema`/`TypeRegistry` vtables for the `anvil.py`/`anvil.net`
+  bindings (roadmap decision D4). Owned by the Bindings agent, and starts after roadmap Phase 3.
+
 ---
 
 ## [v0.9.0-rc] — (2026-10-09)
