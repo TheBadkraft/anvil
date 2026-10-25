@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   direct-only behavior is not kept as a mode. `docs/types-reference.md` (and its site mirror,
   which also picks up the diagnostics section from `FR-2610-anvl-types-001`) describes it.
 
+- **Schema load diagnostics** (`FR-2610-anvl-schema-004`): `anvil_schema_get_diagnostic_count` /
+  `_get_diagnostic` and `anvil_schema_diagnostic_get_category/_type_category/_field/_message`.
+  `anvil_schema_load` still returns a handle for a malformed schema, but now reports what it used to
+  weaken silently: `UNKNOWN_TYPE` (a typo such as `types.Prority`), `MALFORMED_CONSTRAINT`
+  (`size`/`min`/`max`/`values`/`required`), `RULE_NOT_OBJECT` and `CONFLICTING_CONSTRAINTS`
+  (`min` > `max`), plus the type registry's own diagnostics passed through as `TYPE_REGISTRY`
+  (collisions, bad definitions). `UNKNOWN_FORMAT` and `SELF_REFERENCE` are reserved for
+  `FR-2610-anvl-types-004` and `-schema-001`. Unknown rule keys (FlyWire's `pooled`, `mask`) are
+  deliberately not diagnostics. Gives CI a "schema is well-formed" gate: the count is 0.
+
 ### Changed
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).

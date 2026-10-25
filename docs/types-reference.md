@@ -179,6 +179,15 @@ so they stay readable after the source documents are disposed.
 | `ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT` | `size`/`min`/`max` isn't a valid number (`size` must be a non-negative integer) | that constraint is treated as not declared, never as `0` |
 | `ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES` | `values` is not an array | no labels are declared |
 
+A schema that includes types files reports these too: `anvil_schema_load` copies the registry's
+diagnostics into the schema's own list (`anvil_schema_get_diagnostic`, category
+`ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`, with the registry's category under
+`anvil_schema_diagnostic_get_type_category`), followed by the schema's own: `UNKNOWN_TYPE` (a typo
+such as `types.Prority`), `MALFORMED_CONSTRAINT`, `RULE_NOT_OBJECT`, and `CONFLICTING_CONSTRAINTS`
+(`min` greater than `max`). Unknown rule keys such as FlyWire's `pooled` or `mask` are never
+diagnostics. A schema with diagnostics still loads and validates; a CI gate is simply
+"`anvil_schema_get_diagnostic_count` is 0".
+
 ## What's not built yet
 
 For a complete picture, the pieces of this design that are settled but not yet implemented:

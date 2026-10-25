@@ -25,6 +25,8 @@
 #include <sigma.core/allocator.h>
 #include <sigma/list.h>
 #include <sigma/map.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -104,17 +106,55 @@ struct anvil_schema_violation_t {
    char *message;
 };
 
+struct anvil_schema_diagnostic_t {
+   anvil_schema_diag_code category;
+   anvil_type_diag_code type_category; // only for ANVIL_SCHEMA_DIAG_TYPE_REGISTRY
+   char *field;
+   char *message;
+};
+
 struct anvil_schema_t {
    list fields;      // struct anvil_schema_field_t* — every declared field rule, in order
    map by_name;      // field->name -> struct anvil_schema_field_t* (presence/lookup)
    list violations;  // struct anvil_schema_violation_t* — from the most recent validate() call
+   list diagnostics; // struct anvil_schema_diagnostic_t* — what anvil_schema_load noticed
 };
+
+// Records one load diagnostic. The message is formatted to its exact length: field names and
+// type names have no fixed bound.
+static void add_diag(struct anvil_schema_t *schema, anvil_schema_diag_code code,
+                     anvil_type_diag_code type_code, const char *field, const char *fmt, ...) {
+   struct anvil_schema_diagnostic_t *d = Allocator.alloc(sizeof(struct anvil_schema_diagnostic_t));
+   if (!d) {
+      return;
+   }
+   va_list ap, ap2;
+   va_start(ap, fmt);
+   va_copy(ap2, ap);
+   int len = vsnprintf(NULL, 0, fmt, ap);
+   va_end(ap);
+   d->category = code;
+   d->type_category = type_code;
+   d->field = anvil_text_dup(field);
+   d->message = len >= 0 ? Allocator.alloc((size_t)len + 1) : NULL;
+   if (d->message) {
+      vsnprintf(d->message, (size_t)len + 1, fmt, ap2);
+   }
+   va_end(ap2);
+   if (!d->field || !d->message) {
+      Allocator.dispose(d->field);
+      Allocator.dispose(d->message);
+      Allocator.dispose(d);
+      return;
+   }
+   List.append(schema->diagnostics, d);
+}
 
 // A schema field's declared kind is transparent-through: a bare native primitive, a bare
 // `enum`, or a types.X custom type all resolve to the same anvil_type_kind, so validation
 // never needs to know which of the three produced it — see anvil_type_resolve.
 static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
-                            struct anvil_schema_field_t *field) {
+                            struct anvil_schema_field_t *field, struct anvil_schema_t *schema) {
    field->has_kind = false;
    field->kind = ANVIL_TYPE_UNKNOWN;
    field->required = false;
@@ -139,27 +179,54 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
       if (strcmp(fname, "type") == 0) {
          char *text = anvil_text_alloc(fval);
          resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
+         if (!resolved) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, field->name,
+                     "field '%s': type '%s' is neither a native type nor a known types.X",
+                     field->name, text ? text : "");
+         }
          Allocator.dispose(text);
          if (resolved) {
             field->has_kind = true;
             field->kind = anvil_type_def_get_kind(resolved);
          }
-         // An unrecognized type name is silently left with no kind to check against — same
-         // deferred-validation-error reasoning as anvil_types.c's own malformed-declaration
-         // handling; no error-reporting design exists yet for a malformed *schema* field
-         // itself (as opposed to a data document failing to satisfy a well-formed one).
+         // An unrecognized type name leaves the field with no kind to check against, and is
+         // reported as UNKNOWN_TYPE above; the schema still loads (the caller decides).
       } else if (strcmp(fname, "required") == 0) {
          char *text = anvil_text_alloc(fval);
          field->required = text && strcmp(text, "true") == 0;
+         if (!text || (strcmp(text, "true") != 0 && strcmp(text, "false") != 0)) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
+                     field->name, "field '%s': 'required' must be true or false", field->name);
+         }
          Allocator.dispose(text);
       } else if (strcmp(fname, "size") == 0) {
          field->has_size = anvil_numeric_read_size(fval, &field->size);
+         if (!field->has_size) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
+                     field->name,
+                     "field '%s': 'size' is not a non-negative integer; treated as not declared",
+                     field->name);
+         }
       } else if (strcmp(fname, "min") == 0) {
          field->has_min = anvil_numeric_read_bound(fval, &field->min);
+         if (!field->has_min) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
+                     field->name, "field '%s': 'min' is not a valid number; treated as not declared",
+                     field->name);
+         }
       } else if (strcmp(fname, "max") == 0) {
          field->has_max = anvil_numeric_read_bound(fval, &field->max);
+         if (!field->has_max) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
+                     field->name, "field '%s': 'max' is not a valid number; treated as not declared",
+                     field->name);
+         }
       } else if (strcmp(fname, "values") == 0) {
          field->values = read_values_list(fval);
+         if (!field->values) {
+            add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE,
+                     field->name, "field '%s': 'values' must be an array of labels", field->name);
+         }
       }
       Allocator.dispose(fname);
    }
@@ -182,6 +249,13 @@ static void read_field_rule(anvil_value obj_val, anvil_type_registry types,
          field->values = copy_values_from_type(resolved);
       }
    }
+
+   // Effective (inline or inherited) bounds that nothing can satisfy.
+   if (field->has_min && field->has_max && anvil_numeric_compare_bounds(field->min, field->max) > 0) {
+      add_diag(schema, ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, ANVIL_TYPE_DIAG_NONE,
+               field->name, "field '%s': 'min' is greater than 'max'; no value can satisfy it",
+               field->name);
+   }
 }
 
 anvil_schema anvil_schema_load(anvil_document doc) {
@@ -196,6 +270,7 @@ anvil_schema anvil_schema_load(anvil_document doc) {
    schema->fields = List.new(8, sizeof(struct anvil_schema_field_t *));
    schema->by_name = Map.new(8);
    schema->violations = NULL;
+   schema->diagnostics = List.new(4, sizeof(struct anvil_schema_diagnostic_t *));
 
    // types. access comes purely from doc's own includes — @[schema] never implies it, matching
    // how any other document would resolve types.X. Only needed for the duration of the load
@@ -203,13 +278,37 @@ anvil_schema anvil_schema_load(anvil_document doc) {
    // need to outlive this function.
    anvil_type_registry types = anvil_type_registry_load_from_includes(doc);
 
+   // The registry's own diagnostics come first, so one list gives the full picture.
+   size_t registry_diags = anvil_type_registry_get_diagnostic_count(types);
+   for (size_t i = 0; i < registry_diags; i++) {
+      anvil_type_diagnostic rd = anvil_type_registry_get_diagnostic(types, i);
+      size_t name_len = anvil_type_diagnostic_get_name(rd, NULL, 0);
+      size_t msg_len = anvil_type_diagnostic_get_message(rd, NULL, 0);
+      char *name = Allocator.alloc(name_len + 1);
+      char *msg = Allocator.alloc(msg_len + 1);
+      if (name && msg) {
+         anvil_type_diagnostic_get_name(rd, name, name_len + 1);
+         anvil_type_diagnostic_get_message(rd, msg, msg_len + 1);
+         add_diag(schema, ANVIL_SCHEMA_DIAG_TYPE_REGISTRY, anvil_type_diagnostic_get_category(rd),
+                  name, "%s", msg);
+      }
+      Allocator.dispose(name);
+      Allocator.dispose(msg);
+   }
+
    anvil_statement_iterator it = anvil_document_get_statements(doc);
    if (it) {
       anvil_statement stmt = NULL;
       while (anvil_statement_iterator_next(it, &stmt)) {
          anvil_value val = anvil_statement_get_value(stmt);
          if (!val || anvil_value_get_type(val) != ANVIL_VALUE_OBJECT) {
-            continue; // not a well-formed field rule — skip, same reasoning as anvil_types.c
+            char *bad = anvil_name_alloc(stmt);
+            if (bad) {
+               add_diag(schema, ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT, ANVIL_TYPE_DIAG_NONE, bad,
+                        "'%s' is not a field rule (expected a '{ ... }' object); skipped", bad);
+               Allocator.dispose(bad);
+            }
+            continue; // not a field rule - skipped, and reported above
          }
          struct anvil_schema_field_t *field =
             Allocator.alloc(sizeof(struct anvil_schema_field_t));
@@ -221,7 +320,7 @@ anvil_schema anvil_schema_load(anvil_document doc) {
             Allocator.dispose(field);
             continue;
          }
-         read_field_rule(val, types, field);
+         read_field_rule(val, types, field, schema);
 
          List.append(schema->fields, field);
          Map.set(schema->by_name, field->name, strlen(field->name), (addr)field);
@@ -269,6 +368,18 @@ void anvil_schema_dispose(anvil_schema schema) {
       return;
    }
    dispose_violations(s->violations);
+   if (s->diagnostics) {
+      for (usize i = 0, n = List.size(s->diagnostics); i < n; i++) {
+         struct anvil_schema_diagnostic_t *d = NULL;
+         List.get(s->diagnostics, i, (object *)&d);
+         if (d) {
+            Allocator.dispose(d->field);
+            Allocator.dispose(d->message);
+         }
+         Allocator.dispose(d);
+      }
+      List.dispose(s->diagnostics);
+   }
    if (s->fields) {
       usize n = List.size(s->fields);
       for (usize i = 0; i < n; i++) {
@@ -475,4 +586,46 @@ size_t anvil_schema_violation_get_message(anvil_schema_violation v, char *buf, s
       buf[copy_len] = '\0';
    }
    return len;
+}
+
+size_t anvil_schema_get_diagnostic_count(anvil_schema schema) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   return s && s->diagnostics ? (size_t)List.size(s->diagnostics) : 0;
+}
+
+anvil_schema_diagnostic anvil_schema_get_diagnostic(anvil_schema schema, size_t index) {
+   struct anvil_schema_t *s = (struct anvil_schema_t *)schema;
+   if (!s || !s->diagnostics || index >= (size_t)List.size(s->diagnostics)) {
+      return NULL;
+   }
+   struct anvil_schema_diagnostic_t *d = NULL;
+   List.get(s->diagnostics, index, (object *)&d);
+   return (anvil_schema_diagnostic)d;
+}
+
+anvil_schema_diag_code anvil_schema_diagnostic_get_category(anvil_schema_diagnostic diag) {
+   return diag ? diag->category : ANVIL_SCHEMA_DIAG_NONE;
+}
+
+anvil_type_diag_code anvil_schema_diagnostic_get_type_category(anvil_schema_diagnostic diag) {
+   return diag ? diag->type_category : ANVIL_TYPE_DIAG_NONE;
+}
+
+// snprintf-style: always the full length, writes at most buflen - 1 characters plus the NUL.
+static size_t copy_diag_text(const char *text, char *buf, size_t buflen) {
+   size_t len = strlen(text);
+   if (buf && buflen > 0) {
+      size_t n = len < buflen - 1 ? len : buflen - 1;
+      memcpy(buf, text, n);
+      buf[n] = '\0';
+   }
+   return len;
+}
+
+size_t anvil_schema_diagnostic_get_field(anvil_schema_diagnostic diag, char *buf, size_t buflen) {
+   return diag ? copy_diag_text(diag->field, buf, buflen) : 0;
+}
+
+size_t anvil_schema_diagnostic_get_message(anvil_schema_diagnostic diag, char *buf, size_t buflen) {
+   return diag ? copy_diag_text(diag->message, buf, buflen) : 0;
 }

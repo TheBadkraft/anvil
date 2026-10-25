@@ -77,7 +77,11 @@ typedef enum {
  * `types.X` namespace any other document would see. A field rule with no
  * recognized `type :=` (including none at all — e.g. a FlyWire-style
  * `pooled` field) is still registered, just with no type to check against;
- * its `required :=` (if any) is still enforced.
+ * its `required :=` (if any) is still enforced. A malformed schema is still
+ * returned, never rejected: what is wrong with it (an unknown type, a
+ * malformed constraint, a top-level statement that isn't a rule, min > max,
+ * and the type registry's own diagnostics) is reported through
+ * anvil_schema_get_diagnostic, and the caller decides whether that is fatal.
  * @return The schema handle, or NULL if doc is NULL or does not carry
  * @[schema]. Dispose with anvil_schema_dispose once done.
  */
@@ -142,3 +146,71 @@ size_t anvil_schema_violation_get_field(anvil_schema_violation v, char *buf, siz
  * @return The full message length (excluding NUL), regardless of buflen.
  */
 size_t anvil_schema_violation_get_message(anvil_schema_violation v, char *buf, size_t buflen);
+
+/**
+ * @brief Opaque handle to one schema diagnostic - something wrong with the schema *itself*
+ * (as opposed to a violation, which is something wrong with a data document). Produced by
+ * anvil_schema_load and valid until the schema is disposed; independent of the documents it was
+ * loaded from.
+ */
+typedef struct anvil_schema_diagnostic_t *anvil_schema_diagnostic;
+
+/**
+ * @brief Stable diagnostic categories - this API's own set, appended-only. A schema with
+ * diagnostics still loads and still validates (the weakened rule simply checks less); the
+ * caller decides whether any diagnostic is fatal. Unknown rule keys (a consumer's own
+ * extensions, e.g. FlyWire's `pooled`) are deliberately NOT diagnostics.
+ */
+typedef enum {
+   ANVIL_SCHEMA_DIAG_NONE = 0,
+   ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE,            // a `type :=` names nothing the registry or the
+                                              // native set knows; the field is left unchecked
+   ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT,    // size/min/max isn't a valid number, `values` isn't
+                                              // an array, or `required` isn't true/false
+   ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT,         // a top-level statement isn't a `{ ... }` rule
+   ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT,          // reserved: FR-2610-anvl-types-004
+   ANVIL_SCHEMA_DIAG_SELF_REFERENCE,          // reserved: FR-2610-anvl-schema-001
+   ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS, // e.g. min > max: nothing can satisfy the rule
+   ANVIL_SCHEMA_DIAG_TYPE_REGISTRY,           // passed through from the type registry the schema
+                                              // built from its includes; see
+                                              // anvil_schema_diagnostic_get_type_category
+} anvil_schema_diag_code;
+
+/**
+ * @brief How many diagnostics loading this schema produced, in the order found. The type
+ * registry's own diagnostics (anvil_type_registry_get_diagnostic) for the registry built from
+ * the schema's includes come first, so one call gives the full picture.
+ * @param schema The schema to read. NULL returns 0.
+ */
+size_t anvil_schema_get_diagnostic_count(anvil_schema schema);
+
+/**
+ * @brief One diagnostic by index.
+ * @return The handle, or NULL if schema is NULL or index is out of bounds.
+ */
+anvil_schema_diagnostic anvil_schema_get_diagnostic(anvil_schema schema, size_t index);
+
+/**
+ * @brief The diagnostic's category. NULL returns ANVIL_SCHEMA_DIAG_NONE.
+ */
+anvil_schema_diag_code anvil_schema_diagnostic_get_category(anvil_schema_diagnostic diag);
+
+/**
+ * @brief For an ANVIL_SCHEMA_DIAG_TYPE_REGISTRY diagnostic, the registry's own category;
+ * ANVIL_TYPE_DIAG_NONE for every other diagnostic (or NULL).
+ */
+anvil_type_diag_code anvil_schema_diagnostic_get_type_category(anvil_schema_diagnostic diag);
+
+/**
+ * @brief The schema field the diagnostic is about (a top-level field name for now; nested paths
+ * come with FR-2610-anvl-schema-001). For a TYPE_REGISTRY diagnostic, the type's name.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full length (excluding NUL), regardless of buflen. 0 if diag is NULL.
+ */
+size_t anvil_schema_diagnostic_get_field(anvil_schema_diagnostic diag, char *buf, size_t buflen);
+
+/**
+ * @brief A human-readable description. Same buffer convention as get_field.
+ */
+size_t anvil_schema_diagnostic_get_message(anvil_schema_diagnostic diag, char *buf, size_t buflen);
