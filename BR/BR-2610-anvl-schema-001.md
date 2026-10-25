@@ -61,7 +61,7 @@ never compares a truncated prefix.
 
 ## Resolution
 
-Branch `fix/BR-2610-anvl-schema-001`, merged to `main`. Every site in the table is fixed, plus the
+Branch `fix/BR-2610-anvl-schema-001`, commit `2f3f0af`, merged to `main`. Every site in the table is fixed, plus the
 matching sites in `anvil_types.c` (type-def name, rule key, `type :=` text). Reads go through
 `include/internal/text_alloc.h` (query the full length, allocate exactly); field names, type names and
 violation `field`/`message` are allocated to length, so FR-2610-anvl-schema-001's paths need no further
