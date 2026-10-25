@@ -37,3 +37,9 @@ module_document setup_amp_doc(const char *, module_context *);
  * anvl_parse_hook_fn's signature — register directly via anvl_parser_set_hook().
  * The userdata parameter is unused (TestBit already knows the current test). */
 void report_throughput(const anvl_parse_metrics_t *metrics, void *userdata);
+
+/// Vtable-completeness helpers: every function name declared in a public header (a line starting
+/// in column 0 whose first '(' is preceded by an anvil_* identifier), and a whole-file read.
+/// `names` must hold `max` entries of 96 bytes. Free the file text with free().
+size_t test_header_function_names(const char *header_text, char names[][96], size_t max);
+char *test_read_whole_file(const char *path);

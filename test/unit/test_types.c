@@ -10,6 +10,8 @@
 
 #include "anvil_flat.h"
 #include "anvil_type_registry.h"
+#include "anvil_type_registry_vtable.h"
+#include "anvil_vtable.h"
 #include "anvil_types.h"
 #include "internal/format.h"
 #include "internal/numeric_bound.h"
@@ -17,6 +19,8 @@
 #include "testbit.h"
 // ----------------
 #include "../utilities/helpers.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void th(void) {
@@ -1012,6 +1016,106 @@ static void test_typ33_format_declaration(void) {
    }
 }
 
+
+struct vt_entry {
+   const char *flat_name;
+   const void *flat_fn;
+   const void *vtable_member;
+};
+#define VT_MEMBER(flat, member) {#flat, (const void *)flat, (const void *)(member)}
+
+// Every function declared in `header` must have a vtable member (pointer-identical to it), and
+// the table must not name one the header no longer declares: a function added to the flat header
+// without a member fails here.
+static void check_vtable_complete(const char *header, const struct vt_entry *table, size_t table_len,
+                                  const char *label) {
+   char *text = test_read_whole_file(header);
+   TestBit.is_not_null(text, label);
+   if (!text) {
+      return;
+   }
+   static char names[256][96];
+   size_t found = test_header_function_names(text, names, 256);
+   free(text);
+   TestBit.is_true(found > 10, label);
+   for (size_t i = 0; i < found; i++) {
+      const struct vt_entry *entry = NULL;
+      for (size_t j = 0; j < table_len; j++) {
+         if (strcmp(table[j].flat_name, names[i]) == 0) {
+            entry = &table[j];
+         }
+      }
+      if (!entry) {
+         printf("    %s: %s is declared but has no vtable member\n", label, names[i]);
+      }
+      TestBit.is_true(entry != NULL && entry->vtable_member != NULL &&
+                         entry->vtable_member == entry->flat_fn, names[i]);
+   }
+   for (size_t j = 0; j < table_len; j++) {
+      bool declared = false;
+      for (size_t i = 0; i < found; i++) {
+         declared = declared || strcmp(table[j].flat_name, names[i]) == 0;
+      }
+      TestBit.is_true(declared, table[j].flat_name);
+   }
+}
+
+static void test_typ34_type_registry_vtable_matches_flat_and_is_complete(void) {
+   const struct vt_entry table[] = {
+      VT_MEMBER(anvil_type_registry_load, TypeRegistry.load),
+      VT_MEMBER(anvil_type_registry_load_from_includes, TypeRegistry.load_from_includes),
+      VT_MEMBER(anvil_type_registry_dispose, TypeRegistry.dispose),
+      VT_MEMBER(anvil_type_registry_find, TypeRegistry.find),
+      VT_MEMBER(anvil_type_resolve, TypeRegistry.resolve),
+      VT_MEMBER(anvil_type_def_get_kind, TypeRegistry.def_get_kind),
+      VT_MEMBER(anvil_type_def_get_size, TypeRegistry.def_get_size),
+      VT_MEMBER(anvil_type_def_get_min, TypeRegistry.def_get_min),
+      VT_MEMBER(anvil_type_def_get_min_numeric, TypeRegistry.def_get_min_numeric),
+      VT_MEMBER(anvil_type_def_get_max, TypeRegistry.def_get_max),
+      VT_MEMBER(anvil_type_def_get_max_numeric, TypeRegistry.def_get_max_numeric),
+      VT_MEMBER(anvil_type_def_get_format, TypeRegistry.def_get_format),
+      VT_MEMBER(anvil_type_def_get_value_count, TypeRegistry.def_get_value_count),
+      VT_MEMBER(anvil_type_def_get_value, TypeRegistry.def_get_value),
+      VT_MEMBER(anvil_type_registry_get_diagnostic_count, TypeRegistry.get_diagnostic_count),
+      VT_MEMBER(anvil_type_registry_get_diagnostic, TypeRegistry.get_diagnostic),
+      VT_MEMBER(anvil_type_diagnostic_get_category, TypeRegistry.diagnostic_get_category),
+      VT_MEMBER(anvil_type_diagnostic_get_name, TypeRegistry.diagnostic_get_name),
+      VT_MEMBER(anvil_type_diagnostic_get_source, TypeRegistry.diagnostic_get_source),
+      VT_MEMBER(anvil_type_diagnostic_get_message, TypeRegistry.diagnostic_get_message),
+   };
+   check_vtable_complete("../../include/anvil_type_registry.h", table,
+                         sizeof(table) / sizeof(table[0]), "TYP34");
+}
+
+static void test_typ35_type_registry_vtable_round_trip(void) {
+   if (!TypeRegistry.load || !TypeRegistry.find || !TypeRegistry.def_get_kind) {
+      TestBit.is_true(false, "TYP35: the TypeRegistry vtable is populated");
+      return;
+   }
+   const char *src = "#!aml\n@[types]\nVIN := { type := String; size := 17; };\n"
+                     "Half := { type := Numeric; min := 0.5; };\nBad := { type := Strng; };\n";
+   anvil_document doc = Anvil.load_buffer(src, strlen(src));
+   anvil_type_registry reg = TypeRegistry.load(doc);
+   TestBit.is_not_null(reg, "TYP35: TypeRegistry.load");
+   if (reg) {
+      anvil_type_def vin = TypeRegistry.find(reg, "VIN");
+      long long size = 0;
+      TestBit.is_true(vin && TypeRegistry.def_get_kind(vin) == ANVIL_TYPE_STRING &&
+                         TypeRegistry.def_get_size(vin, &size) && size == 17,
+                      "TYP35: find and read a definition");
+      anvil_numeric_t n;
+      TestBit.is_true(TypeRegistry.def_get_min_numeric(TypeRegistry.find(reg, "Half"), &n) &&
+                         n.as_double == 0.5, "TYP35: fractional min");
+      TestBit.is_not_null(TypeRegistry.resolve(reg, "VIN"), "TYP35: resolve");
+      TestBit.is_equal_int(1, (long long)TypeRegistry.get_diagnostic_count(reg), "TYP35: one diagnostic");
+      char name[16] = {0};
+      TypeRegistry.diagnostic_get_name(TypeRegistry.get_diagnostic(reg, 0), name, sizeof(name));
+      TestBit.is_true(strcmp(name, "Bad") == 0, "TYP35: and it names Bad");
+      TypeRegistry.dispose(reg);
+   }
+   Anvil.dispose(doc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1065,6 +1169,11 @@ int main(void) {
 
    TestBit.run_ex("TYP32_format_validators", NULL, test_typ32_format_validators, th);
    TestBit.run_ex("TYP33_format_declaration", NULL, test_typ33_format_declaration, th);
+
+   TestBit.run_ex("TYP34_TYPE_REGISTRY_VTABLE_MATCHES_FLAT_AND_IS_COMPLETE", NULL,
+                  test_typ34_type_registry_vtable_matches_flat_and_is_complete, th);
+   TestBit.run_ex("TYP35_TYPE_REGISTRY_VTABLE_ROUND_TRIP", NULL,
+                  test_typ35_type_registry_vtable_round_trip, th);
 
    return TestBit.report();
 }

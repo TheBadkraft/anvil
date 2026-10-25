@@ -8,6 +8,7 @@
     anvil_*;
     Anvil; Attribute; Builder; Document; DocumentIterator; Error;
     Statement; StatementIterator; Value; Writer;
+    Schema; TypeRegistry;
   local:
     *;
 };

@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Schema` and `TypeRegistry` vtables** (`FR-2610-anvl-public-api-003`, roadmap decision D4):
+  `include/anvil_schema_vtable.h` (`anvil_schema_i`, `extern const anvil_schema_i Schema;`, 40
+  members) and `include/anvil_type_registry_vtable.h` (`anvil_type_registry_i`,
+  `extern const anvil_type_registry_i TypeRegistry;`, 20 members), implemented in
+  `src/schema/schema_vtable.c` and `src/anvil_types_vtable.c`. Same convention as `Writer`/`Builder`:
+  every member is pointer-identical to its flat function, in header declaration order, named without
+  the module prefix; new flat functions are appended, never inserted. Exported from `libanvil.so`
+  (`libanvil.exports`). Tests pin identity and completeness (a flat function without a member fails
+  the suite) and run a load/validate/read-violations round trip through the vtable alone. This is
+  what `anvil.py` and `anvil.net` bind.
 - **Streaming writer** (`FR-2609-anvl-writer-001`): `include/anvil_writer.h` (flat),
   `anvil_writer_vtable.h` (`Writer`) and `anvil_writer_types.h`, implemented in `src/writer/`.
   Emits canonical AML/AMP, validated against the real grammar, and is a separate add-on from the

@@ -11,11 +11,15 @@
 
 #include "anvil_flat.h"
 #include "anvil_schema.h"
+#include "anvil_schema_vtable.h"
+#include "anvil_vtable.h"
 #include "anvil_types.h"
 #include "internal/source_registry.h"
 #include "testbit.h"
 // ----------------
 #include "../utilities/helpers.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void th(void) {
@@ -2314,6 +2318,128 @@ static void test_sch81_size_counts_bytes_and_schemas_are_closed(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+
+struct vt_entry {
+   const char *flat_name;
+   const void *flat_fn;
+   const void *vtable_member;
+};
+#define VT_MEMBER(flat, member) {#flat, (const void *)flat, (const void *)(member)}
+
+// Every function declared in `header` must have a vtable member (pointer-identical to it), and
+// the table must not name one the header no longer declares: a function added to the flat header
+// without a member fails here.
+static void check_vtable_complete(const char *header, const struct vt_entry *table, size_t table_len,
+                                  const char *label) {
+   char *text = test_read_whole_file(header);
+   TestBit.is_not_null(text, label);
+   if (!text) {
+      return;
+   }
+   static char names[256][96];
+   size_t found = test_header_function_names(text, names, 256);
+   free(text);
+   TestBit.is_true(found > 10, label);
+   for (size_t i = 0; i < found; i++) {
+      const struct vt_entry *entry = NULL;
+      for (size_t j = 0; j < table_len; j++) {
+         if (strcmp(table[j].flat_name, names[i]) == 0) {
+            entry = &table[j];
+         }
+      }
+      if (!entry) {
+         printf("    %s: %s is declared but has no vtable member\n", label, names[i]);
+      }
+      TestBit.is_true(entry != NULL && entry->vtable_member != NULL &&
+                         entry->vtable_member == entry->flat_fn, names[i]);
+   }
+   for (size_t j = 0; j < table_len; j++) {
+      bool declared = false;
+      for (size_t i = 0; i < found; i++) {
+         declared = declared || strcmp(table[j].flat_name, names[i]) == 0;
+      }
+      TestBit.is_true(declared, table[j].flat_name);
+   }
+}
+
+static void test_sch82_schema_vtable_matches_flat_and_is_complete(void) {
+   const struct vt_entry table[] = {
+      VT_MEMBER(anvil_schema_load, Schema.load),
+      VT_MEMBER(anvil_schema_dispose, Schema.dispose),
+      VT_MEMBER(anvil_schema_validate, Schema.validate),
+      VT_MEMBER(anvil_schema_validate_value, Schema.validate_value),
+      VT_MEMBER(anvil_schema_get_violation_count, Schema.get_violation_count),
+      VT_MEMBER(anvil_schema_get_violation, Schema.get_violation),
+      VT_MEMBER(anvil_schema_violation_get_category, Schema.violation_get_category),
+      VT_MEMBER(anvil_schema_violation_get_field, Schema.violation_get_field),
+      VT_MEMBER(anvil_schema_violation_get_message, Schema.violation_get_message),
+      VT_MEMBER(anvil_schema_get_diagnostic_count, Schema.get_diagnostic_count),
+      VT_MEMBER(anvil_schema_get_diagnostic, Schema.get_diagnostic),
+      VT_MEMBER(anvil_schema_diagnostic_get_category, Schema.diagnostic_get_category),
+      VT_MEMBER(anvil_schema_diagnostic_get_type_category, Schema.diagnostic_get_type_category),
+      VT_MEMBER(anvil_schema_diagnostic_get_field, Schema.diagnostic_get_field),
+      VT_MEMBER(anvil_schema_diagnostic_get_message, Schema.diagnostic_get_message),
+      VT_MEMBER(anvil_schema_get_field_count, Schema.get_field_count),
+      VT_MEMBER(anvil_schema_get_field, Schema.get_field),
+      VT_MEMBER(anvil_schema_find_field, Schema.find_field),
+      VT_MEMBER(anvil_schema_field_get_name, Schema.field_get_name),
+      VT_MEMBER(anvil_schema_field_get_kind, Schema.field_get_kind),
+      VT_MEMBER(anvil_schema_field_get_type_name, Schema.field_get_type_name),
+      VT_MEMBER(anvil_schema_field_is_required, Schema.field_is_required),
+      VT_MEMBER(anvil_schema_field_is_nullable, Schema.field_is_nullable),
+      VT_MEMBER(anvil_schema_field_is_integer, Schema.field_is_integer),
+      VT_MEMBER(anvil_schema_field_get_size, Schema.field_get_size),
+      VT_MEMBER(anvil_schema_field_get_min_numeric, Schema.field_get_min_numeric),
+      VT_MEMBER(anvil_schema_field_get_max_numeric, Schema.field_get_max_numeric),
+      VT_MEMBER(anvil_schema_field_get_min_items, Schema.field_get_min_items),
+      VT_MEMBER(anvil_schema_field_get_max_items, Schema.field_get_max_items),
+      VT_MEMBER(anvil_schema_field_get_value_count, Schema.field_get_value_count),
+      VT_MEMBER(anvil_schema_field_get_value, Schema.field_get_value),
+      VT_MEMBER(anvil_schema_field_get_format, Schema.field_get_format),
+      VT_MEMBER(anvil_schema_field_get_tag, Schema.field_get_tag),
+      VT_MEMBER(anvil_schema_field_get_nested_count, Schema.field_get_nested_count),
+      VT_MEMBER(anvil_schema_field_get_nested, Schema.field_get_nested),
+      VT_MEMBER(anvil_schema_field_find_nested, Schema.field_find_nested),
+      VT_MEMBER(anvil_schema_field_get_items, Schema.field_get_items),
+      VT_MEMBER(anvil_schema_field_get_extra_count, Schema.field_get_extra_count),
+      VT_MEMBER(anvil_schema_field_get_extra_name, Schema.field_get_extra_name),
+      VT_MEMBER(anvil_schema_field_get_extra_value, Schema.field_get_extra_value),
+   };
+   check_vtable_complete("../../include/anvil_schema.h", table, sizeof(table) / sizeof(table[0]),
+                         "SCH82");
+}
+
+// A load -> validate -> read-violations round trip through `Schema` only (no flat calls).
+static void test_sch83_schema_vtable_round_trip(void) {
+   if (!Schema.load || !Schema.validate || !Schema.get_violation) {
+      TestBit.is_true(false, "SCH83: the Schema vtable is populated");
+      return;
+   }
+   const char *schema_src = "#!aml\n@[schema]\nn := { type := Numeric; max := 3; };\n"
+                            "s := { type := String; pooled := true; };\n";
+   const char *data_src = "#!aml\nn := 5;\nzz := 1;\n";
+   anvil_document sdoc = Anvil.load_buffer(schema_src, strlen(schema_src));
+   anvil_document ddoc = Anvil.load_buffer(data_src, strlen(data_src));
+   anvil_schema schema = Schema.load(sdoc);
+   TestBit.is_not_null(schema, "SCH83: Schema.load");
+   if (schema) {
+      TestBit.is_false(Schema.validate(schema, ddoc), "SCH83: Schema.validate fails the document");
+      TestBit.is_equal_int(2, (long long)Schema.get_violation_count(schema), "SCH83: two violations");
+      char path[16] = {0};
+      anvil_schema_violation v = Schema.get_violation(schema, 0);
+      Schema.violation_get_field(v, path, sizeof(path));
+      TestBit.is_true(strcmp(path, "n") == 0 &&
+                         Schema.violation_get_category(v) == ANVIL_SCHEMA_ERR_VALIDATION_RANGE,
+                      "SCH83: RANGE at n");
+      TestBit.is_equal_int(2, (long long)Schema.get_field_count(schema), "SCH83: two rules");
+      anvil_schema_field s = Schema.find_field(schema, "s");
+      TestBit.is_equal_int(1, (long long)Schema.field_get_extra_count(s), "SCH83: introspection and extras");
+      Schema.dispose(schema);
+   }
+   Anvil.dispose(sdoc);
+   Anvil.dispose(ddoc);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -2479,6 +2605,10 @@ int main(void) {
 
    TestBit.run_ex("SCH81_SIZE_COUNTS_BYTES_AND_SCHEMAS_ARE_CLOSED", NULL,
                   test_sch81_size_counts_bytes_and_schemas_are_closed, th);
+
+   TestBit.run_ex("SCH82_SCHEMA_VTABLE_MATCHES_FLAT_AND_IS_COMPLETE", NULL,
+                  test_sch82_schema_vtable_matches_flat_and_is_complete, th);
+   TestBit.run_ex("SCH83_SCHEMA_VTABLE_ROUND_TRIP", NULL, test_sch83_schema_vtable_round_trip, th);
 
    return TestBit.report();
 }
