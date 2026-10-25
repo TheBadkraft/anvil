@@ -50,7 +50,7 @@ None.
 
 ## Resolution
 
-Branch `feat/FR-2610-anvl-schema-003`, merged to `main`. Tests SCH51–SCH57 (`test_schema.c`) and TYP28
+Branch `feat/FR-2610-anvl-schema-003`, commit `3e3c497`, merged to `main`. Tests SCH51–SCH57 (`test_schema.c`) and TYP28
 (`test_types.c`); fixtures `schema_nullable_*`. Full unit regression green with unchanged counts
 elsewhere, `test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable,
 document, resolver. Docs: `docs/types-reference.md` "Nullable values" (and the site mirror).
