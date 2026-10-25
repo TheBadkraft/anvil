@@ -42,8 +42,8 @@ CORE_SRCS = src/core/anvil.c \
             src/sigma/collections.c \
             src/sigma/query.c
 
-TYPES_SRCS  = src/anvil_types.c
-SCHEMA_SRCS = src/schema/schema.c
+TYPES_SRCS  = src/anvil_types.c src/anvil_types_vtable.c
+SCHEMA_SRCS = src/schema/schema.c src/schema/schema_vtable.c
 
 # sigma.system.alloc (FR-2609-sigmem-001): the Allocator/bump-arena provider, formerly
 # src/sigma/memory.c's own vendored-and-modified copy. A real prebuilt package, installed once

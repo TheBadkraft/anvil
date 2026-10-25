@@ -7,9 +7,8 @@ coder agent does not work this ticket.
 **Filed:** 2026-10-25
 **Filed by:** anvil (planning)
 **Requested by:** rivet, flywire (downstream consumers, through the `anvil.py`/`anvil.net` bindings)
-**Status:** open — not started. Phase 3 is merged; **blocked on BR-2610-anvl-visibility-001**
-(schema/type-registry functions aren't exported from `libanvil.so`, so vtable instances over them
-would have nothing to bind through)
+**Status:** resolved (native side). Done by the ANVL coder agent at the repo owner's direct request, after
+BR-2610-anvl-visibility-001 landed.
 **Decision:** roadmap D4, answered 2026-10-25: add the vtables after Phase 3
 **Tags:** public-api, vtable, schema, types, bindings, rivet-readiness
 
@@ -69,3 +68,27 @@ Follow the `Writer`/`Builder` precedent exactly:
 - `site/assets/docs/Bindings-Guide.md` lists the two new vtables alongside `Writer`/`Builder`.
 - `docs/changelog.md` gets an `## [Unreleased]` → `### Added` entry naming this FR. This is part
   of "done", not a follow-up.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-public-api-003`, commit `4176349`, merged to `main`. Tests SCH82-SCH83 (`test_schema.c`) and
+TYP34-TYP35 (`test_types.c`). Full unit regression green with unchanged counts elsewhere,
+`test_release`, `check-exports` (163 symbols, now including `Schema` and `TypeRegistry`) and
+`check-reader-only` green, Valgrind-clean on schema, types, vtable, native. Verified by hand: deleting a
+table row fails the completeness test naming the function; removing `Schema; TypeRegistry;` from
+`libanvil.exports` fails `check-exports`.
+
+- **Member names.** `Schema`: the flat name without `anvil_schema_` (`load`, `validate`,
+  `validate_value`, `get_violation`, `violation_get_field`, `diagnostic_get_message`, `get_field`,
+  `field_get_name`, `field_get_extra_value`, ...). `TypeRegistry`: without `anvil_type_registry_`
+  (`load`, `load_from_includes`, `find`, `get_diagnostic`), or else without `anvil_type_`
+  (`resolve`, `def_get_kind`, `def_get_min_numeric`, `diagnostic_get_name`). The headers say so.
+- **Layout is final for now.** Members are in flat-header declaration order as of this commit; later flat
+  functions must be appended. Both headers include only their own flat header.
+- **Completeness test** shares its scanner with `VT11` (moved to `test/utilities/helpers.c`), and each
+  test builds its table inside the test function because vtable members aren't constant expressions.
+- **Name check:** `Schema` and `TypeRegistry` collide with nothing in `include/`, `src/` or the
+  exported symbols.
+- **New vtable objects must be listed in `libanvil.exports`** (done for these two).
+- **Not done here:** the "After this lands" items for the Bindings agent (binding the structs in
+  `anvil.py`/`anvil.net`, and the Bindings-Guide listing, which today documents no C vtables at all).

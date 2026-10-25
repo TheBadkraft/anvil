@@ -233,54 +233,6 @@ struct vt_entry {
 #define VT_FLAT_ONLY(flat, why) {#flat, (const void *)flat, NULL, why}
 
 
-// Every function name declared in the header: a line starting in column 0 whose first '(' is
-// preceded by an anvil_* identifier (comments, typedefs, preprocessor lines never match).
-static size_t header_function_names(const char *header_text, char names[][96], size_t max) {
-   size_t count = 0;
-   const char *line = header_text;
-   while (*line && count < max) {
-      const char *eol = strchr(line, '\n');
-      size_t len = eol ? (size_t)(eol - line) : strlen(line);
-      char first = len ? line[0] : ' ';
-      if ((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
-         const char *paren = memchr(line, '(', len);
-         if (paren) {
-            const char *end = paren;
-            const char *start = end;
-            while (start > line && ((start[-1] >= 'a' && start[-1] <= 'z') ||
-                                    (start[-1] >= '0' && start[-1] <= '9') || start[-1] == '_')) {
-               start--;
-            }
-            size_t n = (size_t)(end - start);
-            if (n > 6 && strncmp(start, "anvil_", 6) == 0 && n < 96) {
-               memcpy(names[count], start, n);
-               names[count][n] = '\0';
-               count++;
-            }
-         }
-      }
-      line += len + (eol ? 1 : 0);
-   }
-   return count;
-}
-
-static char *read_whole_file(const char *path) {
-   FILE *f = fopen(path, "rb");
-   if (!f) {
-      return NULL;
-   }
-   fseek(f, 0, SEEK_END);
-   long n = ftell(f);
-   fseek(f, 0, SEEK_SET);
-   char *text = malloc((size_t)n + 1);
-   if (text) {
-      size_t got = fread(text, 1, (size_t)n, f);
-      text[got] = '\0';
-   }
-   fclose(f);
-   return text;
-}
-
 static void test_vt11_vtables_cover_every_flat_function(void) {
 const struct vt_entry VT_TABLE[] = { // automatic: vtable members are not constant expressions
    VT_MEMBER(anvil_load, Anvil.load),
@@ -325,13 +277,13 @@ const struct vt_entry VT_TABLE[] = { // automatic: vtable members are not consta
    VT_MEMBER(anvil_attribute_get_value, Attribute.get_value),
    // Flat-only functions go here as VT_FLAT_ONLY(anvil_x, "why a binding doesn't need it").
 };
-   char *header = read_whole_file("../../include/anvil_flat.h");
+   char *header = test_read_whole_file("../../include/anvil_flat.h");
    TestBit.is_not_null(header, "VT11: anvil_flat.h readable");
    if (!header) {
       return;
    }
    static char names[256][96];
-   size_t found = header_function_names(header, names, 256);
+   size_t found = test_header_function_names(header, names, 256);
    free(header);
    TestBit.is_true(found > 30, "VT11: the header scan finds the flat API");
 

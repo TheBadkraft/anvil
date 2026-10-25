@@ -46,12 +46,12 @@ TESTBIT_SRC = $(TESTBIT)/src/testbit.c
 # core/ and sigma/ under src/, not nested under src/schema/. schema.c (not yet built) is the
 # actual add-on layered on top of it — src/schema/ is reserved for that, and will depend on
 # TYPES_SRCS, never the reverse.
-TYPES_SRCS  = $(ANVL)/src/anvil_types.c
+TYPES_SRCS  = $(ANVL)/src/anvil_types.c $(ANVL)/src/anvil_types_vtable.c
 TYPES_LIB   = $(ANVIL_SRCS) $(TYPES_SRCS)
 
 # schema.c is the real add-on layered on top of TYPES_LIB — lives under src/schema/, reserved
 # for it. Depends on types, never the reverse.
-SCHEMA_SRCS = $(ANVL)/src/schema/schema.c
+SCHEMA_SRCS = $(ANVL)/src/schema/schema.c $(ANVL)/src/schema/schema_vtable.c
 SCHEMA_LIB  = $(TYPES_LIB) $(SCHEMA_SRCS)
 
 # The writer is a standalone add-on (src/writer/): it links no reader code, and the reader links
