@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil.net` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 3):
+  `AnvilTypeRegistry`/`AnvilTypeDef` and `AnvilSchema` in .NET idiom, over the `Schema` and
+  `TypeRegistry` vtables. Validation with `SkipRequired`/`AllowUnknown`, `ValidateField(text, name)`
+  for a request body held as ANVL text, load diagnostics, and field introspection (nested rules,
+  array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds. Every
+  handle is `IDisposable`, and the enums are pinned against the C headers. Built on the pin
+  `f9ee783`. The local package is versioned `0.10.0-dev.1`, provisional until the release decision.
 - **`Schema` and `TypeRegistry` vtables** (`FR-2610-anvl-public-api-003`, roadmap decision D4):
   `include/anvil_schema_vtable.h` (`anvil_schema_i`, `extern const anvil_schema_i Schema;`, 40
   members) and `include/anvil_type_registry_vtable.h` (`anvil_type_registry_i`,

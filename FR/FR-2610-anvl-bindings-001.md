@@ -125,6 +125,54 @@ Test cases 1–5 are covered. Case 7 is deferred, see below.
 - **Deferred to the release (SR-2610-anvl-distribution-001, Release agent):** the `Bindings-Guide.md` Node
   section, because it documents the published `0.8.0-rc` download as "Downloadable today" and
   that artifact does not contain this surface. The README in `anvil.node` documents it meanwhile.
-- **Not started:** slices 2–3 (`anvil.py`, `anvil.net`). Their `Schema`/`TypeRegistry` vtables
-  (FR-2610-anvl-public-api-003) are merged, so they are unblocked.
+- **Not started:** slice 2 (`anvil.py`) and slice 4 (`anvil.wasm`). Slice 3 (`anvil.net`) is done, below.
+
+### Slice 3: `anvil.net` — done (Bindings agent, 2026-10-26)
+
+Done ahead of 1b, 2 and 4 on the planning priority change. Branch `feat/FR-2610-anvl-bindings-001-net`
+in `anvil.net`, commit `ae66547`, off `chore/SR-2610-anvl-vendor-bump-001` (pin `f9ee783`). Not yet
+merged or pushed. 137/137 tests (51 new). Strict TDD: the suite was built and RED first (48 of the
+new tests failing on assertions), then taken to GREEN.
+
+- **Surface**, all `IDisposable` where it owns a handle, `Anvil`-prefixed like the rest of the binding:
+  `AnvilTypeRegistry` (`Load`, `FromIncludes`, `Find`, `Resolve`, `Diagnostics`), `AnvilTypeDef` (`Kind`,
+  `TryGetSize`/`TryGetMin`/`TryGetMax(out long)`, `Min`/`Max` as `AnvilNumeric?`, `Format`, `Values`),
+  `AnvilSchema` (`Load`, `Validate`, `ValidateValue`, `ValidateField` over text or a document,
+  `Diagnostics`, `Fields`, `FindField`), `AnvilSchemaField` (`Name`, `Kind`, `TypeName`, `IsRequired`,
+  `IsNullable`, `IsInteger`, `TryGetSize`, `Min`/`Max`, `TryGetMinItems`/`TryGetMaxItems`, `Values`,
+  `Format`, `Tag`, `Nested`/`FindNested`, `Items`, `Extras`), `AnvilNumeric`, and the snapshots
+  `AnvilSchemaValidation`, `AnvilSchemaViolation`, `AnvilSchemaDiagnostic`, `AnvilTypeDiagnostic`.
+- **Native layer:** `TypeRegistryNative` and `SchemaNative`, 1:1 mirrors of the 20- and 40-member
+  vtables, generated from the headers. `VtableDriftTests` pins them (`TypeRegistryRaw`, `SchemaRaw`),
+  and the new `EnumDriftTests` pins `AnvilTypeKind` (incl. `Blob`), `AnvilTypeDiagnosticCode`,
+  `AnvilSchemaViolationCode` (incl. `Tag`, `Format`) and `AnvilSchemaDiagnosticCode` value for value.
+- **Choices to confirm** (each was a judgment call, recorded so planning can overrule):
+  1. `ValidateField` for an **absent statement** returns one `Required` violation with an empty
+     `Field` and a message naming the statement. The decision said "one violation with an empty path"
+     without a code; `Required` is the closest native category. `anvil.node`'s slice 1b should use the
+     same so the two bindings agree.
+  2. `ValidateField` on **text that doesn't parse** throws `FormatException` (carrying the native
+     message, line and column). `anvil.node` returns `null` and sets `lastError()`, which is that
+     binding's convention; this is .NET's.
+  3. `ValidateValue` takes a live `AnvlValue`, so a body already loaded needs no text round trip. The
+     text form of `ValidateField` exists for the shared convenience.
+  4. A batch (`set := [ {...}, ... ]`) is validated by the caller iterating the array and calling
+     `ValidateValue` per element, which the .NET lazy model makes cheap. No `{ each: true }` form.
+  5. Views (`AnvilTypeDef`, `AnvilSchemaField`) check their owner on every access and throw
+     `ObjectDisposedException` after it is disposed, which is stricter than `AnvlValue`'s documented
+     "invalid after dispose". No finalizer, matching `AnvilDocument`.
+- **Hazard found, worth knowing in every binding:** Anvil Native rejects loading content identical to a
+  document that is **still loaded**, reporting a bare `Io` error with an empty message. It surfaces in
+  `ValidateField(text, ...)` when the caller holds a document with the same text. The exception now
+  says so and points at the `ValidateField(AnvilDocument, ...)` overload.
+- **Verification:** 30,000 load/validate/introspect/dispose rounds grow no faster than a document-only
+  control (14 MB vs 20 MB working set), so no leak. The package was also consumed from the local feed
+  as a downstream project would, and worked end to end.
+- **Local package:** `dotnet pack -c Release` produces `src/Anvil.Net/bin/Release/Anvil.Net.0.10.0-dev.1.nupkg`
+  (`libanvil.so` inside is byte-identical to the `f9ee783` build and exports the `Schema` and
+  `TypeRegistry` vtables). **Consumers must reference `0.10.0-dev.1`**, not `0.8.0-rc`, whose copy in
+  `~/.nuget/packages` is cached. The version is provisional and local-only, below the eventual
+  `0.10.0-rc` (release decision R1).
+- **Deferred:** the `Bindings-Guide.md` .NET section, to the release (Release agent hands it to the
+  Documenter), since it documents the published `0.8.0-rc` download.
 
