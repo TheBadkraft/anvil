@@ -6,7 +6,7 @@
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning)
 **Requested by:** rivet (found by Rivet Coder building the q-or importer; verified by the Rivet Project Engineer)
-**Status:** open — not started
+**Status:** resolved — `anvil.node` and `anvil.wasm` slices done; see Resolution
 **Tags:** bindings, anvil-node, anvil-wasm, attributes, parity, rivet-readiness
 
 ---
@@ -70,3 +70,71 @@ That workaround carries this FR's ID as its TODO. Not blocking.
 ## Dependencies
 
 None. Native already exposes statement and document attributes.
+
+## Resolution
+
+Bindings agent, 2026-10-26. `anvil.node`: branch `feat/FR-2610-anvl-bindings-003-node`, commit `2c28fa4`, on
+`fix/BR-2610-anvl-bindings-002`. `anvil.wasm`: branch `feat/FR-2610-anvl-bindings-003-wasm`, commit `4506503`, on
+`fix/BR-2610-anvl-bindings-002`. Not yet merged or pushed. 174 tests in `anvil.node` (173 pass, 1 `todo`) and 187
+in `anvil.wasm` (185 pass, 2 `todo`), 14 new in each. TDD: the test set first (11 of 14 failing against inert stubs in
+each repo), then the C, the `emcc` build for wasm, and the JS. The addon still exports only its two N-API entry points,
+and Valgrind shows 0 errors and 0 bytes lost over attributed, repeated-name, nested and NUL-valued documents.
+
+### The shape (decided here, as the FR asked)
+
+- **Document level** (on the root node `parse()` returns): `attributes` → frozen `[{ key, value }]` and
+  `findAttribute(key)` → `{ key, value }` or `null`. `hasAttribute(key)` is unchanged. A non-root node has no module
+  attributes: `attributes` is `[]`, `findAttribute` is `null`.
+- **Statement level:** `node.statements()` → `AnvlStatement[]` in declaration order, `node.statement(name)` → the first
+  with that name or `null`. `AnvlStatement` is `{ name, value: AnvlNode, attributes, findAttribute(key) }`, exported.
+  `statements()` is `[]` for a value that is not an object. The root's own statements work the same way.
+- **An attribute** is an immutable `{ key, value }`, `value` `null` for a flag (`@[active]`), in declaration order.
+  A missing key is `null`.
+- **Repeated names:** `statements()` has one entry per occurrence; `get(name)` keeps its established last-wins meaning and
+  `statement(name)` is the first, which is what `find_statement` returns in py/net.
+
+### The envelope (internal, still JSON, as the FR accepted)
+
+An object's envelope is `{"type":"object","value":{name:...}}` as before. When, and only when, a statement in it has
+attributes or a name repeats, it also carries an ordered `"stmts":[{"n":name,"a":[[key,value|null],...],"v":<tagged>}]`:
+`a` only for an attributed statement, and `v` only for a repeated name's earlier occurrences (every other statement's value
+is the name-keyed map's, so nothing is duplicated except those). The root envelope also carries `"moduleAttrs"` when the
+document has module attributes; `"attributes"` (the keys) is unchanged. Detection of repeats is a sort of the statement
+names, O(n log n) per object. **An attribute-free document's envelope is byte-identical to before** (pinned in each repo by
+`test/attribute-free-envelopes.json`).
+
+### Measurements (BR-2609-anvl-004's methodology: median of 15 runs, old addon against new on the same documents)
+
+| | `anvil.node` old → new | `anvil.wasm` old → new |
+|---|---:|---:|
+| `parseRawValue()`, 10,000 rows × 10 fields (path not touched) | 18.56 → 18.57 ms (1.00x) | 27.98 → 28.44 ms (1.02x) |
+| `parse()`, FlyWire-style 3-statement message, 2,000 parses | 4.23 → 4.41 ms (1.04x) | 8.30 → 8.74 ms (1.05x) |
+| `parse()`, 5,000 object statements, no attributes | 10.60 → 11.06 ms (1.04x) | 15.28 → 16.91 ms (1.11x) |
+| `parse()`, 5,000 object statements, an attribute on each | 12.85 → 19.80 ms (1.54x) | 16.92 → 25.55 ms (1.51x) |
+
+Envelope bytes for the attribute-free 5,000-statement document and the message are identical (957,832 and 201). So the hot
+path does not pay *nothing*: attribute-free `parse()` is about 4% slower in Node and 5% to 11% in WASM, from the extra pass
+over each object's statements. For FlyWire's real message that is roughly 0.09 µs per parse in Node. The 1.5x for attributed
+documents is the cost of carrying the data. If 4% is more than the owner wants, the pass can be made conditional (skip the
+sort unless an object has more than one statement and a cheap pre-check hints at a repeat); I have not done that.
+
+### Two things to confirm
+
+1. **Attribute values are native's text, uninterpreted: a quoted string keeps its quotes.** The FR's test case 1 reads
+   `status="done"` → `'done'`. `anvil.py` and `anvil.net` return `'"done"'` for the same attribute (verified in both: the native
+   getter copies the source text, `anvil_attribute_get_value`), and this FR says py/net semantics hold, so `anvil.node` and
+   `anvil.wasm` return `'"done"'` too, and the tests say so. If Rivet's importer wants the unquoted form, that is an unquote
+   convenience to add to **all four** bindings together (or a native change), not a divergence in two. Bare values (`type=bug`) and
+   numbers (`n=5`) are as written either way.
+2. **A pre-existing gap this made visible:** `get(name)`, `entries()` and `count` on an object collapse a repeated name to its
+   last occurrence, because the envelope is a JSON object. Native keeps both (`count` 3 for `{ a := 1; a := 2; b := 3; }`; JS says
+   2). `statements()` is the complete form and is correct. I left `entries()` and `count` alone because changing them would change
+   behavior FlyWire may rely on; say if you want them to match native.
+
+### Tests
+
+The FR's cases 1–8 are covered: attributes with a flag and absent key (1), object-block and nested statements, including
+inside arrays (2), module attributes with `hasAttribute` unchanged (3), the exact attribute-free envelope (4), repeated names
+in order (5), the existing suites and the export list (6), the same tests in `anvil.wasm` (7), changelogs (8). Also pinned:
+attribute values and module attribute values with a NUL (nothing after it lost), quotes, backslashes and non-ASCII.
+

@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil.node` and `anvil.wasm` expose statement attributes and attribute values** (`FR-2610-anvl-bindings-003`):
+  `node.attributes`/`findAttribute(key)` (module attributes with their values, on the root), `node.statements()`/`statement(name)`
+  (an object's statements in order, repeated names included), and `AnvlStatement { name, value, attributes, findAttribute }`,
+  with the same names and meaning as `anvil.py` and `anvil.net`. An attribute's value is native's text (a quoted string keeps
+  its quotes) and `null` for a flag. `hasAttribute` is unchanged, and an attribute-free document's envelope is byte-identical;
+  its `parse()` is about 4% slower in Node and 5% to 11% in WASM.
 - **`anvil.py` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 2): `AnvilTypeRegistry`/`TypeDef` and
   `AnvilSchema` in Python idiom, over the `Schema` and `TypeRegistry` vtables. Validation with keyword-only
   `skip_required`/`allow_unknown`, `validate_field` over text, bytes or a loaded document, load diagnostics, and field
