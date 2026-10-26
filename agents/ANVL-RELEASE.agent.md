@@ -103,6 +103,9 @@ is a recorded, deliberate deferral.
   `libanvil.so` (core, net, py, java).
 - **SR-2610-anvl-vendor-bump-002** is merged in every binding (in progress as of 2026-10-26:
   anvil.node done at `fd7ee74`; wasm, py, net, java pending). The release ships those native fixes.
+- **BR-2610-anvl-attr-001** is merged on native `main` (attribute values carrying trailing
+  whitespace; filed 2026-10-26 and release-blocking). The core release is cut from a `main` that
+  includes it.
 - R1 and R2 are answered (above).
 
 **Order:**
