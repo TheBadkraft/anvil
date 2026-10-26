@@ -2,7 +2,7 @@
 
 **ID:** FR-2610-anvl-bindings-002
 **Type:** Feature Request (bindings)
-**Owner:** anvil-node
+**Owner:** anvil-node, then anvil-wasm (second slice, added 2026-10-25)
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** flywire, rivet (downstream consumers)
@@ -52,3 +52,13 @@ Mirror the Python/.NET surface in JavaScript idiom:
 ## Dependencies
 
 None. The native writer (`anvil_writer.h`, `anvil_builder.h`) is already implemented.
+
+## Decisions (planning, 2026-10-25, owner-approved)
+
+- **Scope extends to `anvil.wasm`** as a second slice, after the `anvil.node` slice: the same
+  `AnvilWriter`/`AnvilBuilder` surface and the same names, so a JS caller gets one API on server
+  and browser. The wasm build already compiles the writer in (SR-2610-anvl-vendor-bump-001); the
+  slice exports its entry points and wraps them.
+- **The release waits for both slices** (SR-2610-anvl-distribution-001). `anvil.node` without the
+  writer would lag `anvil.py`/`anvil.net`, and the writer is how a JS caller produces the ANVL
+  text that `Schema.validateValue` takes.

@@ -160,6 +160,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`BR-2610-anvl-vtable-001`** (filed): `anvil_document_get_path` exists only in the flat API, not
   the `Document` vtable, and no test checks vtable completeness. Roadmap addendum A2. Both A1 and A2
   must merge before the Bindings agent starts Phase 4.
+- **Phase 4 scope decisions** (owner-approved, on the Bindings agent's slice-1 findings):
+  `anvil.node` gains `schema.validateField(docText, name, opts)` (slice 1b), so a request body's
+  `set` object validates without re-serializing it. `anvil.wasm` gets the same types/schema
+  surface (FR-2610-anvl-bindings-001 slice 4) and the writer/builder (FR-2610-anvl-bindings-002
+  second slice); today it compiles them in but exports nothing from them. The release
+  (SR-2610-anvl-distribution-001, now owned by the Release agent) waits for all of Phase 4.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the

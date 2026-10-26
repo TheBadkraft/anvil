@@ -67,3 +67,27 @@ slice 1 can start there. But no native fix or addition in this FR set (BR-2610-a
 onward) reaches Node until `SR-2610-anvl-vendor-bump-001` bumps that pin. Treat the bump as a
 prerequisite for every slice after the first. `anvil.wasm`'s build doesn't compile types or schema
 at all today.
+
+## Decisions (planning, 2026-10-25, owner-approved)
+
+Taken on the Bindings agent's slice-1 findings.
+
+1. **New slice 1b (`anvil.node`, next): `schema.validateField(docText, name, opts)`.** In one native
+   call, it parses the document text, finds the top-level statement `name`, and runs
+   `anvil_schema_validate_value` on its value. It returns the same `{ valid, violations }` shape as
+   `validate`. If the statement is missing, that's one violation with an empty path. If it isn't an
+   object, the native TYPE_MISMATCH. It needs no native change. Why: `anvil.node`'s `parse()`
+   converts eagerly and frees the native document, so `validateValue` can only take text. FlyWire
+   validates the `set` object of a request body it already holds as ANVL text, and without this
+   it would have to serialize that object back first. `validateValue` stays as-is. Batch create
+   (`set := [ {...}, ... ]`) validates each element. If that's awkward from JS, add
+   `validateField(docText, name, { each: true })` with paths `[i].field`, and record the choice.
+   Slice 1b also picks up the already-deferred `schema.fields` introspection.
+2. **New slice 4 (`anvil.wasm`): the same `TypeRegistry`/`Schema` surface as `anvil.node`.** Same
+   names and result shapes, including `validateField`, so FlyWire's server (Node) and browser
+   (wasm) sides share one calling convention. Export the native entry points the wrapper needs
+   (`EXPORTED_FUNCTIONS`), so the linker stops dropping types and schema. Update the README's
+   "Native modules carried". Tests run in Node against the built module, and one smoke test covers
+   the `ENVIRONMENT=web` path.
+3. **The release waits for all of Phase 4** (this FR's slices 1b, 2, 3 and 4, plus
+   FR-2610-anvl-bindings-002). See SR-2610-anvl-distribution-001.

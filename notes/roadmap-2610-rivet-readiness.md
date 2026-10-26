@@ -121,13 +121,19 @@ Both must be merged before the Bindings agent starts Phase 4.
     D3 for wasm)* Node can start as soon as Phase 1 is merged, so the fixes travel with it.
 14. **FR-2610-anvl-bindings-001, slice 1 (`anvil.node`)**: `TypeRegistry`/`Schema` over what's
     landed. Re-bump and add accessors as Phase 3 tickets merge.
-15. **FR-2610-anvl-bindings-002**: writer/builder in `anvil.node`. *(after #13)*
-16. **FR-2610-anvl-bindings-001, slices 2–3 (`anvil.py`, `anvil.net`)**. *(after D4)*
+14b. **FR-2610-anvl-bindings-001, slice 1b (`anvil.node`)**: `schema.validateField(docText,
+    name, opts)` plus `schema.fields` introspection. *(added 2026-10-25)*
+15. **FR-2610-anvl-bindings-002**: writer/builder in `anvil.node`, then in `anvil.wasm` (second
+    slice, added 2026-10-25). *(after #13)*
+16. **FR-2610-anvl-bindings-001, slices 2–3 (`anvil.py`, `anvil.net`)**. *(after D4; unblocked)*
+16b. **FR-2610-anvl-bindings-001, slice 4 (`anvil.wasm`)**: the same `TypeRegistry`/`Schema`
+    surface as `anvil.node`. *(added 2026-10-25)*
 
-## Phase 5: release [ANVL Bindings agent, not the coder agent]
+## Phase 5: release [ANVL Release agent; see `agents/ANVL-RELEASE.agent.md`]
 
-17. **SR-2610-anvl-distribution-001**: `anvil-node`/`anvil-wasm` 0.9.x on anvldata.com, built
-    from a recorded native commit, with 0.8.0-rc kept live. *(after #13 and #14)*
+17. **SR-2610-anvl-distribution-001** and **BR-2610-anvl-distribution-001**: a tagged core release
+    and binding tarballs on anvldata.com, built from that tag. *(after **all** of Phase 4: owner
+    decision 2026-10-25. Version and the fate of the `0.8.0-rc` files are release decisions R1/R2.)*
 
 ---
 

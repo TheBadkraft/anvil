@@ -45,7 +45,8 @@ Read these shared memories first: `anvil-dev-workflow`, `anvil-finish-with-chang
 
 1. **Build from a tag, never from a working tree.** Every artifact comes from a clean checkout of a
    core tag (and the binding commit whose `vendor/anvil` pin equals that tag). Record both commits in
-   the artifact (a `BUILD-INFO` file) and in the release notes.
+   the artifact and in the release notes. Use `BUILD_INFO.json`, the format `anvil.wasm`'s
+   `build.sh` already writes (`dist/BUILD_INFO.json`), for every artifact.
 2. **Scripted, not by hand.** Every artifact is produced by a script under `scripts/release/` that
    another agent or CI can rerun and get the same contents. Hand-assembled tarballs are how
    BR-2610-anvl-distribution-001 happened.
@@ -92,8 +93,10 @@ SR-2609-anvl-distribution-001 with the owner's OK: hosting is done, and the Linu
 is a recorded, deliberate deferral.
 
 **Prerequisites:** check them, don't assume them.
-- The Bindings agent has merged SR-2610-anvl-vendor-bump-001 and FR-2610-anvl-bindings-001 slice 1
-  (`anvil.node`). These gate the node/wasm release.
+- The Bindings agent has merged **all of roadmap Phase 4** (owner decision, 2026-10-25):
+  SR-2610-anvl-vendor-bump-001, FR-2610-anvl-bindings-001 slices 1, 1b, 2, 3 and 4, and
+  FR-2610-anvl-bindings-002 for both `anvil.node` and `anvil.wasm`. Check each ticket's Status and
+  each binding repo's `main`.
 - The coder agent has merged BR-2610-anvl-visibility-001. This gates any artifact that ships
   `libanvil.so` (core, net, py, java).
 - R1 and R2 are answered.
@@ -109,7 +112,11 @@ is a recorded, deliberate deferral.
 5. Stage `site/assets/downloads/`, `SHA256SUMS`, `download.html` entries and `version.js`. Commit and
    merge, then deploy on the owner's go. Run the live check.
 6. Apply R2 to the old files, close the tickets with Resolution sections, update the changelogs, and
-   hand the public changelog content to the Documenter.
+   hand these to the Documenter:
+   - the public changelog content;
+   - the `Bindings-Guide.md` sections the Bindings agent deliberately held back until the release
+     (starting with the Node types/schema section; see `notes/deferred-work.md`, "Deferred —
+     bindings: types and schema"), so the guide never describes a download that lacks the surface.
 
 ## When to stop and report
 
