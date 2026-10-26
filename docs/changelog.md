@@ -26,6 +26,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reader and still returns `"done"` with its quotes. A value the scalar grammar doesn't accept as a whole
   (`@[range=1..5]`) is exposed as a BARE value of its raw text; reading never fails and no document that
   loaded before fails now. Bindings can drop any per-binding unquoting and add one decoded accessor.
+- **`anvil.node` and `anvil.wasm` expose statement attributes and attribute values** (`FR-2610-anvl-bindings-003`):
+  `node.attributes`/`findAttribute(key)` (module attributes with their values, on the root), `node.statements()`/`statement(name)`
+  (an object's statements in order, repeated names included), and `AnvlStatement { name, value, attributes, findAttribute }`,
+  with the same names and meaning as `anvil.py` and `anvil.net`. An attribute's value is native's text (a quoted string keeps
+  its quotes) and `null` for a flag. `hasAttribute` is unchanged, and an attribute-free document's envelope is byte-identical;
+  its `parse()` is about 4% slower in Node and 5% to 11% in WASM.
+- **`anvil.py` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 2): `AnvilTypeRegistry`/`TypeDef` and
+  `AnvilSchema` in Python idiom, over the `Schema` and `TypeRegistry` vtables. Validation with keyword-only
+  `skip_required`/`allow_unknown`, `validate_field` over text, bytes or a loaded document, load diagnostics, and field
+  introspection (nested rules, array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds.
+  Everything that owns a handle is a context manager, and the enums are pinned against the C headers. With this, every slice
+  of `FR-2610-anvl-bindings-001` is done: `anvil.node`, `anvil.net`, `anvil.wasm` and `anvil.py` share one surface.
+- **`anvil.wasm` gains the type registry, schema, writer and builder** (`FR-2610-anvl-bindings-001` slice 4 and
+  `FR-2610-anvl-bindings-002`'s wasm slice): the same surface and result shapes as `anvil.node`, including
+  `validateField` with `each` and `schema.fields`, so a JS caller has one API on the server and in the browser. The
+  module's in-memory filesystem is exposed (`writeFile`/`removeFile`) so schemas can include `@[types]` documents.
+  The `.wasm` grows to about 150 KB because the types, schema and writer code is now reachable. Built on the pin
+  `f9ee783`. Found while porting: `anvil.wasm`'s `parse()` cuts a document at an embedded NUL (`BR-2610-anvl-bindings-002`).
+- **`anvil.node` gains `schema.validateField` and schema introspection** (`FR-2610-anvl-bindings-001`,
+  slice 1b): `validateField(docText, name, opts)` validates a statement of a document you already
+  hold as ANVL text in one call, with an `each` form for batch bodies (violations at `[i].field`),
+  and `schema.fields`/`findField(name)` expose every rule's constraints, nested rules, array items,
+  blob tag and extension keys. An absent statement is one `Required` violation with an empty field,
+  the same as `anvil.net`.
+- **`anvil.net` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 3):
+  `AnvilTypeRegistry`/`AnvilTypeDef` and `AnvilSchema` in .NET idiom, over the `Schema` and
+  `TypeRegistry` vtables. Validation with `SkipRequired`/`AllowUnknown`, `ValidateField(text, name)`
+  for a request body held as ANVL text, load diagnostics, and field introspection (nested rules,
+  array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds. Every
+  handle is `IDisposable`, and the enums are pinned against the C headers. Built on the pin
+  `f9ee783`. The local package is versioned `0.10.0-dev.1`, provisional until the release decision.
 - **`Schema` and `TypeRegistry` vtables** (`FR-2610-anvl-public-api-003`, roadmap decision D4):
   `include/anvil_schema_vtable.h` (`anvil_schema_i`, `extern const anvil_schema_i Schema;`, 40
   members) and `include/anvil_type_registry_vtable.h` (`anvil_type_registry_i`,
@@ -285,6 +316,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`FR-2610-anvl-public-api-004`): the attribute scanner (statement and module attributes) toggled "inside
   a string" on every `"`, escaped or not, so `@[note="a\"b"]` left the string open, ate the closing `]`
   and failed the load (or mis-split later attributes). It is escape-aware now.
+- **`anvil.node` and `anvil.wasm` no longer collapse a repeated name inside an object** (`BR-2610-anvl-bindings-003`). For
+  `{ a := 1; a := 2; b := 3; }`, `count` is now 3, `get('a')` is the first (`1`) and `entries()` yields all three in order, as native,
+  `anvil.py` and `anvil.net` do; they used to report 2, the last, and `a` once. Objects without repeated names are unchanged. A
+  request body that repeats a column is no longer silently taken as its last value.
+- **A NUL character inside a string value no longer cuts a document short in `anvil.wasm` and `anvil.java`**
+  (`BR-2610-anvl-bindings-002`). In `anvil.wasm` every text entry point read its text with `strlen`, so
+  `s := "x";\0t := 1;` parsed as `s` alone with no error; they now pass the byte length. In `anvil.java` every
+  string value was decoded with a read that stops at the first NUL; it now decodes exactly the bytes native wrote.
+  `anvil.node`, `anvil.net` and `anvil.py` were audited and were correct. Native itself is correct for documents.
+  The type registry and schema's own loss (enum labels cut at a NUL, a string extension value lost) is fixed
+  natively by `BR-2610-anvl-nul-001`.
+- **`anvil.node` and `anvil.wasm`: `parse()` and `parseRawValue()` reject a non-string** (`BR-2610-anvl-bindings-001`).
+  They used to parse an empty buffer for a number, object or array (and, in `anvil.wasm`, fail with an
+  incidental internal error for a `Buffer`, `undefined` or `null`), returning a valid, empty document with no
+  error. They now throw a `TypeError` naming the function and the type. An empty string is unchanged.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`
