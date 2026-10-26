@@ -86,6 +86,10 @@ before that handoff, on a branch:
    - thread safety (independent loads are safe);
    - the consumer note that npm doesn't refresh a `file:` dependency, so remove
      `node_modules/<pkg>` before reinstalling.
+   - the version string: a prebuilt tarball reports `0.10.0-rc+N` (N = the release tag's commit
+     count). A source install (`file:` or git dependency, compiled by npm inside `node_modules`, where
+     `vendor/anvil` isn't its own git checkout) has no build number and reports plain `0.10.0-rc`.
+     That's expected; set `ANVIL_BUILD` at install time to supply one.
    Sources: the Progress/Resolution sections of FR-2610-anvl-bindings-001/-002/-003,
    SR-2610-anvl-vendor-bump-002 and `notes/deferred-work.md` "Deferred — bindings: types and schema".
    Each binding's README is accurate for its own surface.
