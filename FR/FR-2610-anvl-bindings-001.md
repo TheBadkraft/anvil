@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet, flywire (downstream consumers)
-**Status:** open — not started
+**Status:** in progress — slice 1 (`anvil.node`) done; `anvil.py` and `anvil.net` slices open
 **Tags:** bindings, anvil-node, anvil-py, anvil-net, schema, types, rivet-readiness
 
 ---
@@ -91,3 +91,40 @@ Taken on the Bindings agent's slice-1 findings.
    the `ENVIRONMENT=web` path.
 3. **The release waits for all of Phase 4** (this FR's slices 1b, 2, 3 and 4, plus
    FR-2610-anvl-bindings-002). See SR-2610-anvl-distribution-001.
+
+## Progress
+
+### Slice 1: `anvil.node` — done (Bindings agent, 2026-10-25)
+
+Branch `feat/FR-2610-anvl-bindings-001-node` in `anvil.node`, commit `45c2b8e`, on top of the vendor
+bump branch (`chore/SR-2610-anvl-vendor-bump-001`, pin `f9ee783`). Not yet merged or pushed. 70/70
+tests (30 new in `test/types-schema.test.js`), Valgrind-clean on the new code (0 errors, 0 bytes
+definitely or indirectly lost), exports still only the two N-API entry points.
+
+Test cases 1–5 are covered. Case 7 is deferred, see below.
+
+- **Surface as built:** `TypeRegistry` (`load`, `loadFile`, `fromIncludes`, `fromIncludesFile`,
+  `find`, `resolve`, `diagnostics`, `loadError`, `dispose`), `TypeDef`, `Schema` (`load`, `loadFile`,
+  `validate`, `validateValue`, `diagnostics`, `dispose`), frozen enums `TypeKind`, `TypeDiagnostic`,
+  `SchemaViolation`, `SchemaDiagnostic`, each pinned against the vendored headers by a test.
+- **Input is ANVL text.** ANVL is not JSON, and a wire body is already ANVL, so `validateValue`
+  takes the object value as text (`'{ a := 1; }'`). Producing ANVL text from a JS value is
+  FR-2610-anvl-bindings-002.
+- **Deviation: no `FinalizationRegistry`.** Handles are N-API externals with a finalizer, which is
+  the same safety net without a JS-side registry. Node runs finalizers on a later event-loop
+  turn, so a synchronous loop that abandons handles should call `dispose()`.
+- **Addition: `registry.loadError`.** `fromIncludes` must not reject a consumer document that
+  loaded with an error, because a name defined by two included `@[types]` documents collides in
+  the consumer's namespace and `NAME_COLLISION` is how Anvil Native reports it (native test TYP13).
+  The document's error is kept on the registry rather than discarded.
+- **Includes:** the text loaders resolve `include`s against the process working directory, the file
+  loaders against the file. Schemas that include `@[types]` documents should use `loadFile`.
+- **Deferred to slice 1b (see Decisions):** `schema.fields` introspection (FR-2610-anvl-schema-005
+  has landed natively); a `min`/`max` that overflows `int64`/`double` is reported as `undefined`
+  because native has no text accessor for it (candidate native FR if Rivet needs it).
+- **Deferred to the release (SR-2610-anvl-distribution-001, Release agent):** the `Bindings-Guide.md` Node
+  section, because it documents the published `0.8.0-rc` download as "Downloadable today" and
+  that artifact does not contain this surface. The README in `anvil.node` documents it meanwhile.
+- **Not started:** slices 2–3 (`anvil.py`, `anvil.net`). Their `Schema`/`TypeRegistry` vtables
+  (FR-2610-anvl-public-api-003) are merged, so they are unblocked.
+

@@ -198,3 +198,13 @@ parser, before Anvil Native/`anvil.node`/`anvil.wasm` are even part of the compa
 - `aml-include-namespace-rules.md` § *Include graph order* — its "reverse pre-order = valid bottom-up order" claim is wrong under diamond includes, though it turned out not to matter: no document-processing order is required at all (map-based resolver). See `document-header-scan.md` § *Include-graph processing order — resolved as unnecessary*. The rest of that document (include/namespace rules, two-phase parse framing) still stands as background context.
 - `aml-include-namespace-rules.md` § 7 *Two-Phase Parse* — its claim that body-parse needs bottom-up document order is superseded for the same reason: the map-based resolver design makes document-processing order irrelevant. See `document-body-parse.md` § *Relationship to header scan and include loading*.
 - ~~`aml-include-namespace-rules.md` § 6 *Inheritance Syntax*~~ — **retracted**: I initially flagged its example (`user : entity { name := string }`, no `:=` before the block) as stale, reasoning from an incorrectly-collapsed single-form grammar. It was actually right all along — confirmed as the `OBJECT_BLOCK` form (`ident [: base] [@[...]] { statements };`, never `:=`) once the real two-form grammar (`ASSIGN` vs `OBJECT_BLOCK`) was worked out. Not superseded; this entry is void.
+
+## Deferred — bindings: types and schema (FR-2610-anvl-bindings-001)
+
+Slice 1 (`anvil.node`) is done; see the FR's Progress section. Still open:
+
+- **`schema.fields` introspection in `anvil.node`.** FR-2610-anvl-schema-005 has landed natively; the FR defers its binding accessors; they are now slice 1b.
+- **`min`/`max` that overflow `int64`/`double`** read as `undefined` in `TypeDef`, because native has no text accessor for the bound (`anvil_numeric_t.overflowed` says only that it did not fit). Candidate native FR if Rivet declares such a bound.
+- **`Bindings-Guide.md` Node section** documents the `0.8.0-rc` download as "Downloadable today". Types and schema land there with the release (SR-2610-anvl-distribution-001, Release agent, after all of Phase 4), not before, so it does not describe an artifact that lacks them.
+- **`anvil.py` and `anvil.net` slices** of the same FR, unblocked now that FR-2610-anvl-public-api-003 (the `Schema`/`TypeRegistry` vtables) is merged.
+- **`anvil.wasm` carries types and schema but exports nothing from them.** The linker drops them until a wrapper exports the entry points (decision D3 put them in the build for FlyWire's browser side).
