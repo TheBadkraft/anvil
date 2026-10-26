@@ -176,3 +176,35 @@ new tests failing on assertions), then taken to GREEN.
 - **Deferred:** the `Bindings-Guide.md` .NET section, to the release (Release agent hands it to the
   Documenter), since it documents the published `0.8.0-rc` download.
 
+### Slice 1b: `anvil.node` — done (Bindings agent, 2026-10-26)
+
+Branch `feat/FR-2610-anvl-bindings-001-node-1b` in `anvil.node`, commit `702d26a`, stacked on the
+writer branch. Not yet merged or pushed. 130/130 tests (23 new in `test/schema-field.test.js`). TDD:
+RED first (21 of 23 failing on assertions against inert stubs), then GREEN. Exports are still only
+the two N-API entry points; Valgrind shows 0 definite or indirect leaks, and the only errors are
+V8's own GC stack scanner (none has an `anvil_node` frame).
+
+- **`schema.validateField(docText, name, { skipRequired, allowUnknown, each })`:** parses the text,
+  finds the top-level statement, runs `anvil_schema_validate_value` on its value, in one native call.
+  Result `{ valid, violations }`, or `null` plus `lastError()` if the text does not parse. An absent
+  statement is one `REQUIRED` violation with an empty `field` and a message naming the statement,
+  the same as `anvil.net` (owner-confirmed). A statement that is not an object is the native
+  `TYPE_MISMATCH`.
+- **Decision recorded: the batch form is needed in Node.** Applying the planning test (can the caller
+  get a per-element handle?): no, because `parse()` converts eagerly and frees the native document,
+  so a Node caller cannot iterate a batch itself. `each: true` therefore validates every element of
+  an array or tuple with the same options and reports violations at `[i]` and `[i].field`. A single
+  object still validates under `each`, and a non-object element is `TYPE_MISMATCH` at `[i]`. An
+  empty batch is valid. `anvil.net` needs no such form (its caller iterates).
+- **`schema.fields` / `schema.findField(name)`:** `SchemaField` snapshots (readable after
+  `dispose()`) with `name`, `kind`, `typeName`, `required`, `nullable`, `integer`, and when declared
+  `size`, `min`, `max`, `minItems`, `maxItems`, `values`, `format`, `tag`; plus `nested`/`findNested`,
+  `items`, and `extras` (each `{ name, value }`, `value` an `AnvlNode` so array/tuple and blob types
+  survive). Undeclared constraints are `undefined`. Tests use native's own fixtures, tracking SCH76-SCH79.
+- **Known limits:** `min`/`max` are JS numbers, so a bound past 2^53 loses precision; one that
+  overflows `int64`/`double` is `undefined`. Both were already true of `TypeDef` in slice 1.
+- **No workaround for BR-2610-anvl-registry-001**, per planning. Node disposes every document inside
+  the call that loaded it, so it does not hit the duplicate-content rejection in normal use.
+- **Next:** slice 2 (`anvil.py`) and slice 4 (`anvil.wasm`), and FR-2610-anvl-bindings-002's
+  `anvil.wasm` slice, which should reuse this exact surface and result shapes.
+

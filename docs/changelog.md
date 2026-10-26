@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil.node` gains `schema.validateField` and schema introspection** (`FR-2610-anvl-bindings-001`,
+  slice 1b): `validateField(docText, name, opts)` validates a statement of a document you already
+  hold as ANVL text in one call, with an `each` form for batch bodies (violations at `[i].field`),
+  and `schema.fields`/`findField(name)` expose every rule's constraints, nested rules, array items,
+  blob tag and extension keys. An absent statement is one `Required` violation with an empty field,
+  the same as `anvil.net`.
 - **`anvil.net` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 3):
   `AnvilTypeRegistry`/`AnvilTypeDef` and `AnvilSchema` in .NET idiom, over the `Schema` and
   `TypeRegistry` vtables. Validation with `SkipRequired`/`AllowUnknown`, `ValidateField(text, name)`
