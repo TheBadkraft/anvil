@@ -54,13 +54,16 @@ That workaround carries this FR's ID as its TODO. Not blocking.
 
 ## Test cases
 
-1. `x @[status="done", flag] := 1;`: the statement's attributes are `[{key:'status', value:'done'},
-   {key:'flag', value:null}]`; `findAttribute('status').value === 'done'`; `findAttribute('nope')`
-   is absent.
+1. `x @[status="done", flag] := 1;`: the statement's attributes are `[{key:'status', value:'"done"'},
+   {key:'flag', value:null}]`; `findAttribute('status').value === '"done"'`; `findAttribute('nope')`
+   is absent. *(Corrected 2026-10-26: `value` is native's raw text, so a quoted string keeps its quotes,
+   as in `anvil.py` and `anvil.net`. The decoded `done` is the native read of
+   FR-2610-anvl-public-api-004, added to all four bindings together when it lands; see Resolution.)*
 2. Object-block statements (`ID @[type=bug] { … };`) and nested statements inside objects carry
    their own attributes.
 3. Module attributes: `#!aml` with `@[version="1.2"]`. The root `findAttribute('version').value ===
-   '1.2'`, and `hasAttribute('version')` is still true (regression).
+   '"1.2"'` (raw, as in case 1; decoded `1.2` is FR-2610-anvl-public-api-004), and
+   `hasAttribute('version')` is still true (regression).
 4. A document with no attributes produces an envelope no larger than today (the hot path is unchanged).
 5. Repeated statement names inside an object both appear in `statements()`, in order.
 6. Existing suites green; the anvil.node addon still exports only its N-API entry points.
