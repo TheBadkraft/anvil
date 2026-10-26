@@ -225,6 +225,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **`anvil.node` and `anvil.wasm` no longer collapse a repeated name inside an object** (`BR-2610-anvl-bindings-003`). For
+  `{ a := 1; a := 2; b := 3; }`, `count` is now 3, `get('a')` is the first (`1`) and `entries()` yields all three in order, as native,
+  `anvil.py` and `anvil.net` do; they used to report 2, the last, and `a` once. Objects without repeated names are unchanged. A
+  request body that repeats a column is no longer silently taken as its last value.
 - **A NUL character inside a string value no longer cuts a document short in `anvil.wasm` and `anvil.java`**
   (`BR-2610-anvl-bindings-002`). In `anvil.wasm` every text entry point read its text with `strlen`, so
   `s := "x";\0t := 1;` parsed as `s` alone with no error; they now pass the byte length. In `anvil.java` every

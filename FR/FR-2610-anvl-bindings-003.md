@@ -115,21 +115,17 @@ names, O(n log n) per object. **An attribute-free document's envelope is byte-id
 Envelope bytes for the attribute-free 5,000-statement document and the message are identical (957,832 and 201). So the hot
 path does not pay *nothing*: attribute-free `parse()` is about 4% slower in Node and 5% to 11% in WASM, from the extra pass
 over each object's statements. For FlyWire's real message that is roughly 0.09 µs per parse in Node. The 1.5x for attributed
-documents is the cost of carrying the data. If 4% is more than the owner wants, the pass can be made conditional (skip the
-sort unless an object has more than one statement and a cheap pre-check hints at a repeat); I have not done that.
+documents is the cost of carrying the data. Accepted by planning (about 0.09 µs on a FlyWire-sized message); the pass is not made conditional, and this table is the record.
 
-### Two things to confirm
+### Decisions confirmed by planning (2026-10-26)
 
-1. **Attribute values are native's text, uninterpreted: a quoted string keeps its quotes.** The FR's test case 1 reads
-   `status="done"` → `'done'`. `anvil.py` and `anvil.net` return `'"done"'` for the same attribute (verified in both: the native
-   getter copies the source text, `anvil_attribute_get_value`), and this FR says py/net semantics hold, so `anvil.node` and
-   `anvil.wasm` return `'"done"'` too, and the tests say so. If Rivet's importer wants the unquoted form, that is an unquote
-   convenience to add to **all four** bindings together (or a native change), not a divergence in two. Bare values (`type=bug`) and
-   numbers (`n=5`) are as written either way.
-2. **A pre-existing gap this made visible:** `get(name)`, `entries()` and `count` on an object collapse a repeated name to its
-   last occurrence, because the envelope is a JSON object. Native keeps both (`count` 3 for `{ a := 1; a := 2; b := 3; }`; JS says
-   2). `statements()` is the complete form and is correct. I left `entries()` and `count` alone because changing them would change
-   behavior FlyWire may rely on; say if you want them to match native.
+1. **Attribute values stay raw: a quoted string keeps its quotes.** `status="done"` is `'"done"'` in all four bindings, which is
+   what the native getter (`anvil_attribute_get_value`) copies and what `anvil.py` and `anvil.net` return. **The FR's test case 1,
+   which reads `'done'`, was wrong**, and the tests in `anvil.node` and `anvil.wasm` assert the raw form. A decoded read is a native
+   capability, FR-2610-anvl-public-api-004; when it lands, a decoded accessor is added to **all four** bindings together, with
+   `value` staying raw everywhere. Bare values (`type=bug`) and numbers (`n=5`) are as written either way.
+2. **The repeated-name collapse** in `get(name)`, `entries()` and `count` (native keeps both occurrences: `count` 3 for
+   `{ a := 1; a := 2; b := 3; }`, where JS said 2) is now **BR-2610-anvl-bindings-003**, resolved.
 
 ### Tests
 
