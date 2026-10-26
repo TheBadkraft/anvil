@@ -213,6 +213,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **A NUL character inside a string value no longer cuts a document short in `anvil.wasm` and `anvil.java`**
+  (`BR-2610-anvl-bindings-002`). In `anvil.wasm` every text entry point read its text with `strlen`, so
+  `s := "x";\0t := 1;` parsed as `s` alone with no error; they now pass the byte length. In `anvil.java` every
+  string value was decoded with a read that stops at the first NUL; it now decodes exactly the bytes native wrote.
+  `anvil.node`, `anvil.net` and `anvil.py` were audited and were correct. Native itself is correct for documents.
+  Still open, and native: the type registry and schema truncate enum labels at a NUL and lose a string extension
+  value containing one.
 - **`anvil.node` and `anvil.wasm`: `parse()` and `parseRawValue()` reject a non-string** (`BR-2610-anvl-bindings-001`).
   They used to parse an empty buffer for a number, object or array (and, in `anvil.wasm`, fail with an
   incidental internal error for a `Buffer`, `undefined` or `null`), returning a valid, empty document with no

@@ -1,12 +1,12 @@
-# BR-2610-anvl-bindings-002: `anvil.wasm` hands text to the module NUL-terminated, so a document containing a NUL is silently cut at it
+# BR-2610-anvl-bindings-002: a document containing a NUL character is silently cut at it (`anvil.wasm`, and the audit that followed)
 
 **ID:** BR-2610-anvl-bindings-002
 **Type:** Bug Report (binding, silent data loss)
 **Owner:** anvil-wasm (ANVL Bindings agent)
 **Filed:** 2026-10-26
 **Filed by:** ANVL Bindings agent, found porting `anvil-node`'s writer tests to `anvil.wasm`
-**Status:** open
-**Blocks:** nothing today
+**Status:** resolved
+**Blocks:** nothing today (resolved)
 **Tags:** bindings, anvil-wasm, parse, silent-failure, nul
 
 ---
@@ -57,3 +57,37 @@ and `anvil_parse_value_fragment` already do natively), and `lib/index.js` passes
   binding (only `lib/index.js` calls them), so it is not a public-API change.
 - Until this is fixed, `test/writer.test.js` in `anvil.wasm` asserts only that the writer emits the
   NUL byte exactly, and says so.
+
+## Resolution
+
+Bindings agent, 2026-10-26. Planning approved the fix and widened this BR into a cross-binding audit. Branch
+`fix/BR-2610-anvl-bindings-002` in each of the five binding repos. Not yet merged or pushed. In every repo the
+tests were written first, each text path was checked against a document with a NUL **inside a string value**,
+**inside a blob**, and **outside any value**, and the writer and builder round trips were compared byte for byte.
+
+**Native first.** A tiny C program calls `anvil_load_buffer` with an explicit length on a document containing a NUL
+in a string and in a blob, with statements after each. Native keeps everything: the string reads back as `61 00 62`,
+the blob as `78 00 79`, and the later statements are intact. The source library is correct; any loss was in a binding.
+
+| Binding | Result | Change |
+|---|---|---|
+| `anvil.wasm` (`0586248`) | **Bug, fixed.** Every text entry point took NUL-terminated text and read it with `strlen`, so `s := "x";\0t := 1;` parsed as `s` alone, with no error. | Every `anvil_wasm_*` text entry point (parse, parseRawValue, the type registry and schema loaders and validators) takes the byte length and reads exactly that many bytes. Names and paths stay NUL-terminated and reject a NUL. Rebuilt on the Linode box. `test/nul.test.js`; 171 pass, 2 `todo`. |
+| `anvil.java` (`f1656b0`) | **Bug, fixed.** `AnvilNative.readBufferedString` learned the exact length written, then decoded with `MemorySegment.getString(0)`, which stops at the first NUL. Every string value (and every other buffered text read) was silently cut. Blob bytes and writer output were already exact. | Decode exactly the bytes written. `NulTests`; 84/84. Six of nine audit tests failed first. |
+| `anvil.node` (`4a5a636`) | No bug. N-API passes the length. | Tests only: `test/nul.test.js`; 159 pass, 1 `todo`. |
+| `anvil.net` (`55f60f9`) | No bug. The UTF-8 string marshaler carries embedded NULs and the readers size by length. | Tests only: `NulTests`; 146 pass, 1 skipped. |
+| `anvil.py` (`2b63a75`) | No bug. ctypes passes `bytes` with an explicit length and the readers size by length. | Tests only: `tests/test_nul.py`; 107 pass. |
+
+**Native limits found, reported to planning and deliberately not worked around** (verified from C, so they are native
+and not binding bugs). The document itself loads completely; the loss is in what the type registry and schema *copy*:
+- The type registry truncates an enum label at a NUL (`anvil_type_def_get_value` returns 1 byte for `"a\0b"`).
+- The schema does the same for its own enum labels (`anvil_schema_field_get_value`).
+- The schema copies a string extension value containing a NUL as a **NULL-typed** value, so it is lost entirely
+  (`anvil_schema_field_get_extra_value` returns type NULL, length 0).
+Each binding records these as a `todo` or skipped test (`anvil.wasm`, `anvil.node`, `anvil.net`) so they flip to passing
+when native is fixed. They are not in `anvil.py` or `anvil.java` yet, because those bindings have no type registry or
+schema surface (`anvil.py` slice 2 will carry the test from day one).
+
+**What this BR changed my mind about.** I had assumed the NUL-terminated copy in `anvil.wasm` was the only instance. It was
+not: Java had the same silent loss through a different mechanism (a `getString` read, not a `strlen` write), found only
+because the same tests were run against every binding before any code was read.
+

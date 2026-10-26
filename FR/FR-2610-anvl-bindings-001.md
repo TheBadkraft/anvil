@@ -227,6 +227,10 @@ and the full test set first (50 failing), then the C, the `emcc` build on the Li
     frees an abandoned one (this is the mechanism the FR originally named; `anvil.node` uses an N-API finalizer).
     Measured: abandoned handles with GC plateau at the same ~2 MB per 30,000 rounds as explicit disposal; without
     GC they grow (38 MB), which is why the docs say to call `dispose()` in loops.
+- **`writeFile(path, textOrBytes)` and `removeFile(path)` are a deliberate wasm-only addition** (planning-accepted, 2026-10-26),
+  beyond "same surface as `anvil.node`". The module has no host filesystem, so a schema that includes `@[types]`
+  documents, and `loadFile`/`fromIncludesFile`, have nothing to read unless the caller can put files into the module's
+  in-memory one. `anvil.node` and `anvil.net` do not need them and do not have them.
 - **The decision's web-path smoke test is `test/web-path.test.js`.** It evaluates `dist/anvil.js` in a sandbox with no
   `process`, so Emscripten takes its `ENVIRONMENT=web` branch and fetches the `.wasm` over `fetch`, then validates a
   batch and loads a schema from the in-memory filesystem. It is not a real browser (no DOM, no real network), but it

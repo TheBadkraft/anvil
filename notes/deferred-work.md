@@ -221,7 +221,7 @@ Done and resolved; see the FR's Resolution. Still open:
 
 Slice 4 of FR-2610-anvl-bindings-001 and the wasm slice of FR-2610-anvl-bindings-002 are done on branches; see the FRs. Still open:
 
-- **BR-2610-anvl-bindings-002:** `anvil.wasm` text entry points are NUL-terminated, so a document containing a NUL is silently cut. Needs a length parameter on the `anvil_wasm_*` text functions.
+- ~~**BR-2610-anvl-bindings-002:** `anvil.wasm` text entry points are NUL-terminated.~~ Resolved: fixed in `anvil.wasm` and `anvil.java`, audited in `anvil.node`, `anvil.net` and `anvil.py`. What remains is **native**: the type registry and schema copy strings as C strings, so an enum label containing a NUL is truncated and a string extension value containing a NUL is lost (BR-2610-anvl-bindings-002's Resolution). Planning files the native BR for the Coder.
 - **`dist/` for `anvil.wasm` is not in git.** Every checkout must rebuild it on the Linode box before its tests pass; the planned CI (`anvil-ci-plan-is-linode-based`) is where that belongs.
 - **A real-browser test.** `test/web-path.test.js` exercises the `ENVIRONMENT=web` branch in a Node sandbox, not a browser. FlyWire's browser client is the first real consumer.
 - **A bytes-capable loader** (see BR-2610-anvl-bindings-001's Notes) applies to `anvil.wasm` as much as `anvil.node`.
