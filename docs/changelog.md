@@ -226,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
   against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
   the release is live.
+- **`BR-2610-anvl-attr-001`** (filed): an attribute's raw value includes any whitespace before the
+  next `,` or `]`, and a newline there makes the decoded value fall back to BARE with its quotes
+  kept. From Rivet's q-or re-import.
 - **Release decisions and agent instructions:** the release is `v0.10.0-rc` (R1). The website,
   including downloads, `version.js` and deploys, belongs to the ANVL Documentor, and the
   `0.8.0-rc` downloads are removed with no archive (R2). `agents/ANVL-RELEASE.agent.md` now builds
