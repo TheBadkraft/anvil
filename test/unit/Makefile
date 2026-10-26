@@ -68,11 +68,23 @@ LIB_RELEASE   = $(ANVL)/lib/release/libanvil.a
 
 # Built by the root Makefile (core + types + schema bundled — see notes/deferred-work.md),
 # not compiled here — test_release links against the real artifact, not source files.
-$(LIB_DEBUG):
+#
+# The archive is a file that this Makefile cannot see the inputs of, so the rule must NOT be "build it
+# if it is missing": that linked an archive built from older sources after a branch switch or rebase
+# (SR-2610-anvl-build-001). Depend on a phony target that always asks the top-level make, which tracks
+# every source and header (-MMD -MP) and so does nothing when the archive is current. Same pattern as
+# test/functional/Makefile.
+.PHONY: lib-debug lib-release
+
+lib-debug:
 	$(MAKE) -C $(ANVL) lib-debug
 
-$(LIB_RELEASE):
+lib-release:
 	$(MAKE) -C $(ANVL) lib-release
+
+$(LIB_DEBUG): lib-debug
+
+$(LIB_RELEASE): lib-release
 
 BIN = bin
 VALGRIND_LOG = $(BIN)/valgrind_test.log

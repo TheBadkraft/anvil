@@ -214,6 +214,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **`make test_release` can no longer link a stale `libanvil.a`** (`SR-2610-anvl-build-001`):
+  `test/unit/Makefile` only built the release archive when it was missing, so after a branch switch or
+  rebase `test_release` linked an archive built from older sources and could fail (or pass) for no reason
+  that had to do with the code. It now asks the top-level make every time, which tracks sources and
+  headers and does nothing when the archive is current. New `make check-test-release-fresh` proves both
+  halves (rebuilds after a core source changes, recompiles nothing when nothing changed).
 - **Parse errors now say what is wrong, and a repeated top-level name has a position**
   (`BR-2610-anvl-errors-001`): eight error codes were declared in `errors.h` with no entry in the message
   table (and twelve with no name), so documented failures read "Unknown error". The worst offender was a

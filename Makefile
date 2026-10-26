@@ -104,7 +104,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh
 
 all: lib so
 
@@ -187,6 +187,10 @@ check-tsan:
 		echo "check-tsan [$$m, alloc=$(TSAN_ALLOC)]: exit $$r, $$(grep -c 'WARNING: ThreadSanitizer' $(TSAN_DIR)/$$m.log) race report(s), $$(grep -c '^FAIL' $(TSAN_DIR)/$$m.log) load failure(s)"; \
 		[ $$r -eq 0 ] || rc=1; \
 	done; exit $$rc
+
+# test_release must never link a stale archive (SR-2610-anvl-build-001); scripts/check-test-release-fresh.sh.
+check-test-release-fresh:
+	sh scripts/check-test-release-fresh.sh
 
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release
