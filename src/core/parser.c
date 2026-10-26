@@ -865,8 +865,11 @@ static bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
 static bool parse_reserved_literal(anvl_source src, anvl_value *out_value) {
    const char *start = Source.at(src);
    for (usize i = 0; i < sizeof(reserved_literals) / sizeof(reserved_literals[0]); i++) {
+      // A WHOLE token only: `nullable` is a bare word that merely begins with `null`
+      // (BR-2610-anvl-parser-001); the literal ends where bare-literal characters stop.
       if (Source.match_token(src, reserved_literals[i], reserved_lengths[i]) ==
-          reserved_lengths[i]) {
+             reserved_lengths[i] &&
+          !Source.is_bare_literal_part(Source.peek_offset(src, reserved_lengths[i]))) {
          // Found a reserved literal
          *out_value = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
          if (!*out_value) {

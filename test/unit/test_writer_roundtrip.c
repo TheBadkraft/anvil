@@ -829,6 +829,38 @@ static void test_rt13_blob_tags_round_trip(void) {
    anvil_writer_dispose(copy);
 }
 
+/* BR-2610-anvl-parser-001: the writer's bare-word rule only reserves the EXACT literals, so a word
+ * that merely begins with one is accepted and must read back as BARE (it used to fail to load). */
+static void test_rt_literal_prefixed_bare_words(void) {
+   const char *words[] = {"nullable", "nulls", "truely", "falsey", "nullx"};
+   for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
+      anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+      TestBit.is_true(anvil_writer_statement(w, "x", NULL) && anvil_writer_bare(w, words[i]) &&
+                         anvil_writer_finish(w), words[i]);
+      size_t len = 0;
+      const char *data = anvil_writer_data(w, &len);
+      anvil_document doc = data ? anvil_load_buffer(data, len) : NULL;
+      anvil_statement st = doc ? anvil_document_find_statement(doc, "x") : NULL;
+      anvil_value v = st ? anvil_statement_get_value(st) : NULL;
+      char text[32] = {0};
+      if (v) {
+         anvil_value_get_text(v, text, sizeof(text));
+      }
+      TestBit.is_true(doc && !anvil_has_errors(doc) && v && anvil_value_get_type(v) == ANVIL_VALUE_BARE &&
+                         strcmp(text, words[i]) == 0, "round-trips as BARE");
+      if (doc) {
+         anvil_dispose(doc);
+      }
+      anvil_writer_dispose(w);
+   }
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "x", NULL);
+   TestBit.is_false(anvil_writer_bare(w, "null"), "the exact literal null is still rejected as a bare word");
+   TestBit.is_false(anvil_writer_bare(w, "true"), "and true");
+   TestBit.is_false(anvil_writer_bare(w, "false"), "and false");
+   anvil_writer_dispose(w);
+}
+
 int main(void) {
    TestBit.run_ex("RT01_scalars", NULL, test_rt01_scalars, th);
    TestBit.run_ex("RT02_string_escapes", NULL, test_rt02_string_escapes, th);
@@ -845,5 +877,7 @@ int main(void) {
                   th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,
                   th);
+   TestBit.run_ex("RT_LITERAL_PREFIXED_BARE_WORDS", NULL, test_rt_literal_prefixed_bare_words, th);
+
    return TestBit.report();
 }

@@ -1507,6 +1507,123 @@ static void test_anv53_whitespace_and_escaped_quote_scanning(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-parser-001 - null / true / false are recognized only as WHOLE tokens
+ * ---------------------------------------------------------------------- */
+static anvil_value value_at(anvil_document doc, const char *name) {
+   anvil_statement st = doc ? anvil_document_find_statement(doc, name) : NULL;
+   return st ? anvil_statement_get_value(st) : NULL;
+}
+
+static void test_anv54_bare_values_starting_with_a_literal(void) {
+   const char *words[] = {"nullable", "nulls", "truely", "falsey", "nullx", "true_", "false1",
+                          "null-ish", "true/x", "null.v", "falsehood"};
+   for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
+      char src[96];
+      snprintf(src, sizeof(src), "#!aml\nx := %s;\ny := 1;\n", words[i]);
+      anvil_document doc = anvil_load_buffer(src, strlen(src));
+      anvil_value v = value_at(doc, "x");
+      char text[32] = {0};
+      size_t n = v ? anvil_value_get_text(v, text, sizeof(text)) : 0;
+      TestBit.is_true(doc && !anvil_has_errors(doc) && v && anvil_value_get_type(v) == ANVIL_VALUE_BARE &&
+                         n == strlen(words[i]) && strcmp(text, words[i]) == 0 && value_at(doc, "y"),
+                      words[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document q = ATTR_LOAD("#!aml\nx := \"nullable\";\nz := includes;\n");
+   TestBit.is_true(q && !anvil_has_errors(q), "ANV54: the quoted and keyword-prefix rows still load");
+   if (q) {
+      anvil_dispose(q);
+   }
+}
+
+static void test_anv55_exact_literals_are_unchanged(void) {
+   // Followed by every terminator the grammar allows.
+   const struct { const char *src; anvil_value_type type; } cases[] = {
+      {"#!aml\nx := null;\n", ANVIL_VALUE_NULL},   {"#!aml\nx := true;\n", ANVIL_VALUE_BOOL},
+      {"#!aml\nx := false;\n", ANVIL_VALUE_BOOL},  {"#!aml\nx := null ;\n", ANVIL_VALUE_NULL},
+      {"#!aml\nx := true ;\n", ANVIL_VALUE_BOOL}, {"#!aml\nx := [ null, true, false ];\n", ANVIL_VALUE_ARRAY},
+      {"#!aml\nx := [null,true,false];\n", ANVIL_VALUE_ARRAY}, {"#!aml\nx := ( true, null );\n", ANVIL_VALUE_TUPLE},
+      {"#!aml\nx := {a := true;b := null;};\n", ANVIL_VALUE_OBJECT},
+      {"#!aml\nx := { a := false; };\n", ANVIL_VALUE_OBJECT},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      anvil_document doc = anvil_load_buffer(cases[i].src, strlen(cases[i].src));
+      anvil_value v = value_at(doc, "x");
+      TestBit.is_true(doc && !anvil_has_errors(doc) && v && anvil_value_get_type(v) == cases[i].type,
+                      cases[i].src);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document doc = ATTR_LOAD("#!aml\nx := [ null, true, false ];\n");
+   anvil_value arr = value_at(doc, "x");
+   TestBit.is_true(arr && anvil_value_get_type(anvil_value_get_element(arr, 0)) == ANVIL_VALUE_NULL &&
+                      anvil_value_get_type(anvil_value_get_element(arr, 1)) == ANVIL_VALUE_BOOL &&
+                      anvil_value_get_type(anvil_value_get_element(arr, 2)) == ANVIL_VALUE_BOOL,
+                   "ANV55: array elements keep their literal types");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv56_whole_token_in_collections_and_objects(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\narr := [ nullable, true, nulls ];\ntup := ( falsey, false );\nobj := { a := truely; b := null; };\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV56: collections of literal-prefixed words load");
+   if (doc) {
+      anvil_value arr = value_at(doc, "arr");
+      TestBit.is_true(arr && anvil_value_get_count(arr) == 3 &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 0)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 1)) == ANVIL_VALUE_BOOL &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 2)) == ANVIL_VALUE_BARE,
+                      "ANV56: array: BARE, BOOL, BARE");
+      anvil_value tup = value_at(doc, "tup");
+      TestBit.is_true(tup && anvil_value_get_type(anvil_value_get_element(tup, 0)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_value_get_element(tup, 1)) == ANVIL_VALUE_BOOL,
+                      "ANV56: tuple: BARE, BOOL");
+      anvil_value obj = value_at(doc, "obj");
+      anvil_statement a = obj ? anvil_value_find_statement(obj, "a") : NULL;
+      anvil_statement b = obj ? anvil_value_find_statement(obj, "b") : NULL;
+      TestBit.is_true(a && b && anvil_value_get_type(anvil_statement_get_value(a)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_statement_get_value(b)) == ANVIL_VALUE_NULL,
+                      "ANV56: object fields: BARE, NULL");
+      anvil_dispose(doc);
+   }
+   // AMP uses the same scalar grammar.
+   anvil_document amp = ATTR_LOAD("#!amp\nx := nullable;\ny := true;\n");
+   TestBit.is_true(amp && !anvil_has_errors(amp), "ANV56: AMP loads `nullable` too");
+   if (amp) {
+      TestBit.is_true(anvil_value_get_type(value_at(amp, "x")) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(value_at(amp, "y")) == ANVIL_VALUE_BOOL, "ANV56: AMP types");
+      anvil_dispose(amp);
+   }
+}
+
+static void test_anv57_whole_token_in_attribute_values(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\n@[a=nullable, b=true, c=null, d=falsey]\nx @[e=nulls, f=false, g=truely, h=null] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV57: attributes with literal-prefixed values load");
+   if (doc) {
+      const struct { const char *key; bool module; anvil_value_type type; const char *text; } want[] = {
+         {"a", true, ANVIL_VALUE_BARE, "nullable"}, {"b", true, ANVIL_VALUE_BOOL, "true"},
+         {"c", true, ANVIL_VALUE_NULL, "null"},     {"d", true, ANVIL_VALUE_BARE, "falsey"},
+         {"e", false, ANVIL_VALUE_BARE, "nulls"},   {"f", false, ANVIL_VALUE_BOOL, "false"},
+         {"g", false, ANVIL_VALUE_BARE, "truely"},  {"h", false, ANVIL_VALUE_NULL, "null"},
+      };
+      for (size_t i = 0; i < sizeof(want) / sizeof(want[0]); i++) {
+         anvil_attribute a = want[i].module ? anvil_document_find_attribute(doc, want[i].key)
+                                            : stmt_attr(doc, "x", want[i].key);
+         anvil_value v = anvil_attribute_get_value_handle(a);
+         TestBit.is_true(v && anvil_value_get_type(v) == want[i].type &&
+                            text_is(v, want[i].text, strlen(want[i].text)), want[i].key);
+      }
+      anvil_dispose(doc);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1579,6 +1696,15 @@ int main(void) {
                   test_anv52_undecodable_value_falls_back_to_bare, th);
    TestBit.run_ex("ANV53_WHITESPACE_AND_ESCAPED_QUOTE_SCANNING", NULL,
                   test_anv53_whitespace_and_escaped_quote_scanning, th);
+
+   TestBit.run_ex("ANV54_BARE_VALUES_STARTING_WITH_A_LITERAL", NULL,
+                  test_anv54_bare_values_starting_with_a_literal, th);
+   TestBit.run_ex("ANV55_EXACT_LITERALS_ARE_UNCHANGED", NULL,
+                  test_anv55_exact_literals_are_unchanged, th);
+   TestBit.run_ex("ANV56_WHOLE_TOKEN_IN_COLLECTIONS_AND_OBJECTS", NULL,
+                  test_anv56_whole_token_in_collections_and_objects, th);
+   TestBit.run_ex("ANV57_WHOLE_TOKEN_IN_ATTRIBUTE_VALUES", NULL,
+                  test_anv57_whole_token_in_attribute_values, th);
 
    return TestBit.report();
 }

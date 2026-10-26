@@ -214,6 +214,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **A bare value that merely begins with `null`, `true` or `false` now loads** (`BR-2610-anvl-parser-001`):
+  the scalar parser matched the reserved literal as a PREFIX, so `x := nullable;`, `nulls`, `truely` and
+  `falsey` were read as NULL/BOOL followed by stray characters and failed with an unhelpful error (Rivet's
+  q-or importer had to quote such values). `null`, `true` and `false` are literals only as whole tokens
+  now; everything else is an ordinary BARE word with its full text. Exact `null`/`true`/`false` are
+  unchanged, in statements, arrays, tuples, objects and attribute values. The writer already reserved
+  only the exact words, so `anvil_writer_bare("nullable")` was always accepted; it now reads back as BARE.
 - **Loading documents is now thread-safe across independent documents, and identical text no longer
   collides** (`BR-2610-anvl-registry-001`, part 2). Any number of threads may call `anvil_load`,
   `anvil_load_buffer` and `anvil_parse_value_fragment` at the same time, on the same text or different
