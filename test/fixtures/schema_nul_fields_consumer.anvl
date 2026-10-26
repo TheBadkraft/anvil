@@ -1,0 +1,5 @@
+#!aml
+include "schema_nul_fields_types.anvl";
+@[schema]
+
+owner := { type := types.Person; };

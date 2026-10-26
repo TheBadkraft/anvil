@@ -43,6 +43,11 @@ int anvil_numeric_compare_bounds(anvil_numeric_t a, anvil_numeric_t b);
 /// with anvil_parse_value_fragment to build the nested rules a field referencing the type
 /// inherits - the registry stays ignorant of the rule vocabulary.
 const char *anvil_type_def_fields_text(anvil_type_def def);
+/// Its exact byte length: the text may contain NUL bytes (a string inside a nested rule can).
+size_t anvil_type_def_fields_length(anvil_type_def def);
+
+/// An enum label, length-carried (it may contain NUL bytes), or NULL. See internal/text_alloc.h.
+const struct anvil_label *anvil_type_def_value_label(anvil_type_def def, size_t index);
 
 /// Whether a type definition declares `nullable := true`, and whether it declared the key at all
 /// (a field inherits it only when it didn't declare its own).

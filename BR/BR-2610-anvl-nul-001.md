@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the Bindings agent's cross-binding NUL audit (BR-2610-anvl-bindings-002)
-**Status:** open
+**Status:** resolved (branch `fix/BR-2610-anvl-nul-001`, off main; not merged, not pushed)
 **Tags:** types, schema, nul, silent-data-loss, rivet-readiness
 
 ---
@@ -75,3 +75,53 @@ That's temporary storage, so turn them into unit tests rather than relying on th
 5. The decisions for identifier-like positions are pinned (exact, or a diagnostic).
 6. Full unit suite green; Valgrind-clean on types and schema; `test_release`/`check-exports` green.
 7. Changelog entry under `## [Unreleased]` → `### Fixed`.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-nul-001`, off `main` (independent of the registry branch). Tests TYP36-TYP37
+(`test_types.c`) and SCH86-SCH91 (`test_schema.c`), written first and RED (TYP36/37: lengths 1 not 3,
+`Numeric<NUL>x` accepted as Numeric; SCH86-90 as in the ticket plus the cases below). The Bindings
+agent's probes (`nul.c`-`nul4.c`) are now unit tests; fixtures `schema_nul_*.anvl` hold real NUL bytes.
+Full unit regression green with counts unchanged except types 37 and schema 89; `test_release`,
+`check-exports`, `check-reader-only` green; Valgrind-clean on types, schema, writer_roundtrip,
+builder_roundtrip.
+
+**Where it was lost, all fixed:**
+1. Enum labels (types and schema, plus the copy a field inherits from a type) were `char *` read with a
+   length but stored and read back as C strings. They are now `anvil_label` (length + bytes, one
+   allocation, `internal/text_alloc.h`); `anvil_type_def_get_value` and `anvil_schema_field_get_value`
+   return the exact byte length and copy at most `buflen - 1` bytes (NULs included) plus a terminator.
+2. `values` membership: `strcmp` -> length check then `memcmp`. Pinned both ways (SCH87): `values [a]`
+   rejects `"a<NUL>b"`; `values [a<NUL>b]` accepts it, rejects `"a"`, and rejects `"a<NUL>c"` (same
+   length, differs after the NUL).
+3. Extras: `value_source_text` built the right bytes and then `strlen`'d them for
+   `anvil_parse_value_fragment`, cutting the fragment at the NUL (hence the NULL-typed value, because the
+   truncated text was an unterminated string). It now returns and passes the exact length. The same
+   `strlen` hit a collection's raw span (`[ "p<NUL>q", 2 ]`) and a blob extra's payload; all covered by
+   SCH88.
+4. A type's `fields` source text (FR-2610-anvl-schema-001) was stored and re-parsed as a C string, so a NUL
+   inside any nested rule cut off every rule after it. It now stores its length
+   (`anvil_type_def_fields_length`); SCH90.
+
+**Decision for identifier-like positions (recorded per the ticket):** `type :=`, `format :=`, `tag :=`
+and `required`/`nullable`/`integer` are *compared* as names, so they cannot carry a NUL meaningfully.
+A quoted value containing a NUL there is **malformed**: it is diagnosed (the message ends "(the value
+contains a NUL byte)"; `UNKNOWN_TYPE` / `UNKNOWN_FORMAT` / `MALFORMED_CONSTRAINT` on the schema,
+`UNKNOWN_BASE_TYPE` / `MALFORMED_CONSTRAINT` on a type) and treated as not declared. It is never
+truncated to a prefix that could match (before: `type := "Numeric<NUL>x"` was Numeric, `format :=
+"uuid<NUL>x"` was uuid, `required := "true<NUL>x"` was true). Pinned by TYP37 and SCH89.
+Statement names, rule keys and bare words cannot contain a NUL at all: the core rejects the document at
+load (SCH91 pins that). `format`-checked *data* containing a NUL was already invalid (FR-2610-anvl-types-004).
+
+**Diagnostics and violation messages:** violation messages are fixed strings and diagnostics quote only
+type and format names, which are now never NUL-bearing (the NUL case names the problem instead of quoting
+a truncated value), so nothing user-supplied is quoted with a lost tail.
+
+**Incidental, in the test suite:** `test_writer_roundtrip` and `test_builder_roundtrip` copied the
+writer's output with `strdup`, which truncates at a NUL; the new NUL fixtures exposed it (RT10 / RB02 walk
+every fixture). Both now copy by length. They then pass, which is a free result: the writer and builder
+round-trip strings with embedded NULs to a fixed point.
+
+**For the Bindings agent:** the todo/skipped NUL tests in anvil.node, anvil.wasm and anvil.net can flip to
+passing at the next bump. Read a label or extra with the returned length (the usual two-call
+`get_value(NULL, 0)` then allocate-and-copy), not by treating the buffer as a C string.

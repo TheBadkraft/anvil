@@ -227,6 +227,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   part 1): `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical content is already loaded")
   replaced a reused parser code and is recorded on the load's error detail. Within one include graph it
   is what the diamond-include handling keys on.
+- **Strings containing a NUL byte are no longer truncated or dropped by the type registry and schema**
+  (`BR-2610-anvl-nul-001`): the core reader always loaded them intact, but the registry and schema
+  copied text into C strings. An enum label `"a\0b"` read back as `"a"` from `anvil_type_def_get_value`
+  and `anvil_schema_field_get_value`; a string extension key containing a NUL came back as a
+  NULL-typed value from `anvil_schema_field_get_extra_value` (a NUL in an array/object/blob extra was lost
+  the same way); a type's nested `fields` were cut off at a NUL; and `values` membership compared with
+  `strcmp`, so `"a\0b"` matched a label `"a"`. Labels are now length-carried, the getters return the
+  exact byte length and copy every byte (NULs included), membership is by length then bytes, and extras
+  and a type's `fields` are re-parsed with their exact length. In the places that NAME something (a
+  `type`, `format`, `tag`, or a `required`/`nullable`/`integer` flag) a quoted value containing a NUL is
+  reported as malformed ("the value contains a NUL byte") instead of being truncated into a match
+  (`"uuid\0x"` is not `uuid`). A NUL in a statement name, rule key or bare word is rejected by the core
+  at load time, so those can't occur. No public signature changed.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`

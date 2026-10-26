@@ -54,6 +54,7 @@ struct anvil_type_def_t {
    bool integer;
    bool nullable_declared; // `nullable := true|false` was present and well-formed
    bool nullable;
+   size_t fields_len; // exact byte length of fields_text (it may contain NUL bytes)
    char *fields_text; // source text of `fields := { ... }` (copied), NULL if none - see
                       // anvil_type_def_fields_text
 };
@@ -179,16 +180,13 @@ static list read_values_list(anvil_value val) {
       return NULL;
    }
    size_t count = anvil_value_get_count(val);
-   list values = List.new(count > 0 ? count : 1, sizeof(char *));
+   list values = List.new(count > 0 ? count : 1, sizeof(anvil_label *));
    for (size_t i = 0; i < count; i++) {
-      anvil_value elem = anvil_value_get_element(val, i);
-      size_t len = anvil_value_get_text(elem, NULL, 0);
-      char *label = Allocator.alloc(len + 1);
+      anvil_label *label = anvil_label_from_value(anvil_value_get_element(val, i));
       if (!label) {
          continue;
       }
-      anvil_value_get_text(elem, label, len + 1);
-      List.append(values, label);
+      List.append(values, label); // length-carried: a label may contain NUL bytes
    }
    return values;
 }
@@ -203,6 +201,9 @@ struct type_issues {
    bool type_declared; // a `type :=` field was present
    char *type_text;    // its text (allocated), for the report; NULL if absent
    bool bad_size, bad_min, bad_max, bad_values, bad_fields, bad_nullable, bad_integer, bad_tag;
+   // Which identifier-like values (a name or a true/false flag) contained a NUL byte: reported as
+   // malformed, never truncated into a match.
+   bool nul_type, nul_format, nul_tag, nul_nullable, nul_integer;
    char *bad_format_name; // an unknown `format := name`, for the report (allocated)
 };
 
@@ -211,6 +212,7 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
    *issues = (struct type_issues){0};
    def->source = NULL;
    def->fields_text = NULL;
+   def->fields_len = 0;
    def->nullable_declared = def->nullable = false;
    def->integer_declared = def->integer = false;
    def->tag = NULL;
@@ -232,8 +234,10 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
       }
 
       if (strcmp(fname, "type") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          issues->type_declared = true;
+         issues->nul_type = issues->nul_type || nul;
          if (text) {
             def->kind = parse_type_kind(text);
             Allocator.dispose(issues->type_text);
@@ -253,7 +257,9 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
          issues->bad_values = (def->values == NULL);
       } else if (strcmp(fname, "format") == 0) {
          anvil_value_type ft = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
-         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_text_alloc(fval) : NULL;
+         bool nul = false;
+         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_ident_alloc(fval, &nul) : NULL;
+         issues->nul_format = issues->nul_format || nul;
          if (name && anvil_format_known(name)) {
             Allocator.dispose(def->format);
             def->format = name;
@@ -263,33 +269,40 @@ static void read_type_fields(anvil_value obj_val, struct anvil_type_def_t *def,
          }
       } else if (strcmp(fname, "tag") == 0) {
          anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
-         if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
+         bool nul = false;
+         char *tag = (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) ? anvil_ident_alloc(fval, &nul) : NULL;
+         if (tag) {
             Allocator.dispose(def->tag);
-            def->tag = anvil_text_alloc(fval);
+            def->tag = tag;
          } else {
             issues->bad_tag = true;
+            issues->nul_tag = issues->nul_tag || nul;
          }
       } else if (strcmp(fname, "integer") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
             def->integer_declared = true;
             def->integer = (strcmp(text, "true") == 0);
          } else {
             issues->bad_integer = true;
+            issues->nul_integer = issues->nul_integer || nul;
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "nullable") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
             def->nullable_declared = true;
             def->nullable = (strcmp(text, "true") == 0);
          } else {
             issues->bad_nullable = true;
+            issues->nul_nullable = issues->nul_nullable || nul;
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "fields") == 0) {
          if (fval && anvil_value_get_type(fval) == ANVIL_VALUE_OBJECT) {
-            def->fields_text = anvil_text_alloc(fval);
+            def->fields_text = anvil_text_alloc_n(fval, &def->fields_len); // may contain NULs
          } else {
             issues->bad_fields = true;
          }
@@ -382,8 +395,8 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       if (def->kind == ANVIL_TYPE_UNKNOWN) {
          if (issues.type_declared) {
             add_diag(reg, ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, def->name, src,
-                     "type '%s' has an unrecognized base type 'type := %s'", def->name,
-                     issues.type_text ? issues.type_text : "");
+                     "type '%s' has an unrecognized base type 'type := %s'%s", def->name,
+                     issues.type_text ? issues.type_text : "", ANVIL_NUL_NOTE(issues.nul_type));
          } else {
             add_diag(reg, ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE, def->name, src,
                      "type '%s' declares no 'type :=' base type", def->name);
@@ -406,23 +419,24 @@ static void collect_type_defs(anvil_document doc, struct anvil_type_registry_t *
       }
       if (issues.bad_format_name) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
-                  "type '%s': unknown format '%s' (known: iso8601_date, iso8601_datetime, uuid); "
-                  "treated as not declared", def->name, issues.bad_format_name);
+                  "type '%s': unknown format '%s' (known: iso8601_date, iso8601_datetime, uuid)%s; "
+                  "treated as not declared", def->name, issues.bad_format_name,
+                  ANVIL_NUL_NOTE(issues.nul_format));
       }
       if (issues.bad_tag) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
-                  "type '%s': 'tag' must be an identifier or string; treated as not declared",
-                  def->name);
+                  "type '%s': 'tag' must be an identifier or string%s; treated as not declared",
+                  def->name, ANVIL_NUL_NOTE(issues.nul_tag));
       }
       if (issues.bad_integer) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
-                  "type '%s': 'integer' must be true or false; treated as not declared",
-                  def->name);
+                  "type '%s': 'integer' must be true or false%s; treated as not declared",
+                  def->name, ANVIL_NUL_NOTE(issues.nul_integer));
       }
       if (issues.bad_nullable) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
-                  "type '%s': 'nullable' must be true or false; treated as not declared",
-                  def->name);
+                  "type '%s': 'nullable' must be true or false%s; treated as not declared",
+                  def->name, ANVIL_NUL_NOTE(issues.nul_nullable));
       }
       if (issues.bad_fields) {
          add_diag(reg, ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT, def->name, src,
@@ -677,18 +691,24 @@ size_t anvil_type_def_get_value(anvil_type_def def, size_t index, char *buf, siz
    if (!d || !d->values || index >= List.size(d->values)) {
       return 0;
    }
-   char *label = NULL;
+   anvil_label *label = NULL;
    List.get(d->values, index, (object *)&label);
-   if (!label) {
-      return 0;
+   return anvil_label_copy_out(label, buf, buflen); // exact length: a label may contain NULs
+}
+
+const struct anvil_label *anvil_type_def_value_label(anvil_type_def def, size_t index) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   if (!d || !d->values || index >= List.size(d->values)) {
+      return NULL;
    }
-   size_t len = strlen(label);
-   if (buf && buflen > 0) {
-      size_t copy_len = len < buflen - 1 ? len : buflen - 1;
-      memcpy(buf, label, copy_len);
-      buf[copy_len] = '\0';
-   }
-   return len;
+   anvil_label *label = NULL;
+   List.get(d->values, index, (object *)&label);
+   return label;
+}
+
+size_t anvil_type_def_fields_length(anvil_type_def def) {
+   struct anvil_type_def_t *d = (struct anvil_type_def_t *)def;
+   return d && d->fields_text ? d->fields_len : 0;
 }
 
 size_t anvil_type_registry_get_diagnostic_count(anvil_type_registry reg) {

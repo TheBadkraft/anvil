@@ -212,9 +212,12 @@ size_t anvil_type_def_get_value_count(anvil_type_def def);
  * numeric value (see notes/native-schema.md's enum design).
  * @param buf Destination buffer, or NULL to only query the required length.
  * @param buflen Size of buf in bytes, including room for the NUL terminator.
- * @return The full label length (excluding NUL), regardless of buflen —
- * same snprintf-style convention as anvil_statement_get_name. 0 if def is
- * NULL or index is out of bounds.
+ * @return The full label length in bytes, regardless of buflen — same
+ * snprintf-style convention as anvil_statement_get_name. 0 if def is NULL or
+ * index is out of bounds. A label may contain NUL bytes (`"a\0b"` is 3 bytes):
+ * the length is exact, the copy includes them, and a buffer sized from the
+ * returned length gets every byte. At most buflen - 1 bytes are copied, then a
+ * terminator.
  */
 size_t anvil_type_def_get_value(anvil_type_def def, size_t index, char *buf, size_t buflen);
 

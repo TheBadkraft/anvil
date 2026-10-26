@@ -1,0 +1,5 @@
+#!aml
+include "schema_nul_types.anvl";
+@[schema]
+
+y := { type := types.T; };

@@ -2513,6 +2513,188 @@ static void test_sch85_identical_extras_are_all_readable(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-nul-001 - strings containing a NUL are carried exactly through the schema
+ * ---------------------------------------------------------------------- */
+#define LOAD_LIT(lit) anvil_load_buffer((lit), sizeof(lit) - 1)
+
+static bool bytes_are(anvil_schema_field f, size_t idx, const char *want, size_t want_len) {
+   char buf[16];
+   memset(buf, 0x7f, sizeof(buf));
+   size_t n = anvil_schema_field_get_value(f, idx, buf, sizeof(buf));
+   return n == want_len && memcmp(buf, want, want_len) == 0 && buf[want_len] == '\0';
+}
+
+static void test_sch86_enum_labels_with_nul(void) {
+   anvil_document sdoc = LOAD_LIT(
+      "#!aml\n@[schema]\nx := { type := enum; values := [ ok, \"a\0b\" ]; };\n");
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH86: schema loaded");
+   if (schema) {
+      anvil_schema_field x = anvil_schema_find_field(schema, "x");
+      TestBit.is_equal_int(3, (long long)anvil_schema_field_get_value(x, 1, NULL, 0),
+                           "SCH86: the inline label's length is 3, not 1");
+      TestBit.is_true(bytes_are(x, 1, "a\0b", 3), "SCH86: inline label bytes 61 00 62");
+      TestBit.is_true(bytes_are(x, 0, "ok", 2), "SCH86: ordinary labels unaffected");
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+   // Inherited from a type: the type's copy is length-carried, and so is the field's copy of it.
+   anvil_document tdoc = LOAD_LIT("#!aml\n@[types]\nT := { type := enum; values := [ ok, \"a\0b\" ]; };\n");
+   anvil_document cdoc = anvil_load(fixture_path("schema_nul_consumer.anvl"));
+   anvil_schema inherited = cdoc ? anvil_schema_load(cdoc) : NULL;
+   TestBit.is_not_null(inherited, "SCH86: schema with an inherited NUL label loaded");
+   if (inherited) {
+      anvil_schema_field y = anvil_schema_find_field(inherited, "y");
+      TestBit.is_equal_int(2, (long long)anvil_schema_field_get_value_count(y), "SCH86: two inherited labels");
+      TestBit.is_true(bytes_are(y, 1, "a\0b", 3), "SCH86: the inherited label keeps its NUL");
+      anvil_schema_dispose(inherited);
+   }
+   if (cdoc) anvil_dispose(cdoc);
+   if (tdoc) anvil_dispose(tdoc);
+}
+
+static void test_sch87_values_membership_is_by_length(void) {
+   const char *want_ok = "SCH87";
+   (void)want_ok;
+   anvil_document s1 = LOAD_LIT("#!aml\n@[schema]\nv := { type := String; values := [ \"a\" ]; };\n");
+   anvil_document s2 = LOAD_LIT("#!aml\n@[schema]\nv := { type := String; values := [ \"a\0b\" ]; };\n");
+   anvil_schema only_a = s1 ? anvil_schema_load(s1) : NULL;
+   anvil_schema a_nul_b = s2 ? anvil_schema_load(s2) : NULL;
+   TestBit.is_true(only_a && a_nul_b, "SCH87: both schemas loaded");
+   if (only_a && a_nul_b) {
+      anvil_document d_a = LOAD_LIT("#!aml\nv := \"a\";\n");
+      anvil_document d_anb = LOAD_LIT("#!aml\nv := \"a\0b\";\n");
+      anvil_document d_anc = LOAD_LIT("#!aml\nv := \"a\0c\";\n");
+      TestBit.is_true(anvil_schema_validate(only_a, d_a), "SCH87: values [a] accepts \"a\"");
+      TestBit.is_false(anvil_schema_validate(only_a, d_anb),
+                       "SCH87: values [a] REJECTS \"a<NUL>b\" (no false accept by prefix)");
+      TestBit.is_true(anvil_schema_validate(a_nul_b, d_anb), "SCH87: values [a<NUL>b] accepts \"a<NUL>b\"");
+      TestBit.is_false(anvil_schema_validate(a_nul_b, d_a), "SCH87: and rejects \"a\" (no false accept)");
+      TestBit.is_false(anvil_schema_validate(a_nul_b, d_anc),
+                       "SCH87: and rejects \"a<NUL>c\" (same length, differs after the NUL)");
+      if (d_a) anvil_dispose(d_a);
+      if (d_anb) anvil_dispose(d_anb);
+      if (d_anc) anvil_dispose(d_anc);
+   }
+   if (only_a) anvil_schema_dispose(only_a);
+   if (a_nul_b) anvil_schema_dispose(a_nul_b);
+   if (s1) anvil_dispose(s1);
+   if (s2) anvil_dispose(s2);
+}
+
+static void test_sch88_extras_with_nul(void) {
+   anvil_document sdoc = LOAD_LIT(
+      "#!aml\n@[schema]\n"
+      "x := { type := String; note := \"a\0b\"; plain := \"ab\"; list := [ \"p\0q\", 2 ]; "
+      "blob := @t`x\0y`; nested := { k := \"m\0n\"; }; };\n");
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH88: schema loaded");
+   if (schema) {
+      anvil_schema_field x = anvil_schema_find_field(schema, "x");
+      TestBit.is_equal_int(5, (long long)anvil_schema_field_get_extra_count(x), "SCH88: five extras");
+      char buf[16];
+      anvil_value note = anvil_schema_field_get_extra_value(x, 0);
+      TestBit.is_true(note && anvil_value_get_type(note) == ANVIL_VALUE_STRING,
+                      "SCH88: a string extra containing a NUL is a STRING (it used to be NULL-typed)");
+      size_t n = note ? anvil_value_get_bytes(note, buf, sizeof(buf)) : 0;
+      TestBit.is_true(n == 3 && memcmp(buf, "a\0b", 3) == 0, "SCH88: with bytes 61 00 62");
+      n = note ? anvil_value_get_text(note, buf, sizeof(buf)) : 0;
+      TestBit.is_true(n == 3 && memcmp(buf, "a\0b", 3) == 0, "SCH88: and text 61 00 62");
+      anvil_value plain = anvil_schema_field_get_extra_value(x, 1);
+      TestBit.is_true(plain && anvil_value_get_type(plain) == ANVIL_VALUE_STRING &&
+                         anvil_value_get_text(plain, buf, sizeof(buf)) == 2, "SCH88: \"ab\" still works");
+      anvil_value list = anvil_schema_field_get_extra_value(x, 2);
+      TestBit.is_true(list && anvil_value_get_type(list) == ANVIL_VALUE_ARRAY && anvil_value_get_count(list) == 2,
+                      "SCH88: an array extra whose element holds a NUL survives");
+      anvil_value el = list ? anvil_value_get_element(list, 0) : NULL;
+      n = el ? anvil_value_get_bytes(el, buf, sizeof(buf)) : 0;
+      TestBit.is_true(n == 3 && memcmp(buf, "p\0q", 3) == 0, "SCH88: and the element keeps its NUL");
+      anvil_value blob = anvil_schema_field_get_extra_value(x, 3);
+      n = blob ? anvil_value_get_bytes(blob, buf, sizeof(buf)) : 0;
+      TestBit.is_true(blob && anvil_value_get_type(blob) == ANVIL_VALUE_BLOB && n == 3 &&
+                         memcmp(buf, "x\0y", 3) == 0, "SCH88: a blob extra keeps its NUL payload");
+      anvil_value nested = anvil_schema_field_get_extra_value(x, 4);
+      TestBit.is_true(nested && anvil_value_get_type(nested) == ANVIL_VALUE_OBJECT && anvil_value_get_count(nested) == 1,
+                      "SCH88: an object extra with a NUL string survives");
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+static void test_sch89_nul_in_identifier_positions_is_malformed(void) {
+   anvil_document sdoc = LOAD_LIT(
+      "#!aml\n@[schema]\n"
+      "a := { type := \"String\0x\"; };\n"
+      "b := { type := String; format := \"uuid\0x\"; };\n"
+      "c := { type := Blob; tag := \"png\0x\"; };\n"
+      "d := { type := Numeric; required := \"true\0x\"; nullable := \"true\0x\"; integer := \"true\0x\"; };\n");
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH89: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_kind(anvil_schema_find_field(schema, "a")),
+                           "SCH89: `String<NUL>x` is not the String type");
+      char buf[16];
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_format(anvil_schema_find_field(schema, "b"), buf, sizeof(buf)),
+                           "SCH89: `uuid<NUL>x` is not the uuid format");
+      TestBit.is_equal_int(0, (long long)anvil_schema_field_get_tag(anvil_schema_find_field(schema, "c"), buf, sizeof(buf)),
+                           "SCH89: a tag with a NUL is not declared");
+      anvil_schema_field d = anvil_schema_find_field(schema, "d");
+      TestBit.is_true(!anvil_schema_field_is_required(d) && !anvil_schema_field_is_nullable(d) &&
+                         !anvil_schema_field_is_integer(d), "SCH89: `true<NUL>x` is not true");
+      TestBit.is_equal_int(6, (long long)anvil_schema_get_diagnostic_count(schema),
+                           "SCH89: each is diagnosed (type, format, tag, required, nullable, integer)");
+      for (size_t i = 0; i < anvil_schema_get_diagnostic_count(schema); i++) {
+         char msg[256] = {0};
+         anvil_schema_diagnostic_get_message(anvil_schema_get_diagnostic(schema, i), msg, sizeof(msg));
+         TestBit.is_true(strstr(msg, "NUL") != NULL, "SCH89: and the message says the value contains a NUL");
+      }
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+// A type's nested `fields` are stored as source text and re-parsed with a length; a NUL inside a
+// nested string must not truncate that text.
+static void test_sch90_type_fields_text_with_nul(void) {
+   anvil_document cdoc = anvil_load(fixture_path("schema_nul_fields_consumer.anvl"));
+   anvil_schema schema = cdoc ? anvil_schema_load(cdoc) : NULL;
+   TestBit.is_not_null(schema, "SCH90: schema loaded");
+   if (schema) {
+      TestBit.is_equal_int(0, (long long)anvil_schema_get_diagnostic_count(schema), "SCH90: no diagnostics");
+      anvil_schema_field owner = anvil_schema_find_field(schema, "owner");
+      anvil_schema_field kind = anvil_schema_field_find_nested(owner, "kind");
+      TestBit.is_not_null(kind, "SCH90: the nested rule after the NUL-bearing one is present");
+      TestBit.is_true(kind && bytes_are(kind, 1, "a\0b", 3), "SCH90: the nested enum label keeps its NUL");
+      anvil_schema_field after = anvil_schema_field_find_nested(owner, "after");
+      TestBit.is_not_null(after, "SCH90: and the rules declared after it were not cut off");
+      anvil_schema_dispose(schema);
+   }
+   if (cdoc) anvil_dispose(cdoc);
+}
+
+
+// The pure-identifier positions (a statement name, a rule key, a bare word) cannot hold a NUL at all:
+// the core rejects the document, so the registry and schema never see one. Pinned so a change there
+// is noticed.
+static void test_sch91_nul_in_names_and_bare_words_is_a_load_error(void) {
+   anvil_document a = LOAD_LIT("#!aml\nab\0c := 1;\nz := 2;\n");
+   anvil_document b = LOAD_LIT("#!aml\n@[schema]\nx := { ty\0pe := Numeric; };\n");
+   anvil_document c = LOAD_LIT("#!aml\nv := bar\0e;\n");
+   TestBit.is_true(a && anvil_has_errors(a), "SCH91: a statement name with a NUL is a load error");
+   TestBit.is_true(b && anvil_has_errors(b), "SCH91: a rule key with a NUL is a load error");
+   TestBit.is_true(c && anvil_has_errors(c), "SCH91: a bare word with a NUL is a load error");
+   if (a) anvil_dispose(a);
+   if (b) anvil_dispose(b);
+   if (c) anvil_dispose(c);
+}
+
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -2686,6 +2868,20 @@ int main(void) {
                   test_sch84_validate_while_same_text_document_is_alive, th);
    TestBit.run_ex("SCH85_IDENTICAL_EXTRAS_ARE_ALL_READABLE", NULL,
                   test_sch85_identical_extras_are_all_readable, th);
+
+   TestBit.run_ex("SCH86_ENUM_LABELS_WITH_NUL", NULL,
+                  test_sch86_enum_labels_with_nul, th);
+   TestBit.run_ex("SCH87_VALUES_MEMBERSHIP_IS_BY_LENGTH", NULL,
+                  test_sch87_values_membership_is_by_length, th);
+   TestBit.run_ex("SCH88_EXTRAS_WITH_NUL", NULL,
+                  test_sch88_extras_with_nul, th);
+   TestBit.run_ex("SCH89_NUL_IN_IDENTIFIER_POSITIONS_IS_MALFORMED", NULL,
+                  test_sch89_nul_in_identifier_positions_is_malformed, th);
+   TestBit.run_ex("SCH90_TYPE_FIELDS_TEXT_WITH_NUL", NULL,
+                  test_sch90_type_fields_text_with_nul, th);
+
+   TestBit.run_ex("SCH91_NUL_IN_NAMES_AND_BARE_WORDS_IS_A_LOAD_ERROR", NULL,
+                  test_sch91_nul_in_names_and_bare_words_is_a_load_error, th);
 
    return TestBit.report();
 }

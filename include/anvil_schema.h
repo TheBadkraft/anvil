@@ -329,7 +329,8 @@ bool anvil_schema_field_get_max_numeric(anvil_schema_field field, anvil_numeric_
 bool anvil_schema_field_get_min_items(anvil_schema_field field, long long *out_min_items);
 bool anvil_schema_field_get_max_items(anvil_schema_field field, long long *out_max_items);
 
-/// The `values` labels. 0 / 0 when none are declared; same buffer convention as get_name.
+/// The `values` labels. 0 / 0 when none are declared; same buffer convention as get_name. A label
+/// may contain NUL bytes: the returned length is its exact byte length and the copy includes them.
 size_t anvil_schema_field_get_value_count(anvil_schema_field field);
 size_t anvil_schema_field_get_value(anvil_schema_field field, size_t index, char *buf, size_t buflen);
 

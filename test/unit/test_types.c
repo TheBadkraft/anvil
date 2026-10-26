@@ -1115,6 +1115,83 @@ static void test_typ35_type_registry_vtable_round_trip(void) {
    Anvil.dispose(doc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-nul-001 - strings containing a NUL are carried exactly (never truncated at the NUL)
+ * ---------------------------------------------------------------------- */
+#define LOAD_LIT(lit) anvil_load_buffer((lit), sizeof(lit) - 1)
+
+static void test_typ36_enum_label_with_nul(void) {
+   anvil_document doc = LOAD_LIT("#!aml\n@[types]\nT := { type := enum; values := [ ok, \"a\0b\", \"\0\", tail ]; };\n");
+   anvil_type_registry reg = doc ? anvil_type_registry_load(doc) : NULL;
+   TestBit.is_not_null(reg, "TYP36: registry loaded from a document with NUL bytes");
+   if (reg) {
+      anvil_type_def t = anvil_type_registry_find(reg, "T");
+      TestBit.is_equal_int(4, (long long)anvil_type_def_get_value_count(t), "TYP36: four labels");
+      char buf[8];
+      memset(buf, 0x7f, sizeof(buf));
+      TestBit.is_equal_int(3, (long long)anvil_type_def_get_value(t, 1, NULL, 0),
+                           "TYP36: the length query for \"a\\0b\" is 3, not 1");
+      TestBit.is_equal_int(3, (long long)anvil_type_def_get_value(t, 1, buf, sizeof(buf)),
+                           "TYP36: and the copy reports 3");
+      TestBit.is_true(memcmp(buf, "a\0b", 3) == 0 && buf[3] == '\0', "TYP36: bytes 61 00 62, then a terminator");
+      memset(buf, 0x7f, sizeof(buf));
+      TestBit.is_equal_int(3, (long long)anvil_type_def_get_value(t, 1, buf, 2),
+                           "TYP36: a short buffer still reports the full length");
+      TestBit.is_true(buf[0] == 'a' && buf[1] == '\0' && buf[2] == 0x7f,
+                      "TYP36: and copies buflen-1 bytes plus a terminator");
+      TestBit.is_equal_int(1, (long long)anvil_type_def_get_value(t, 2, buf, sizeof(buf)),
+                           "TYP36: a label that is a single NUL has length 1");
+      TestBit.is_true(buf[0] == '\0', "TYP36: and is that NUL");
+      TestBit.is_equal_int(4, (long long)anvil_type_def_get_value(t, 3, buf, sizeof(buf)),
+                           "TYP36: ordinary labels after it are unaffected");
+      TestBit.is_true(memcmp(buf, "tail", 4) == 0, "TYP36: tail");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+// Identifier-like positions (a type's `type`, `format`, `tag`, and the true/false flags) are read as
+// text; a value with a NUL there must be malformed, never truncated into a match.
+static void test_typ37_nul_in_identifier_positions_is_malformed(void) {
+   anvil_document doc = LOAD_LIT(
+      "#!aml\n@[types]\n"
+      "A := { type := \"Numeric\0x\"; };\n"
+      "B := { type := String; format := \"uuid\0x\"; };\n"
+      "C := { type := Blob; tag := \"png\0x\"; };\n"
+      "D := { type := Numeric; nullable := \"true\0x\"; integer := \"true\0x\"; };\n");
+   anvil_type_registry reg = doc ? anvil_type_registry_load(doc) : NULL;
+   TestBit.is_not_null(reg, "TYP37: registry loaded");
+   if (reg) {
+      TestBit.is_true(anvil_type_registry_find(reg, "A") == NULL,
+                      "TYP37: `Numeric<NUL>x` is not the Numeric type (definition not registered)");
+      char buf[32];
+      TestBit.is_equal_int(0, (long long)anvil_type_def_get_format(anvil_type_registry_find(reg, "B"), buf, sizeof(buf)),
+                           "TYP37: `uuid<NUL>x` is not the uuid format");
+      TestBit.is_true(anvil_type_def_tag(anvil_type_registry_find(reg, "C")) == NULL,
+                      "TYP37: a tag with a NUL is not declared");
+      bool declared = true;
+      anvil_type_def d = anvil_type_registry_find(reg, "D");
+      TestBit.is_true(!anvil_type_def_nullable(d, &declared) && !declared,
+                      "TYP37: `true<NUL>x` is not nullable := true");
+      TestBit.is_true(!anvil_type_def_integer(d, &declared) && !declared,
+                      "TYP37: `true<NUL>x` is not integer := true");
+      TestBit.is_equal_int(5, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP37: each is reported (unknown base, format, tag, nullable, integer)");
+      for (size_t i = 0; i < anvil_type_registry_get_diagnostic_count(reg); i++) {
+         char msg[256] = {0};
+         anvil_type_diagnostic_get_message(anvil_type_registry_get_diagnostic(reg, i), msg, sizeof(msg));
+         TestBit.is_true(strstr(msg, "NUL") != NULL, "TYP37: and the message says the value contains a NUL");
+      }
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -1173,6 +1250,10 @@ int main(void) {
                   test_typ34_type_registry_vtable_matches_flat_and_is_complete, th);
    TestBit.run_ex("TYP35_TYPE_REGISTRY_VTABLE_ROUND_TRIP", NULL,
                   test_typ35_type_registry_vtable_round_trip, th);
+
+   TestBit.run_ex("TYP36_ENUM_LABEL_WITH_NUL", NULL, test_typ36_enum_label_with_nul, th);
+   TestBit.run_ex("TYP37_NUL_IN_IDENTIFIER_POSITIONS_IS_MALFORMED", NULL,
+                  test_typ37_nul_in_identifier_positions_is_malformed, th);
 
    return TestBit.report();
 }

@@ -635,7 +635,10 @@ static void test_rt10_fixture_fixed_point(void) {
       anvil_dispose(original);
       if (first) {
          size_t len1 = 0;
-         char *text1 = strdup(anvil_writer_data(first, &len1));
+         const char *data1 = anvil_writer_data(first, &len1);
+         char *text1 = malloc(len1 + 1); // by length: the output can contain NUL bytes
+         memcpy(text1, data1, len1);
+         text1[len1] = '\0';
          anvil_document reread = anvil_load_buffer(text1, len1);
          TestBit.is_true(reread && !anvil_has_errors(reread), entry->d_name);
          if (reread && !anvil_has_errors(reread)) {

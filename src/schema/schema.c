@@ -86,16 +86,13 @@ static list read_values_list(anvil_value val) {
       return NULL;
    }
    size_t count = anvil_value_get_count(val);
-   list values = List.new(count > 0 ? count : 1, sizeof(char *));
+   list values = List.new(count > 0 ? count : 1, sizeof(anvil_label *));
    for (size_t i = 0; i < count; i++) {
-      anvil_value elem = anvil_value_get_element(val, i);
-      size_t len = anvil_value_get_text(elem, NULL, 0);
-      char *label = Allocator.alloc(len + 1);
+      anvil_label *label = anvil_label_from_value(anvil_value_get_element(val, i));
       if (!label) {
          continue;
       }
-      anvil_value_get_text(elem, label, len + 1);
-      List.append(values, label);
+      List.append(values, label); // length-carried: a label may contain NUL bytes
    }
    return values;
 }
@@ -107,14 +104,13 @@ static list copy_values_from_type(anvil_type_def def) {
    if (count == 0) {
       return NULL;
    }
-   list values = List.new(count, sizeof(char *));
+   list values = List.new(count, sizeof(anvil_label *));
    for (size_t i = 0; i < count; i++) {
-      size_t len = anvil_type_def_get_value(def, i, NULL, 0);
-      char *label = Allocator.alloc(len + 1);
+      const anvil_label *src = anvil_type_def_value_label(def, i);
+      anvil_label *label = src ? anvil_label_new(src->text, src->len) : NULL;
       if (!label) {
          continue;
       }
-      anvil_type_def_get_value(def, i, label, len + 1);
       List.append(values, label);
    }
    return values;
@@ -216,10 +212,12 @@ struct schema_extra {
 // The source text of a value that anvil_parse_value_fragment will read back as the same value.
 // Collections: their raw span (nested quoting intact). Scalars: a string's and a blob's content
 // are delimiter-free in the public API, so they are re-wrapped from the exact bytes.
-static char *value_source_text(anvil_value v) {
+// Returns the text and its exact length: a string or blob may contain NUL bytes, so the length
+// is carried and the text is never measured with strlen.
+static char *value_source_text(anvil_value v, size_t *out_len) {
    anvil_value_type t = anvil_value_get_type(v);
    if (t != ANVIL_VALUE_STRING && t != ANVIL_VALUE_BLOB) {
-      return anvil_text_alloc(v);
+      return anvil_text_alloc_n(v, out_len); // a collection's raw span can hold a NUL string too
    }
    size_t blen = anvil_value_get_bytes(v, NULL, 0);
    size_t tlen = t == ANVIL_VALUE_BLOB ? anvil_value_get_blob_tag(v, NULL, 0) : 0;
@@ -238,6 +236,7 @@ static char *value_source_text(anvil_value v) {
    at += blen;
    out[at++] = t == ANVIL_VALUE_BLOB ? '`' : '"';
    out[at] = '\0';
+   *out_len = at;
    return out;
 }
 
@@ -248,9 +247,10 @@ static void add_extra(struct anvil_schema_field_t *field, const char *name, anvi
    }
    memset(e, 0, sizeof(*e));
    e->name = anvil_text_dup(name);
-   char *text = val ? value_source_text(val) : NULL;
+   size_t text_len = 0;
+   char *text = val ? value_source_text(val, &text_len) : NULL;
    if (text) {
-      e->frag = anvil_parse_value_fragment(text, strlen(text));
+      e->frag = anvil_parse_value_fragment(text, text_len);
       if (e->frag && !anvil_has_errors(e->frag)) {
          e->value = anvil_document_get_fragment_value(e->frag);
       }
@@ -387,7 +387,7 @@ static void expand_type_fields(anvil_type_def def, anvil_type_registry types,
          return;
       }
    }
-   anvil_document frag = anvil_parse_value_fragment(text, strlen(text));
+   anvil_document frag = anvil_parse_value_fragment(text, anvil_type_def_fields_length(def));
    anvil_value obj = frag ? anvil_document_get_fragment_value(frag) : NULL;
    if (obj && anvil_value_get_type(obj) == ANVIL_VALUE_OBJECT) {
       struct expand_frame frame = {def, stack};
@@ -419,14 +419,15 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
       }
 
       if (strcmp(fname, "type") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul); // NULL if the text holds a NUL: unknown, not a prefix
          Allocator.dispose(field->type_name);
          field->type_name = text ? anvil_text_dup(text) : NULL;
          resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
          if (!resolved) {
             add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, path,
-                     "field '%s': type '%s' is neither a native type nor a known types.X", path,
-                     text ? text : "");
+                     "field '%s': type '%s' is neither a native type nor a known types.X%s", path,
+                     text ? text : "", ANVIL_NUL_NOTE(nul));
          }
          Allocator.dispose(text);
          if (resolved) {
@@ -436,53 +437,62 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
          // An unrecognized type name leaves the field with no kind to check against, and is
          // reported as UNKNOWN_TYPE above; the schema still loads (the caller decides).
       } else if (strcmp(fname, "required") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          field->required = text && strcmp(text, "true") == 0;
          if (!text || (strcmp(text, "true") != 0 && strcmp(text, "false") != 0)) {
             add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
-                     "field '%s': 'required' must be true or false", path);
+                     "field '%s': 'required' must be true or false%s", path, ANVIL_NUL_NOTE(nul));
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "format") == 0) {
          anvil_value_type ft = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
-         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_text_alloc(fval) : NULL;
+         bool nul = false;
+         char *name = (ft == ANVIL_VALUE_BARE || ft == ANVIL_VALUE_STRING) ? anvil_ident_alloc(fval, &nul) : NULL;
          if (name && anvil_format_known(name)) {
             Allocator.dispose(field->format);
             field->format = name;
          } else {
             add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT, ANVIL_TYPE_DIAG_NONE, path,
                      "field '%s': unknown format '%s' (known: iso8601_date, iso8601_datetime, "
-                     "uuid); treated as not declared", path, name ? name : "");
+                     "uuid)%s; treated as not declared", path, name ? name : "",
+                     ANVIL_NUL_NOTE(nul));
             Allocator.dispose(name);
          }
       } else if (strcmp(fname, "tag") == 0) {
          anvil_value_type tt = fval ? anvil_value_get_type(fval) : ANVIL_VALUE_NULL;
-         if (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) {
+         bool nul = false;
+         char *tag = (tt == ANVIL_VALUE_BARE || tt == ANVIL_VALUE_STRING) ? anvil_ident_alloc(fval, &nul) : NULL;
+         if (tag) {
             Allocator.dispose(field->tag);
-            field->tag = anvil_text_alloc(fval);
+            field->tag = tag;
          } else {
             add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
-                     "field '%s': 'tag' must be an identifier or string; treated as not declared",
-                     path);
+                     "field '%s': 'tag' must be an identifier or string%s; treated as not declared",
+                     path, ANVIL_NUL_NOTE(nul));
          }
       } else if (strcmp(fname, "integer") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
             field->integer_declared = true;
             field->integer = (strcmp(text, "true") == 0);
          } else {
             add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
-                     "field '%s': 'integer' must be true or false; treated as false", path);
+                     "field '%s': 'integer' must be true or false%s; treated as false", path,
+                     ANVIL_NUL_NOTE(nul));
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "nullable") == 0) {
-         char *text = anvil_text_alloc(fval);
+         bool nul = false;
+         char *text = anvil_ident_alloc(fval, &nul);
          if (text && (strcmp(text, "true") == 0 || strcmp(text, "false") == 0)) {
             field->nullable_declared = true;
             field->nullable = (strcmp(text, "true") == 0);
          } else {
             add_diag(schema, ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT, ANVIL_TYPE_DIAG_NONE, path,
-                     "field '%s': 'nullable' must be true or false; treated as false", path);
+                     "field '%s': 'nullable' must be true or false%s; treated as false", path,
+                     ANVIL_NUL_NOTE(nul));
          }
          Allocator.dispose(text);
       } else if (strcmp(fname, "size") == 0) {
@@ -704,7 +714,7 @@ static void dispose_field_values(list values) {
    }
    usize n = List.size(values);
    for (usize i = 0; i < n; i++) {
-      char *label = NULL;
+      anvil_label *label = NULL;
       List.get(values, i, (object *)&label);
       Allocator.dispose(label);
    }
@@ -986,13 +996,15 @@ static void check_value(struct anvil_schema_t *s, const struct anvil_schema_fiel
       }
    }
    if (rule->values && data_val) {
-      char *text = anvil_text_alloc(data_val);
+      // By length, then bytes: a label or a value may contain NUL bytes, and "a" is not "a\0b".
+      size_t text_len = 0;
+      char *text = anvil_text_alloc_n(data_val, &text_len);
       bool member = false;
       usize value_count = List.size(rule->values);
       for (usize vi = 0; vi < value_count; vi++) {
-         char *label = NULL;
+         anvil_label *label = NULL;
          List.get(rule->values, vi, (object *)&label);
-         if (label && text && strcmp(label, text) == 0) {
+         if (text && anvil_label_equals(label, text, text_len)) {
             member = true;
             break;
          }
@@ -1288,9 +1300,9 @@ size_t anvil_schema_field_get_value(anvil_schema_field field, size_t index, char
    if (!field || !field->values || index >= (size_t)List.size(field->values)) {
       return 0;
    }
-   char *label = NULL;
+   anvil_label *label = NULL;
    List.get(field->values, index, (object *)&label);
-   return label ? copy_text(label, buf, buflen) : 0;
+   return anvil_label_copy_out(label, buf, buflen); // exact length: a label may contain NULs
 }
 
 size_t anvil_schema_field_get_format(anvil_schema_field field, char *buf, size_t buflen) {
