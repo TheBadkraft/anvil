@@ -50,6 +50,14 @@ thing: a statement whose value is an object. They're indistinguishable through t
 `anvil_statement_get_value` returns the same kind of value either way. Nesting works identically
 in both forms: a statement's value can itself contain further statements, to any depth.
 
+**The `;` stays on the value's line.** A statement ends with `;`, and between a finished value and its
+`;` only spaces and tabs are allowed: `x := hello ;` is fine, but `x := hello` followed by a newline and
+then `;` (or a comment, or a block comment in between) is an error, "Expected ';' to end the statement".
+This is deliberate and applies to every kind of value. Between statements, and inside object bodies,
+newlines, blank lines and comments are unrestricted, and a comment after the `;` is the usual place for
+one: `x := 1; // note`. A `/* ... */` comment that is never closed swallows the rest of the document, so
+it is an error ("Unterminated block comment") reported at the line and column where the comment opens.
+
 ## 4. Value Kinds
 
 | Kind | Example | Notes |

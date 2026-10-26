@@ -429,6 +429,15 @@ static bool parse_source(context ctx) {
    Source.finish_body(ctx->src, ctx->statements, &parser.err_code);
    ctx->statements = NULL;
 
+   // An error recorded while only skipping (an unterminated block comment, which swallows the rest
+   // of the document) is a failed parse even though every statement before it parsed cleanly.
+   if (Source.has_errors(ctx->src)) {
+      if (parser.err_code == ANVL_ERR_NONE) {
+         parser.err_code = ANVL_ERR_PARSER_UNTERMINATED_COMMENT;
+      }
+      return false;
+   }
+
    // Return true if all source was consumed, false otherwise
    return Source.position(ctx->src) == length;
 

@@ -172,15 +172,18 @@ static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code
 
       if (c == '/' && Source.peek_offset(src, 1) == '*') {
          Source.consume(src, 2);
+         bool closed = false;
          while (!Source.is_eof(src)) {
             if (Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/') {
                Source.consume(src, 2);
+               closed = true;
                break;
             }
             Source.consume(src, 1);
          }
-         if (Source.is_eof(src) &&
-             !(Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/')) {
+         if (!closed) {
+            // (This used to test "at EOF and not looking at '*/'", which is also true right after
+            // a comment that closed as the very last thing in the file.)
             *err_code = ANVL_ERR_PARSER_UNTERMINATED_COMMENT;
             return false;
          }

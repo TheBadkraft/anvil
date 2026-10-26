@@ -214,6 +214,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **An unterminated block comment is now an error wherever it opens** (`BR-2610-anvl-parser-002`): only the
+  header scanner checked for it, so `x := 1; /* never closed` loaded with no error, a statement after it was
+  silently lost, and inside an object, array, tuple or attribute list the error blamed the end of the file.
+  It is now reported as "Unterminated block comment" at the line and column where the comment OPENS, in AML
+  and AMP, from the body parser too. The header check also wrongly rejected a comment that closed as the very
+  last thing in a file. A newline between a value and its `;` stays an error: that rule is deliberate
+  (`notes/document-body-parse.md`) and is now stated in `docs/language-reference.md` and pinned for every
+  value kind.
 - **`make test_release` can no longer link a stale `libanvil.a`** (`SR-2610-anvl-build-001`):
   `test/unit/Makefile` only built the release archive when it was missing, so after a branch switch or
   rebase `test_release` linked an archive built from older sources and could fail (or pass) for no reason

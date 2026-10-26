@@ -1713,6 +1713,106 @@ static void test_anv60_parser_errors_have_specific_messages(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-parser-002 - an unterminated block comment is an error, wherever it opens
+ * ---------------------------------------------------------------------- */
+// Line/column (1-based, from the start of the text) of the first occurrence of `needle` in `src`.
+static void pos_of(const char *src, const char *needle, size_t *line, size_t *col) {
+   const char *at = strstr(src, needle);
+   *line = 1;
+   *col = 1;
+   for (const char *p = src; at && p < at; p++) {
+      if (*p == '\n') {
+         (*line)++;
+         *col = 1;
+      } else {
+         (*col)++;
+      }
+   }
+}
+
+static void test_anv61_unterminated_block_comment_is_an_error(void) {
+   const char *bad[] = {
+      "#!aml\nx := 1; /* never closed",                       // after the first statement, at EOF
+      "#!aml\nx := 1; /* never closed\ny := 2;\n",            // swallows the later statement
+      "#!aml\nx := {\n  a := 1; /* never closed\n  b := 2;\n};\n", // inside an object
+      "#!aml\nx := [ 1, /* never closed\n 2 ];\n",            // inside an array
+      "#!aml\nx := ( 1, /* never closed\n 2 );\n",            // inside a tuple
+      "#!aml\nx @[a=1, /* never closed\n b=2] := 1;\n",       // inside an attribute list
+      "#!aml\nx := 1;\n/* never closed\n",                    // on its own line
+      "#!amp\nx := 1; /* never closed\ny := 2;\n",            // AMP
+      "#!aml\nx := 1; /*",                                    // just the opener
+   };
+   for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      anvil_document doc = anvil_load_buffer(bad[i], strlen(bad[i]));
+      char msg[160] = {0};
+      size_t line = 0, col = 0, want_line = 0, want_col = 0;
+      bool have = doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col);
+      pos_of(bad[i], "/*", &want_line, &want_col);
+      if (!have || strstr(msg, "Unterminated") == NULL || line != want_line || col != want_col) {
+         printf("    ANV61: input %zu: have=%d msg=\"%s\" at %zu:%zu, want %zu:%zu\n", i, (int)have, msg,
+                line, col, want_line, want_col);
+      }
+      TestBit.is_true(have && strstr(msg, "Unterminated block comment") != NULL && line == want_line &&
+                         col == want_col, bad[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+static void test_anv62_terminated_comments_still_load(void) {
+   const char *good[] = {
+      "#!aml\nx := 1; /* closed */",                  // closed comment ending exactly at EOF
+      "#!aml\n/* header-only, closed */",             // a document that is only a comment
+      "#!aml\nx := 1; /* closed */ y := 2;\n",        // between statements
+      "#!aml\nx := [ 1, /* c */ 2 ];\n",              // inside an array
+      "#!aml\nx := {\n /* c */ a := 1;\n};\n",        // inside an object
+      "#!aml\nx @[a=1, /* c */ b=2] := 1;\n",         // inside an attribute list
+      "#!aml\nx := 1; // line comment at EOF",        // a line comment is never 'unterminated'
+      "#!aml\nx := 1; /* multi\nline */ y := 2;\n",
+   };
+   for (size_t i = 0; i < sizeof(good) / sizeof(good[0]); i++) {
+      anvil_document doc = anvil_load_buffer(good[i], strlen(good[i]));
+      TestBit.is_true(doc && !anvil_has_errors(doc), good[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+/* The terminator must stay on the same line as its value - deliberate, documented in
+ * notes/document-body-parse.md ("Resolved questions" #1), pinned here for every value kind. */
+static void test_anv63_terminator_must_share_the_values_line(void) {
+   const char *values[] = {"1", "1.5", "\"s\"", "bare", "true", "null", "`blob`", "[ 1, 2 ]", "( 1, 2 )",
+                           "{ a := 1; }"};
+   for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+      char same[96], split[96], tab[96];
+      snprintf(same, sizeof(same), "#!aml\nx := %s ;\ny := 2;\n", values[i]);
+      snprintf(tab, sizeof(tab), "#!aml\nx := %s\t;\ny := 2;\n", values[i]);
+      snprintf(split, sizeof(split), "#!aml\nx := %s\n;\ny := 2;\n", values[i]);
+      anvil_document ok = anvil_load_buffer(same, strlen(same));
+      anvil_document ok2 = anvil_load_buffer(tab, strlen(tab));
+      anvil_document bad = anvil_load_buffer(split, strlen(split));
+      char msg[120] = {0};
+      size_t line = 0, col = 0;
+      TestBit.is_true(ok && !anvil_has_errors(ok) && ok2 && !anvil_has_errors(ok2),
+                      values[i]);
+      TestBit.is_true(bad && anvil_has_errors(bad) && detail_of(bad, msg, sizeof(msg), &line, &col) &&
+                         strstr(msg, "';'") != NULL,
+                      "a newline before ';' is an error with the missing-';' message");
+      if (ok) anvil_dispose(ok);
+      if (ok2) anvil_dispose(ok2);
+      if (bad) anvil_dispose(bad);
+   }
+   anvil_document c = ATTR_LOAD("#!aml\nx := 1; // trailing comment after the ';'\ny := 2;\n");
+   TestBit.is_true(c && !anvil_has_errors(c), "a comment AFTER the ';' is fine");
+   if (c) anvil_dispose(c);
+   anvil_document cb = ATTR_LOAD("#!aml\nx := 1 // comment before the ';'\n;\n");
+   TestBit.is_true(cb && anvil_has_errors(cb), "a comment before the ';' is an error");
+   if (cb) anvil_dispose(cb);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1802,6 +1902,13 @@ int main(void) {
 
    TestBit.run_ex("ANV60_PARSER_ERRORS_HAVE_SPECIFIC_MESSAGES", NULL,
                   test_anv60_parser_errors_have_specific_messages, th);
+
+   TestBit.run_ex("ANV61_UNTERMINATED_BLOCK_COMMENT_IS_AN_ERROR", NULL,
+                  test_anv61_unterminated_block_comment_is_an_error, th);
+   TestBit.run_ex("ANV62_TERMINATED_COMMENTS_STILL_LOAD", NULL,
+                  test_anv62_terminated_comments_still_load, th);
+   TestBit.run_ex("ANV63_TERMINATOR_MUST_SHARE_THE_VALUES_LINE", NULL,
+                  test_anv63_terminator_must_share_the_values_line, th);
 
    return TestBit.report();
 }

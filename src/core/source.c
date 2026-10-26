@@ -508,6 +508,9 @@ static usize source_match_token(anvl_source src, const char *token, usize len) {
 /* ----------------------------------------------------------------------- *
  * Whitespace and comment skipping
  * ----------------------------------------------------------------------- */
+static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize line, usize column,
+                                    const char *file, anvl_err_code *out_err_code);
+
 static usize source_skip_whitespace_and_comments(anvl_source src) {
    if (!src || !src->buffer.bucket) {
       return 0;
@@ -537,16 +540,27 @@ static usize source_skip_whitespace_and_comments(anvl_source src) {
 
       // block comment
       if (c == '/' && src->pos + 1 < src->length && data[src->pos + 1] == '*') {
+         usize open_line = src->line, open_col = src->col; // where the comment OPENS
          source_consume(src, 2);
          skipped += 2;
+         bool closed = false;
          while (src->pos < src->length) {
             if (data[src->pos] == '*' && src->pos + 1 < src->length && data[src->pos + 1] == '/') {
                source_consume(src, 2);
                skipped += 2;
+               closed = true;
                break;
             }
             source_consume(src, 1);
             skipped++;
+         }
+         if (!closed) {
+            // A comment that never closes swallows the rest of the document, silently: record it
+            // where it opened (BR-2610-anvl-parser-002). First-error-wins keeps this the reported
+            // error even though the parser then runs into the end of the source.
+            anvl_err_code ignored = ANVL_ERR_NONE;
+            source_set_error(src, ANVL_ERR_PARSER_UNTERMINATED_COMMENT, open_line, open_col, NULL,
+                             &ignored);
          }
          continue;
       }
