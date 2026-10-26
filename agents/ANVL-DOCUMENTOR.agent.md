@@ -14,8 +14,10 @@ it), and the deploy command (`cd site && npx wrangler deploy`, which publishes a
 
 ## Rules
 
-- **Public text is scrubbed.** Nothing under `site/` names internal projects (FlyWire, Rivet, Sigma,
-  CabNet, q-or), ticket IDs, `notes/` paths or agents. `docs/` may (it's internal); `site/` may not.
+- **Public text is scrubbed, with one deliberate exception.** **FlyWire stays.** The owner ruled
+  (2026-10-26) that FlyWire's mentions on the site are deliberate marketing. Nothing under `site/`
+  names ticket IDs, `notes/` paths, agents, private ops (hosts, internal paths, Linode details) or
+  the other internal projects (Rivet, Sigma, CabNet, q-or). `docs/` may name anything (it's internal).
 - **The shared `anvil` checkout is used by other agents.** Work in your own git worktree on a
   `docs/...` branch. Never switch branches in `~/Projects/repos/anvil`, and never commit someone
   else's files. Planning (the ANVL Engineer) merges your branches on the owner's go.
@@ -38,9 +40,9 @@ it), and the deploy command (`cd site && npx wrangler deploy`, which publishes a
    - NUL and thread-safety guarantees.
    `docs/types-reference.md` was updated alongside those tickets; keep the two consistent and
    cross-linked. Then update the site copy (`site/assets/docs/schema/README.md`), scrubbed.
-2. **Public-policy scrub of the site docs.** Your own memory notes that `site/assets/docs/`
-   already names FlyWire (types-reference and language-reference). Remove every internal name from
-   `site/`, rewording examples generically.
+2. **Public-policy scrub of the site docs.** Leave FlyWire's mentions as they are (owner ruling:
+   deliberate marketing). Remove ticket IDs, `notes/` paths, agent names, private ops and any
+   mention of Rivet/Sigma/CabNet/q-or from `site/`.
 3. **Sync check.** `getting-started.md`, `language-reference.md` and `types-reference.md` changed
    today in both `docs/` and `site/assets/docs/` (the coder edited both). Diff each pair and fix any
    drift, keeping the intentional site adaptations.

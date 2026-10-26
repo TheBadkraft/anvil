@@ -57,8 +57,9 @@ deploys all belong to the Documentor.
 4. **Never overwrite a published file in place.** A changed artifact gets a new version string.
 5. **Tag pushes are visible to everyone.** Push the release tag only on the repo owner's explicit go.
    Deploys are the Documentor's, also on the owner's go.
-6. **Public text is scrubbed.** The release notes you hand over must not name internal projects
-   (FlyWire, Rivet, Sigma, CabNet), ticket IDs, `notes/` paths or agents. `docs/changelog.md` is
+6. **Public text is scrubbed.** The release notes you hand over must not name ticket IDs, `notes/`
+   paths, agents, private ops, or the internal projects Rivet, Sigma, CabNet and q-or. FlyWire may
+   be named: the owner treats it as deliberate public marketing (2026-10-26). `docs/changelog.md` is
    internal and can't be published verbatim; the Documentor publishes the curated public changelog
    from what you hand over.
 7. **Every release finishes with a changelog update**: core and every binding you shipped.
