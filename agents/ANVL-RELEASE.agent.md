@@ -75,6 +75,7 @@ Read these shared memories first: `anvil-dev-workflow`, `anvil-finish-with-chang
 | **Export check**: `nm -D` on any shipped `libanvil.so` lists the public schema/type-registry functions | core, net, py, java tarballs | BR-2610-anvl-visibility-001 |
 | **Checksum**: write a `SHA256SUMS` next to the tarballs and verify it after download | every artifact | integrity |
 | **Live check (post-deploy)**: rerun the install and grammar checks against the live anvldata.com URLs | every artifact | the hosted file is the real deliverable |
+| **Downstream acceptance**: run FlyWire's own guard test, `flywire/tests/test-anvl-binding-grammar.js`, against the extracted node and wasm tarballs (read-only use of the FlyWire checkout: point its binding dependency at the staged tarball in a scratch copy, never edit FlyWire). Record the result in the release notes, and notify the FlyWire Engineer and the Rivet Project Engineer with the version and the URLs once live. | node, wasm | FlyWire adopts a tarball only after this passes (BR-2610-anvl-distribution-001); running it before upload means it can't fail on their side after publication |
 
 Prove the grammar check works before you trust it: run it against the current published
 `0.8.0-rc` `anvil-node` tarball. It must **fail**. That's your genuine RED, per `anvil-dev-workflow`.

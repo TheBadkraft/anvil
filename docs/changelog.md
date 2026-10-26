@@ -182,6 +182,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`BR-2610-anvl-bindings-003`** (filed): `anvil.node`/`anvil.wasm` collapse a repeated object
   field name to its last occurrence (`count`, `get`, `entries`), while native/py/net keep all of
   them and find the first.
+- Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
+  against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
+  the release is live.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
