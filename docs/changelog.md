@@ -166,6 +166,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surface (FR-2610-anvl-bindings-001 slice 4) and the writer/builder (FR-2610-anvl-bindings-002
   second slice); today it compiles them in but exports nothing from them. The release
   (SR-2610-anvl-distribution-001, now owned by the Release agent) waits for all of Phase 4.
+- **`BR-2610-anvl-registry-001`** (filed): loading text identical to a live document fails with an
+  empty `Io` error. Underneath, the process-global source registry makes independent loads collide,
+  which three bindings have now hit separately. Part 1 fixes the message; Part 2 proposes scoping
+  dedup to one load's include graph.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
