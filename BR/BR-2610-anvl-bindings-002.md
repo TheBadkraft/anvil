@@ -77,7 +77,7 @@ the blob as `78 00 79`, and the later statements are intact. The source library 
 | `anvil.net` (`55f60f9`) | No bug. The UTF-8 string marshaler carries embedded NULs and the readers size by length. | Tests only: `NulTests`; 146 pass, 1 skipped. |
 | `anvil.py` (`2b63a75`) | No bug. ctypes passes `bytes` with an explicit length and the readers size by length. | Tests only: `tests/test_nul.py`; 107 pass. |
 
-**Native limits found, reported to planning and deliberately not worked around** (verified from C, so they are native
+**Native limits found, filed by planning as BR-2610-anvl-nul-001, and deliberately not worked around** (verified from C, so they are native
 and not binding bugs). The document itself loads completely; the loss is in what the type registry and schema *copy*:
 - The type registry truncates an enum label at a NUL (`anvil_type_def_get_value` returns 1 byte for `"a\0b"`).
 - The schema does the same for its own enum labels (`anvil_schema_field_get_value`).
