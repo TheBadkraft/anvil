@@ -234,6 +234,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
   against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
   the release is live.
+- **Grammar decision: newlines are allowed inside an attribute list** (owner, 2026-10-26). A
+  multi-line `@[ … ]` is valid and purely a style choice. The parser already accepted it, and
+  BR-2610-anvl-attr-001 keeps the whitespace out of values; the language reference will state it.
 - **`BR-2610-anvl-version-001`** (filed): the reported version is `MAJOR.MINOR.PATCH+BUILD-TAG`
   (not semver, so `0.8.0+0-rc` reads as a release), `ANVL_VERSION_STR` is a second, drifting
   source of truth, and Node/WASM builds hard-code `BUILD=0`. From the Release agent's audit.

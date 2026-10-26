@@ -46,6 +46,20 @@ it), and the deploy command (`cd site && npx wrangler deploy`, which publishes a
 3. **Sync check.** `getting-started.md`, `language-reference.md` and `types-reference.md` changed
    today in both `docs/` and `site/assets/docs/` (the coder edited both). Diff each pair and fix any
    drift, keeping the intentional site adaptations.
+3b. **State the attribute line-break rule** in `docs/language-reference.md` §5 (and its site copy).
+   Owner decision, 2026-10-26: whitespace, including newlines, is allowed anywhere between the
+   tokens of an attribute list. A multi-line list is valid, it's purely a style and readability
+   choice, and an attribute's value never includes the whitespace around it (BR-2610-anvl-attr-001).
+   Contrast it, in one sentence, with the one place a newline *is* significant: a statement's `;`
+   must stay on its value's line (§3). Example:
+   ```anvl
+   ticket @[
+      type=bug,
+      status="open"
+   ] {
+      title := "Login fails";
+   };
+   ```
 4. **The live site is stale.** Every page checked on 2026-10-26 differed from the repo. Prepare a
    deploy of the above. It can go out on the owner's go before the release, since the docs describe
    native behavior that's already merged. Say in your report whether anything in it describes a
