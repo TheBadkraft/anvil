@@ -24,3 +24,11 @@ mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 make_tarball() { # <parent dir> <dir name> <mtime ISO> -> $OUT/<dir name>.tar.gz
   tar --sort=name --mtime="$3" --owner=0 --group=0 --numeric-owner -cf - -C "$1" "$2" | gzip -n -9 > "$OUT/$2.tar.gz"
 }
+
+# libanvil.so for bindings that ship the library: taken from the staged core tarball (built from the
+# same tag with the same BUILD and already export-gated), so every artifact carries identical bytes.
+core_lib() { # <dest dir>
+  local tgz=$OUT/anvil-v$VERSION-linux-x86_64.tar.gz
+  [ -f "$tgz" ] || { echo "FAIL core tarball not staged: $tgz (run package-core.sh first)" >&2; return 1; }
+  tar -xzf "$tgz" -C "$1" --strip-components=1 "anvil-v$VERSION-linux-x86_64/lib/libanvil.so"
+}

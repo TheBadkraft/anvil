@@ -1,6 +1,8 @@
 """Release probe for anvil-py: argv[1] = extracted package dir (contains anvil/)."""
 import sys
-sys.path.insert(0, sys.argv[1])
+import os
+root = sys.argv[1]
+sys.path.insert(0, os.path.join(root, "src") if os.path.isdir(os.path.join(root, "src")) else root)
 from anvil import AnvilDocument
 
 print(f"version={AnvilDocument.get_version()}")
