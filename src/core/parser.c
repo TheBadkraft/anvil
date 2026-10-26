@@ -40,12 +40,13 @@
 #include <sigma/list.h>
 #include <sigma/time.h>
 
-// Parser state structure
+// Parser state structure. Per-thread (see `parser` below): the only thing it carries is the last
+// error code. It used to also hold a process-wide list of in-flight parse contexts, appended and
+// removed by position around every parse; that list existed only for anvl_cleanup to dispose
+// contexts a parse had not yet disposed itself, which never happens (anvl_parse disposes its own
+// context on every path), and concurrent loads corrupted it (BR-2610-anvl-registry-001, TSan).
 typedef struct {
-   // list of parser_state objects, one for each document being parsed
-   list state_map;         // List of parser_ctx for each document being parsed
    anvl_err_code err_code; // Error code for the parser state
-   bool is_initialized;    // Flag to indicate if the parser has been initialized
 } parser_state;
 typedef struct {
    anvl_source src; // The source being parsed
@@ -72,8 +73,9 @@ typedef struct {
    anvl_value_type value_type;
 } collection_spec_t;
 
-// Global parser state
-static parser_state parser = {0};
+// Per-thread parser state: two threads loading different documents must not share (or race on)
+// each other's last-error code. anvl_get_error() reports the calling thread's last parse.
+static _Thread_local parser_state parser = {0};
 
 // constant static data for reserved literals
 static const char *reserved_literals[] = {ANVL_KEYWORD_TRUE, ANVL_KEYWORD_FALSE, ANVL_KEYWORD_NULL};
@@ -137,9 +139,6 @@ anvl_result anvl_parse(anvl_source source) {
    //    goto error;
    // }
 
-   // tracking the state for the given source in the parser's state map
-   usize idx = List.size(parser.state_map);
-   (void)List.append(parser.state_map, ctx);
    anvl_result res = parse_source(ctx) ? ANVL_RES_OK : ANVL_RES_ERR;
 
    // Fire the instrumentation hook regardless of success/failure — how fast
@@ -153,7 +152,6 @@ anvl_result anvl_parse(anvl_source source) {
    }
 
    parser_dispose_ctx(&ctx);
-   List.remove(parser.state_map, idx); // Clean up the state map after parsing
 
    return res;
 
@@ -180,7 +178,7 @@ static anvl_err_code last_context_error(module_document doc) {
 // the full contract. Reuses parse_value_body completely unchanged, so every existing grammar
 // rule (empty collections, tuple arity, AMP's scalar-only element rule, AMP's object ban,
 // unterminated strings, ...) is inherited for free — no second, divergent copy of that
-// validation to keep in sync. Deliberately bypasses parser_init/parser.state_map entirely:
+// validation to keep in sync. Deliberately bypasses parser_init entirely:
 // those exist to track concurrent whole-document parses, which a single value expression has
 // no need of.
 anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value,
@@ -246,26 +244,9 @@ anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value
    }
    return ANVL_RES_OK;
 }
-// Clean up the parser state and free any allocated resources
-void anvl_cleanup(void) {
-   if (!parser.is_initialized) {
-      return; // Nothing to clean up
-   }
-
-   // Dispose of all parser contexts in the state map
-   usize count = List.size(parser.state_map);
-   for (usize i = 0; i < count; i++) {
-      parser_ctx *ctx = NULL;
-      List.get(parser.state_map, i, (object *)&ctx);
-      if (ctx) {
-         parser_dispose_ctx(&ctx);
-      }
-   }
-
-   List.dispose(parser.state_map);
-   parser.state_map = NULL;
-   parser.is_initialized = false;
-}
+// Reset the calling thread's parser state (its last error code). Nothing else is held between
+// parses: every parse disposes its own context.
+void anvl_cleanup(void) { parser.err_code = ANVL_ERR_NONE; }
 // Get the last error code from the parser state
 anvl_err_code anvl_get_error(void) { return parser.err_code; }
 // Register (or clear, with fn == NULL) the instrumentation hook
@@ -282,19 +263,8 @@ void anvl_parser_clear_hook(void) {
 /* ----------------------------------------------------------------- *
  * Internal Parser Function Implementations
  * ----------------------------------------------------------------- */
-// Initialize the parser state if not already initialized
-static bool parser_init(void) {
-   if (parser.is_initialized) {
-      return true; // Already initialized
-   }
-
-   // Initialize any global parser state here if needed
-   parser.state_map = List.new(4, ptr_size); // Initial capacity of 4, element size of pointer
-   parser.is_initialized = parser.state_map != NULL;
-   parser.err_code = parser.is_initialized ? ANVL_ERR_NONE : ANVL_ERR_PARSER_INITIALIZATION_FAILED;
-
-   return parser.is_initialized;
-}
+// Nothing to set up any more (see parser_state); kept as the single point anvl_parse calls first.
+static bool parser_init(void) { return true; }
 // Create a new parser context for the given source and return true on success, false on failure
 static bool parser_create_ctx(anvl_source source, context *out_ctx) {
    if (!source || !out_ctx) {
