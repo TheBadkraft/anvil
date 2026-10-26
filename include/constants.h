@@ -31,7 +31,20 @@
 #define ANVL_VERSION_MINOR 9
 #define ANVL_VERSION_PATCH 0
 #define ANVL_VERSION_TAG "rc"
-#define ANVL_VERSION_STR "0.9.0-rc"
+// Derived from the parts above, so the two cannot drift (BR-2610-anvl-version-001). It is the
+// version WITHOUT build metadata; the library reports it with `+BUILD` appended when BUILD is known.
+// (Needs a non-empty ANVL_VERSION_TAG; a tagless release would drop the "-" and the tag here.)
+#define ANVL_VERSION_XSTR_(x) #x
+#define ANVL_VERSION_XSTR(x) ANVL_VERSION_XSTR_(x)
+#define ANVL_VERSION_STR                                                                         \
+   ANVL_VERSION_XSTR(ANVL_VERSION_MAJOR) "." ANVL_VERSION_XSTR(ANVL_VERSION_MINOR)               \
+   "." ANVL_VERSION_XSTR(ANVL_VERSION_PATCH) "-" ANVL_VERSION_TAG
+
+// The build number, passed by the build as -DANVL_BUILD=<n> (a commit count, or the release tag's
+// count). 0 or unset means "unknown" and is left out of the reported version entirely.
+#ifndef ANVL_BUILD
+#define ANVL_BUILD 0
+#endif
 
 /* ----------------------------------------------------------------------- *
  * Constants                                                               *

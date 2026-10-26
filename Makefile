@@ -3,7 +3,11 @@ STD = c2x
 AR = ar
 STRIP = strip
 
-BUILD_NUM := $(shell git rev-list --count HEAD)
+# The build number reported as `+BUILD`: an explicit override (make ANVL_BUILD=176, or BUILD_NUM=176, or
+# the environment) wins, so a release build can pass the tag's count and not depend on the checkout; else
+# the commit count of HEAD; else 0, which the library reports as "unknown" (no `+BUILD`), e.g. in an
+# extracted tarball with no .git. (BR-2610-anvl-version-001.)
+BUILD_NUM := $(or $(ANVL_BUILD),$(BUILD_NUM),$(shell git rev-list --count HEAD 2>/dev/null),0)
 
 # sigma.core: a real system-installed dependency, not vendored into this repo and not a
 # sibling-relative path either (FR-2609-sigmem-001) -- see notes/sigma-system-alloc-dependency.md
@@ -104,7 +108,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -149,6 +153,13 @@ $(RELEASE_OBJ)/%.o: src/%.c
 -include $(DEBUG_OBJS:.o=.d)
 -include $(RELEASE_OBJS:.o=.d)
 
+# -D flags are not tracked by -MMD, so anvil.o (the only object that reads ANVL_BUILD) would keep a stale
+# `+BUILD` after the number changes (a new commit, or an explicit ANVL_BUILD=). A stamp file holding the
+# number, rewritten only when it changes, makes the object depend on it (BR-2610-anvl-version-001).
+BUILD_STAMP = build/.anvl_build_number
+$(shell mkdir -p build; printf '%s\n' '$(BUILD_NUM)' | cmp -s - $(BUILD_STAMP) 2>/dev/null || printf '%s\n' '$(BUILD_NUM)' > $(BUILD_STAMP))
+$(DEBUG_OBJ)/core/anvil.o $(RELEASE_OBJ)/core/anvil.o: $(BUILD_STAMP)
+
 # Builds the reader-only bundle (WITH_WRITER=0) into its own directories, then checks it: no
 # anvil_writer_*/anvil_builder_* function or `Writer`/`Builder` vtable symbol, and a program using only the reader API links
 # against it. The full bundle must still carry both.
@@ -191,6 +202,10 @@ check-tsan:
 # test_release must never link a stale archive (SR-2610-anvl-build-001); scripts/check-test-release-fresh.sh.
 check-test-release-fresh:
 	sh scripts/check-test-release-fresh.sh
+
+# The reported version is semver and honors an explicit build number (scripts/check-version.sh).
+check-version:
+	sh scripts/check-version.sh
 
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release

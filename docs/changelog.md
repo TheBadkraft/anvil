@@ -269,6 +269,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **The reported version is now valid semver** (`BR-2610-anvl-version-001`, native half): the library built
+  `MAJOR.MINOR.PATCH+BUILD-TAG` (`0.9.0+0-rc`), which any semver parser reads as the release `0.9.0` with
+  build metadata `0-rc`. It is now `MAJOR.MINOR.PATCH[-TAG][+BUILD]`, with the pre-release tag before the
+  build metadata (`0.10.0-rc+176`), and `+BUILD` is left out when the build number is 0 or not provided
+  ("unknown", never a fake `+0`). `ANVL_VERSION_STR` is now derived from the version parts and can no longer
+  drift from what the library reports; it is the reported version without `+BUILD`. Every Makefile takes an
+  explicit build number (`make ANVL_BUILD=176`, `BUILD_NUM=176`, or the environment), so a release build can
+  pass the tag's commit count and not depend on the checkout; the default is the commit count, and 0 (no
+  `+BUILD`) when there is no git (an extracted tarball). A build-number stamp makes `anvil.o` rebuild when the
+  number changes (a `-D` flag isn't tracked by dependency files). `-DANVL_BUILD=0` (what the node and wasm
+  builds hard-code today) now reports no `+BUILD`. New `make check-version`. The binding build halves are
+  tracked in the same ticket.
 - **An attribute value's span now ends at the value, not at the next delimiter** (`BR-2610-anvl-attr-001`):
   the attribute scanners (statement and module attributes) ran each value on to the next `,` or `]`, so
   whitespace before the delimiter became part of the raw value: `@[a="1" , b="2"]` gave `a` the raw value
