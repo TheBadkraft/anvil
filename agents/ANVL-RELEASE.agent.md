@@ -107,6 +107,11 @@ is a recorded, deliberate deferral.
 - **BR-2610-anvl-attr-001** is merged on native `main` (attribute values carrying trailing
   whitespace; filed 2026-10-26 and release-blocking). The core release is cut from a `main` that
   includes it.
+- **BR-2610-anvl-version-001** is fixed in both halves (semver `0.10.0-rc+BUILD`, BUILD override in
+  the core Makefile, `ANVL_BUILD` from the environment in `binding.gyp`/`build.sh`). Your contract:
+  compute BUILD once as `git rev-list --count v0.10.0-rc`, pass it to every artifact's build, and
+  require the identical string everywhere.
+- Build anvil.java against the tag's `libanvil.so`, never the shared checkout's `../anvil/lib`.
 - R1 and R2 are answered (above).
 
 **Order:**
