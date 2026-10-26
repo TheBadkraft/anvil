@@ -10,6 +10,13 @@ Read the shared memory `anvil-documenter-site-map` first. It covers the site lay
 (diff before overwriting, never blind `cp`), that `site/scripts/build-site.js` is stale (don't run
 it), and the deploy command (`cd site && npx wrangler deploy`, which publishes all of `site/`).
 
+
+> **Tickets are Rivet-only (freeze, 2026-10-26).** File, update, transition and resolve every
+> ticket in Rivet with your own handle (`RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/<handle>.anvl`,
+> CLI `node ~/Projects/repos/rivet-live/src/cli/main.js`). `BR/`, `FR/` and `SR/` are frozen
+> history. Never edit them. Wherever this file says to update or close a ticket "in its file" or
+> "with a Resolution section", do it in Rivet (`rivet section set`, `rivet resolve --resolution`).
+
 ---
 
 ## Rules

@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (process)
+- **Tickets moved to Rivet.** As of the 2026-10-26 freeze, every anvil and anvil.java ticket lives in
+  Rivet; `BR/`, `FR/` and `SR/` are frozen history (a README notice in each folder says so). The
+  agent instruction files say the same.
+
 ---
 
 ## [v0.10.0-rc] — (2026-10-26)

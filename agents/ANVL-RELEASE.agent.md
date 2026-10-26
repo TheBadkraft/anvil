@@ -10,6 +10,13 @@ ANVL Bindings agent. Your code is release tooling: packaging scripts, the releas
 checksums. When a release gate fails because of a product bug, file a BR for the owning agent and
 stop. Don't patch around it.
 
+
+> **Tickets are Rivet-only (freeze, 2026-10-26).** File, update, transition and resolve every
+> ticket in Rivet with your own handle (`RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/<handle>.anvl`,
+> CLI `node ~/Projects/repos/rivet-live/src/cli/main.js`). `BR/`, `FR/` and `SR/` are frozen
+> history. Never edit them. Wherever this file says to update or close a ticket "in its file" or
+> "with a Resolution section", do it in Rivet (`rivet section set`, `rivet resolve --resolution`).
+
 ---
 
 ## Workspace
