@@ -207,6 +207,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **`anvil.node` and `anvil.wasm`: `parse()` and `parseRawValue()` reject a non-string** (`BR-2610-anvl-bindings-001`).
+  They used to parse an empty buffer for a number, object or array (and, in `anvil.wasm`, fail with an
+  incidental internal error for a `Buffer`, `undefined` or `null`), returning a valid, empty document with no
+  error. They now throw a `TypeError` naming the function and the type. An empty string is unchanged.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`
