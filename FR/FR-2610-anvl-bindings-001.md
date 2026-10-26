@@ -208,3 +208,31 @@ V8's own GC stack scanner (none has an `anvil_node` frame).
 - **Next:** slice 2 (`anvil.py`) and slice 4 (`anvil.wasm`), and FR-2610-anvl-bindings-002's
   `anvil.wasm` slice, which should reuse this exact surface and result shapes.
 
+### Slice 4: `anvil.wasm` — done (Bindings agent, 2026-10-26)
+
+Branch `feat/FR-2610-anvl-bindings-001-wasm` in `anvil.wasm`, commit `b8829ba`, on `fix/BR-2610-anvl-bindings-001`
+(which is on the vendor-bump branch, pin `f9ee783`). Not yet merged or pushed. 123/123 tests (60 new). TDD: stubs
+and the full test set first (50 failing), then the C, the `emcc` build on the Linode box, and the JS.
+
+- **Surface and result shapes are `anvil.node`'s** (the tests are derived from `anvil.node`'s by script, so they
+  assert the same thing): `TypeRegistry`, `Schema` with `validate`, `validateValue`, `validateField` and its `each`
+  form, `diagnostics`, `fields`, `findField`, `SchemaField`, and the four frozen enums.
+- **Twelve native entry points** are exported from `src/binding.c` (`anvil_wasm_registry_*`, `anvil_wasm_schema_*`),
+  so the linker no longer drops the types and schema code: the `.wasm` grows from 87 KB to 131 KB.
+- **Differences forced by the runtime**, all documented in the `anvil.wasm` README:
+  - Includes and `loadFile` need a filesystem, and the module has none. The module's in-memory filesystem is
+    exported (`FS`, `FORCE_FILESYSTEM`) and `writeFile(path, textOrBytes)`/`removeFile(path)` fill it. File loaders
+    resolve includes beside the file; text loaders against `/`.
+  - Handles are WASM heap memory, which nothing reclaims, so `dispose()` frees one and a `FinalizationRegistry`
+    frees an abandoned one (this is the mechanism the FR originally named; `anvil.node` uses an N-API finalizer).
+    Measured: abandoned handles with GC plateau at the same ~2 MB per 30,000 rounds as explicit disposal; without
+    GC they grow (38 MB), which is why the docs say to call `dispose()` in loops.
+- **The decision's web-path smoke test is `test/web-path.test.js`.** It evaluates `dist/anvil.js` in a sandbox with no
+  `process`, so Emscripten takes its `ENVIRONMENT=web` branch and fetches the `.wasm` over `fetch`, then validates a
+  batch and loads a schema from the in-memory filesystem. It is not a real browser (no DOM, no real network), but it
+  is the same code path, and it is the only test that runs that branch.
+- **Known limits** shared with `anvil.node`: `min`/`max` are JS numbers. A limit specific to `anvil.wasm`: text is passed
+  NUL-terminated, see **BR-2610-anvl-bindings-002**.
+- **`dist/` is not committed.** Anyone checking out the branch must rebuild it (`build.sh` on the Linode box, with
+  `build-sigma-system-alloc.sh` run once) before the tests can pass; `test/vendor-pin.test.js` fails a stale `dist/`.
+

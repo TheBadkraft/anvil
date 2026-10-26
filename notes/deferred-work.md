@@ -216,3 +216,13 @@ Done and resolved; see the FR's Resolution. Still open:
 - **A bytes-capable loader for `anvil.node`** (`parse(Buffer)` meaning something, plus `AnvlNode.asBytes()`). Today a blob written from non-UTF-8 bytes is emitted exactly but reads back lossy, because the loader takes a JS string. New surface, so its own FR, and sequenced after **BR-2610-anvl-bindings-001** (`parse()` silently returns an empty document for any non-string).
 - **`numeric()` exponent sign.** The native writer rejects `1.5e3` and requires `1.5e+3`, while the reader accepts `1e3`. Probably intended; worth confirming with the coder agent before a binding documents it as a rule.
 - **FlyWire's hand-built ANVL** (`src/am-packet.js`, `harness/server.js`) can move to `AnvilWriter` once `anvil-node` 0.9.x is published; that change is FlyWire's.
+
+## Deferred — bindings: `anvil.wasm` types, schema, writer and builder
+
+Slice 4 of FR-2610-anvl-bindings-001 and the wasm slice of FR-2610-anvl-bindings-002 are done on branches; see the FRs. Still open:
+
+- **BR-2610-anvl-bindings-002:** `anvil.wasm` text entry points are NUL-terminated, so a document containing a NUL is silently cut. Needs a length parameter on the `anvil_wasm_*` text functions.
+- **`dist/` for `anvil.wasm` is not in git.** Every checkout must rebuild it on the Linode box before its tests pass; the planned CI (`anvil-ci-plan-is-linode-based`) is where that belongs.
+- **A real-browser test.** `test/web-path.test.js` exercises the `ENVIRONMENT=web` branch in a Node sandbox, not a browser. FlyWire's browser client is the first real consumer.
+- **A bytes-capable loader** (see BR-2610-anvl-bindings-001's Notes) applies to `anvil.wasm` as much as `anvil.node`.
+

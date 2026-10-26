@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil.wasm` gains the type registry, schema, writer and builder** (`FR-2610-anvl-bindings-001` slice 4 and
+  `FR-2610-anvl-bindings-002`'s wasm slice): the same surface and result shapes as `anvil.node`, including
+  `validateField` with `each` and `schema.fields`, so a JS caller has one API on the server and in the browser. The
+  module's in-memory filesystem is exposed (`writeFile`/`removeFile`) so schemas can include `@[types]` documents.
+  The `.wasm` grows to about 150 KB because the types, schema and writer code is now reachable. Built on the pin
+  `f9ee783`. Found while porting: `anvil.wasm`'s `parse()` cuts a document at an embedded NUL (`BR-2610-anvl-bindings-002`).
 - **`anvil.node` gains `schema.validateField` and schema introspection** (`FR-2610-anvl-bindings-001`,
   slice 1b): `validateField(docText, name, opts)` validates a statement of a document you already
   hold as ANVL text in one call, with an `each` form for batch bodies (violations at `[i].field`),

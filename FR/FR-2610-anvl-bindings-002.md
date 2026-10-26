@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** flywire, rivet (downstream consumers)
-**Status:** in progress — `anvil.node` slice done (see Resolution); `anvil.wasm` slice open
+**Status:** resolved — `anvil.node` and `anvil.wasm` slices done (see Resolution)
 **Tags:** bindings, anvil-node, writer, builder, amp, rivet-readiness
 
 ---
@@ -96,4 +96,22 @@ N-API entry points.
   it documents the published `0.8.0-rc` download); a bytes-capable loader and `asBytes()`; the
   FlyWire call sites (`src/am-packet.js`, `harness/server.js`) still concatenate by hand, and
   switching them over is FlyWire's change to make.
+
+## Resolution (`anvil.wasm` slice)
+
+Bindings agent, 2026-10-26. Branch `feat/FR-2610-anvl-bindings-002-wasm` in `anvil.wasm`, commit `8e72de9`, on the
+slice-4 branch above it. Not yet merged or pushed. 160/160 tests (37 new in `test/writer.test.js`, derived from
+`anvil.node`'s by script). TDD: stubs and the full test set first (36 failing), then the C, the `emcc` build, and the JS.
+
+- **Same surface as `anvil.node`:** `AnvilWriter`, `AnvilBuilder`, `AnvilNode`, `AnvilMember`, `AnvilWriterError`, and the
+  frozen `AnvilDialect` and `WriterErrorCode`, the latter two pinned against `anvil_writer_types.h`.
+- **Twenty-five native entry points** in the new `src/writer_binding.c`, so the writer is no longer dropped by the
+  linker (`.wasm` ~150 KB). Node and member pointers cross as plain numbers.
+- **Differences forced by the runtime** (README): output bytes are a `Uint8Array`, not a `Buffer`; integers are written
+  as exact decimal text through the numeric entry point, so no 64-bit value crosses the JS/WASM boundary and a `bigint`
+  of any size is exact; `build.sh` also exports `HEAPU8`.
+- **A finding, filed as BR-2610-anvl-bindings-002:** `anvil.wasm`'s `parse()` hands text to the module NUL-terminated,
+  so a document containing a NUL is cut at it, silently. The writer emits a NUL exactly (it is length-delimited), so the
+  FR's string round-trip test could not include a NUL in wasm; the test asserts the writer's bytes instead and cites the BR.
+- **Deferred:** the `Bindings-Guide.md` `anvil.wasm` section, to the release (Release agent, then Documenter).
 
