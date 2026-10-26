@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Quantum Override. All rights reserved.              *
  * SPDX-License-Identifier: Proprietary                                   *
  * ---------------------------------------------------------------------- *
- * test_registry.c - Unit tests for source hash registry                  *
+ * test_registry.c - Unit tests for the context-scoped source registry    *
  * ---------------------------------------------------------------------- *
  * Author: BadKraft                                                       *
  * File: test/unit/test_registry.c                                        *
@@ -18,88 +18,164 @@
 #include "std.h"
 // ----------------
 #include "../utilities/debug.h"
+#include <sigma/list.h>
 #include <sigma/types.h>
+#include <string.h>
 
-static void tr(void) { Registry.clear(); }
+/* The registry is scoped to one module_context (BR-2610-anvl-registry-001): these tests build their
+ * own contexts, and two contexts never see each other's documents. */
 
-/* ---------------------------------------------------------------------- *
- * REG00 — Registry starts empty
- * ---------------------------------------------------------------------- */
-static void test_reg00_registry_starts_empty(void) {
-   TestBit.is_equal_int(0, (long long)Registry.count(), "REG00: registry count is 0 at start");
+// A stub document whose source holds `text`, not yet registered anywhere.
+static module_document make_doc(const char *text) {
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   module_document doc = Debug.stub_doc(NULL);
+   Source.create(&doc->source, &err_code);
+   Source.from_buffer(&doc->source, text, strlen(text), &err_code);
+   return doc;
 }
 
-/* ---------------------------------------------------------------------- *
- * REG01 — add a document and find it by hash
- * ---------------------------------------------------------------------- */
-static void test_reg01_add_and_find(void) {
-   module_document doc = Debug.stub_doc(NULL);
-   TestBit.is_not_null(doc, "REG01: stub document allocated");
-
-   // create then load a buffer so the source has a non-zero hash
-   const char *buffer = "name := test\n";
+static module_context make_ctx(void) {
+   module_context ctx = NULL;
    anvl_err_code err_code = ANVL_ERR_NONE;
-   Source.create(&doc->source, &err_code);
-   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
-   TestBit.is_equal_int(ANVL_ERR_NONE, err_code, "REG01: buffer load succeeds");
+   mod_ctx_initialize(NULL, &ctx, &err_code);
+   return ctx;
+}
 
+/* REG00 - a fresh context's registry starts empty */
+static void test_reg00_registry_starts_empty(void) {
+   module_context ctx = make_ctx();
+   TestBit.is_not_null(ctx, "REG00: context created");
+   TestBit.is_equal_int(0, (long long)Registry.count(ctx), "REG00: registry count is 0 at start");
+   TestBit.is_equal_int(0, (long long)Registry.count(NULL), "REG00: count(NULL) is 0");
+   Debug.dispose_ctx(ctx);
+}
+
+/* REG01 - add a document and find it by hash; its source points back at it */
+static void test_reg01_add_and_find(void) {
+   module_context ctx = make_ctx();
+   module_document doc = make_doc("name := test\n");
    uint64_t hash = Source.hash(doc->source);
    TestBit.is_true(hash != 0, "REG01: source hash is non-zero");
+   TestBit.is_true(doc->source->owner == NULL, "REG01: no owner before registration");
 
-   anvl_result res = Registry.add(doc, &err_code);
-   TestBit.is_equal_int(ANVL_RES_OK, res, "REG01: registry add returns OK");
-   TestBit.is_equal_int(1, (long long)Registry.count(), "REG01: registry count is 1 after add");
-
-   module_document found = Registry.find(hash);
-   TestBit.is_not_null(found, "REG01: registered document found by hash");
-   TestBit.is_true(found == doc, "REG01: found document matches registered document");
-
-   Debug.dispose_doc(doc);
-}
-
-/* ---------------------------------------------------------------------- *
- * REG02 — find on unknown hash returns NULL
- * ---------------------------------------------------------------------- */
-static void test_reg02_find_unknown_returns_null(void) {
-   module_document found = Registry.find(UINT64_MAX);
-   TestBit.is_null(found, "REG02: find on unknown hash returns NULL");
-}
-
-/* ---------------------------------------------------------------------- *
- * REG03 — duplicate hash registration fails
- * ---------------------------------------------------------------------- */
-static void test_reg03_duplicate_hash_fails(void) {
-   const char *buffer = "name := test\n";
    anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, Registry.add(ctx, doc, &err_code), "REG01: add returns OK");
+   TestBit.is_equal_int(1, (long long)Registry.count(ctx), "REG01: count is 1 after add");
+   TestBit.is_true(Registry.find(ctx, hash) == doc, "REG01: found by hash");
+   TestBit.is_true(doc->source->owner == doc, "REG01: the source's owner is its document");
 
-   module_document doc1 = Debug.stub_doc(NULL);
-   Source.create(&doc1->source, &err_code);
-   Source.from_buffer(&doc1->source, buffer, strlen(buffer), &err_code);
-   uint64_t hash = Source.hash(doc1->source);
+   Registry.remove(ctx, hash);
+   Debug.dispose_doc(doc);
+   Debug.dispose_ctx(ctx);
+}
 
-   module_document doc2 = Debug.stub_doc(NULL);
-   Source.create(&doc2->source, &err_code);
-   Source.from_buffer(&doc2->source, buffer, strlen(buffer), &err_code);
+/* REG02 - find on an unknown hash, or with no context, returns NULL */
+static void test_reg02_find_unknown_returns_null(void) {
+   module_context ctx = make_ctx();
+   TestBit.is_null(Registry.find(ctx, UINT64_MAX), "REG02: unknown hash returns NULL");
+   TestBit.is_null(Registry.find(ctx, 0), "REG02: hash 0 returns NULL");
+   TestBit.is_null(Registry.find(NULL, 1), "REG02: no context returns NULL");
+   Debug.dispose_ctx(ctx);
+}
 
-   TestBit.is_equal_int((long long)hash, (long long)Source.hash(doc2->source),
+/* REG03 - a duplicate hash in the SAME context fails with the dedicated code */
+static void test_reg03_duplicate_hash_fails(void) {
+   module_context ctx = make_ctx();
+   module_document doc1 = make_doc("name := test\n");
+   module_document doc2 = make_doc("name := test\n");
+   TestBit.is_equal_int((long long)Source.hash(doc1->source), (long long)Source.hash(doc2->source),
                         "REG03: identical buffers have identical hashes");
-
-   anvl_result res = Registry.add(doc1, &err_code);
-   TestBit.is_equal_int(ANVL_RES_OK, res, "REG03: first add succeeds");
-
-   res = Registry.add(doc2, &err_code);
-   TestBit.is_equal_int(ANVL_RES_ERR, res, "REG03: duplicate add fails");
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, Registry.add(ctx, doc1, &err_code), "REG03: first add succeeds");
+   TestBit.is_equal_int(ANVL_RES_ERR, Registry.add(ctx, doc2, &err_code),
+                        "REG03: duplicate add to the same context fails");
    TestBit.is_equal_int(ANVL_ERR_SOURCE_ALREADY_LOADED, err_code,
                         "REG03: with its own specific code, not a parser code");
-
+   TestBit.is_true(doc2->source->owner == NULL && doc1->source->owner == doc1,
+                   "REG03: the loser has no owner and the winner keeps its own");
+   Registry.remove(ctx, Source.hash(doc1->source));
    Debug.dispose_doc(doc1);
    Debug.dispose_doc(doc2);
+   Debug.dispose_ctx(ctx);
 }
 
+/* REG04 - the SAME hash in two different contexts is fine, and they never see each other */
+static void test_reg04_contexts_are_independent(void) {
+   module_context a = make_ctx(), b = make_ctx();
+   module_document da = make_doc("name := test\n");
+   module_document db = make_doc("name := test\n");
+   uint64_t hash = Source.hash(da->source);
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, Registry.add(a, da, &err_code), "REG04: add to context A");
+   TestBit.is_equal_int(ANVL_RES_OK, Registry.add(b, db, &err_code),
+                        "REG04: identical content added to context B succeeds");
+   TestBit.is_true(Registry.find(a, hash) == da && Registry.find(b, hash) == db,
+                   "REG04: each context finds its own document");
+   TestBit.is_true(da->source->owner == da && db->source->owner == db,
+                   "REG04: each source points at its own document");
+   Registry.remove(a, hash);
+   TestBit.is_null(Registry.find(a, hash), "REG04: removing from A unregisters it there");
+   TestBit.is_true(Registry.find(b, hash) == db && db->source->owner == db,
+                   "REG04: and leaves B's registration untouched");
+   Registry.remove(b, hash);
+   Debug.dispose_doc(da);
+   Debug.dispose_doc(db);
+   Debug.dispose_ctx(a);
+   Debug.dispose_ctx(b);
+}
 
-/* ---------------------------------------------------------------------- *
- * REG08 (BR-2610-anvl-registry-001) - the dedicated code has a real message and name
- * ---------------------------------------------------------------------- */
+/* REG05 - remove by hash unregisters the document and clears its source's owner */
+static void test_reg05_remove_unregisters(void) {
+   module_context ctx = make_ctx();
+   module_document doc = make_doc("name := test\n");
+   uint64_t hash = Source.hash(doc->source);
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   Registry.add(ctx, doc, &err_code);
+   TestBit.is_equal_int(1, (long long)Registry.count(ctx), "REG05: count is 1 before remove");
+   Registry.remove(ctx, hash);
+   TestBit.is_equal_int(0, (long long)Registry.count(ctx), "REG05: count is 0 after remove");
+   TestBit.is_null(Registry.find(ctx, hash), "REG05: removed document not found");
+   TestBit.is_null(doc->source->owner, "REG05: and its source has no owner any more");
+   Registry.remove(ctx, hash); // removing something absent is a no-op
+   Registry.remove(NULL, hash);
+   Debug.dispose_doc(doc);
+   Debug.dispose_ctx(ctx);
+}
+
+/* REG06 - add rejects a NULL context/document and a source without a hash */
+static void test_reg06_add_rejects_invalid(void) {
+   module_context ctx = make_ctx();
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_ERR, Registry.add(ctx, NULL, &err_code), "REG06: NULL document");
+   TestBit.is_equal_int(ANVL_ERR_INVALID_ARGUMENT, err_code, "REG06: INVALID_ARGUMENT for NULL doc");
+   module_document doc = Debug.stub_doc(NULL);
+   TestBit.is_equal_int(ANVL_RES_ERR, Registry.add(ctx, doc, &err_code),
+                        "REG06: a document without a source fails");
+   module_document ok = make_doc("name := test\n");
+   TestBit.is_equal_int(ANVL_RES_ERR, Registry.add(NULL, ok, &err_code), "REG06: NULL context fails");
+   Debug.dispose_doc(doc);
+   Debug.dispose_doc(ok);
+   Debug.dispose_ctx(ctx);
+}
+
+/* REG07 - clear unregisters everything in a context and clears the owners */
+static void test_reg07_clear_empties_registry(void) {
+   module_context ctx = make_ctx();
+   module_document doc = make_doc("name := test\n");
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   Registry.add(ctx, doc, &err_code);
+   List.append(ctx->docs, doc);
+   TestBit.is_equal_int(1, (long long)Registry.count(ctx), "REG07: count is 1 before clear");
+   Registry.clear(ctx);
+   TestBit.is_equal_int(0, (long long)Registry.count(ctx), "REG07: count is 0 after clear");
+   TestBit.is_null(doc->source->owner, "REG07: the owner is cleared");
+   Registry.clear(ctx); // idempotent
+   List.remove(ctx->docs, 0);
+   Debug.dispose_doc(doc);
+   Debug.dispose_ctx(ctx);
+}
+
+/* REG08 - the dedicated code has a real message and name */
 static void test_reg08_already_loaded_code_has_message(void) {
    const char *msg = anvl_error_code_message(ANVL_ERR_SOURCE_ALREADY_LOADED);
    TestBit.is_true(strcmp(msg, "Unknown error") != 0 && strstr(msg, "identical") != NULL,
@@ -108,119 +184,54 @@ static void test_reg08_already_loaded_code_has_message(void) {
    TestBit.is_true(strcmp(name, "ANVL_ERR_SOURCE_ALREADY_LOADED") == 0, "REG08: and it has a name");
 }
 
-/* ---------------------------------------------------------------------- *
- * REG04 — remove by hash unregisters document
- * ---------------------------------------------------------------------- */
-static void test_reg04_remove_unregisters(void) {
-   const char *buffer = "name := test\n";
+/* REG09 - a source with no owner (never registered, or unregistered) is handled cleanly by every
+ * Source function that used to ask the registry: false / error / NULL, never a crash. This is what
+ * "Registry.find returned NULL" meant before the back-pointer. */
+static void test_reg09_ownerless_source_is_handled_cleanly(void) {
+   module_context ctx = make_ctx();
+   module_document doc = make_doc("name := test\n");
    anvl_err_code err_code = ANVL_ERR_NONE;
+   Registry.add(ctx, doc, &err_code);
+   doc->context = ctx; // mod_ctx_register_doc does this; the facade alone only registers
+   mod_ctx_create_arena(ctx, 4096, &err_code);
 
-   module_document doc = Debug.stub_doc(NULL);
-   Source.create(&doc->source, &err_code);
-   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
-   uint64_t hash = Source.hash(doc->source);
+   // Registered: everything works.
+   TestBit.is_true(Source.get_arena(doc->source, &err_code) != NULL, "REG09: arena while registered");
+   TestBit.is_equal_int(ANVL_RES_OK,
+                        Source.set_error(doc->source, ANVL_ERR_PARSER_UNEXPECTED_TOKEN, 1, 1, NULL, &err_code),
+                        "REG09: set_error while registered");
+   TestBit.is_true(Source.has_errors(doc->source), "REG09: has_errors while registered");
 
-   Registry.add(doc, &err_code);
-   TestBit.is_equal_int(1, (long long)Registry.count(), "REG04: registry count is 1 before remove");
-
-   Registry.remove(hash);
-   TestBit.is_equal_int(0, (long long)Registry.count(), "REG04: registry count is 0 after remove");
-   TestBit.is_null(Registry.find(hash), "REG04: removed document not found");
+   // Unregistered with the source still alive: the same calls fail cleanly.
+   Registry.remove(ctx, Source.hash(doc->source));
+   err_code = ANVL_ERR_NONE;
+   TestBit.is_false(Source.has_errors(doc->source), "REG09: has_errors is false without an owner");
+   TestBit.is_equal_int(ANVL_RES_ERR,
+                        Source.set_error(doc->source, ANVL_ERR_PARSER_UNEXPECTED_CHAR, 1, 1, NULL, &err_code),
+                        "REG09: set_error fails without an owner");
+   TestBit.is_true(err_code != ANVL_ERR_NONE, "REG09: with an error code");
+   TestBit.is_null(Source.get_arena(doc->source, &err_code), "REG09: no arena without an owner");
+   TestBit.is_null(Source.new_node(doc->source, ANVL_NODE_VALUE, &err_code),
+                   "REG09: no node without an owner");
+   TestBit.is_false(Source.has_errors(NULL), "REG09: NULL source");
 
    Debug.dispose_doc(doc);
-}
-
-/* ---------------------------------------------------------------------- *
- * REG05 — add rejects null document and source without hash
- * ---------------------------------------------------------------------- */
-static void test_reg05_add_rejects_invalid(void) {
-   anvl_err_code err_code = ANVL_ERR_NONE;
-
-   anvl_result res = Registry.add(NULL, &err_code);
-   TestBit.is_equal_int(ANVL_RES_ERR, res, "REG05: add NULL document fails");
-   TestBit.is_equal_int(ANVL_ERR_INVALID_ARGUMENT, err_code,
-                        "REG05: err_code is INVALID_ARGUMENT for NULL doc");
-
-   module_document doc = Debug.stub_doc(NULL);
-   res = Registry.add(doc, &err_code);
-   TestBit.is_equal_int(ANVL_RES_ERR, res, "REG05: add document without source hash fails");
-
-   Debug.dispose_doc(doc);
-}
-
-/* ---------------------------------------------------------------------- *
- * REG06 — clear empties the registry
- * ---------------------------------------------------------------------- */
-static void test_reg06_clear_empties_registry(void) {
-   const char *buffer = "name := test\n";
-   anvl_err_code err_code = ANVL_ERR_NONE;
-
-   module_document doc = Debug.stub_doc(NULL);
-   Source.create(&doc->source, &err_code);
-   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
-   Registry.add(doc, &err_code);
-   TestBit.is_equal_int(1, (long long)Registry.count(), "REG06: registry count is 1 before clear");
-
-   Registry.clear();
-   TestBit.is_equal_int(0, (long long)Registry.count(), "REG06: registry count is 0 after clear");
-
-   Debug.dispose_doc(doc);
-}
-
-/* ---------------------------------------------------------------------- *
- * REG07 — release keeps registry alive until final reference
- * ---------------------------------------------------------------------- */
-static void test_reg07_release_survives_multiple_refs(void) {
-   const char *buffer = "name := test\n";
-   anvl_err_code err_code = ANVL_ERR_NONE;
-
-   Registry.init();
-   Registry.init();
-
-   Registry.release();
-
-   module_document doc = Debug.stub_doc(NULL);
-   Source.create(&doc->source, &err_code);
-   Source.from_buffer(&doc->source, buffer, strlen(buffer), &err_code);
-   uint64_t hash = Source.hash(doc->source);
-
-   TestBit.is_equal_int(ANVL_RES_OK, Registry.add(doc, &err_code),
-                        "REG07: add succeeds while registry has remaining ref");
-   TestBit.is_equal_int(1, (long long)Registry.count(), "REG07: registry count is 1 after add");
-
-   Registry.release();
-   TestBit.is_equal_int(0, (long long)Registry.count(),
-                        "REG07: registry count is 0 after final release");
-   TestBit.is_null(Registry.find(hash), "REG07: document not found after final release");
-
-   Debug.dispose_doc(doc);
-}
-
-/* ---------------------------------------------------------------------- *
- * REG08 — release on uninitialized registry is a no-op
- * ---------------------------------------------------------------------- */
-static void test_reg08_release_noop_when_uninitialized(void) {
-   Registry.clear();
-   Registry.release();
-   TestBit.is_equal_int(0, (long long)Registry.count(),
-                        "REG08: release on cleared registry keeps count at 0");
+   Debug.dispose_ctx(ctx);
 }
 
 int main(void) {
-   TestBit.run_ex("REG00_registry_starts_empty", NULL, test_reg00_registry_starts_empty, tr);
-   TestBit.run_ex("REG01_add_and_find", NULL, test_reg01_add_and_find, tr);
-   TestBit.run_ex("REG02_find_unknown_returns_null", NULL, test_reg02_find_unknown_returns_null,
-                  tr);
-   TestBit.run_ex("REG03_duplicate_hash_fails", NULL, test_reg03_duplicate_hash_fails, tr);
+   TestBit.run_ex("REG00_registry_starts_empty", NULL, test_reg00_registry_starts_empty, NULL);
+   TestBit.run_ex("REG01_add_and_find", NULL, test_reg01_add_and_find, NULL);
+   TestBit.run_ex("REG02_find_unknown_returns_null", NULL, test_reg02_find_unknown_returns_null, NULL);
+   TestBit.run_ex("REG03_duplicate_hash_fails", NULL, test_reg03_duplicate_hash_fails, NULL);
+   TestBit.run_ex("REG04_contexts_are_independent", NULL, test_reg04_contexts_are_independent, NULL);
+   TestBit.run_ex("REG05_remove_unregisters", NULL, test_reg05_remove_unregisters, NULL);
+   TestBit.run_ex("REG06_add_rejects_invalid", NULL, test_reg06_add_rejects_invalid, NULL);
+   TestBit.run_ex("REG07_clear_empties_registry", NULL, test_reg07_clear_empties_registry, NULL);
    TestBit.run_ex("REG08_already_loaded_code_has_message", NULL,
-                  test_reg08_already_loaded_code_has_message, tr);
-   TestBit.run_ex("REG04_remove_unregisters", NULL, test_reg04_remove_unregisters, tr);
-   TestBit.run_ex("REG05_add_rejects_invalid", NULL, test_reg05_add_rejects_invalid, tr);
-   TestBit.run_ex("REG06_clear_empties_registry", NULL, test_reg06_clear_empties_registry, tr);
-   TestBit.run_ex("REG07_release_survives_multiple_refs", NULL,
-                  test_reg07_release_survives_multiple_refs, tr);
-   TestBit.run_ex("REG08_release_noop_when_uninitialized", NULL,
-                  test_reg08_release_noop_when_uninitialized, tr);
+                  test_reg08_already_loaded_code_has_message, NULL);
+   TestBit.run_ex("REG09_ownerless_source_is_handled_cleanly", NULL,
+                  test_reg09_ownerless_source_is_handled_cleanly, NULL);
 
    return TestBit.report();
 }

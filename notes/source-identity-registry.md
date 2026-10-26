@@ -1,5 +1,11 @@
 # Source Identity Registry
 
+> **Superseded in part (BR-2610-anvl-registry-001):** the registry is no longer process-wide. Each
+> `module_context` owns its own hash -> document map (`ctx->sources`), a source reaches its document
+> through `anvl_source_t::owner`, and independent loads of identical text no longer collide. Everything
+> below that says "process-wide"/"global" describes the original design; see the ticket for why it
+> changed.
+
 ## Status
 
 **Complete.** The transition from per-context namespace/doc_map identity to a

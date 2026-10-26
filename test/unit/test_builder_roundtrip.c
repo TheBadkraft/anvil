@@ -29,7 +29,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 static char *text_of(anvil_value v) {

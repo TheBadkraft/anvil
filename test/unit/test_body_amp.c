@@ -38,7 +38,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
    anvl_cleanup();
 }
 

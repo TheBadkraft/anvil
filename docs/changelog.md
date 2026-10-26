@@ -204,14 +204,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
-- **Loading text identical to a live document now reports a real error** (`BR-2610-anvl-registry-001`,
-  part 1): the failure surfaced as `ANVIL_ERR_IO` with an empty message because the registry reused the
-  unrelated parser code `ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT` and `load_common` recorded nothing.
-  There is now a dedicated internal code, `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical
-  content is already loaded"), and `anvil_document_get_error`'s detail carries that message (the public
-  category stays `ANVIL_ERR_IO`). The failed load leaves the live document untouched. The underlying
-  limitation (the registry is process-global, so identical text can't be loaded twice at once) is
-  unchanged; see the ticket for part 2.
+- **Independent loads of identical text now work, and concurrent loads no longer race**
+  (`BR-2610-anvl-registry-001`, part 2). Source deduplication was a process-global map, so loading text
+  identical to ANY live document anywhere in the process failed (the `anvil.node` `parse()` race, the
+  `anvil.net` xUnit flake, `AnvilSchema.ValidateField(text)`), value fragments with identical text
+  failed the same way (so two identical schema extension-key extras, such as `pooled := true` in two
+  fields, silently read back as NULL), and the unsynchronized map was a data race between threads
+  loading different text. Deduplication is now per module context (one load's include graph; a diamond
+  include still loads each shared document once), and each source points back at its document
+  directly, so there is no global lookup. Also removed the parser's process-wide in-flight context list
+  and made its last-error code per-thread (`anvl_get_error()` reports the calling thread's last
+  parse); that list was a second shared structure under concurrent loads. Under ThreadSanitizer, 8
+  threads loading, reading and disposing now report 0 races and 0 failures; before: 88-169 race reports
+  and up to 1590 failed loads. Internal only; no public ABI change. New `make check-tsan`.
+- **Loading text identical to a live document reports a real error** (`BR-2610-anvl-registry-001`,
+  part 1): `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical content is already loaded")
+  replaced a reused parser code and is recorded on the load's error detail. Within one include graph it
+  is what the diamond-include handling keys on.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`

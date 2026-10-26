@@ -27,7 +27,6 @@
 
 static void td(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -616,13 +615,13 @@ static void test_cr16_mod_dispose_releases_registry(void) {
 
    res = mod_ctx_register_doc(mod->context, doc, NULL, &err_code);
    TestBit.is_equal_int(ANVL_RES_OK, res, "CR16: register doc returns OK");
-   TestBit.is_equal_int(1, (long long)Registry.count(), "CR16: registry contains one document");
+   TestBit.is_equal_int(1, (long long)Registry.count(mod->context),
+                        "CR16: the context's registry contains one document");
+   TestBit.is_true(Registry.find(mod->context, hash) == doc && doc->source->owner == doc,
+                   "CR16: found by hash, and the source points back at its document");
 
    mod_dispose(&mod);
    TestBit.is_true(mod == NULL, "CR16: mod_dispose nulls caller module pointer");
-   TestBit.is_equal_int(0, (long long)Registry.count(),
-                        "CR16: registry is empty after module disposal");
-   TestBit.is_null(Registry.find(hash), "CR16: document no longer findable after disposal");
 }
 /* ---------------------------------------------------------------------- *
  * CR17 — mod_ctx_create_arena creates a usable, shared arena

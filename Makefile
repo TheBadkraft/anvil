@@ -104,7 +104,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan
 
 all: lib so
 
@@ -166,6 +166,27 @@ check-32bit:
 		$(CC) -m32 -std=$(STD) -Wall -Wextra -Werror -Woverflow $(INCLUDE) $(DEFS) -c src/writer/grammar.c -o /dev/null && \
 		echo "check-32bit OK: src/writer/grammar.c compiles clean with -m32"; \
 	else echo "check-32bit SKIPPED: no -m32 headers here (install gcc-multilib, or build with emcc)"; fi
+
+# Concurrent load/read/dispose under ThreadSanitizer (test/infra/tsan_load_stress.c): any data race in
+# anvil, or in a global it calls, is reported and fails the target. TSAN_ALLOC=source also rebuilds
+# sigma.system.alloc from $(SIGMA_CORE)/src/system_alloc.c with the sanitizer, since races inside the
+# prebuilt (uninstrumented) allocator object are otherwise invisible. BR-2610-anvl-registry-001.
+SIGMA_CORE ?= ../sigma.core
+TSAN_DIR    = build/tsan
+TSAN_MODES ?= different identical diamond
+TSAN_ALLOC ?= prebuilt
+check-tsan:
+	@mkdir -p $(TSAN_DIR)
+	@if [ "$(TSAN_ALLOC)" = "source" ]; then \
+		$(CC) -fsanitize=thread -g -O1 -std=$(STD) -I/usr/local/include $(DEFS) -c $(SIGMA_CORE)/src/system_alloc.c -o $(TSAN_DIR)/alloc.o; \
+		cp $(TSAN_DIR)/alloc.o $(TSAN_DIR)/alloc.use.o; \
+	else cp $(SIGMA_SYSTEM_ALLOC_PKG) $(TSAN_DIR)/alloc.use.o; fi
+	$(CC) -fsanitize=thread -g -O1 -std=$(STD) $(INCLUDE) $(DEFS) $(LIB_SRCS) test/infra/tsan_load_stress.c $(TSAN_DIR)/alloc.use.o -lpthread -o $(TSAN_DIR)/stress
+	@rc=0; for m in $(TSAN_MODES); do \
+		TSAN_OPTIONS="halt_on_error=0 exitcode=66 report_signal_unsafe=0" $(TSAN_DIR)/stress $$m > $(TSAN_DIR)/$$m.log 2>&1; r=$$?; \
+		echo "check-tsan [$$m, alloc=$(TSAN_ALLOC)]: exit $$r, $$(grep -c 'WARNING: ThreadSanitizer' $(TSAN_DIR)/$$m.log) race report(s), $$(grep -c '^FAIL' $(TSAN_DIR)/$$m.log) load failure(s)"; \
+		[ $$r -eq 0 ] || rc=1; \
+	done; exit $$rc
 
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release

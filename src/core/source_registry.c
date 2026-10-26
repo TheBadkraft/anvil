@@ -28,73 +28,66 @@
 #include <sigma.core/allocator.h>
 #include <sigma/map.h>
 
-// Initial capacity for the global source registry. Must be a power-of-two
-// to satisfy the Sigma map contract.
-#define SOURCE_REGISTRY_INITIAL_CAP 64
+// Initial capacity of a context's source map. Must be a power-of-two (Sigma map contract).
+#define SOURCE_REGISTRY_INITIAL_CAP 16
 
-// Process-wide registry map: hash (uint64_t) -> module_document.
-static map source_registry = NULL;
-
-// Number of live modules referencing the registry. The registry is cleared
-// when this count reaches zero.
-static usize module_ref_count = 0;
-
-static void registry_ensure_initialized(void) {
-   if (!source_registry) {
-      source_registry = Map.new(SOURCE_REGISTRY_INITIAL_CAP);
+static bool registry_init(module_context ctx) {
+   if (!ctx) {
+      return false;
    }
+   if (!ctx->sources) {
+      ctx->sources = Map.new(SOURCE_REGISTRY_INITIAL_CAP);
+   }
+   return ctx->sources != NULL;
 }
 
-static void registry_init(void) {
-   registry_ensure_initialized();
-   module_ref_count++;
+static module_document registry_find(module_context ctx, uint64_t hash) {
+   if (!ctx || !ctx->sources || hash == 0) {
+      return NULL;
+   }
+   addr found = 0;
+   if (Map.get(ctx->sources, (const char *)&hash, sizeof(hash), &found) == 0) {
+      return NULL;
+   }
+   return (module_document)found;
 }
 
-static void registry_release(void) {
-   if (module_ref_count == 0) {
-      return;
-   }
-
-   module_ref_count--;
-   if (module_ref_count == 0 && source_registry) {
-      Map.dispose(source_registry);
-      source_registry = NULL;
-   }
-}
-
-static anvl_result registry_add(module_document doc, anvl_err_code *out_err_code) {
+static anvl_result registry_add(module_context ctx, module_document doc,
+                                anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (out_err_code) {
       *out_err_code = err_code;
    }
-   if (!doc || !doc->source) {
+   if (!ctx || !doc || !doc->source) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
 
-   uint64_t *hash = &doc->source->hash;
-   if (*hash == 0) {
+   uint64_t hash = doc->source->hash;
+   if (hash == 0) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
 
-   registry_ensure_initialized();
-   if (!source_registry) {
+   if (!registry_init(ctx)) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
-   if (Map.has(source_registry, (const char *)hash, sizeof(*hash))) {
+   if (Map.has(ctx->sources, (const char *)&hash, sizeof(hash))) {
       err_code = ANVL_ERR_SOURCE_ALREADY_LOADED;
       goto error;
    }
 
-   if (Map.set(source_registry, (const char *)hash, sizeof(*hash), (addr)doc) != 0) {
+   // The map keeps the key POINTER, not a copy: key it by the source's own hash field, which lives
+   // exactly as long as the registration does (it is removed before the source is disposed).
+   if (Map.set(ctx->sources, (const char *)&doc->source->hash, sizeof(hash), (addr)doc) != 0) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
 
+   doc->source->owner = doc;
    return ANVL_RES_OK;
 
 error:
@@ -104,49 +97,54 @@ error:
    return ANVL_RES_ERR;
 }
 
-static void registry_remove(uint64_t hash) {
-   if (!source_registry || hash == 0) {
+static void registry_remove(module_context ctx, uint64_t hash) {
+   module_document doc = registry_find(ctx, hash);
+   if (!doc) {
       return;
    }
-
-   Map.remove(source_registry, (const char *)&hash, sizeof(hash));
+   Map.remove(ctx->sources, (const char *)&hash, sizeof(hash));
+   if (doc->source && doc->source->owner == doc) {
+      doc->source->owner = NULL;
+   }
 }
 
-static module_document registry_find(uint64_t hash) {
-   if (!source_registry || hash == 0) {
-      return NULL;
-   }
-
-   addr found = 0;
-   if (Map.get(source_registry, (const char *)&hash, sizeof(hash), &found) == 0) {
-      return NULL;
-   }
-
-   return (module_document)found;
+static usize registry_count(module_context ctx) {
+   return ctx && ctx->sources ? Map.count(ctx->sources) : 0;
 }
 
-static usize registry_count(void) {
-   if (!source_registry) {
-      return 0;
+static void registry_clear(module_context ctx) {
+   if (!ctx || !ctx->sources) {
+      return;
    }
-
-   return Map.count(source_registry);
+   // Clear owners first; the documents themselves are the context's list, not this map's.
+   if (ctx->docs) {
+      for (usize i = 0, n = List.size(ctx->docs); i < n; i++) {
+         module_document d = NULL;
+         List.get(ctx->docs, i, (object *)&d);
+         if (d && d->source && d->source->owner == d) {
+            d->source->owner = NULL;
+         }
+      }
+   }
+   Map.dispose(ctx->sources);
+   ctx->sources = NULL;
 }
 
-static void registry_clear(void) {
-   if (source_registry) {
-      Map.dispose(source_registry);
-      source_registry = NULL;
+// Dispose the map itself. Called from the context's own teardown, after its documents (whose
+// doc_dispose already unregistered them), so it must not touch ctx->docs.
+static void registry_release(module_context ctx) {
+   if (ctx && ctx->sources) {
+      Map.dispose(ctx->sources);
+      ctx->sources = NULL;
    }
-   module_ref_count = 0;
 }
 
 const anvl_source_registry_i Registry = {
-   .init = registry_init,
    .add = registry_add,
    .remove = registry_remove,
    .find = registry_find,
    .count = registry_count,
-   .release = registry_release,
    .clear = registry_clear,
+   .init = registry_init,
+   .release = registry_release,
 };

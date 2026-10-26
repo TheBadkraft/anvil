@@ -38,7 +38,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* A fragment has no header — just register the buffer and create an arena

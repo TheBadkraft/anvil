@@ -38,7 +38,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* Loads a buffer through header-scan + include-loading + arena creation,

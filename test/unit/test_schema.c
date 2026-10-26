@@ -24,7 +24,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 // Finds a violation by field name among all of them, so multi-violation tests don't depend on
@@ -2440,6 +2439,79 @@ static void test_sch83_schema_vtable_round_trip(void) {
    Anvil.dispose(ddoc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-registry-001 part 2 - identical text across independently loaded documents
+ * ---------------------------------------------------------------------- */
+// The anvil.net repro in C: ValidateField(text) while a document of the same text is alive.
+static void test_sch84_validate_while_same_text_document_is_alive(void) {
+   const char *schema_src = "#!aml\n@[schema]\nn := { type := Numeric; max := 3; };\n";
+   const char *data_src = "#!aml\nset := { n := 5; };\n";
+   anvil_document sdoc = anvil_load_buffer(schema_src, strlen(schema_src));
+   anvil_schema schema = sdoc ? anvil_schema_load(sdoc) : NULL;
+   anvil_document held = anvil_load_buffer(data_src, strlen(data_src)); // the caller's own copy
+   TestBit.is_true(schema && held && !anvil_has_errors(held), "SCH84: schema and the held document");
+   if (schema && held) {
+      // "ValidateField(text)": parse the same text again and validate its value.
+      anvil_document again = anvil_load_buffer(data_src, strlen(data_src));
+      TestBit.is_true(again && !anvil_has_errors(again),
+                      "SCH84: the same text loads again while the first copy is alive");
+      if (again) {
+         anvil_statement st = anvil_document_find_statement(again, "set");
+         anvil_value set = st ? anvil_statement_get_value(st) : NULL;
+         TestBit.is_false(anvil_schema_validate_value(schema, set, NULL), "SCH84: and validates (fails range)");
+         TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema), "SCH84: one violation");
+         anvil_dispose(again);
+      }
+      anvil_dispose(held);
+      held = NULL;
+   }
+   if (held) {
+      anvil_dispose(held);
+   }
+   if (schema) {
+      anvil_schema_dispose(schema);
+   }
+   if (sdoc) {
+      anvil_dispose(sdoc);
+   }
+}
+
+// Extension-key extras are copied into fragment documents; two with identical text (a very common
+// `pooled := true`) must both be readable, in one schema and across two schemas.
+static void test_sch85_identical_extras_are_all_readable(void) {
+   const char *src = "#!aml\n@[schema]\n"
+                     "a := { type := Numeric; pooled := true; tags := [ 1, 2 ]; };\n"
+                     "b := { type := Numeric; pooled := true; tags := [ 1, 2 ]; };\n";
+   anvil_document d1 = anvil_load_buffer(src, strlen(src));
+   anvil_schema s1 = d1 ? anvil_schema_load(d1) : NULL;
+   anvil_document d2 = anvil_load(fixture_path("schema_introspect_consumer.anvl"));
+   anvil_schema s2 = d2 ? anvil_schema_load(d2) : NULL;
+   anvil_document d3 = anvil_load_buffer(src, strlen(src)); // identical to d1, d1 still alive
+   anvil_schema s3 = d3 ? anvil_schema_load(d3) : NULL;
+   TestBit.is_true(s1 && s2 && s3, "SCH85: three schemas, two with identical text, all alive");
+   if (s1 && s3) {
+      for (int which = 0; which < 2; which++) {
+         anvil_schema sc = which ? s3 : s1;
+         const char *fields[] = {"a", "b"};
+         for (int f = 0; f < 2; f++) {
+            anvil_schema_field fld = anvil_schema_find_field(sc, fields[f]);
+            anvil_value pooled = anvil_schema_field_get_extra_value(fld, 0);
+            anvil_value tags = anvil_schema_field_get_extra_value(fld, 1);
+            TestBit.is_true(pooled && anvil_value_get_type(pooled) == ANVIL_VALUE_BOOL &&
+                               tags && anvil_value_get_count(tags) == 2,
+                            "SCH85: every identical extra is readable (none silently NULL)");
+         }
+      }
+   }
+   if (s3) anvil_schema_dispose(s3);
+   if (d3) anvil_dispose(d3);
+   if (s2) anvil_schema_dispose(s2);
+   if (d2) anvil_dispose(d2);
+   if (s1) anvil_schema_dispose(s1);
+   if (d1) anvil_dispose(d1);
+}
+
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -2609,6 +2681,11 @@ int main(void) {
    TestBit.run_ex("SCH82_SCHEMA_VTABLE_MATCHES_FLAT_AND_IS_COMPLETE", NULL,
                   test_sch82_schema_vtable_matches_flat_and_is_complete, th);
    TestBit.run_ex("SCH83_SCHEMA_VTABLE_ROUND_TRIP", NULL, test_sch83_schema_vtable_round_trip, th);
+
+   TestBit.run_ex("SCH84_VALIDATE_WHILE_SAME_TEXT_DOCUMENT_IS_ALIVE", NULL,
+                  test_sch84_validate_while_same_text_document_is_alive, th);
+   TestBit.run_ex("SCH85_IDENTICAL_EXTRAS_ARE_ALL_READABLE", NULL,
+                  test_sch85_identical_extras_are_all_readable, th);
 
    return TestBit.report();
 }

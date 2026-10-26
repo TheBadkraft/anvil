@@ -27,7 +27,6 @@
 
 static void td(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -569,7 +568,7 @@ static void test_doc09_register_doc_identity(void) {
    TestBit.is_not_null(doc->filepath, "DOC09: document filepath is set");
    TestBit.is_equal_int(1, (long long)List.size(ctx->docs),
                         "DOC09: context docs list contains one document");
-   TestBit.is_not_null(Registry.find(Source.hash(doc->source)),
+   TestBit.is_not_null(Registry.find(ctx, Source.hash(doc->source)),
                        "DOC09: document is registered by source hash");
 
    mod_ctx_dispose(ctx);

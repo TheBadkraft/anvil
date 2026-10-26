@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the Bindings agent's anvil.net slice-3 report
-**Status:** part 1 done (branch `fix/BR-2610-anvl-registry-001`, not merged); part 2 awaiting planning's decision
+**Status:** resolved on branch `fix/BR-2610-anvl-registry-001` (not merged, not pushed; awaiting the owner's go)
 **Tags:** source-registry, errors, bindings, rivet-readiness
 
 ---
@@ -151,3 +151,94 @@ identical-text collision; (b) composite key (context pointer + hash) fails becau
 **Decision needed from planning:** go/no-go on the per-context redesign above (back-pointer in
 `anvl_source`, per-context dedup map, retire or reduce the global `Registry`), and whether to run a TSan
 check on the global map first.
+
+## Part 2 TSan baseline (before any Part 2 code)
+
+Harness: `test/infra/tsan_load_stress.c`, `make check-tsan` (8 threads x 200 rounds, public flat API
+only, built with `-fsanitize=thread`; modes `different`, `identical`, `diamond`; `TSAN_ALLOC=source`
+rebuilds `sigma.system.alloc` from `../sigma.core/src/system_alloc.c` with the sanitizer so the
+allocator is not a blind spot). Baseline = Part 1 only, current main.
+
+| mode | race reports | failed loads |
+|---|---|---|
+| `different` (every thread loads text no other loads), prebuilt allocator | 100 | **41** |
+| `different`, allocator built from source with TSan | 109 | 16 |
+| `identical` (all threads, same text, all alive) | 169 | 1379 |
+| `diamond` (all threads, same file with a diamond graph) | 88 | 1590 |
+
+Even loads of *different* text failed: the unsynchronized global map corrupts lookups under
+concurrency, so this confirms the anvil.net xUnit flake is a real race and not only the
+identical-text collision. Attributed by the shared object each race hit (`different`, source allocator):
+
+| shared object | reports |
+|---|---|
+| the global source registry (`source_registry` pointer, its map nodes and resize buffers) | 59 |
+| **the global `parser_state parser` in `parser.c`** (`state_map` list, `err_code`) and lists reachable through it | 19 global + about 20 list blocks |
+| unattributed (stack / reused block addresses) | 10 |
+| the allocator itself | 0 of its own: one `free` report whose other side was the parser global's list |
+
+So: **the per-context design alone would not have made concurrent loads safe.** A second shared
+structure sits under every load: `parser.c`'s process-wide `parser` (a list of in-flight parse contexts
+appended and removed *by position* around every parse, plus the last-error code).
+`sigma.system.alloc` shows no race of its own (checked with it instrumented), and no other sigma or
+module global appeared.
+
+## Part 2 Resolution
+
+Same branch, in two commits so the parser change can be vetoed separately (the second one).
+
+**Design as built (the recommendation, approved):**
+- `anvl_source_t` gains `owner` (its `module_document`). The five `Source.*` lookups in `source.c`
+  (`has_errors`, `set_error`, `get_arena`, `new_node`, and the fifth) read `src->owner` instead of
+  `Registry.find(src->hash)`. `owner` is set when a document is registered and cleared when it is
+  unregistered.
+- Deduplication is `ctx->sources`, a hash -> document map owned by the `module_context`, created in
+  `mod_ctx_initialize` and released after the context's documents in `mod_ctx_dispose`.
+- **The global `Registry` is kept as a context-scoped facade** (my call): same name and file, so the
+  call sites and tests migrate mechanically, and the include loader's diamond handling is untouched
+  except for passing the context. `add(ctx, doc, &err)`, `remove(ctx, hash)`, `find(ctx, hash)`,
+  `count(ctx)`, `clear(ctx)`, `init(ctx)`, `release(ctx)`. The process-wide map, its reference count and
+  `Registry.init()/release()` in `mod_new`/`mod_dispose` are gone. Nothing global remains.
+- `doc_dispose` unregisters from the document's own context only if it is the registered one (as
+  before); `doc_unload_source` now unregisters the old content's identity first (it left a stale
+  global entry before).
+- **Trap, recorded:** `Map` keeps the key *pointer*, not a copy. The registry keys by
+  `&doc->source->hash` (alive exactly as long as the registration), and my first version keyed by a
+  stack variable, which silently broke diamond dedup.
+- **Parser (separate commit):** `parser.c`'s `parser_state` loses `state_map` and `is_initialized`
+  (the in-flight list existed only for `anvl_cleanup` to dispose contexts a parse had not yet disposed,
+  which never happens: `anvl_parse` disposes its own on every path) and becomes `_Thread_local`, so
+  `anvl_get_error()` reports the calling thread's last parse. `anvl_cleanup()` now just resets that
+  code. Behavior for single-threaded callers is unchanged (all body-parse tests unchanged).
+
+**Result (TSan, same harness, prebuilt allocator and allocator built from source):** `different`,
+`identical`, `diamond`: **0 race reports, 0 failed loads** in all three modes, in both allocator
+configurations.
+
+**Tests.** Written first and RED (ANV45 identical loads independent, ANV46 diamond per graph, ANV47
+identical fragments, SCH84 `ValidateField(text)` equivalent, SCH85 identical extras all readable; the
+TSan harness failing in `identical` and `diamond`). Then GREEN, plus:
+- `test_registry.c` rewritten for the context-scoped contract (REG00-REG09): duplicates within one
+  context fail with `ANVL_ERR_SOURCE_ALREADY_LOADED`; the same hash in two contexts is fine and each
+  context finds its own; remove/clear unregister and clear owners; REG09 is the *use after
+  unregistered* case: every `Source.*` function that used to ask the registry returns false / error /
+  NULL for a source with no owner (what `Registry.find` returning NULL meant before).
+- **Fragments do go through the registry** (`anvil_parse_value_fragment` registers its document
+  like any load), so FR-2610-anvl-schema-005's extras were silently NULL whenever two had identical
+  text (`pooled := true` in two fields: very common). That was a latent bug, now pinned by SCH85 (one
+  schema, two schemas, identical text).
+- ANV44 (part 1's "identical load reports a specific message") was **retired**: the failure it
+  asserted can no longer happen through the public API. Its code and message stay covered by REG03 and
+  REG08, and `load_common` still records any registration failure.
+- Existing suites touched only to drop the now-meaningless global `Registry.clear()` from their
+  setup, and four call sites (DOC09, HDR20, CR16, `Debug`) moved to the context-scoped calls.
+
+**Regression:** all 19 unit suites green, counts unchanged except registry 10 (REG rewritten), native 46,
+schema 85; `test_release`, `check-exports`, `check-reader-only` green; Valgrind-clean on registry, source,
+module, header, document, native, schema, body_amp, resolver; `make check-tsan` green in both allocator
+configurations.
+
+**For the Bindings agent:** the workarounds can go (anvil.net's xUnit parallelization switch and the
+special `ValidateField` exception text); `anvil.node`'s eager-conversion in `parse()` is no longer
+needed for correctness. Loads on separate threads are independent; sharing a *single* document handle
+across threads is still the caller's responsibility, as before.

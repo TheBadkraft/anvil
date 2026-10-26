@@ -95,8 +95,8 @@ void doc_dispose(module_document doc) {
       // handling) shares its content hash with a different, still-alive
       // document; disposing it must not evict that document's entry.
       uint64_t hash = Source.hash(doc->source);
-      if (Registry.find(hash) == doc) {
-         Registry.remove(hash);
+      if (doc->context && Registry.find(doc->context, hash) == doc) {
+         Registry.remove(doc->context, hash);
       }
       Source.dispose(doc->source);
       doc->source = NULL;
@@ -533,6 +533,9 @@ void doc_unload_source(module_document doc) {
    // unload the source return the source object to a pristine state (creates a new source object).
    if (!doc || !doc->source) {
       return;
+   }
+   if (doc->context) {
+      Registry.remove(doc->context, Source.hash(doc->source)); // the old content's identity
    }
    Source.dispose(doc->source);
    anvl_err_code err_code = ANVL_ERR_NONE;

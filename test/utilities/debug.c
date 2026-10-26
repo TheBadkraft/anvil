@@ -34,7 +34,9 @@ void dispose_doc_manual(module_document doc) {
       return;
 
    if (doc->source) {
-      Registry.remove(Source.hash(doc->source));
+      if (doc->context) {
+         Registry.remove(doc->context, Source.hash(doc->source));
+      }
       Source.dispose(doc->source);
       doc->source = NULL;
    }
@@ -97,6 +99,7 @@ void dispose_ctx_manual(module_context ctx) {
       clear_docs_manual(ctx->docs);
       ctx->docs = NULL;
    }
+   Registry.release(ctx); // the per-context source map (after the documents unregistered from it)
    if (ctx->errors) {
       clear_errs_manual(ctx->errors);
       ctx->errors = NULL;
@@ -126,9 +129,6 @@ void dispose_mod_manual(AnvlMod mod) {
    dispose_ctx_manual(mod->context);
    mod->context = NULL;
    mod->root = NULL;
-
-   // release the registry reference acquired by mod_new
-   Registry.release();
 
    Allocator.dispose(mod);
 }

@@ -24,7 +24,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -989,7 +988,6 @@ static anvil_numeric_t numeric_of(const char *literal) {
       }
       anvil_dispose(doc);
    }
-   Registry.clear(); // the next call may load byte-identical text
    return result;
 }
 
@@ -1267,39 +1265,106 @@ static void test_anv43_value_get_blob_tag(void) {
 }
 
 
+/* ANV44 (BR-2610-anvl-registry-001 part 1) asserted that loading text identical to a live document
+ * reported a specific message. Part 2 made that failure unreachable through the public API (an
+ * independent load has its own context), so the assertion became ANV45: both loads succeed. The
+ * dedicated code and message remain covered at the registry level (REG03, REG08). */
+
 /* ---------------------------------------------------------------------- *
- * ANV44 (BR-2610-anvl-registry-001) - loading text identical to a live document reports a real,
- * specific message (not an empty Io error)
+ * ANV45 (BR-2610-anvl-registry-001, part 2) - independent loads of identical text, all alive at
+ * once, all succeed and are independent of each other
  * ---------------------------------------------------------------------- */
-static void test_anv44_identical_load_reports_specific_error(void) {
-   const char *src = "#!aml\nanv44_unique_marker := 1;\n";
-   anvil_document first = anvil_load_buffer(src, strlen(src));
-   TestBit.is_not_null(first, "ANV44: first load");
-   TestBit.is_false(first && anvil_has_errors(first), "ANV44: first load is clean");
-   anvil_document second = anvil_load_buffer(src, strlen(src));
-   TestBit.is_not_null(second, "ANV44: the failed load still returns a handle");
-   if (second) {
-      TestBit.is_true(anvil_has_errors(second), "ANV44: the identical load fails");
-      TestBit.is_equal_int(ANVIL_ERR_IO, anvil_get_error(second), "ANV44: public category stays Io");
-      anvil_error err = anvil_document_get_error(second);
-      TestBit.is_not_null(err, "ANV44: with an error detail");
-      char msg[256] = {0};
-      size_t len = anvil_error_get_message(err, msg, sizeof(msg));
-      TestBit.is_true(len > 0 && strstr(msg, "identical") != NULL,
-                      "ANV44: whose message says an identical document is already loaded");
-      anvil_dispose(second);
+static void test_anv45_identical_loads_are_independent(void) {
+   const char *src = "#!aml\nanv45_marker := 7;\nname := \"same\";\n";
+   anvil_document a = anvil_load_buffer(src, strlen(src));
+   anvil_document b = anvil_load_buffer(src, strlen(src));
+   anvil_document c = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(a && !anvil_has_errors(a), "ANV45: first load");
+   TestBit.is_true(b && !anvil_has_errors(b), "ANV45: identical second load, first still alive");
+   TestBit.is_true(c && !anvil_has_errors(c), "ANV45: identical third load");
+   TestBit.is_true(a != b && b != c, "ANV45: distinct handles");
+   // Dispose the middle one: the others stay fully usable (no shared bookkeeping evicted).
+   if (b) {
+      anvil_dispose(b);
    }
-   // The failed load must not disturb the live document.
-   anvil_statement st = first ? anvil_document_find_statement(first, "anv44_unique_marker") : NULL;
-   TestBit.is_not_null(st, "ANV44: the first document is untouched");
-   if (first) {
-      anvil_dispose(first);
+   anvil_statement sa = a ? anvil_document_find_statement(a, "anv45_marker") : NULL;
+   anvil_statement sc = c ? anvil_document_find_statement(c, "anv45_marker") : NULL;
+   TestBit.is_true(sa && sc && anvil_value_get_numeric(anvil_statement_get_value(sa)).as_int64 == 7 &&
+                      anvil_value_get_numeric(anvil_statement_get_value(sc)).as_int64 == 7,
+                   "ANV45: the survivors read correctly after a sibling is disposed");
+   if (a) {
+      anvil_dispose(a);
    }
-   // Once the first is gone the same text loads fine again.
-   anvil_document third = anvil_load_buffer(src, strlen(src));
-   TestBit.is_true(third != NULL && !anvil_has_errors(third), "ANV44: reloadable after disposal");
-   if (third) {
-      anvil_dispose(third);
+   // Disposing one must not evict the other's identity: c still loads includes, errors, etc.
+   TestBit.is_true(c && !anvil_has_errors(c), "ANV45: the last one is still clean");
+   if (c) {
+      anvil_dispose(c);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV46 - the same, through a diamond include graph: each independent load of the same file gets
+ * its own graph, and within one graph the shared document still loads once
+ * ---------------------------------------------------------------------- */
+static void test_anv46_diamond_per_graph(void) {
+   const char *path = fixture_path("reg_diamond_root.anvl");
+   anvil_document a = anvil_load(path);
+   anvil_document b = anvil_load(path);
+   TestBit.is_true(a && !anvil_has_errors(a), "ANV46: first diamond load");
+   TestBit.is_true(b && !anvil_has_errors(b), "ANV46: the same file again, first alive");
+   size_t includes_a = 0, includes_b = 0;
+   anvil_document_iterator it = a ? anvil_document_get_includes(a) : NULL;
+   anvil_document inc = NULL;
+   while (it && anvil_document_iterator_next(it, &inc)) {
+      includes_a++;
+      anvil_dispose(inc);
+   }
+   if (it) {
+      anvil_document_iterator_dispose(it);
+   }
+   it = b ? anvil_document_get_includes(b) : NULL;
+   while (it && anvil_document_iterator_next(it, &inc)) {
+      includes_b++;
+      anvil_dispose(inc);
+   }
+   if (it) {
+      anvil_document_iterator_dispose(it);
+   }
+   TestBit.is_true(includes_a == 2 && includes_b == 2,
+                   "ANV46: both graphs resolve the root's two direct includes");
+   if (a) {
+      anvil_dispose(a);
+   }
+   if (b) {
+      anvil_dispose(b);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV47 - value fragments are documents too: two live fragments of identical text both parse
+ * (they register with their own context like any other load)
+ * ---------------------------------------------------------------------- */
+static void test_anv47_identical_fragments(void) {
+   const char *text = "[ 1, 2, 3 ]";
+   anvil_document f1 = anvil_parse_value_fragment(text, strlen(text));
+   anvil_document f2 = anvil_parse_value_fragment(text, strlen(text));
+   TestBit.is_true(f1 && !anvil_has_errors(f1), "ANV47: first fragment");
+   TestBit.is_true(f2 && !anvil_has_errors(f2), "ANV47: identical second fragment, first alive");
+   anvil_value v1 = f1 ? anvil_document_get_fragment_value(f1) : NULL;
+   anvil_value v2 = f2 ? anvil_document_get_fragment_value(f2) : NULL;
+   TestBit.is_true(v1 && v2 && anvil_value_get_count(v1) == 3 && anvil_value_get_count(v2) == 3,
+                   "ANV47: both readable");
+   // A document with the same text as a live fragment is also fine: different graphs.
+   anvil_document d = anvil_load_buffer(text, strlen(text));
+   TestBit.is_true(d != NULL, "ANV47: a document load with the fragment's text returns a handle");
+   if (d) {
+      anvil_dispose(d);
+   }
+   if (f1) {
+      anvil_dispose(f1);
+   }
+   if (f2) {
+      anvil_dispose(f2);
    }
 }
 
@@ -1358,8 +1423,10 @@ int main(void) {
                   test_anv41_value_get_bytes_buffer_convention, th);
    TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
    TestBit.run_ex("ANV43_value_get_blob_tag", NULL, test_anv43_value_get_blob_tag, th);
-   TestBit.run_ex("ANV44_identical_load_reports_specific_error", NULL,
-                  test_anv44_identical_load_reports_specific_error, th);
+   TestBit.run_ex("ANV45_identical_loads_are_independent", NULL,
+                  test_anv45_identical_loads_are_independent, th);
+   TestBit.run_ex("ANV46_diamond_per_graph", NULL, test_anv46_diamond_per_graph, th);
+   TestBit.run_ex("ANV47_identical_fragments", NULL, test_anv47_identical_fragments, th);
 
    return TestBit.report();
 }
