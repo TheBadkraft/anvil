@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the Rivet Project Engineer (found by Rivet Coder in FR-2610-rivet-006)
-**Status:** open
+**Status:** resolved (branch `fix/BR-2610-anvl-attr-001`, off main; not merged, not pushed)
 **Tags:** attributes, parser, whitespace, rivet-readiness
 
 ---
@@ -60,3 +60,33 @@ reports the raw value with stray whitespace.
 
 The bindings report `value` and `decodedValue` straight from native, so no binding change is
 needed beyond a re-bump. anvil.node and every other binding pick it up at their next pin.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-attr-001`, off `main` (`20ea23a`). Tests ANV64 and ANV65 (`test_anvil_native.c`),
+written first and RED on every row of the ticket (raw values with a trailing space/tab/newline, decoded BARE
+with quotes). Full unit regression green (native 64), `test_release`, `check-exports`, `check-reader-only`,
+`check-tsan` green, Valgrind-clean on the 16 suites.
+
+**Fix, in both scanners** (`parse_attribute_list` for statements, `header_scan_attributes` for the module):
+the scan still runs to the delimiter to find where the value ends (it has to honor strings, escapes and
+blobs), but the recorded span now ends at the last non-whitespace character before it: space, tab, CR and LF
+are trimmed off the END. The cursor still stops at the `,` / `]`.
+
+**The decode followed.** `anvl_attribute_decode` (FR-2610-anvl-public-api-004) used to skip trailing
+same-line whitespace and compare against the span end; with a trimmed span that skip would have run past the
+end into the real text, so it now requires the scalar to be exactly the span. (Its own trim of spaces and
+tabs was only ever a patch for this bug and is kept as a defensive no-op.) That is also why a newline used to
+break decoding: the old trim handled space and tab but not newlines, so `"2"` + newline didn't parse as a
+whole scalar.
+
+**Checked per the ticket:**
+- Every row: `@[a="1", b="2"` + LF + `]`, `@[` LF `b="2"` LF `]`, `@[b="2" ]`, `@[b=bug<TAB>]`,
+  `@[a="1" , b="2"]` (the one that shows it is not only the last attribute): raw is exactly the token and the
+  decoded value is STRING `2` / BARE `bug` / STRING `1`.
+- CRLF line endings inside the list, statement and module level.
+- Module-level attributes with the same layouts (ANV65).
+- Whitespace after `=` (spaces, tab, newline): not affected, because both scanners already skip it before
+  recording the value start; pinned.
+- Regressions: an escaped quote and a `]` inside a string (ANV53 and again in ANV64), `range=1..5`, numbers,
+  an internal space (`"a b"`), `1.5`: all unchanged.

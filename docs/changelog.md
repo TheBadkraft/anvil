@@ -258,6 +258,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **An attribute value's span now ends at the value, not at the next delimiter** (`BR-2610-anvl-attr-001`):
+  the attribute scanners (statement and module attributes) ran each value on to the next `,` or `]`, so
+  whitespace before the delimiter became part of the raw value: `@[a="1" , b="2"]` gave `a` the raw value
+  `"1" `, and when the whitespace held a newline (`@[b="2"` newline `]`, the usual multi-line layout) the
+  decoded value from `anvil_attribute_get_value_handle` fell back to BARE with its quotes kept. Spaces,
+  tabs, CR and LF before the delimiter are no longer part of the value, so the raw value is exactly the
+  token (`"2"`, `bug`, `1..5`) and the decoded value is STRING `2` / BARE `bug` whatever whitespace follows,
+  including CRLF files. Whitespace after `=` was never affected. Every binding picks this up at its next
+  pin.
 - **An unterminated block comment is now an error wherever it opens** (`BR-2610-anvl-parser-002`): only the
   header scanner checked for it, so `x := 1; /* never closed` loaded with no error, a statement after it was
   silently lost, and inside an object, array, tuple or attribute list the error blamed the end of the file.

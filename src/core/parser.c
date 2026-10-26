@@ -134,7 +134,7 @@ bool anvl_attribute_decode(anvl_source src, anvl_attribute attr) {
    const char *begin = attr->value.start;
    const char *end = attr->value.end;
    while (end > begin && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
-      end--; // the scanner stops at ',' or ']', so trailing whitespace is part of the slice
+      end--; // defensive: the scanners already end the span at the token (BR-2610-anvl-attr-001)
    }
    if (end == begin) {
       return true;
@@ -153,8 +153,8 @@ bool anvl_attribute_decode(anvl_source src, anvl_attribute attr) {
    anvl_value value = Source.new_node(src, ANVL_NODE_VALUE, &node_err);
    bool whole = value && parse_scalar_value(src, &value) && value;
    if (whole) {
-      skip_same_line_whitespace(src);
-      whole = Source.at(src) == attr->value.end; // only the slice's trailing whitespace may remain
+      whole = Source.at(src) == attr->value.end; // the scalar must be exactly the span (no trailing
+                                                 // whitespace is in it, and none is skipped)
    }
 
    // Forget the trial: its position, any error it recorded, the parser's last-error code.
@@ -547,7 +547,15 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
          }
          Source.init_slice(src, &attr->value);
          attr->value.start = value_start;
-         attr->value.end = Source.at(src);
+         // The value ends at the end of its TOKEN: the scan above runs on to the delimiter, so
+         // whitespace before it (spaces, tabs, CR, LF) is not part of the value (BR-2610-anvl-attr-001).
+         const char *value_end = Source.at(src);
+         while (value_end > value_start &&
+                (value_end[-1] == ' ' || value_end[-1] == '\t' || value_end[-1] == '\r' ||
+                 value_end[-1] == '\n')) {
+            value_end--;
+         }
+         attr->value.end = value_end;
          if (!anvl_attribute_decode(src, attr)) {
             Allocator.dispose(attr);
             dispose_attribute_list(attrs);

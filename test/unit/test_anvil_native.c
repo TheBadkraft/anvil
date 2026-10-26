@@ -1813,6 +1813,108 @@ static void test_anv63_terminator_must_share_the_values_line(void) {
    if (cb) anvil_dispose(cb);
 }
 
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-attr-001 - an attribute value's span ends at the TOKEN, not at the next delimiter
+ * ---------------------------------------------------------------------- */
+static bool raw_is(anvil_attribute a, const char *want) {
+   char buf[64] = {0};
+   size_t n = a ? anvil_attribute_get_value(a, buf, sizeof(buf)) : 999;
+   return a && n == strlen(want) && memcmp(buf, want, n) == 0;
+}
+
+// Checks one attribute (module or statement level): raw text is exactly `raw`, decoded is `type`/`text`.
+static void check_attr(anvil_document doc, bool module, const char *key, const char *raw,
+                       anvil_value_type type, const char *text, const char *label) {
+   anvil_attribute a = module ? anvil_document_find_attribute(doc, key) : stmt_attr(doc, "x", key);
+   anvil_value v = anvil_attribute_get_value_handle(a);
+   TestBit.is_true(raw_is(a, raw) && v && anvil_value_get_type(v) == type &&
+                      text_is(v, text, strlen(text)), label);
+}
+
+static void test_anv64_attribute_span_ends_at_the_token(void) {
+   // Statement attributes, the layouts from the ticket.
+   anvil_document d1 = ATTR_LOAD("#!aml\nx @[a=\"1\", b=\"2\"\n] := 1;\n");
+   anvil_document d2 = ATTR_LOAD("#!aml\nx @[\n  b=\"2\"\n] := 1;\n");
+   anvil_document d3 = ATTR_LOAD("#!aml\nx @[b=\"2\" ] := 1;\n");
+   anvil_document d4 = ATTR_LOAD("#!aml\nx @[b=bug\t] := 1;\n");
+   anvil_document d5 = ATTR_LOAD("#!aml\nx @[a=\"1\" , b=\"2\"] := 1;\n");
+   if (d1) {
+      check_attr(d1, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: @[a=\"1\", b=\"2\"<NL>]: a");
+      check_attr(d1, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: ... b is STRING 2, raw has no newline");
+   }
+   if (d2) check_attr(d2, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: @[<NL>  b=\"2\"<NL>]");
+   if (d3) check_attr(d3, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: a trailing space is not in the raw value");
+   if (d4) check_attr(d4, false, "b", "bug", ANVIL_VALUE_BARE, "bug", "ANV64: a trailing tab is not in the raw value");
+   if (d5) {
+      check_attr(d5, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: `\"1\" ,` - not only the last attribute");
+      check_attr(d5, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: and the one after the comma");
+   }
+   TestBit.is_true(d1 && d2 && d3 && d4 && d5, "ANV64: all of them load");
+   anvil_document all[] = {d1, d2, d3, d4, d5};
+   for (size_t i = 0; i < 5; i++) {
+      if (all[i]) anvil_dispose(all[i]);
+   }
+
+   // CRLF line endings inside the list.
+   anvil_document crlf = ATTR_LOAD("#!aml\r\nx @[a=\"1\",\r\n b=\"2\"\r\n] := 1;\r\n");
+   TestBit.is_true(crlf && !anvil_has_errors(crlf), "ANV64: a CRLF attribute list loads");
+   if (crlf) {
+      check_attr(crlf, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: CRLF: a");
+      check_attr(crlf, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: CRLF: b, newline before ']'");
+      anvil_dispose(crlf);
+   }
+
+   // Whitespace after '=' (a newline included) was never a problem; pinned.
+   anvil_document lead = ATTR_LOAD("#!aml\nx @[a =\n  \"1\" , b =\t\"2\"] := 1;\n");
+   if (lead) {
+      check_attr(lead, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: a newline after '=' is skipped");
+      check_attr(lead, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: and so is a tab");
+      anvil_dispose(lead);
+   } else {
+      TestBit.is_not_null(lead, "ANV64: whitespace after '=' loads");
+   }
+
+   // Unchanged: a bare value with internal non-whitespace characters, numbers, an escaped quote and
+   // a ']' inside a string.
+   anvil_document keep = ATTR_LOAD(
+      "#!aml\nx @[range=1..5\n, n=42 , s=\"c\\\"d]\"\n, t=\"a b\" ,\n u=1.5\n] := 1;\n");
+   TestBit.is_true(keep && !anvil_has_errors(keep), "ANV64: mixed layouts load");
+   if (keep) {
+      check_attr(keep, false, "range", "1..5", ANVIL_VALUE_BARE, "1..5", "ANV64: range=1..5 is unchanged");
+      check_attr(keep, false, "n", "42", ANVIL_VALUE_NUMERIC, "42", "ANV64: n=42");
+      check_attr(keep, false, "s", "\"c\\\"d]\"", ANVIL_VALUE_STRING, "c\"d]", "ANV64: escaped quote and ']' in a string");
+      check_attr(keep, false, "t", "\"a b\"", ANVIL_VALUE_STRING, "a b", "ANV64: internal space is kept");
+      check_attr(keep, false, "u", "1.5", ANVIL_VALUE_NUMERIC, "1.5", "ANV64: u=1.5");
+      anvil_dispose(keep);
+   }
+}
+
+static void test_anv65_module_attribute_span_ends_at_the_token(void) {
+   const char *layouts[] = {
+      "#!aml\n@[a=\"1\", b=\"2\"\n]\nx := 1;\n",
+      "#!aml\n@[\n  a=\"1\",\n  b=\"2\"\n]\nx := 1;\n",
+      "#!aml\n@[a=\"1\" , b=\"2\" ]\nx := 1;\n",
+      "#!aml\r\n@[a=\"1\",\r\n b=\"2\"\r\n]\r\nx := 1;\r\n",
+   };
+   for (size_t i = 0; i < sizeof(layouts) / sizeof(layouts[0]); i++) {
+      anvil_document doc = anvil_load_buffer(layouts[i], strlen(layouts[i]));
+      TestBit.is_true(doc && !anvil_has_errors(doc), "ANV65: module attributes load");
+      if (doc) {
+         check_attr(doc, true, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV65: module a");
+         check_attr(doc, true, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV65: module b");
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document bare = ATTR_LOAD("#!aml\n@[kind=bug\t,\n  range=1..5\n]\nx := 1;\n");
+   if (bare) {
+      check_attr(bare, true, "kind", "bug", ANVIL_VALUE_BARE, "bug", "ANV65: module bare value, tab before ','");
+      check_attr(bare, true, "range", "1..5", ANVIL_VALUE_BARE, "1..5", "ANV65: module range=1..5 unchanged");
+      anvil_dispose(bare);
+   } else {
+      TestBit.is_not_null(bare, "ANV65: loads");
+   }
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1909,6 +2011,11 @@ int main(void) {
                   test_anv62_terminated_comments_still_load, th);
    TestBit.run_ex("ANV63_TERMINATOR_MUST_SHARE_THE_VALUES_LINE", NULL,
                   test_anv63_terminator_must_share_the_values_line, th);
+
+   TestBit.run_ex("ANV64_ATTRIBUTE_SPAN_ENDS_AT_THE_TOKEN", NULL,
+                  test_anv64_attribute_span_ends_at_the_token, th);
+   TestBit.run_ex("ANV65_MODULE_ATTRIBUTE_SPAN_ENDS_AT_THE_TOKEN", NULL,
+                  test_anv65_module_attribute_span_ends_at_the_token, th);
 
    return TestBit.report();
 }

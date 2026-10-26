@@ -344,6 +344,15 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                Source.consume(src, 1);
             }
             usize value_end = Source.position(src);
+            // The value ends at the end of its TOKEN, not at the delimiter: whitespace before the ','
+            // or ']' (spaces, tabs, CR, LF) is not part of it (BR-2610-anvl-attr-001).
+            while (value_end > value_start) {
+               char last = ((const char *)src->buffer.bucket)[value_end - 1];
+               if (last != ' ' && last != '\t' && last != '\r' && last != '\n') {
+                  break;
+               }
+               value_end--;
+            }
             attr->value.data = src->buffer.bucket;
             attr->value.start = src->buffer.bucket + value_start;
             attr->value.end = src->buffer.bucket + value_end;
