@@ -226,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
   against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
   the release is live.
+- **`SR-2610-anvl-vendor-bump-002`** (filed): re-bump every binding to native `main` after the
+  2026-10-26 merges, drop the identical-content workarounds, flip the NUL tests, and add one decoded
+  attribute accessor across the bindings. It gates the v0.10.0-rc release.
 - **`BR-2610-anvl-parser-001`** (filed): a bare value that begins with `null`/`true`/`false`
   (`nullable`, `truely`, `falsey`) fails to load. The literal is matched as a prefix. From Rivet's
   q-or importer.
