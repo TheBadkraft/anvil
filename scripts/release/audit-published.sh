@@ -16,6 +16,6 @@ for kind in core node wasm net py; do
   echo "sha256 $(sha256sum "$work/$f" | cut -d' ' -f1)"
   mkdir -p "$work/$kind" && tar -xzf "$work/$f" -C "$work/$kind"
   root=$(find "$work/$kind" -mindepth 1 -maxdepth 1 -type d | head -1)
-  "$here/check-grammar.sh" "$kind" "$root" "$ver" || fail=1
+  LEGACY_VERSION_FORMAT=1 "$here/check-grammar.sh" "$kind" "$root" "$ver" || fail=1
 done
 exit $fail
