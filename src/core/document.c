@@ -330,7 +330,12 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                if (!in_string && (c == ',' || c == ']')) {
                   break;
                }
-               if (c == '"') {
+               if (in_string && c == '\\') {
+                  Source.consume(src, 1); // an escape: the next character never toggles the string
+                  if (Source.is_eof(src)) {
+                     break;
+                  }
+               } else if (c == '"') {
                   in_string = !in_string;
                }
                Source.consume(src, 1);

@@ -835,6 +835,11 @@ size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen) {
    return copy_to_buffer(a->key.start, (size_t)Source.slice_length(a->key), buf, buflen);
 }
 
+anvil_value anvil_attribute_get_value_handle(anvil_attribute attr) {
+   anvl_attribute a = (anvl_attribute)attr;
+   return a ? (anvil_value)a->decoded : NULL; // read as a value when the attribute was parsed
+}
+
 size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen) {
    anvl_attribute a = (anvl_attribute)attr;
    if (!a) {

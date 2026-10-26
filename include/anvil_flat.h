@@ -442,6 +442,22 @@ size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen);
  */
 size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen);
 
+/**
+ * @brief An attribute's value read AS A VALUE, so the whole value API applies unchanged:
+ * anvil_value_get_type (STRING / BARE / NUMERIC / BOOL / NULL), anvil_value_get_text (escapes
+ * resolved, delimiters stripped: `@[status="done"]` reads as `done`), anvil_value_get_numeric and
+ * anvil_value_get_bytes. anvil_attribute_get_value is the raw-source-text reader and stays
+ * unchanged (it still returns `"done"` with its quotes).
+ *
+ * A value the scalar grammar does not accept as a whole (for example `@[range=1..5]` or
+ * `@[x=1 2]`) is exposed as a BARE value of its raw text, trimmed: reading it never fails and the
+ * document still loads. Like every string, the text may contain NUL bytes: use the returned length.
+ * @param attr The attribute to read. NULL returns NULL.
+ * @return The value handle, or NULL for a flag attribute (`@[active]`, no `=value`). It lives as
+ * long as the document the attribute came from; never dispose it.
+ */
+anvil_value anvil_attribute_get_value_handle(anvil_attribute attr);
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility pop
 #endif

@@ -6,7 +6,7 @@
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the Bindings agent's FR-2610-anvl-bindings-003 finding
 **Requested by:** rivet (q-or importer reads `status="done"`-style attributes)
-**Status:** open — not started
+**Status:** resolved (branch `feat/FR-2610-anvl-public-api-004`, off main; not merged, not pushed)
 **Tags:** public-api, attributes, parity, rivet-readiness
 
 ---
@@ -63,3 +63,44 @@ accessors) last. The completeness test (VT11) and `check-exports` enforce both.
 A Bindings follow-up adds the decoded accessor to **all four** bindings at once, e.g.
 `AnvilAttribute.text` / `.Text`, and a typed form where the binding has one. `value` stays raw in
 every binding.
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-public-api-004`, off `main`. Tests ANV48-ANV53 (`test_anvil_native.c`) and the
+`Attribute` rows of VT06/VT11 (`test_anvil_vtable.c`), written first and RED (the accessor was a NULL
+stub; ANV48 and ANV53 also failed to *load*, which is the escaped-quote bug below). Full unit regression
+green with counts unchanged except native 49; `test_release`, `check-exports` (164 symbols) and
+`check-reader-only` green; Valgrind-clean on native, vtable, body_aml, body_amp, attribute_grammar,
+header, module, document, schema and both roundtrip suites.
+
+**Design chosen: the value handle** `anvil_value anvil_attribute_get_value_handle(attr)` (NULL for a flag
+attribute), appended last in `anvil_flat.h` and in `anvil_attribute_i`; `get_value` is untouched. The
+fallback in the FR (`get_value_type` + `get_text`) was not needed.
+
+**Did the parser already hold attribute values as values? No.** Both attribute scanners (`parse_attribute_list`
+for statements, `header_scan_attributes` for the module) keep only a raw *slice* of `key` and `value`. So
+the value is now parsed **once, at load**, through the existing scalar grammar (`parse_scalar_value`), and
+stored on the attribute (`anvl_attribute_t::decoded`, an arena-owned value node; nothing new to free).
+Cost: one extra scalar parse per valued attribute at load, none for flag attributes; nothing at read time,
+and the document stays immutable after load. Statement attributes are decoded as they are parsed; module
+attributes at the start of the document's body parse, because the arena that owns value nodes does not
+exist during the header scan.
+
+**Decode can never fail a load that scanning accepted.** The trial parse saves and restores the source
+position, truncates any error it recorded, and restores the parser's last-error code. The value must be
+consumed whole (up to trailing whitespace in the slice); otherwise (`1..5`, `1 2`) the attribute is exposed
+as a **BARE value of its trimmed raw text**. Only an allocation failure fails the load.
+
+**A bug found on the way and fixed (the FR's test 1 needs it):** both scanners toggled "in string" on every
+`"` regardless of escapes, so `@[note="a\"b"]` left the string open and the scan ran on past the closing
+`]`. Both are escape-aware now (`ANV53` pins `,` / `]` / escaped quotes inside strings and whitespace
+around `=` and `,`). Any document that previously relied on the broken behavior could not have loaded.
+
+**NUL (BR-2610-anvl-nul-001):** a NUL inside a quoted attribute value survives; `get_text` and `get_bytes`
+report the exact length (ANV51, module and statement attributes).
+
+**Source-to-document lookup:** isolated in one helper in `parser.c` (`source_document`), which returns the
+source's `owner` back-pointer (BR-2610-anvl-registry-001); this branch is stacked on that one.
+
+**After this lands (Bindings):** one decoded accessor in all four bindings (`value` stays raw); module and
+statement attributes both work.

@@ -87,6 +87,7 @@ typedef anvl_include_t *anvl_include;
 typedef struct anvl_attribute_t {
    anvl_slice key;   // identifier
    anvl_slice value; // value text; length 0 means flag attribute
+   struct anvl_value_t *decoded; // the value read as a value (arena-owned); NULL for a flag attribute
 } anvl_attribute_t;
 typedef anvl_attribute_t *anvl_attribute;
 

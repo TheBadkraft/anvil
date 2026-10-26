@@ -1368,6 +1368,145 @@ static void test_anv47_identical_fragments(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-public-api-004 - an attribute's value read as a value
+ * ---------------------------------------------------------------------- */
+#define ATTR_LOAD(lit) anvil_load_buffer((lit), sizeof(lit) - 1)
+
+// The statement `name`'s attribute `key`, or NULL.
+static anvil_attribute stmt_attr(anvil_document doc, const char *name, const char *key) {
+   anvil_statement st = anvil_document_find_statement(doc, name);
+   return st ? anvil_statement_find_attribute(st, key) : NULL;
+}
+
+static bool text_is(anvil_value v, const char *want, size_t want_len) {
+   char buf[64];
+   size_t n = v ? anvil_value_get_text(v, buf, sizeof(buf)) : 999;
+   return v && n == want_len && memcmp(buf, want, want_len) == 0;
+}
+
+static void test_anv48_attribute_value_handle_scalars(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\nx @[status=\"done\", note=\"a\\\"b\", type=bug, n=42, f=1.5, on=true, off=false, none=null] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV48: document with attributes loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "status"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "done", 4),
+                      "ANV48: status=\"done\" is a STRING with text done (quotes stripped)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "note"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "a\"b", 3),
+                      "ANV48: note=\"a\\\"b\" is a STRING with text a\"b (escape resolved)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "type"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "bug", 3),
+                      "ANV48: type=bug is BARE with text bug");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "n"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).is_integral && anvil_value_get_numeric(v).as_int64 == 42,
+                      "ANV48: n=42 is NUMERIC and get_numeric gives 42");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "f"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_double == 1.5, "ANV48: f=1.5 is NUMERIC 1.5");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "on"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BOOL && text_is(v, "true", 4),
+                      "ANV48: on=true is BOOL");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "none"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NULL, "ANV48: none=null is NULL");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv49_flag_attribute_has_no_value_handle(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\n@[schema, table=assets, active]\nx @[hot, k=v] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV49: loads");
+   if (doc) {
+      TestBit.is_true(anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "schema")) == NULL,
+                      "ANV49: a module flag attribute has a NULL handle");
+      TestBit.is_true(anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "active")) == NULL,
+                      "ANV49: so does a flag after valued ones");
+      TestBit.is_true(anvil_attribute_get_value_handle(stmt_attr(doc, "x", "hot")) == NULL,
+                      "ANV49: a statement flag attribute has a NULL handle");
+      anvil_value v = anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "table"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "assets", 6),
+                      "ANV49: a module attribute with a value has a handle");
+      TestBit.is_true(anvil_attribute_get_value_handle(NULL) == NULL, "ANV49: NULL attribute");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv50_raw_value_reader_is_unchanged(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[status=\"done\", note=\"a\\\"b\", type=bug, n=42] := 1;\n");
+   if (doc) {
+      const struct { const char *key, *raw; } want[] = {
+         {"status", "\"done\""}, {"note", "\"a\\\"b\""}, {"type", "bug"}, {"n", "42"}};
+      for (size_t i = 0; i < 4; i++) {
+         char buf[32] = {0};
+         anvil_attribute a = stmt_attr(doc, "x", want[i].key);
+         size_t n = a ? anvil_attribute_get_value(a, buf, sizeof(buf)) : 0;
+         TestBit.is_true(n == strlen(want[i].raw) && strcmp(buf, want[i].raw) == 0,
+                         "ANV50: anvil_attribute_get_value still returns the raw source text");
+      }
+      anvil_dispose(doc);
+   } else {
+      TestBit.is_not_null(doc, "ANV50: loaded");
+   }
+}
+
+static void test_anv51_nul_in_attribute_value(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\n@[m=\"p\0q\"]\nx @[s=\"a\0b\", t=after] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV51: a NUL inside a quoted attribute value loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "s"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "a\0b", 3),
+                      "ANV51: statement attribute text is 61 00 62");
+      char buf[8] = {0};
+      TestBit.is_equal_int(3, (long long)(v ? anvil_value_get_bytes(v, buf, sizeof(buf)) : 0),
+                           "ANV51: and get_bytes reports 3");
+      anvil_value after = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "t"));
+      TestBit.is_true(after && text_is(after, "after", 5), "ANV51: the attribute after it is intact");
+      v = anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "m"));
+      TestBit.is_true(v && text_is(v, "p\0q", 3), "ANV51: module attribute text is 70 00 71");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv52_undecodable_value_falls_back_to_bare(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[range=1..5, pair=1 2, ok=\"fine\"] := 1;\ny := 2;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc),
+                   "ANV52: values the scalar grammar rejects do not fail the load");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "range"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "1..5", 4),
+                      "ANV52: 1..5 is a BARE value of its raw text");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "pair"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "1 2", 3),
+                      "ANV52: so is `1 2` (a prefix that parses is not the whole value)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "ok"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "fine", 4),
+                      "ANV52: and the next attribute is unaffected");
+      TestBit.is_equal_int(0, (long long)(anvil_has_errors(doc)), "ANV52: no recorded errors");
+      TestBit.is_true(anvil_document_find_statement(doc, "y") != NULL, "ANV52: later statements load");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv53_whitespace_and_escaped_quote_scanning(void) {
+   // Attribute values are scanned up to the next ',' or ']' outside a string; an escaped quote must
+   // not flip that state (it used to swallow the closing ']' and everything after it).
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[ a = \"p,]q\" , b = \"c\\\"d]\" , e = 7 ] := 1;\ny := 2;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV53: loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "a"));
+      TestBit.is_true(v && text_is(v, "p,]q", 4), "ANV53: ',' and ']' inside a string are content");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "b"));
+      TestBit.is_true(v && text_is(v, "c\"d]", 4), "ANV53: an escaped quote does not end the string");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "e"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_int64 == 7, "ANV53: and later attributes parse");
+      TestBit.is_true(anvil_document_find_statement(doc, "y") != NULL, "ANV53: as do later statements");
+      anvil_dispose(doc);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1427,6 +1566,19 @@ int main(void) {
                   test_anv45_identical_loads_are_independent, th);
    TestBit.run_ex("ANV46_diamond_per_graph", NULL, test_anv46_diamond_per_graph, th);
    TestBit.run_ex("ANV47_identical_fragments", NULL, test_anv47_identical_fragments, th);
+
+   TestBit.run_ex("ANV48_ATTRIBUTE_VALUE_HANDLE_SCALARS", NULL,
+                  test_anv48_attribute_value_handle_scalars, th);
+   TestBit.run_ex("ANV49_FLAG_ATTRIBUTE_HAS_NO_VALUE_HANDLE", NULL,
+                  test_anv49_flag_attribute_has_no_value_handle, th);
+   TestBit.run_ex("ANV50_RAW_VALUE_READER_IS_UNCHANGED", NULL,
+                  test_anv50_raw_value_reader_is_unchanged, th);
+   TestBit.run_ex("ANV51_NUL_IN_ATTRIBUTE_VALUE", NULL,
+                  test_anv51_nul_in_attribute_value, th);
+   TestBit.run_ex("ANV52_UNDECODABLE_VALUE_FALLS_BACK_TO_BARE", NULL,
+                  test_anv52_undecodable_value_falls_back_to_bare, th);
+   TestBit.run_ex("ANV53_WHITESPACE_AND_ESCAPED_QUOTE_SCANNING", NULL,
+                  test_anv53_whitespace_and_escaped_quote_scanning, th);
 
    return TestBit.report();
 }

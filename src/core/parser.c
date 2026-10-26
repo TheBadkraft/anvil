@@ -121,11 +121,91 @@ static void parser_set_error(anvl_source, anvl_err_code);
 /* ----------------------------------------------------------------- *
  * Parser Function Implementations
  * ----------------------------------------------------------------- */
+// The document a source belongs to: the back-pointer set when the document was registered
+// (NULL for a source that is not registered, e.g. a standalone one).
+static module_document source_document(anvl_source src) { return src ? src->owner : NULL; }
+
+bool anvl_attribute_decode(anvl_source src, anvl_attribute attr) {
+   attr->decoded = NULL;
+   if (!src || Source.slice_length(attr->value) == 0) {
+      return true; // a flag attribute has no value
+   }
+   const char *base = (const char *)src->buffer.bucket;
+   const char *begin = attr->value.start;
+   const char *end = attr->value.end;
+   while (end > begin && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
+      end--; // the scanner stops at ',' or ']', so trailing whitespace is part of the slice
+   }
+   if (end == begin) {
+      return true;
+   }
+
+   // Everything the trial parse could disturb is saved and restored.
+   module_document doc = source_document(src);
+   module_context ctx = doc ? doc->context : NULL;
+   usize errors_before = ctx && ctx->errors ? List.size(ctx->errors) : 0;
+   anvl_err_code last_error = parser.err_code;
+   usize pos = src->pos, line = src->line, col = src->col;
+
+   Source.set_position(src, (usize)(begin - base), line, col);
+   // The scalar parsers fill a node their caller allocated (parse_reserved_literal replaces it).
+   anvl_err_code node_err = ANVL_ERR_NONE;
+   anvl_value value = Source.new_node(src, ANVL_NODE_VALUE, &node_err);
+   bool whole = value && parse_scalar_value(src, &value) && value;
+   if (whole) {
+      skip_same_line_whitespace(src);
+      whole = Source.at(src) == attr->value.end; // only the slice's trailing whitespace may remain
+   }
+
+   // Forget the trial: its position, any error it recorded, the parser's last-error code.
+   Source.set_position(src, pos, line, col);
+   parser.err_code = last_error;
+   if (ctx && ctx->errors) {
+      while (List.size(ctx->errors) > errors_before) {
+         usize last = List.size(ctx->errors) - 1;
+         anvl_error err = NULL;
+         List.get(ctx->errors, last, (object *)&err);
+         List.remove(ctx->errors, last);
+         Allocator.dispose(err);
+      }
+   }
+
+   if (!whole) {
+      // Not a scalar as a whole (`1..5`, `1 2`): expose the raw text as a BARE value instead.
+      if (!value) {
+         value = Source.new_node(src, ANVL_NODE_VALUE, &node_err);
+      }
+      if (!value) {
+         return false;
+      }
+      value->type = ANVL_VALUE_BARE;
+      Source.init_slice(src, &value->text);
+      value->text.start = begin;
+      value->text.end = end;
+   }
+   attr->decoded = value;
+   return true;
+}
+
 // Parse the given source and return the result
 anvl_result anvl_parse(anvl_source source) {
    // immediately set up the parser context and state for the given document
    if (!parser_init()) {
       goto error; // Failed to initialize parser
+   }
+
+   // Module attributes were scanned in the header, before the arena existed; read their values now.
+   module_document owner = source_document(source);
+   if (owner && owner->header && owner->header->attributes) {
+      list attrs = owner->header->attributes;
+      for (usize i = 0, n = List.size(attrs); i < n; i++) {
+         anvl_attribute attr = NULL;
+         List.get(attrs, i, (object *)&attr);
+         if (attr && !anvl_attribute_decode(source, attr)) {
+            parser.err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+            goto error;
+         }
+      }
    }
 
    context ctx = NULL;
@@ -446,7 +526,12 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
             if (!in_string && (c == ',' || c == ANVL_TOK_RBRACKET)) {
                break;
             }
-            if (c == ANVL_TOK_QUOTE) {
+            if (in_string && c == '\\') {
+               Source.consume(src, 1); // an escape: the next character (an escaped quote, say)
+               if (Source.is_eof(src)) { // never closes or opens a string
+                  break;
+               }
+            } else if (c == ANVL_TOK_QUOTE) {
                in_string = !in_string;
             }
             Source.consume(src, 1);
@@ -454,6 +539,11 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
          Source.init_slice(src, &attr->value);
          attr->value.start = value_start;
          attr->value.end = Source.at(src);
+         if (!anvl_attribute_decode(src, attr)) {
+            Allocator.dispose(attr);
+            dispose_attribute_list(attrs);
+            return false; // anvl_attribute_decode already set its own error
+         }
       }
 
       List.append(attrs, attr);

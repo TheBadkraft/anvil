@@ -93,6 +93,7 @@ extern const anvil_document_iterator_i DocumentIterator;
 typedef struct anvil_attribute_i {
    size_t (*get_key)(anvil_attribute attr, char *buf, size_t buflen);
    size_t (*get_value)(anvil_attribute attr, char *buf, size_t buflen);
+   anvil_value (*get_value_handle)(anvil_attribute attr); // appended: existing offsets unchanged
 } anvil_attribute_i;
 extern const anvil_attribute_i Attribute;
 

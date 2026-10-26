@@ -148,6 +148,8 @@ static void test_vt06_attribute_matches_flat(void) {
                    "VT06: Attribute.get_key is anvil_attribute_get_key");
    TestBit.is_true(Attribute.get_value == anvil_attribute_get_value,
                    "VT06: Attribute.get_value is anvil_attribute_get_value");
+   TestBit.is_true(Attribute.get_value_handle == anvil_attribute_get_value_handle,
+                   "VT06: Attribute.get_value_handle is anvil_attribute_get_value_handle");
 }
 /* ---------------------------------------------------------------------- *
  * VT04 — end-to-end smoke test using only the vtable, never a flat
@@ -274,6 +276,7 @@ const struct vt_entry VT_TABLE[] = { // automatic: vtable members are not consta
    VT_MEMBER(anvil_statement_find_attribute, Statement.find_attribute),
    VT_MEMBER(anvil_attribute_get_key, Attribute.get_key),
    VT_MEMBER(anvil_attribute_get_value, Attribute.get_value),
+   VT_MEMBER(anvil_attribute_get_value_handle, Attribute.get_value_handle),
    // Flat-only functions go here as VT_FLAT_ONLY(anvil_x, "why a binding doesn't need it").
 };
    char *header = test_read_whole_file("../../include/anvil_flat.h");

@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil_attribute_get_value_handle`** (`FR-2610-anvl-public-api-004`; flat API and `Attribute.get_value_handle`,
+  both appended last): an attribute's value read AS A VALUE, so `anvil_value_get_type` (STRING / BARE /
+  NUMERIC / BOOL / NULL), `get_text` (escapes resolved, delimiters stripped), `get_numeric` and `get_bytes`
+  apply unchanged. `@[status="done"]` reads as the string `done`, `@[note="a\"b"]` as `a"b`, `@[n=42]` as the
+  number 42; a flag attribute (`@[active]`) returns NULL. Works for module and statement attributes, the
+  handle lives as long as its document, and a NUL inside a quoted value survives
+  (`BR-2610-anvl-nul-001`). `anvil_attribute_get_value` is unchanged: it is still the raw-source-text
+  reader and still returns `"done"` with its quotes. A value the scalar grammar doesn't accept as a whole
+  (`@[range=1..5]`) is exposed as a BARE value of its raw text; reading never fails and no document that
+  loaded before fails now. Bindings can drop any per-binding unquoting and add one decoded accessor.
 - **`Schema` and `TypeRegistry` vtables** (`FR-2610-anvl-public-api-003`, roadmap decision D4):
   `include/anvil_schema_vtable.h` (`anvil_schema_i`, `extern const anvil_schema_i Schema;`, 40
   members) and `include/anvil_type_registry_vtable.h` (`anvil_type_registry_i`,
@@ -240,6 +250,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported as malformed ("the value contains a NUL byte") instead of being truncated into a match
   (`"uuid\0x"` is not `uuid`). A NUL in a statement name, rule key or bare word is rejected by the core
   at load time, so those can't occur. No public signature changed.
+- **A quoted attribute value containing an escaped quote no longer swallows the rest of the document**
+  (`FR-2610-anvl-public-api-004`): the attribute scanner (statement and module attributes) toggled "inside
+  a string" on every `"`, escaped or not, so `@[note="a\"b"]` left the string open, ate the closing `]`
+  and failed the load (or mis-split later attributes). It is escape-aware now.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`
