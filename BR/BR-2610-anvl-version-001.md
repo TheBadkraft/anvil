@@ -100,9 +100,9 @@ Done by the ANVL Bindings agent. Branches, not merged, not pushed.
 
 **The rule** (the same in `build-number.js` and `build-number.sh`; 9 tests each, `test/build-number.test.js`):
 
-1. `ANVIL_BUILD`, when set and non-empty, wins. It must be a plain non-negative integer that fits a C `int`; anything
+1. `ANVL_BUILD`, when set and non-empty, wins. It must be a plain non-negative integer that fits a C `int`; anything
    else fails the build with a message, rather than reporting a made-up number. Leading zeros are dropped (a C literal
-   `0176` is octal). `ANVIL_BUILD=0` forces "not provided".
+   `0176` is octal). `ANVL_BUILD=0` forces "not provided".
 2. Otherwise the commit count of `vendor/anvil` (`git rev-list --count HEAD`), but only when `vendor/anvil` is a full
    git checkout **of its own**: a `vendor/anvil` with no `.git` that sits inside some other repository would otherwise
    report that repository's commit count, and a shallow clone would report a truncated one. Both fall through to 3.

@@ -197,7 +197,7 @@ FlyWire guard). Supersedes the `0.8.0-rc` downloads, which predate the `import` 
 
 ### Changed
 - **Bindings take `ANVL_BUILD` from the environment instead of hard-coding `0`** (`BR-2610-anvl-version-001`, build half):
-  `anvil.node`'s `binding.gyp` and `anvil.wasm`'s `build.sh` use `ANVIL_BUILD` if set, else the commit count of a full
+  `anvil.node`'s `binding.gyp` and `anvil.wasm`'s `build.sh` use `ANVL_BUILD` if set, else the commit count of a full
   `vendor/anvil` checkout, else 0 (no `+BUILD`). All five bindings re-pinned to `78bb318` with a regression test for
   attribute values that no longer carry trailing whitespace (`BR-2610-anvl-attr-001`). The binding READMEs now lead with
   installing the prebuilt package, and `Anvil.Net` is repackaged as `0.10.0-dev.2`.
