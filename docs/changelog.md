@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **All five bindings re-pinned to native `main` (`e089837`) and given a decoded attribute accessor**
+  (`SR-2610-anvl-vendor-bump-002`): `decodedValue` in `anvil.node`/`anvil.wasm`, `decoded_value` in `anvil.py`,
+  `DecodedValue` in `anvil.net`, `getDecodedValue()` in `anvil.java`, next to the unchanged raw `value`
+  (`status="done"` is `done`; a flag is null/None). The `Attribute` vtable's appended member is mirrored where it is read.
+  The identical-content workarounds are gone (the `anvil.net` xUnit switch and the special exception text in `anvil.net` and
+  `anvil.py`), the NUL tests are real tests, and the newer native's real `;` message, unterminated-comment error and
+  `nullable`/`truely` bare words are pinned in every binding. `anvil.java` gained a vtable drift test, which found its
+  `Document` group one member short.
 - **`anvil_attribute_get_value_handle`** (`FR-2610-anvl-public-api-004`; flat API and `Attribute.get_value_handle`,
   both appended last): an attribute's value read AS A VALUE, so `anvil_value_get_type` (STRING / BARE /
   NUMERIC / BOOL / NULL), `get_text` (escapes resolved, delimiters stripped), `get_numeric` and `get_bytes`
