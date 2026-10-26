@@ -170,6 +170,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty `Io` error. Underneath, the process-global source registry makes independent loads collide,
   which three bindings have now hit separately. Part 1 fixes the message; Part 2 proposes scoping
   dedup to one load's include graph.
+- **`BR-2610-anvl-nul-001`** (filed): the type registry and schema store copied text as C strings,
+  so an enum label containing a NUL is truncated and a string extension value containing one comes
+  back NULL. Found by the Bindings agent's cross-binding NUL audit. The core reader itself is correct.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
