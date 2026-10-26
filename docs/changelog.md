@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.10.0-rc] — (2026-10-26)
+
+First release cut by the release tooling: every artifact is built from this tag, reports
+`0.10.0-rc+<BUILD>` (`BUILD` = the tag's commit count, computed once), and is gated on the packaged
+file, not the build tree (`scripts/release/`: grammar and version, exports, install, README and the
+FlyWire guard). Supersedes the `0.8.0-rc` downloads, which predate the `import` -> `include` rename
+(`BR-2610-anvl-distribution-001`).
+
 ### Added
 - **All five bindings re-pinned to native `main` (`e089837`) and given a decoded attribute accessor**
   (`SR-2610-anvl-vendor-bump-002`): `decodedValue` in `anvil.node`/`anvil.wasm`, `decoded_value` in `anvil.py`,

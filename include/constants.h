@@ -28,7 +28,7 @@
  * Update this by script for each release                                  *
  * ----------------------------------------------------------------------- */
 #define ANVL_VERSION_MAJOR 0
-#define ANVL_VERSION_MINOR 9
+#define ANVL_VERSION_MINOR 10
 #define ANVL_VERSION_PATCH 0
 #define ANVL_VERSION_TAG "rc"
 // Derived from the parts above, so the two cannot drift (BR-2610-anvl-version-001). It is the
