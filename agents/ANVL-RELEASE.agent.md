@@ -16,6 +16,8 @@ stop. Don't patch around it.
 > CLI `node ~/Projects/repos/rivet-live/src/cli/main.js`). `BR/`, `FR/` and `SR/` are frozen
 > history. Never edit them. Wherever this file says to update or close a ticket "in its file" or
 > "with a Resolution section", do it in Rivet (`rivet section set`, `rivet resolve --resolution`).
+> Full reference: `~/Projects/repos/rivet-live/docs/agent-guide.md` (setup, filing forms, workflow,
+> statuses including backlog, inbox, rules, every command).
 
 ---
 
