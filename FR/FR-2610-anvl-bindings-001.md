@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet, flywire (downstream consumers)
-**Status:** in progress — slice 1 (`anvil.node`) done; `anvil.py` and `anvil.net` slices open
+**Status:** resolved — every slice done (1, 1b `anvil.node`; 2 `anvil.py`; 3 `anvil.net`; 4 `anvil.wasm`); see Progress
 **Tags:** bindings, anvil-node, anvil-py, anvil-net, schema, types, rivet-readiness
 
 ---
@@ -239,4 +239,33 @@ and the full test set first (50 failing), then the C, the `emcc` build on the Li
   NUL-terminated, see **BR-2610-anvl-bindings-002**.
 - **`dist/` is not committed.** Anyone checking out the branch must rebuild it (`build.sh` on the Linode box, with
   `build-sigma-system-alloc.sh` run once) before the tests can pass; `test/vendor-pin.test.js` fails a stale `dist/`.
+
+### Slice 2: `anvil.py` — done (Bindings agent, 2026-10-26)
+
+Branch `feat/FR-2610-anvl-bindings-001-py` in `anvil.py`, commit `0e9a93c`, on `fix/BR-2610-anvl-bindings-002` (which is on
+the vendor-bump branch, pin `f9ee783`). Not yet merged or pushed. 164 tests pass and 1 is an expected failure (57 new).
+TDD: stubs and the full test set first (55 failing), then the ctypes layer, then the public classes. Built after, and
+paused for, BR-2610-anvl-bindings-002 as planning directed, so the NUL tests for the registry and schema were in the
+test set from the start.
+
+- **Surface, in Python idiom** (same members as `anvil.net`'s slice, with Python's conventions): `AnvilTypeRegistry`
+  (`load`, `from_includes`, `find`, `resolve`, `diagnostics`), `TypeDef`, `AnvilSchema` (`load`, `validate`,
+  `validate_value`, `validate_field`, `diagnostics`, `fields`, `find_field`), `SchemaField`, `AnvilNumeric`, the snapshot
+  dataclasses `SchemaValidation`, `SchemaViolation`, `SchemaDiagnostic`, `TypeDiagnostic`, `SchemaExtra`, and the four
+  enums. Everything that owns a handle is a context manager; views raise `RuntimeError` after their owner is disposed,
+  matching `AnvilDocument`'s existing convention. No finalizer, matching `AnvilDocument`.
+- **Python-idiom choices** (confirm or overrule): options are **keyword-only** (`skip_required=`, `allow_unknown=`);
+  `validate_field` is **one method** taking text, bytes or an `AnvilDocument` (where `anvil.net` has two overloads);
+  absent constraints are **`None`** (as the FR specified); `min`/`max` are an `int` when integral and a `float` when
+  fractional, with `min_numeric`/`max_numeric` giving the exact `AnvilNumeric` (so the `TryGet*(out long)` forms of
+  `anvil.net` have no Python counterpart: an `int` is unbounded). A text-parse failure is a `ValueError`, the analogue
+  of `anvil.net`'s `FormatException`. An absent statement is one `REQUIRED` violation with an empty field, as in the
+  other bindings.
+- **Native layer:** `_native/type_registry.py` and `_native/schema.py`, 1:1 mirrors of the 20- and 40-member vtables,
+  generated from the headers and reviewed; `tests/test_vtable_drift.py` pins them, `tests/test_enum_drift.py` pins the enums.
+- **The identical-content hazard** (BR-2610-anvl-registry-001) is handled as in `anvil.net`: `validate_field(text)` raises a
+  `ValueError` that names the cause and points at the document form. Drop it when that BR lands.
+- **Verification:** 30,000 full rounds (load, introspect, validate, `validate_field`, registry) grow RSS by 0.1 MB, the same
+  as a document-only control.
+- **Deferred:** the `Bindings-Guide.md` Python section, to the release (Release agent, then Documenter).
 

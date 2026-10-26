@@ -206,7 +206,7 @@ Slice 1 (`anvil.node`) is done; see the FR's Progress section. Still open:
 - **`schema.fields` introspection in `anvil.node`.** FR-2610-anvl-schema-005 has landed natively; the FR defers its binding accessors; they are now slice 1b.
 - **`min`/`max` that overflow `int64`/`double`** read as `undefined` in `TypeDef`, because native has no text accessor for the bound (`anvil_numeric_t.overflowed` says only that it did not fit). Candidate native FR if Rivet declares such a bound.
 - **`Bindings-Guide.md` Node section** documents the `0.8.0-rc` download as "Downloadable today". Types and schema land there with the release (SR-2610-anvl-distribution-001, Release agent, after all of Phase 4), not before, so it does not describe an artifact that lacks them.
-- **`anvil.py` and `anvil.net` slices** of the same FR, unblocked now that FR-2610-anvl-public-api-003 (the `Schema`/`TypeRegistry` vtables) is merged.
+- ~~**`anvil.py` and `anvil.net` slices** of the same FR.~~ Done: every slice of FR-2610-anvl-bindings-001 is complete.
 - **`anvil.wasm` carries types and schema but exports nothing from them.** The linker drops them until a wrapper exports the entry points (decision D3 put them in the build for FlyWire's browser side).
 
 ## Deferred — bindings: writer and builder in `anvil.node` (FR-2610-anvl-bindings-002)

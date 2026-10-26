@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`anvil.py` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 2): `AnvilTypeRegistry`/`TypeDef` and
+  `AnvilSchema` in Python idiom, over the `Schema` and `TypeRegistry` vtables. Validation with keyword-only
+  `skip_required`/`allow_unknown`, `validate_field` over text, bytes or a loaded document, load diagnostics, and field
+  introspection (nested rules, array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds.
+  Everything that owns a handle is a context manager, and the enums are pinned against the C headers. With this, every slice
+  of `FR-2610-anvl-bindings-001` is done: `anvil.node`, `anvil.net`, `anvil.wasm` and `anvil.py` share one surface.
 - **`anvil.wasm` gains the type registry, schema, writer and builder** (`FR-2610-anvl-bindings-001` slice 4 and
   `FR-2610-anvl-bindings-002`'s wasm slice): the same surface and result shapes as `anvil.node`, including
   `validateField` with `each` and `schema.fields`, so a JS caller has one API on the server and in the browser. The
