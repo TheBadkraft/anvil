@@ -200,6 +200,22 @@ returns a real handle, `anvil_attribute_get_value` just reports zero length for 
 after (as above); use the `_count`/indexed-`_get` pair on either level to enumerate every
 attribute a document or statement carries.
 
+`anvil_attribute_get_value` returns the value's **raw source text**, exactly as written: for
+`@[status="done"]` that is `"done"` with its quotes, and a quoted value's escapes stay escaped. To read
+the value itself, use the value handle: `anvil_attribute_get_value_handle(attr)` returns an
+`anvil_value` (or NULL for a flag attribute), so the ordinary value calls apply:
+
+```c
+anvil_value v = anvil_attribute_get_value_handle(attr);
+if (v) {
+   anvil_value_get_type(v);    // ANVIL_VALUE_STRING for "done", BARE for production, NUMERIC for 42, ...
+   anvil_value_get_text(v, buf, sizeof(buf)); // done  (quotes stripped, escapes resolved)
+   anvil_value_get_numeric(v); // for @[retries=3]
+}
+```
+
+A value that isn't a single scalar (`@[range=1..5]`) reads as a BARE value of its raw text.
+
 ## 8. Walking Includes
 
 `anvil_document_get_includes` walks a document's own *direct* includes (not the whole transitive
