@@ -86,7 +86,7 @@ static anvl_result registry_add(module_document doc, anvl_err_code *out_err_code
    }
 
    if (Map.has(source_registry, (const char *)hash, sizeof(*hash))) {
-      err_code = ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT;
+      err_code = ANVL_ERR_SOURCE_ALREADY_LOADED;
       goto error;
    }
 

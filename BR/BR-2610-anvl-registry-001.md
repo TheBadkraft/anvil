@@ -5,7 +5,7 @@
 **Owner:** anvl, worked by the ANVL coder agent
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the Bindings agent's anvil.net slice-3 report
-**Status:** open
+**Status:** part 1 done (branch `fix/BR-2610-anvl-registry-001`, not merged); part 2 awaiting planning's decision
 **Tags:** source-registry, errors, bindings, rivet-readiness
 
 ---
@@ -74,3 +74,80 @@ making it global), and record the finding here.
 
 The Bindings agent can drop the workarounds: anvil.net's xUnit parallelization switch, and the
 special exception text in `ValidateField`.
+
+## Part 1 Resolution
+
+Branch `fix/BR-2610-anvl-registry-001` (not merged, not pushed: awaiting the owner's go).
+
+- New internal code `ANVL_ERR_SOURCE_ALREADY_LOADED = 9005` (generic block), message "A document with
+  identical content is already loaded", name table entry added. It replaces the reused parser code at
+  all three sites that raise or branch on it: `source_registry.c` (`registry_add`), `module.c`
+  (`mod_ctx_register_doc` and the diamond-include handling in `include_load_child`, which *branches* on
+  this code, see below), plus the comments in `document.c`.
+- `load_common` records the failure on the context (`anvl_error_set`) when `mod_ctx_register_doc` fails,
+  so `make_error_detail` finds it. Public category stays `ANVIL_ERR_IO` (the public enum is
+  deliberately small and nothing better fits).
+- Tests: ANV44 (native: identical load reports "identical" in the detail message, category Io, first
+  document untouched, same text loads again after the first is disposed), REG03 (now also asserts the
+  specific code), REG08 (message and name). RED first (REG03 got 4001, REG08 and ANV44 failed on the
+  message). Full unit regression green, counts unchanged except registry 9 -> 10 and native 43 -> 44;
+  `test_release`, `check-exports`, `check-reader-only` green; Valgrind-clean on registry, native, module,
+  header, document, schema.
+- **Trap worth knowing:** `include_load_child` decides "this include is a diamond, reuse the existing
+  document" by comparing the register error to the old parser code. Changing the code in only one place
+  would have turned every diamond include into a load failure; all three sites move together, and the
+  existing include tests (HDR13 and the CR diamond cases) are what caught-by-design cover it.
+
+## Part 2 findings (investigation only; nothing implemented)
+
+**Who depends on the registry, and on its being global:**
+
+1. **The registry is not primarily a dedup mechanism. It is the Source -> owning-document back-lookup.**
+   Five functions in `source.c` (`source_has_errors`, `source_set_error`, `source_get_arena`,
+   `source_new_node`, and one more at ≈ line 755) call `Registry.find(src->hash)` to get from an
+   `anvl_source` (all the parser is handed) to its `module_document` and from there to
+   `doc->context` (error list, arena). `notes/source-identity-registry.md`'s goal says exactly this:
+   "Pass `anvl_source` through the parser; let parser errors route through `Source.set_error(src, ...)`
+   -> registry lookup -> context error list." The hash was chosen as the document identity, and a
+   process-wide map was the simplest place to keep identity -> document.
+2. **Dedup is a side effect of that identity choice.** Two documents with the same content hash can't
+   both be registered, which gives the diamond-include dedup for free (`include_load_child`) and, as an
+   unintended consequence, the cross-load collision. No note records a reason for *cross-load* dedup:
+   the notes say "Registry is process-wide with module reference counting to support the intended
+   one-module-per-process design while tolerating multiple modules in tests". The design assumed one
+   module per process; independent root loads were never an intended use of the global scope.
+3. **Nothing in `src/` relies on cross-load dedup.** The only intentional dedup is within one include
+   graph (module.c ≈ 617). Other registry users: `doc_dispose` (evict own entry only),
+   `mod_ctx_register_doc`, `Registry.release()` in module teardown, and the tests
+   (`test_registry.c` REG01-REG10, `test_source.c` registry-backed `has_errors`/`set_error`,
+   `Debug.stub_doc`/`dispose_doc`).
+4. **The map is unsynchronized.** `source_registry.c` has no lock; `Map` has none. Concurrent loads on
+   different threads race on the same global map, which is a plausible cause of the anvil.net
+   xUnit-parallelism *flake* beyond the identical-text collision: two parallel loads of *different* text
+   also share and mutate it. Worth confirming with a thread-sanitizer run before the design is chosen.
+5. **Ordering hazard:** with a global map, disposing handle A while handle B (same content) is mid-load
+   is fine today only because B's registration fails before touching A's entry (`doc_dispose` evicts only
+   the entry it owns).
+
+**What a per-context scope would take** (my recommendation, for planning to confirm):
+
+- Give `anvl_source` a back-pointer to its `module_document` (set in `mod_ctx_register_doc`, cleared in
+  `doc_dispose`); the five `Registry.find(src->hash)` calls in `source.c` become `src->doc`. This removes
+  the need for a global lookup at all and is also faster.
+- Move deduplication to a `map` owned by `module_context` (hash -> document), used by
+  `mod_ctx_register_doc` and `include_load_child` exactly as now. Diamond behavior is unchanged.
+- The global `Registry` vtable (`init/add/remove/find/count/release/clear`) then has no remaining
+  production caller. Either delete it or make it a thin per-context facade. Its tests (REG01-REG10), the
+  `Debug` helpers and the SRC tests that register stub documents would be rewritten, not just edited.
+  That is the core-contract change: an internal API removal, no public ABI change.
+- It would also make concurrent loads on separate contexts independent (no shared mutable state), which
+  addresses finding 4 without adding a lock. Thread safety *within* one context stays the caller's
+  responsibility, as it is today.
+
+**Alternatives considered and rejected:** (a) a mutex around the global map fixes the race but not the
+identical-text collision; (b) composite key (context pointer + hash) fails because `Source.*` only has
+`src->hash` when it looks the document up, i.e. it needs the back-pointer anyway.
+
+**Decision needed from planning:** go/no-go on the per-context redesign above (back-pointer in
+`anvl_source`, per-context dedup map, retire or reduce the global `Registry`), and whether to run a TSan
+check on the global map first.

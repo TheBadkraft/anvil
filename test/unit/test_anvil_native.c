@@ -1266,6 +1266,43 @@ static void test_anv43_value_get_blob_tag(void) {
    anvil_dispose(doc);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * ANV44 (BR-2610-anvl-registry-001) - loading text identical to a live document reports a real,
+ * specific message (not an empty Io error)
+ * ---------------------------------------------------------------------- */
+static void test_anv44_identical_load_reports_specific_error(void) {
+   const char *src = "#!aml\nanv44_unique_marker := 1;\n";
+   anvil_document first = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(first, "ANV44: first load");
+   TestBit.is_false(first && anvil_has_errors(first), "ANV44: first load is clean");
+   anvil_document second = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(second, "ANV44: the failed load still returns a handle");
+   if (second) {
+      TestBit.is_true(anvil_has_errors(second), "ANV44: the identical load fails");
+      TestBit.is_equal_int(ANVIL_ERR_IO, anvil_get_error(second), "ANV44: public category stays Io");
+      anvil_error err = anvil_document_get_error(second);
+      TestBit.is_not_null(err, "ANV44: with an error detail");
+      char msg[256] = {0};
+      size_t len = anvil_error_get_message(err, msg, sizeof(msg));
+      TestBit.is_true(len > 0 && strstr(msg, "identical") != NULL,
+                      "ANV44: whose message says an identical document is already loaded");
+      anvil_dispose(second);
+   }
+   // The failed load must not disturb the live document.
+   anvil_statement st = first ? anvil_document_find_statement(first, "anv44_unique_marker") : NULL;
+   TestBit.is_not_null(st, "ANV44: the first document is untouched");
+   if (first) {
+      anvil_dispose(first);
+   }
+   // Once the first is gone the same text loads fine again.
+   anvil_document third = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(third != NULL && !anvil_has_errors(third), "ANV44: reloadable after disposal");
+   if (third) {
+      anvil_dispose(third);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1321,6 +1358,8 @@ int main(void) {
                   test_anv41_value_get_bytes_buffer_convention, th);
    TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
    TestBit.run_ex("ANV43_value_get_blob_tag", NULL, test_anv43_value_get_blob_tag, th);
+   TestBit.run_ex("ANV44_identical_load_reports_specific_error", NULL,
+                  test_anv44_identical_load_reports_specific_error, th);
 
    return TestBit.report();
 }

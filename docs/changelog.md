@@ -204,6 +204,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **Loading text identical to a live document now reports a real error** (`BR-2610-anvl-registry-001`,
+  part 1): the failure surfaced as `ANVIL_ERR_IO` with an empty message because the registry reused the
+  unrelated parser code `ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT` and `load_common` recorded nothing.
+  There is now a dedicated internal code, `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical
+  content is already loaded"), and `anvil_document_get_error`'s detail carries that message (the public
+  category stays `ANVIL_ERR_IO`). The failed load leaves the live document untouched. The underlying
+  limitation (the registry is process-global, so identical text can't be loaded twice at once) is
+  unchanged; see the ticket for part 2.
 - **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
   `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
   constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`

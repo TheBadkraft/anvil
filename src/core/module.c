@@ -382,7 +382,7 @@ void mod_ctx_dispose(module_context ctx) {
 /*
  * Register a document with the context and global source registry. The document's
  * source must be loaded and have a non-zero hash. If the document is already
- * registered, the call fails with ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT.
+ * registered, the call fails with ANVL_ERR_SOURCE_ALREADY_LOADED.
  * If a filepath is provided, it is copied into the document's filepath field.
  * The document is appended to the context's docs list.
  * Returns ANVL_RES_OK on success, or ANVL_RES_ERR on failure.
@@ -405,7 +405,7 @@ anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const 
    }
 
    if (Registry.find(Source.hash(doc->source)) != NULL) {
-      err_code = ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT;
+      err_code = ANVL_ERR_SOURCE_ALREADY_LOADED;
       goto error;
    }
 
@@ -614,7 +614,7 @@ static anvl_result include_load_child(module_context ctx, module_document parent
    // existing document and discard the freshly loaded duplicate.
    res = mod_ctx_register_doc(ctx, child, resolved, &err_code);
    if (res != ANVL_RES_OK) {
-      if (err_code == ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT) {
+      if (err_code == ANVL_ERR_SOURCE_ALREADY_LOADED) {
          module_document existing = Registry.find(Source.hash(child->source));
          if (existing) {
             inc->resolved = existing;

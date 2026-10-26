@@ -126,6 +126,9 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    }
 
    if (ANVL_RES_OK != mod_ctx_register_doc(ctx, doc, register_label, &err_code)) {
+      // Record why, so the detail carries a real message (ANVL_ERR_SOURCE_ALREADY_LOADED for text
+      // identical to a live document) instead of reading as an empty Io error.
+      anvl_error_set(ctx->errors, err_code, 0, 0, __FILE__, NULL);
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;

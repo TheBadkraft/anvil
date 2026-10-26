@@ -91,7 +91,7 @@ void doc_dispose(module_document doc) {
       // Only remove the registry entry if this doc is actually the one
       // registered under that hash. A document whose own registration
       // failed (e.g. the discarded duplicate in a diamond include — see
-      // include_load_child's ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT
+      // include_load_child's ANVL_ERR_SOURCE_ALREADY_LOADED
       // handling) shares its content hash with a different, still-alive
       // document; disposing it must not evict that document's entry.
       uint64_t hash = Source.hash(doc->source);

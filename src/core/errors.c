@@ -151,6 +151,7 @@ static const char *error_messages[] = {
 
    [ANVL_ERR_INVALID_OPERATION] = "Invalid operation",
    [ANVL_ERR_INVALID_ARGUMENT] = "Invalid argument",
+   [ANVL_ERR_SOURCE_ALREADY_LOADED] = "A document with identical content is already loaded",
 };
 static const char *error_names[] = {
    [ANVL_ERR_NONE] = "ANVL_ERR_NONE",
@@ -256,6 +257,7 @@ static const char *error_names[] = {
 
    [ANVL_ERR_INVALID_OPERATION] = "ANVL_ERR_INVALID_OPERATION",
    [ANVL_ERR_INVALID_ARGUMENT] = "ANVL_ERR_INVALID_ARGUMENT",
+   [ANVL_ERR_SOURCE_ALREADY_LOADED] = "ANVL_ERR_SOURCE_ALREADY_LOADED",
 };
 
 /* ----------------------------------------------------------------------- *

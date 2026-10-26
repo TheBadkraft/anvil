@@ -174,6 +174,7 @@ typedef enum {
    ANVL_ERR_INVALID_ARGUMENT = 9002,
    ANVL_ERR_SOURCE_NOT_FOUND = 9003,
    ANVL_ERR_CONTEXT_INVALID = 9004,
+   ANVL_ERR_SOURCE_ALREADY_LOADED = 9005, // a document with identical content is already loaded
    ANVL_ERR_NOT_IMPLEMENTED = 9999,
 } anvl_err_code;
 

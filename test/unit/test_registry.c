@@ -89,9 +89,23 @@ static void test_reg03_duplicate_hash_fails(void) {
 
    res = Registry.add(doc2, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "REG03: duplicate add fails");
+   TestBit.is_equal_int(ANVL_ERR_SOURCE_ALREADY_LOADED, err_code,
+                        "REG03: with its own specific code, not a parser code");
 
    Debug.dispose_doc(doc1);
    Debug.dispose_doc(doc2);
+}
+
+
+/* ---------------------------------------------------------------------- *
+ * REG08 (BR-2610-anvl-registry-001) - the dedicated code has a real message and name
+ * ---------------------------------------------------------------------- */
+static void test_reg08_already_loaded_code_has_message(void) {
+   const char *msg = anvl_error_code_message(ANVL_ERR_SOURCE_ALREADY_LOADED);
+   TestBit.is_true(strcmp(msg, "Unknown error") != 0 && strstr(msg, "identical") != NULL,
+                   "REG08: the message says an identical document is already loaded");
+   const char *name = anvl_error_code_name(ANVL_ERR_SOURCE_ALREADY_LOADED);
+   TestBit.is_true(strcmp(name, "ANVL_ERR_SOURCE_ALREADY_LOADED") == 0, "REG08: and it has a name");
 }
 
 /* ---------------------------------------------------------------------- *
@@ -198,6 +212,8 @@ int main(void) {
    TestBit.run_ex("REG02_find_unknown_returns_null", NULL, test_reg02_find_unknown_returns_null,
                   tr);
    TestBit.run_ex("REG03_duplicate_hash_fails", NULL, test_reg03_duplicate_hash_fails, tr);
+   TestBit.run_ex("REG08_already_loaded_code_has_message", NULL,
+                  test_reg08_already_loaded_code_has_message, tr);
    TestBit.run_ex("REG04_remove_unregisters", NULL, test_reg04_remove_unregisters, tr);
    TestBit.run_ex("REG05_add_rejects_invalid", NULL, test_reg05_add_rejects_invalid, tr);
    TestBit.run_ex("REG06_clear_empties_registry", NULL, test_reg06_clear_empties_registry, tr);
