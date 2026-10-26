@@ -242,3 +242,23 @@ configurations.
 special `ValidateField` exception text); `anvil.node`'s eager-conversion in `parse()` is no longer
 needed for correctness. Loads on separate threads are independent; sharing a *single* document handle
 across threads is still the caller's responsibility, as before.
+
+## Follow-ups (Engineer's review)
+
+- **Notes:** `notes/source-identity-registry.md` now carries a banner pointing at this Resolution, the
+  superseded passages (process-wide registry, module reference count and `Registry.init()/release()`,
+  "one module per process", the global-map Valgrind workaround) are marked **[superseded]** in place, and
+  the **threading contract** is recorded there, once: independent loads on different threads are safe;
+  sharing one document handle across threads is the caller's job (no lock, concurrent readers of one
+  handle not tested, so not promised); `anvl_get_error` is per-thread; the parse hook is still a
+  process-wide setting; `sigma.system.alloc`'s `Allocator` is the only process-global left.
+- **Changelog:** the Fixed entry says loads are thread-safe across independent documents, and a separate
+  entry covers the `FR-2610-anvl-schema-005` identical-extras fix (SCH85), written for consumers that
+  currently serialize loads.
+- **emcc with `_Thread_local` (checked on the Linode box, emsdk 6.0.2, scratch dir, since removed):** every
+  source compiles with `emcc -Wall -Wextra` with no warnings; the library links with the wasm
+  `sigma.system.alloc.o` and runs under node (two identical-text loads both succeed, a malformed
+  document still reports errors); and in the object file `parser` is an ordinary data symbol, not a
+  TLS one. Without `-pthread`, Emscripten treats `_Thread_local` as a plain global, which is correct for
+  a single-threaded wasm module. A pthread-enabled wasm build would give each thread its own state, also
+  correct. The Bindings agent still re-verifies on its own `build.sh` at the re-bump.

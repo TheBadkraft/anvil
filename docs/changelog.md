@@ -204,19 +204,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
-- **Independent loads of identical text now work, and concurrent loads no longer race**
-  (`BR-2610-anvl-registry-001`, part 2). Source deduplication was a process-global map, so loading text
-  identical to ANY live document anywhere in the process failed (the `anvil.node` `parse()` race, the
-  `anvil.net` xUnit flake, `AnvilSchema.ValidateField(text)`), value fragments with identical text
-  failed the same way (so two identical schema extension-key extras, such as `pooled := true` in two
-  fields, silently read back as NULL), and the unsynchronized map was a data race between threads
-  loading different text. Deduplication is now per module context (one load's include graph; a diamond
-  include still loads each shared document once), and each source points back at its document
-  directly, so there is no global lookup. Also removed the parser's process-wide in-flight context list
-  and made its last-error code per-thread (`anvl_get_error()` reports the calling thread's last
-  parse); that list was a second shared structure under concurrent loads. Under ThreadSanitizer, 8
-  threads loading, reading and disposing now report 0 races and 0 failures; before: 88-169 race reports
-  and up to 1590 failed loads. Internal only; no public ABI change. New `make check-tsan`.
+- **Loading documents is now thread-safe across independent documents, and identical text no longer
+  collides** (`BR-2610-anvl-registry-001`, part 2). Any number of threads may call `anvil_load`,
+  `anvil_load_buffer` and `anvil_parse_value_fragment` at the same time, on the same text or different
+  text: each load owns its state and shares nothing with other loads. (Sharing ONE document handle
+  across threads is still the caller's job; `anvl_get_error()` is per-thread.) Before this, source
+  deduplication was a process-global, unsynchronized map, so: loading text identical to any live
+  document anywhere in the process failed (the `anvil.node` `parse()` race, the `anvil.net` xUnit
+  flake, `AnvilSchema.ValidateField(text)`); loading *different* text on several threads corrupted that
+  map and failed loads too; and a second shared structure in the parser raced as well. Now
+  deduplication is per module context (one load's include graph; a diamond include still loads each
+  shared document once), each source points directly at its document, and the parser's last-error code
+  is per-thread. Under ThreadSanitizer, 8 threads loading, reading and disposing now report 0 races and
+  0 failed loads; before: 88-169 race reports and up to 1590 failed loads. Internal only, no public ABI
+  change. New `make check-tsan`. Consumers that serialize loads to work around this can stop.
+- **Schema extension keys with identical text are no longer lost** (`BR-2610-anvl-registry-001`, found
+  while fixing the above; `FR-2610-anvl-schema-005`): extension-key values are copied into value
+  fragments, which went through the same registry, so when two extras had identical text (for example
+  `pooled := true` on two fields, or the same rule in two schemas) the second one silently read back as
+  NULL from `anvil_schema_field_get_extra_value`. All of them are now readable (SCH85).
 - **Loading text identical to a live document reports a real error** (`BR-2610-anvl-registry-001`,
   part 1): `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical content is already loaded")
   replaced a reused parser code and is recorded on the load's error detail. Within one include graph it
