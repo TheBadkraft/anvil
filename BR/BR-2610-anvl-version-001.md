@@ -5,7 +5,7 @@
 **Owner:** anvl (native half, ANVL coder agent) and anvil-node/anvil-wasm (build half, ANVL Bindings agent)
 **Filed:** 2026-10-26
 **Filed by:** anvil (planning), from the ANVL Release agent's audit (BR-2610-anvl-distribution-001, "Release audit")
-**Status:** native half resolved (branch `fix/BR-2610-anvl-version-001`, off main; not merged, not pushed); binding build halves still open
+**Status:** resolved: native half merged (`ab42e73`); binding build halves done on branches, awaiting merge
 **Blocks:** SR-2610-anvl-distribution-001 (the release's version check)
 **Tags:** version, build, release
 
@@ -87,3 +87,49 @@ The version numbers themselves are NOT bumped (the Release agent sets `0.10.0-rc
   still pass `ANVL_BUILD=0`; with this change that already reports no `+BUILD` (not `+0`), and they can
   take `ANVL_BUILD` from the environment as the ticket describes. The release script's tag-count contract
   is the Release agent's.
+
+## Binding build half: Resolution
+
+Done by the ANVL Bindings agent. Branches, not merged, not pushed.
+
+| Binding | What changed | Branch / commits |
+|---|---|---|
+| anvil.node | `binding.gyp` takes `ANVL_BUILD` from `scripts/build-number.js` (`<!(node scripts/build-number.js)`), no longer `0` | `fix/BR-2610-anvl-version-001-build`: `245f125` (code + test), `a908fae` and `ffd05ff` (README) |
+| anvil.wasm | `build.sh` takes `-DANVL_BUILD` from `scripts/build-number.sh`, no longer `0`; `dist/` rebuilt on the Linode box | `fix/BR-2610-anvl-version-001-build`: `70afa78` (code + test), `da57013` (README) |
+| anvil.py, anvil.net, anvil.java | No build-side change: they build through native's own Makefile, which already takes `BUILD_NUM`/`ANVL_BUILD` (`ab42e73`) | READMEs only: py `79190fd`, net `add20db` + `2e364f6`, java `0695070` (on the re-pin branches) |
+
+**The rule** (the same in `build-number.js` and `build-number.sh`; 9 tests each, `test/build-number.test.js`):
+
+1. `ANVIL_BUILD`, when set and non-empty, wins. It must be a plain non-negative integer that fits a C `int`; anything
+   else fails the build with a message, rather than reporting a made-up number. Leading zeros are dropped (a C literal
+   `0176` is octal). `ANVIL_BUILD=0` forces "not provided".
+2. Otherwise the commit count of `vendor/anvil` (`git rev-list --count HEAD`), but only when `vendor/anvil` is a full
+   git checkout **of its own**: a `vendor/anvil` with no `.git` that sits inside some other repository would otherwise
+   report that repository's commit count, and a shallow clone would report a truncated one. Both fall through to 3.
+3. Otherwise 0, which native reports as no `+BUILD` (never a fake `+0`).
+
+Tests cover each case, including the parent-repository and shallow-clone traps (RED first: the script did not exist), and
+that the built addon / `dist/` carries the number the script resolves (RED against the previous build, then GREEN after a
+rebuild). Node 212 tests, wasm 226.
+
+**Test case 3, same string for the same pin.** At the `78bb318` pin node, wasm, py and net all report `0.9.0+272-rc`
+(the pin's commit count). Getting there found a stale-library trap in the OLD native Makefile (pins before `ab42e73`): `-D`
+flags are not tracked by `-MMD`, so after a submodule bump `anvil.o` kept the previous pin's number. The py and net
+libraries had been built at `e089837` and reported `0.9.0+264-rc` for a pin whose count is 272, and the first
+`Anvil.Net.0.10.0-dev.2` pack carried it. A `make -C vendor/anvil clean` rebuild fixed all of them; a pin at or after
+`ab42e73` does this by itself (the stamp file), so the Release agent's re-pin to the tag needs no such step. Both READMEs
+say so under "The version string". Java reports whatever `anvilNativeDir` points at.
+
+**Other things done in this batch** (requested by the planning session, no separate ticket):
+
+- **READMEs for the prebuilt packages.** The `anvil-node`, `anvil-wasm`, `anvil-py` and `anvil-net` READMEs now open with
+  "Installing the prebuilt package" (requirements, platform, how to install from the tarball), then a Quick start (parse,
+  schema `validateField`, writer; each snippet was run), then the API sections, with everything about building from source,
+  the vendor pin, design history and the repo layout under one "Development" heading. No `](../` links remain
+  (`scripts/release/check-readme.sh` passes on all four). The wasm README no longer defers to `anvil.node`'s: it is
+  self-contained. The py and net `docs/getting-started.md` prerequisites no longer tell an installed user to init a
+  submodule. `anvil.java` is not distributed, so its README only had stale facts corrected.
+- **`Anvil.Net` is `0.10.0-dev.2`.** `dev.1` carries the `f9ee783` library. The package was verified by consuming it from
+  a local feed with a `PackageReference` (a newline before `]` gives `b` the raw `"2"` and decoded `2`; version
+  `0.9.0+272-rc`). The tarball route was verified too (a plain `Reference` + `libanvil.so` copied beside the output).
+
