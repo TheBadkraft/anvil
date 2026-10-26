@@ -40,6 +40,7 @@ for h in "$pkg"/include/anvil_*.h; do
     || { echo "FAIL header does not compile standalone: $h" >&2; exit 1; }
 done
 "$here/check-grammar.sh" core "$pkg" "$ver" "$build"
+"$here/check-readme.sh" "$pkg"
 sh "$here/../check-exports.sh" "$pkg/lib/libanvil.so" "$pkg/include"
 
 # Deterministic tarball: sorted names, commit time as mtime, no owner, no gzip timestamp.
