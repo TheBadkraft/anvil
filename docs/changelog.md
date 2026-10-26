@@ -185,6 +185,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
   against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
   the release is live.
+- **`BR-2610-anvl-parser-001`** (filed): a bare value that begins with `null`/`true`/`false`
+  (`nullable`, `truely`, `falsey`) fails to load. The literal is matched as a prefix. From Rivet's
+  q-or importer.
+- **`BR-2610-anvl-errors-001`** (filed): several parse errors report "Unknown error" (a missing
+  `;`, for example), and a repeated top-level name reports no position.
+- **`SR-2610-anvl-build-001`** (filed): `test/unit`'s `test_release` can link a stale
+  `libanvil.a`, because its archive rule has no prerequisites.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
