@@ -742,9 +742,7 @@ void mod_ctx_clear_errs(list errors) {
    for (usize i = 0; i < List.size(errors); i++) {
       anvl_error err = NULL;
       List.get(errors, i, (object *)&err);
-      if (err) {
-         Allocator.dispose(err);
-      }
+      anvl_error_dispose(err);
    }
    List.dispose(errors);
 }

@@ -72,7 +72,7 @@ void dispose_err_manual(anvl_error err) {
    if (!err)
       return;
 
-   Allocator.dispose(err);
+   anvl_error_dispose(err);
 }
 /*
  * Clear a list of errors, disposing each error and then the list itself.
@@ -81,9 +81,7 @@ void clear_errs_manual(list errors) {
    for (usize i = 0; i < List.size(errors); i++) {
       anvl_error err = NULL;
       List.get(errors, i, (object *)&err);
-      if (err) {
-         Allocator.dispose(err);
-      }
+      anvl_error_dispose(err);
    }
    List.dispose(errors);
 }

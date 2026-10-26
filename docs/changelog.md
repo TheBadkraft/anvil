@@ -214,6 +214,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five published `0.8.0-rc` tarballs.
 
 ### Fixed
+- **Parse errors now say what is wrong, and a repeated top-level name has a position**
+  (`BR-2610-anvl-errors-001`): eight error codes were declared in `errors.h` with no entry in the message
+  table (and twelve with no name), so documented failures read "Unknown error". The worst offender was a
+  missing `;`, which now reads "Expected ';' to end the statement" (position unchanged); the others are
+  `ANVL_ERR_PARSER_EXPECTED_COLON`, the AMP object error, an invalid `$` reference, and the arena, source,
+  context and not-implemented codes. A repeated top-level name was reported at line 0 / column 0; it now
+  points at the SECOND occurrence and the message names the identifier and the first one's line
+  (`Duplicate top-level identifier 'x' (first declared at line 2)`). A completeness test reads `errors.h`
+  and fails when any code lacks a message or a name, so the tables can't fall behind again. "Unknown
+  error" is now reachable only for a genuinely unknown code.
 - **A bare value that merely begins with `null`, `true` or `false` now loads** (`BR-2610-anvl-parser-001`):
   the scalar parser matched the reserved literal as a PREFIX, so `x := nullable;`, `nulls`, `truely` and
   `falsey` were read as NULL/BOOL followed by stray characters and failed with an unhelpful error (Rivet's

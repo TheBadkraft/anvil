@@ -151,6 +151,14 @@ static const char *error_messages[] = {
 
    [ANVL_ERR_INVALID_OPERATION] = "Invalid operation",
    [ANVL_ERR_INVALID_ARGUMENT] = "Invalid argument",
+   [ANVL_ERR_SOURCE_NOT_FOUND] = "The document's source could not be found",
+   [ANVL_ERR_CONTEXT_INVALID] = "The document has no valid context",
+   [ANVL_ERR_NOT_IMPLEMENTED] = "Not implemented",
+   [ANVL_ERR_ARENA_NOT_INITIALIZED] = "The node arena has not been initialized",
+   [ANVL_ERR_PARSER_EXPECTED_COLON] = "Expected ':'",
+   [ANVL_ERR_PARSER_UNTERMINATED_STATEMENT] = "Expected ';' to end the statement",
+   [ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED] = "Objects are not allowed in AMP",
+   [ANVL_ERR_VARS_INVALID_VARREF] = "Invalid '$' variable reference",
    [ANVL_ERR_SOURCE_ALREADY_LOADED] = "A document with identical content is already loaded",
 };
 static const char *error_names[] = {
@@ -257,14 +265,27 @@ static const char *error_names[] = {
 
    [ANVL_ERR_INVALID_OPERATION] = "ANVL_ERR_INVALID_OPERATION",
    [ANVL_ERR_INVALID_ARGUMENT] = "ANVL_ERR_INVALID_ARGUMENT",
+   [ANVL_ERR_SOURCE_NOT_FOUND] = "ANVL_ERR_SOURCE_NOT_FOUND",
+   [ANVL_ERR_CONTEXT_INVALID] = "ANVL_ERR_CONTEXT_INVALID",
+   [ANVL_ERR_NOT_IMPLEMENTED] = "ANVL_ERR_NOT_IMPLEMENTED",
+   [ANVL_ERR_ARENA_NOT_INITIALIZED] = "ANVL_ERR_ARENA_NOT_INITIALIZED",
+   [ANVL_ERR_PARSER_INITIALIZATION_FAILED] = "ANVL_ERR_PARSER_INITIALIZATION_FAILED",
+   [ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED] = "ANVL_ERR_PARSER_EMPTY_TUPLE_NOT_ALLOWED",
+   [ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS] = "ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS",
+   [ANVL_ERR_PARSER_EXPECTED_COLON] = "ANVL_ERR_PARSER_EXPECTED_COLON",
+   [ANVL_ERR_PARSER_UNTERMINATED_COMMENT] = "ANVL_ERR_PARSER_UNTERMINATED_COMMENT",
+   [ANVL_ERR_PARSER_UNTERMINATED_STATEMENT] = "ANVL_ERR_PARSER_UNTERMINATED_STATEMENT",
+   [ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED] = "ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED",
+   [ANVL_ERR_VARS_INVALID_VARREF] = "ANVL_ERR_VARS_INVALID_VARREF",
    [ANVL_ERR_SOURCE_ALREADY_LOADED] = "ANVL_ERR_SOURCE_ALREADY_LOADED",
 };
 
 /* ----------------------------------------------------------------------- *
  * Error State Management                                                  *
  * ----------------------------------------------------------------------- */
-anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize column,
-                           const char *file, anvl_err_code *out_err_code) {
+static anvl_result error_set_impl(list target, anvl_err_code code, usize line, usize column,
+                                  const char *file, const char *message,
+                                  anvl_err_code *out_err_code) {
    anvl_err_code err_code = code;
    anvl_error new_error = NULL;
 
@@ -294,6 +315,16 @@ anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize co
 
    new_error->code = code;
    new_error->message = anvl_error_code_message(code);
+   if (message) {
+      size_t len = strlen(message);
+      new_error->detail = Allocator.alloc(len + 1);
+      if (!new_error->detail) {
+         err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         goto error;
+      }
+      memcpy(new_error->detail, message, len + 1);
+      new_error->message = new_error->detail;
+   }
    new_error->line = line;
    new_error->column = column;
    new_error->file = file;
@@ -305,13 +336,29 @@ anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize co
    return ANVL_RES_OK;
 
 error:
-   if (new_error) {
-      Allocator.dispose(new_error);
-   }
+   anvl_error_dispose(new_error);
    if (out_err_code) {
       *out_err_code = err_code;
    }
    return ANVL_RES_ERR;
+}
+
+anvl_result anvl_error_set(list target, anvl_err_code code, usize line, usize column,
+                           const char *file, anvl_err_code *out_err_code) {
+   return error_set_impl(target, code, line, column, file, NULL, out_err_code);
+}
+
+anvl_result anvl_error_set_message(list target, anvl_err_code code, usize line, usize column,
+                                   const char *file, const char *message,
+                                   anvl_err_code *out_err_code) {
+   return error_set_impl(target, code, line, column, file, message, out_err_code);
+}
+
+void anvl_error_dispose(anvl_error err) {
+   if (err) {
+      Allocator.dispose(err->detail);
+      Allocator.dispose(err);
+   }
 }
 
 bool anvl_error_is_set(list target) { return List.size(target) > 0; }

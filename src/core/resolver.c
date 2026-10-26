@@ -28,6 +28,7 @@
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <sigma/types.h>
+#include <stdio.h>
 #include <string.h>
 
 // Builds ctx->identifiers: top-level statement name -> anvl_statement, across every document
@@ -36,6 +37,36 @@
 // resolution targets. A duplicate top-level name anywhere in the context — same document or
 // across a merged include — is a hard error (see notes/resolution-phase.md "Duplicate names are
 // a hard error, full stop").
+// Line and column (both 1-based, counted from the start of the file, the way the parser reports
+// them) of a pointer into one of the context's source buffers. False if it points into none.
+static bool locate_in_sources(module_context ctx, const char *p, usize *line, usize *col) {
+   for (usize d = 0, n = List.size(ctx->docs); d < n; d++) {
+      module_document doc = NULL;
+      List.get(ctx->docs, d, (object *)&doc);
+      if (!doc || !doc->source) {
+         continue;
+      }
+      const char *base = (const char *)Source.data(doc->source);
+      usize len = Source.length(doc->source);
+      if (!base || p < base || p > base + len) {
+         continue;
+      }
+      usize l = 1, c = 1;
+      for (const char *q = base; q < p; q++) {
+         if (*q == '\n') {
+            l++;
+            c = 1;
+         } else {
+            c++;
+         }
+      }
+      *line = l;
+      *col = c;
+      return true;
+   }
+   return false;
+}
+
 static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_code) {
    if (!ctx->identifiers) {
       ctx->identifiers = Map.new(ANVL_CTX_DEFAULT_MAP_CAP);
@@ -66,8 +97,24 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
             continue; // VARS/IMPORT - no declared name, never a resolvable target
          }
          if (Map.has(ctx->identifiers, stmt->name.start, name_len)) {
-            anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER, 0, 0, __FILE__,
-                           NULL);
+            // Report the SECOND occurrence (this statement), and name the first one's line.
+            usize line = 0, col = 0, first_line = 0, first_col = 0;
+            (void)locate_in_sources(ctx, stmt->name.start, &line, &col);
+            addr first = 0;
+            Map.get(ctx->identifiers, stmt->name.start, name_len, &first);
+            bool have_first = first &&
+               locate_in_sources(ctx, ((anvl_statement)first)->name.start, &first_line, &first_col);
+            char msg[256];
+            if (have_first) {
+               snprintf(msg, sizeof(msg),
+                        "Duplicate top-level identifier '%.*s' (first declared at line %zu)",
+                        (int)(name_len > 100 ? 100 : name_len), stmt->name.start, first_line);
+            } else {
+               snprintf(msg, sizeof(msg), "Duplicate top-level identifier '%.*s'",
+                        (int)(name_len > 100 ? 100 : name_len), stmt->name.start);
+            }
+            anvl_error_set_message(ctx->errors, ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER, line, col,
+                                   __FILE__, msg, NULL);
             *out_err_code = ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER;
             return ANVL_RES_ERR;
          }

@@ -166,7 +166,7 @@ bool anvl_attribute_decode(anvl_source src, anvl_attribute attr) {
          anvl_error err = NULL;
          List.get(ctx->errors, last, (object *)&err);
          List.remove(ctx->errors, last);
-         Allocator.dispose(err);
+         anvl_error_dispose(err);
       }
    }
 

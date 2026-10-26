@@ -1624,6 +1624,95 @@ static void test_anv57_whole_token_in_attribute_values(void) {
    }
 }
 
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-errors-001 - specific messages and real positions
+ * ---------------------------------------------------------------------- */
+static bool detail_of(anvil_document doc, char *msg, size_t cap, size_t *line, size_t *col) {
+   anvil_error e = doc ? anvil_document_get_error(doc) : NULL;
+   if (!e) {
+      return false;
+   }
+   anvil_error_get_message(e, msg, cap);
+   *line = anvil_error_get_line(e);
+   *col = anvil_error_get_column(e);
+   return true;
+}
+
+static void test_anv58_missing_semicolon_has_a_message(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx := 1\ny := 2;\n");
+   char msg[160] = {0};
+   size_t line = 0, col = 0;
+   TestBit.is_true(doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col),
+                   "ANV58: a missing ';' is an error with a detail");
+   TestBit.is_true(strcmp(msg, "Unknown error") != 0 && strstr(msg, "';'") != NULL,
+                   "ANV58: whose message names the missing ';' (not \"Unknown error\")");
+   TestBit.is_true(line == 2 && col == 7, "ANV58: and the position is unchanged (line 2, col 7)");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv59_duplicate_top_level_name_has_a_position(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx := 1;\ny := 2;\n  x := 3;\n");
+   char msg[200] = {0};
+   size_t line = 0, col = 0;
+   TestBit.is_true(doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col),
+                   "ANV59: a repeated top-level name is an error with a detail");
+   TestBit.is_true(line == 4 && col == 3,
+                   "ANV59: at the SECOND occurrence (line 4, col 3), not line 0 / col 0");
+   TestBit.is_true(strstr(msg, "'x'") != NULL, "ANV59: the message names the identifier");
+   TestBit.is_true(strstr(msg, "line 2") != NULL, "ANV59: and the line of the first occurrence");
+   TestBit.is_true(strstr(msg, "Duplicate") != NULL, "ANV59: and still says it is a duplicate");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+   // The first occurrence on line 2 of a shebang-less-looking file, and a duplicate in a later position.
+   anvil_document d2 = ATTR_LOAD("#!aml\na := 1;\nb := { c := 1; };\nb := 2;\n");
+   TestBit.is_true(d2 && anvil_has_errors(d2) && detail_of(d2, msg, sizeof(msg), &line, &col) &&
+                      line == 4 && col == 1 && strstr(msg, "'b'") != NULL && strstr(msg, "line 3") != NULL,
+                   "ANV59: another position (line 4, col 1, first at line 3)");
+   if (d2) {
+      anvil_dispose(d2);
+   }
+}
+
+// One input per parser failure that is reachable from the public API: every one must report a specific
+// message (never "Unknown error") at a real position.
+static void test_anv60_parser_errors_have_specific_messages(void) {
+   const char *bad[] = {
+      "#!aml\nx := 1\ny := 2;\n",            // missing ';'
+      "#!aml\nx := 1; ]\n",                  // stray token
+      "#!aml\nx := \"open;\n",               // unterminated string
+      "#!aml\nx := [];\n",                   // empty array
+      "#!aml\nx := ( 1 );\n",                // one-element tuple
+      "#!aml\nx := ();\n",                   // empty tuple
+      "#!aml\nx := { };\n",                  // empty object
+      "#!aml\n1x := 1;\n",                   // bad identifier
+      "#!aml\ninclude := 1;\n",              // keyword as an identifier
+      "#!aml\nx := include;\n",              // keyword as a value
+      "#!aml\n/* never closed\nx := 1;\n",    // unterminated block comment (header)
+      "#!aml\nx := $;\n",                    // bare '$'
+      "#!amp\nx := { a := 1; };\n",          // object in AMP
+      "#!aml\nx @[ := 1;\n",                 // broken attribute list
+      "#!aml\nx := `open\n",                 // unterminated blob
+      "#!aml\nx := 1;\nx := 2;\n",           // duplicate top-level name
+   };
+   for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      anvil_document doc = anvil_load_buffer(bad[i], strlen(bad[i]));
+      char msg[200] = {0};
+      size_t line = 0, col = 0;
+      bool have = doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col);
+      if (!have || strcmp(msg, "Unknown error") == 0 || !*msg || line == 0) {
+         printf("    ANV60: input %zu (%.30s...): have=%d line=%zu col=%zu msg=\"%s\"\n", i, bad[i] + 6,
+                (int)have, line, col, msg);
+      }
+      TestBit.is_true(have && strcmp(msg, "Unknown error") != 0 && *msg && line > 0, bad[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -1705,6 +1794,14 @@ int main(void) {
                   test_anv56_whole_token_in_collections_and_objects, th);
    TestBit.run_ex("ANV57_WHOLE_TOKEN_IN_ATTRIBUTE_VALUES", NULL,
                   test_anv57_whole_token_in_attribute_values, th);
+
+   TestBit.run_ex("ANV58_MISSING_SEMICOLON_HAS_A_MESSAGE", NULL,
+                  test_anv58_missing_semicolon_has_a_message, th);
+   TestBit.run_ex("ANV59_DUPLICATE_TOP_LEVEL_NAME_HAS_A_POSITION", NULL,
+                  test_anv59_duplicate_top_level_name_has_a_position, th);
+
+   TestBit.run_ex("ANV60_PARSER_ERRORS_HAVE_SPECIFIC_MESSAGES", NULL,
+                  test_anv60_parser_errors_have_specific_messages, th);
 
    return TestBit.report();
 }

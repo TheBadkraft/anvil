@@ -20,6 +20,8 @@
 #include "../utilities/debug.h"
 #include <sigma/list.h>
 #include <sigma/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* The registry is scoped to one module_context (BR-2610-anvl-registry-001): these tests build their
@@ -219,6 +221,47 @@ static void test_reg09_ownerless_source_is_handled_cleanly(void) {
    Debug.dispose_ctx(ctx);
 }
 
+/* REG10 (BR-2610-anvl-errors-001) - the message and name tables are COMPLETE: every anvl_err_code
+ * declared in errors.h has a specific message and a name. The errors analogue of VT11: the codes are
+ * read from the header, so a code added without a table entry fails here. */
+static void test_reg10_error_tables_are_complete(void) {
+   FILE *f = fopen("../../include/errors.h", "rb");
+   TestBit.is_not_null(f, "REG10: errors.h readable");
+   if (!f) {
+      return;
+   }
+   char line[256];
+   int checked = 0;
+   bool in_enum = false;
+   while (fgets(line, sizeof(line), f)) {
+      if (strstr(line, "typedef enum")) {
+         in_enum = true;
+      }
+      if (in_enum && strstr(line, "} anvl_err_code;")) {
+         break;
+      }
+      char name[96];
+      unsigned long value;
+      const char *p = strstr(line, "ANVL_ERR_");
+      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+         const char *msg = anvl_error_code_message((anvl_err_code)value);
+         const char *nm = anvl_error_code_name((anvl_err_code)value);
+         bool ok = msg && *msg && strcmp(msg, "Unknown error") != 0 && nm &&
+                   strcmp(nm, "ANVL_ERR_UNKNOWN") != 0 && strncmp(nm, "ANVL_ERR_", 9) == 0;
+         if (!ok) {
+            printf("    REG10: %s (%lu) has no message (\"%s\") or name (\"%s\")\n", name, value,
+                   msg ? msg : "(null)", nm ? nm : "(null)");
+         }
+         TestBit.is_true(ok, name);
+         checked++;
+      }
+   }
+   fclose(f);
+   TestBit.is_true(checked > 90, "REG10: the header scan found the whole enum");
+   TestBit.is_true(strcmp(anvl_error_code_message((anvl_err_code)123456), "Unknown error") == 0,
+                   "REG10: a genuinely unknown code still reads \"Unknown error\" (defensive)");
+}
+
 int main(void) {
    TestBit.run_ex("REG00_registry_starts_empty", NULL, test_reg00_registry_starts_empty, NULL);
    TestBit.run_ex("REG01_add_and_find", NULL, test_reg01_add_and_find, NULL);
@@ -232,6 +275,8 @@ int main(void) {
                   test_reg08_already_loaded_code_has_message, NULL);
    TestBit.run_ex("REG09_ownerless_source_is_handled_cleanly", NULL,
                   test_reg09_ownerless_source_is_handled_cleanly, NULL);
+
+   TestBit.run_ex("REG10_error_tables_are_complete", NULL, test_reg10_error_tables_are_complete, NULL);
 
    return TestBit.report();
 }
