@@ -17,7 +17,7 @@ name=anvil-v$ver-linux-x86_64
 git -C "$repo" archive --format=tar "$tag" | tar -x -C "$work"
 # Sigma sources are vendored in-tree (src/sigma), the allocator comes from the installed
 # sigma.system.alloc package the Makefile already links.
-( cd "$work" && make -j"$(nproc)" lib-release so-release BUILD_NUM="$build" ANVL_BUILD="$build" >"$work/make.log" 2>&1 ) \
+( cd "$work" && make -j"$(nproc)" lib-release so-release ANVL_BUILD="$build" >"$work/make.log" 2>&1 ) \
   || { tail -20 "$work/make.log"; echo "FAIL core build" >&2; exit 1; }
 
 pkg=$work/$name; mkdir -p "$pkg/lib" "$pkg/include"
