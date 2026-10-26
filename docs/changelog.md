@@ -176,6 +176,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`FR-2610-anvl-bindings-003`** (filed): `anvil.node` and `anvil.wasm` expose only module
   attribute *keys*, root-only. Statement attributes, and all attribute values, are unreachable from
   JS, unlike `anvil.py`/`anvil.net`. Requested by Rivet for its q-or importer.
+- **`FR-2610-anvl-public-api-004`** (filed): an attribute's value can only be read as raw source
+  text (`status="done"` reads `"done"`, quotes and escapes included). Adds a decoded/typed read,
+  preferably as an `anvil_value`, so no binding reimplements unquoting.
+- **`BR-2610-anvl-bindings-003`** (filed): `anvil.node`/`anvil.wasm` collapse a repeated object
+  field name to its last occurrence (`count`, `get`, `entries`), while native/py/net keep all of
+  them and find the first.
 - **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
   truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
   differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
