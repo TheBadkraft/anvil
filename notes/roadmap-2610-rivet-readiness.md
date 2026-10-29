@@ -1,5 +1,10 @@
 # Roadmap: rivet-readiness (types, schema, bindings)
 
+> **Status (2026-10-29):** Phases 1–4 are done. Phase 5 continues as the Release Engineer's
+> assignment in `agents/assignments/release-v0.10.0-rc.md`. The agent names below predate the move
+> to one session with sub-agents (`agents/README.md`): the coder agent is now the Core Engineer, the
+> Bindings agent the Bindings Engineer, and the Release agent the Release Engineer.
+
 > **NOTE to the ANVL coder agent: follow this roadmap strictly.**
 > - Your scope is **Phases 1–3 plus Addendum A1–A2**: the native tickets numbered 1–12 below, in
 >   that order, then A1 and A2,
@@ -129,7 +134,7 @@ Both must be merged before the Bindings agent starts Phase 4.
 16b. **FR-2610-anvl-bindings-001, slice 4 (`anvil.wasm`)**: the same `TypeRegistry`/`Schema`
     surface as `anvil.node`. *(added 2026-10-25)*
 
-## Phase 5: release [ANVL Release agent; see `agents/ANVL-RELEASE.agent.md`]
+## Phase 5: release [ANVL Release agent; now the Release Engineer, `agents/assignments/release-v0.10.0-rc.md`]
 
 17. **SR-2610-anvl-distribution-001** and **BR-2610-anvl-distribution-001**: a tagged core release
     and binding tarballs on anvldata.com, built from that tag. *(after **all** of Phase 4: owner
