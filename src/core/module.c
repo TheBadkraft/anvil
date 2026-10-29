@@ -166,10 +166,6 @@ anvl_result mod_new(AnvlMod *out_mod, anvl_err_code *out_err_code) {
    mod->context = NULL;
    mod->root = NULL;
 
-   // Ensure the process-wide source registry exists before any document is
-   // registered. The registry is cleared in mod_dispose().
-   Registry.init();
-
    *out_mod = mod;
    return ANVL_RES_OK;
 
@@ -194,11 +190,6 @@ void mod_dispose(AnvlMod *mod_ptr) {
    if (mod->context) {
       mod_ctx_dispose(mod->context);
    }
-
-   // Release this module's reference to the global source registry. When the
-   // reference count reaches zero, the registry is cleared. Documents
-   // unregister themselves individually during context disposal.
-   Registry.release();
 
    Allocator.dispose(mod);
    *mod_ptr = NULL;
@@ -261,7 +252,7 @@ anvl_result mod_ctx_initialize(context_spec ctx_spec, module_context *out_ctx,
    ctx->errors = List.new(ctx_spec->errs_cap, sizeof(anvl_error));
    ctx->statements = List.new(ANVL_CTX_DEFAULT_NODE_CAP, sizeof(anvl_statement));
    ctx->values = List.new(ANVL_CTX_DEFAULT_NODE_CAP, sizeof(anvl_value));
-   if (!ctx->docs || !ctx->errors || !ctx->statements || !ctx->values) {
+   if (!ctx->docs || !ctx->errors || !ctx->statements || !ctx->values || !Registry.init(ctx)) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
       goto error;
    }
@@ -275,6 +266,7 @@ error: {
       List.dispose(ctx->errors);
       List.dispose(ctx->statements);
       List.dispose(ctx->values);
+      Registry.release(ctx);
       ctx->docs = NULL;
       ctx->errors = NULL;
       ctx->statements = NULL;
@@ -297,6 +289,7 @@ void mod_ctx_dispose(module_context ctx) {
       return;
    }
    mod_ctx_clear_docs(ctx->docs);
+   Registry.release(ctx); // after the documents: doc_dispose unregisters from it
    mod_ctx_clear_errs(ctx->errors);
    ctx->docs = NULL;
    ctx->errors = NULL;
@@ -400,9 +393,9 @@ void mod_ctx_dispose(module_context ctx) {
    Allocator.dispose(ctx);
 }
 /*
- * Register a document with the context and global source registry. The document's
+ * Register a document with the context (and its per-context source map). The document's
  * source must be loaded and have a non-zero hash. If the document is already
- * registered, the call fails with ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT.
+ * registered, the call fails with ANVL_ERR_SOURCE_ALREADY_LOADED.
  * If a filepath is provided, it is copied into the document's filepath field.
  * The document is appended to the context's docs list.
  * Returns ANVL_RES_OK on success, or ANVL_RES_ERR on failure.
@@ -424,8 +417,8 @@ anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const 
       goto error;
    }
 
-   if (Registry.find(Source.hash(doc->source)) != NULL) {
-      err_code = ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT;
+   if (Registry.find(ctx, Source.hash(doc->source)) != NULL) {
+      err_code = ANVL_ERR_SOURCE_ALREADY_LOADED;
       goto error;
    }
 
@@ -441,7 +434,7 @@ anvl_result mod_ctx_register_doc(module_context ctx, module_document doc, const 
       }
    }
 
-   if (Registry.add(doc, &err_code) != ANVL_RES_OK) {
+   if (Registry.add(ctx, doc, &err_code) != ANVL_RES_OK) {
       goto error;
    }
 
@@ -634,8 +627,8 @@ static anvl_result include_load_child(module_context ctx, module_document parent
    // existing document and discard the freshly loaded duplicate.
    res = mod_ctx_register_doc(ctx, child, resolved, &err_code);
    if (res != ANVL_RES_OK) {
-      if (err_code == ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT) {
-         module_document existing = Registry.find(Source.hash(child->source));
+      if (err_code == ANVL_ERR_SOURCE_ALREADY_LOADED) {
+         module_document existing = Registry.find(ctx, Source.hash(child->source));
          if (existing) {
             inc->resolved = existing;
             doc_dispose(child);
@@ -769,9 +762,7 @@ void mod_ctx_clear_errs(list errors) {
    for (usize i = 0; i < List.size(errors); i++) {
       anvl_error err = NULL;
       List.get(errors, i, (object *)&err);
-      if (err) {
-         Allocator.dispose(err);
-      }
+      anvl_error_dispose(err);
    }
    List.dispose(errors);
 }

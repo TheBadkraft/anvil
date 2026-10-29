@@ -1,0 +1,5 @@
+#!aml
+include "dia_x.types.anvl";
+include "dia_y.types.anvl";
+
+plain := 1;

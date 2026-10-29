@@ -43,6 +43,10 @@ struct anvl_mod_ctx_t {
    bump_allocator arena; // body-parse node arena, shared across every document in ctx->docs;
                          // NULL until mod_ctx_create_arena runs. See notes/document-body-parse.md
                          // "Arena-backed allocation".
+   map sources;          // content hash (uint64_t) -> module_document, for THIS context only:
+                         // deduplicates a diamond include within one load, and nothing outside it
+                         // (two independent loads of identical text each have their own context).
+                         // Owned by the Registry facade (source_registry.h).
    list statements;      // index of every anvl_statement allocated via Source.new_node; does not
                          // own the pointed-to nodes (the arena does) — see "Arena node iteration".
    list values;          // index of every anvl_value allocated via Source.new_node; same non-owning
@@ -83,6 +87,7 @@ typedef anvl_include_t *anvl_include;
 typedef struct anvl_attribute_t {
    anvl_slice key;   // identifier
    anvl_slice value; // value text; length 0 means flag attribute
+   struct anvl_value_t *decoded; // the value read as a value (arena-owned); NULL for a flag attribute
 } anvl_attribute_t;
 typedef anvl_attribute_t *anvl_attribute;
 

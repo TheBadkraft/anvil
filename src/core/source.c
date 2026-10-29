@@ -508,6 +508,9 @@ static usize source_match_token(anvl_source src, const char *token, usize len) {
 /* ----------------------------------------------------------------------- *
  * Whitespace and comment skipping
  * ----------------------------------------------------------------------- */
+static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize line, usize column,
+                                    const char *file, anvl_err_code *out_err_code);
+
 static usize source_skip_whitespace_and_comments(anvl_source src) {
    if (!src || !src->buffer.bucket) {
       return 0;
@@ -537,16 +540,27 @@ static usize source_skip_whitespace_and_comments(anvl_source src) {
 
       // block comment
       if (c == '/' && src->pos + 1 < src->length && data[src->pos + 1] == '*') {
+         usize open_line = src->line, open_col = src->col; // where the comment OPENS
          source_consume(src, 2);
          skipped += 2;
+         bool closed = false;
          while (src->pos < src->length) {
             if (data[src->pos] == '*' && src->pos + 1 < src->length && data[src->pos + 1] == '/') {
                source_consume(src, 2);
                skipped += 2;
+               closed = true;
                break;
             }
             source_consume(src, 1);
             skipped++;
+         }
+         if (!closed) {
+            // A comment that never closes swallows the rest of the document, silently: record it
+            // where it opened (BR-2610-anvl-parser-002). First-error-wins keeps this the reported
+            // error even though the parser then runs into the end of the source.
+            anvl_err_code ignored = ANVL_ERR_NONE;
+            source_set_error(src, ANVL_ERR_PARSER_UNTERMINATED_COMMENT, open_line, open_col, NULL,
+                             &ignored);
          }
          continue;
       }
@@ -566,14 +580,14 @@ static bool source_is_shebang(anvl_source src) {
 
 /*
  * Returns true if the source's owning document has accumulated errors.
- * Uses the global source registry to locate the owning document.
+ * Reaches the owning document through the source's owner back-pointer.
  */
 static bool source_has_errors(anvl_source src) {
    if (!src || src->hash == 0) {
       return false;
    }
 
-   module_document doc = Registry.find(src->hash);
+   module_document doc = src->owner;
    if (!doc || !doc->context) {
       return false;
    }
@@ -581,8 +595,8 @@ static bool source_has_errors(anvl_source src) {
    return List.size(doc->context->errors) > 0;
 }
 /*
- * Records an error on the source's owning document by looking it up in the
- * global source registry and appending to the context's error list.
+ * Records an error on the source's owning document through its owner
+ * back-pointer and appending to the context's error list.
  */
 static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize line, usize column,
                                     const char *file, anvl_err_code *out_err_code) {
@@ -596,7 +610,7 @@ static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize l
       goto error;
    }
 
-   module_document doc = Registry.find(src->hash);
+   module_document doc = src->owner;
    if (!doc || !doc->context) {
       err_code = ANVL_ERR_INVALID_ARGUMENT;
       goto error;
@@ -611,8 +625,8 @@ error:
    return ANVL_RES_ERR;
 }
 /*
- * Retrieves the bump allocator (arena) associated with the source's owning document. Uses the
- * global source registry to locate the document and its context. Returns NULL if the source is
+ * Retrieves the bump allocator (arena) associated with the source's owning document. Reaches the
+ * document and its context through the owner back-pointer. Returns NULL if the source is
  * NULL, if the source is not registered, or if the context's arena is not initialized. The output
  * error code is set to ANVL_ERR_NONE on success, or to an appropriate error code on failure. The
  * caller is responsible for checking the error code to determine the reason for failure.
@@ -625,7 +639,7 @@ static bump_allocator source_get_arena(anvl_source src, anvl_err_code *out_err_c
       goto error;
    }
    // 2. guard registry lookup
-   module_document doc = Registry.find(src->hash);
+   module_document doc = src->owner;
    if (!doc || !doc->context) {
       err_code = ANVL_ERR_CONTEXT_INVALID;
       goto error;
@@ -650,8 +664,8 @@ error:
    return NULL;
 }
 /*
- * Constructs a new node (statement or value) in the source's owning document's context. Uses the
- * global source registry to locate the document and its context. Allocates the node from the
+ * Constructs a new node (statement or value) in the source's owning document's context. Reaches the
+ * document and its context through the owner back-pointer. Allocates the node from the
  * context's bump allocator (arena). Returns a pointer to the new node on success, or NULL on
  * failure. The output error code is set to ANVL_ERR_NONE on success, or to an appropriate error
  * code on failure. The caller is responsible for checking the error code to determine the reason
@@ -669,7 +683,7 @@ static void *source_new_node(anvl_source src, anvl_node_kind kind, anvl_err_code
    }
 
    // get the document from the source lookup
-   module_document doc = Registry.find(src->hash);
+   module_document doc = src->owner;
    module_context context = doc ? doc->context : NULL;
    if (!doc || !context) {
       err_code = ANVL_ERR_CONTEXT_INVALID;
@@ -752,7 +766,7 @@ static anvl_result source_finish_body(anvl_source src, list statements,
       goto error;
    }
 
-   module_document doc = Registry.find(src->hash);
+   module_document doc = src->owner;
    if (!doc || !doc->context) {
       err_code = ANVL_ERR_CONTEXT_INVALID;
       goto error;

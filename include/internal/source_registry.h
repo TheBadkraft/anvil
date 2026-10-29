@@ -30,50 +30,45 @@
 
 /* ---------------------------------------------------------------------- *
  * Source registry interface
+ * ----------------------------------------------------------------------
+ * Context-scoped (BR-2610-anvl-registry-001). Each module_context owns a hash -> document map
+ * (ctx->sources) that deduplicates documents within ONE load's include graph; independent loads
+ * have independent contexts and never see each other. There is no process-global state: a source
+ * reaches its document through anvl_source_t::owner, which `add` sets and `remove` clears.
  * ---------------------------------------------------------------------- */
 typedef struct anvl_source_registry_i {
    /**
-    * @brief Idempotently initialize the global source registry.
-    * @details Safe to call multiple times. Normally invoked from `mod_new()` so
-    * the registry exists before any document is registered.
-    */
-   void (*init)(void);
-   /**
-    * @brief Register a document under its source hash.
+    * @brief Register a document in `ctx` under its source hash and make it its source's owner.
+    * @param ctx The context whose include graph the document belongs to.
     * @param doc The document to register. Must have a loaded source with a non-zero hash.
-    * @param[out] out_err_code Pointer to the error code if registration fails.
-    * @return Anvl result: `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
-    * @details This function adds the document to the global registry keyed by
-    * `Source.hash(doc->source)`. If the hash is already registered, the call fails.
+    * @param[out] out_err_code ANVL_ERR_SOURCE_ALREADY_LOADED if `ctx` already holds a document
+    * with this content hash (a diamond include, to the caller that handles it), or another code.
+    * @return `ANVL_RES_OK` on success; otherwise `ANVL_RES_ERR`.
     */
-   anvl_result (*add)(module_document doc, anvl_err_code *out_err_code);
+   anvl_result (*add)(module_context ctx, module_document doc, anvl_err_code *out_err_code);
    /**
-    * @brief Remove a document from the registry by source hash.
-    * @param hash The source hash to unregister.
+    * @brief Unregister the document under `hash` in `ctx` and clear its source's owner.
     * @details Silently no-ops if the hash is not present.
     */
-   void (*remove)(uint64_t hash);
+   void (*remove)(module_context ctx, uint64_t hash);
    /**
-    * @brief Look up a document by source hash.
-    * @param hash The source hash to search for.
-    * @return The registered document, or NULL if not found.
+    * @brief Look up a document of `ctx` by source hash. NULL if not found.
     */
-   module_document (*find)(uint64_t hash);
+   module_document (*find)(module_context ctx, uint64_t hash);
    /**
-    * @brief Return the number of registered documents.
+    * @brief The number of documents registered in `ctx`.
     */
-   usize (*count)(void);
+   usize (*count)(module_context ctx);
    /**
-    * @brief Release one module reference to the registry.
-    * @details Decrements the module reference count and clears the registry
-    * when the count reaches zero. Normally invoked from `mod_dispose()`.
+    * @brief Unregister every document of `ctx` (does not dispose them) and clear their owners.
     */
-   void (*release)(void);
+   void (*clear)(module_context ctx);
    /**
-    * @brief Clear every entry from the registry unconditionally.
-    * @details This does not dispose of the registered documents. Intended for
-    * tests and explicit reset scenarios; module code should prefer `release()`.
+    * @brief Create (`init`) or dispose (`release`) ctx's map. Called by the context's own
+    * lifecycle; `release` runs after the context's documents are disposed and touches nothing
+    * else.
     */
-   void (*clear)(void);
+   bool (*init)(module_context ctx);
+   void (*release)(module_context ctx);
 } anvl_source_registry_i;
 extern const anvl_source_registry_i Registry;

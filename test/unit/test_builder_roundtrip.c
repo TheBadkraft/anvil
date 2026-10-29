@@ -29,7 +29,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 static char *text_of(anvil_value v) {
@@ -205,7 +204,12 @@ static char *emit_copy(anvil_document doc, size_t *out_len, const char *label) {
    char *copy = NULL;
    const char *text = ok ? anvil_builder_emit(b, out_len) : NULL;
    if (text) {
-      copy = strdup(text);
+      // Copy by length: the emitted text can contain NUL bytes (a string or blob with one).
+      copy = malloc(*out_len + 1);
+      if (copy) {
+         memcpy(copy, text, *out_len);
+         copy[*out_len] = '\0';
+      }
    } else if (b) {
       fprintf(stderr, "[%s] builder rejected a copied document: %s\n", label,
               anvil_writer_error_message(anvil_builder_get_error(b)));

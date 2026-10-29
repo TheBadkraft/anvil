@@ -3,7 +3,8 @@ STD     = c2x
 ANVL   = ../..
 TESTBIT = ../../../testbit
 
-BUILD_NUM := $(shell git rev-list --count HEAD)
+# Build number: explicit override, else the commit count, else 0 (= unknown); see ../../Makefile.
+BUILD_NUM := $(or $(ANVL_BUILD),$(BUILD_NUM),$(shell git rev-list --count HEAD 2>/dev/null),0)
 CFLAGS  = -Wall -Wextra -g -std=$(STD) \
           -I$(ANVL)/include \
           -I/usr/local/include \

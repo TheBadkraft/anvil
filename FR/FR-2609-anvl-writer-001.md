@@ -6,7 +6,8 @@
 **Filed:** 2026-10-09
 **Filed by:** anvil
 **Status:** in progress — the streaming writer and the document builder (each flat + vtable) are
-implemented and tested; binding wrappers: `anvil.java`, `anvil.py` and `anvil.net` done; `anvil.node`/`anvil.wasm` not started
+implemented and tested, and every binding wraps them (`anvil.node`/`anvil.wasm` via FR-2610-anvl-bindings-002,
+merged 2026-10-26). Still open: builder follow-ups, a shared conformance corpus, layer-3 codecs.
 **Continues:** [`FR-2609-anvl-public-api-001`](FR-2609-anvl-public-api-001.md) — the public API there is
 read-only; this adds the other direction.
 **Tags:** writer, serialization, public-api, bindings
@@ -122,6 +123,7 @@ objects may repeat. Names pulled in by an `include` are invisible to the writer.
   - `anvil.java` — **done** (`AnvilWriter`, `AnvilBuilder`; 24 marshaling tests).
   - `anvil.py` — **done** (`AnvilWriter`, `AnvilBuilder`; reader exactness fixes; 52 new tests incl. a vtable drift gate).
   - `anvil.net` — **done** (`AnvilWriter`, `AnvilBuilder`; reader exactness fixes; 52 new tests incl. a vtable drift gate).
-  - `anvil.node`, `anvil.wasm` — not started; first need the deferred `sigma.system.alloc` vendor bump.
+  - `anvil.node`, `anvil.wasm` — **done** under FR-2610-anvl-bindings-002 (`AnvilWriter`, `AnvilBuilder`,
+    same surface on both; merged 2026-10-26).
 - **Conformance corpus** shared by all bindings (golden outputs).
 - **Binary serialization / codecs** (layer 3).

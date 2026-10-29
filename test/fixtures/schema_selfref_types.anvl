@@ -1,0 +1,10 @@
+#!aml
+@[types]
+
+Node := {
+   type := Object;
+   fields := {
+      label := { type := String; };
+      child := { type := types.Node; };
+   };
+};

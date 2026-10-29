@@ -23,6 +23,15 @@
 #include "anvil_types.h"
 #include <stddef.h>
 
+// The library is built with -fvisibility=hidden (src/sigma/* and other internals must never
+// leak into a consumer's global dynamic symbol table -- see notes/symbol-visibility.md); this
+// pragma pins every declaration below back to default visibility so the public ABI stays
+// exported from libanvil.so exactly as before. `make check-exports` fails if a public header
+// forgets it.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /**
  * @brief Opaque handle to a loaded type registry — the result of walking one
  * @[types]-attributed document's own top-level statements.
@@ -56,6 +65,7 @@ typedef enum {
    ANVIL_TYPE_TUPLE,
    ANVIL_TYPE_ARRAY,
    ANVIL_TYPE_ENUM,
+   ANVIL_TYPE_BLOB, // a backtick blob; may carry `tag :=`. Appended last - existing values unchanged.
 } anvil_type_kind;
 
 /**
@@ -64,23 +74,25 @@ typedef enum {
  * — every one of its top-level statements is then treated, without
  * exception, as a type definition (see notes/native-schema.md). A statement
  * that doesn't have a valid type-definition shape (no `type :=` field naming
- * a recognized kind) is skipped, not registered — this first slice does not
- * yet report that as a validation error.
+ * a recognized kind) is skipped, not registered, and reported as an
+ * ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE diagnostic.
  * @return The registry handle, or NULL if doc is NULL or does not carry
  * @[types]. Dispose with anvil_type_registry_dispose once done.
  */
 anvil_type_registry anvil_type_registry_load(anvil_document doc);
 
 /**
- * @brief Build a registry from a document's own *direct* includes (not the
- * whole transitive graph — see anvil_document_get_includes), the mechanism
+ * @brief Build a registry from a document's include graph, the mechanism
  * behind the `types.X` namespace: `doc` itself does not need to carry
- * @[types] at all. Every direct include that does carry @[types] has its own
- * type definitions merged into one combined registry, keyed by bare name
- * (e.g. "VIN", not "types.VIN") — `types.` is a flat namespace, independent
- * of which included file a given name actually came from. If two includes
- * declare the same name, the later one silently wins (Map's own last-write
- * behavior) — collision reporting isn't designed yet.
+ * @[types] at all. Includes are followed transitively, depth-first in
+ * include order, each document visited at most once; every document on the
+ * way that carries @[types] has its type definitions merged into one combined
+ * registry, keyed by bare name (e.g. "VIN", not "types.VIN"). A document
+ * without @[types] is walked through but contributes nothing. Deeper
+ * includes merge first, so a definition closer to `doc` overrides a deeper
+ * one - `types.` is a flat namespace, independent of which included file a
+ * given name actually came from. Any name declared twice resolves last-write
+ * and is reported through the registry's diagnostics.
  * @param doc The (typically non-@[types]) document whose includes to walk.
  * @return The registry handle (real but empty if `doc` has no @[types]
  * includes), or NULL only if doc itself is NULL. Dispose with
@@ -142,17 +154,49 @@ bool anvil_type_def_get_size(anvil_type_def def, long long *out_size);
  * @brief A type definition's declared `min`, if any.
  * @param def The definition to read.
  * @param out_min Set to the declared minimum on success; untouched otherwise.
- * @return true if `min` was declared; false if def is NULL or it wasn't.
+ * @return true if `min` was declared as an integral number that fits; false if def is NULL, it
+ * wasn't declared, or it is fractional/exponent-form (never truncated to fit - use
+ * anvil_type_def_get_min_numeric for those).
  */
 bool anvil_type_def_get_min(anvil_type_def def, long long *out_min);
+
+/**
+ * @brief A type definition's declared `min`, exactly - fractional and exponent forms included.
+ * @param def The definition to read.
+ * @param out_min Set to the declared minimum on success; untouched otherwise. See
+ * anvil_numeric_t: `is_integral` reflects the spelling, so `1e+3` reads as the double 1000.
+ * @return true if `min` was declared as a valid number; false if def is NULL, it wasn't
+ * declared, or it was malformed (reported as a MALFORMED_CONSTRAINT diagnostic).
+ */
+bool anvil_type_def_get_min_numeric(anvil_type_def def, anvil_numeric_t *out_min);
 
 /**
  * @brief A type definition's declared `max`, if any.
  * @param def The definition to read.
  * @param out_max Set to the declared maximum on success; untouched otherwise.
- * @return true if `max` was declared; false if def is NULL or it wasn't.
+ * @return true if `max` was declared as an integral number that fits; false if def is NULL, it
+ * wasn't declared, or it is fractional/exponent-form (never truncated - see
+ * anvil_type_def_get_max_numeric).
  */
 bool anvil_type_def_get_max(anvil_type_def def, long long *out_max);
+
+/**
+ * @brief A type definition's declared `max`, exactly. Same contract as
+ * anvil_type_def_get_min_numeric.
+ */
+bool anvil_type_def_get_max_numeric(anvil_type_def def, anvil_numeric_t *out_max);
+
+/**
+ * @brief A type definition's declared `format` (a String constraint naming one of a small, closed
+ * set of lexical formats: `iso8601_date`, `iso8601_datetime`, `uuid`).
+ * @param def The definition to read.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full length (excluding NUL), regardless of buflen - same snprintf-style convention
+ * as anvil_statement_get_name. 0 if def is NULL or declares no (known) format; an unknown format
+ * name is reported as a diagnostic and treated as not declared.
+ */
+size_t anvil_type_def_get_format(anvil_type_def def, char *buf, size_t buflen);
 
 /**
  * @brief The number of enum member labels a type declared via `values`.
@@ -168,8 +212,76 @@ size_t anvil_type_def_get_value_count(anvil_type_def def);
  * numeric value (see notes/native-schema.md's enum design).
  * @param buf Destination buffer, or NULL to only query the required length.
  * @param buflen Size of buf in bytes, including room for the NUL terminator.
- * @return The full label length (excluding NUL), regardless of buflen —
- * same snprintf-style convention as anvil_statement_get_name. 0 if def is
- * NULL or index is out of bounds.
+ * @return The full label length in bytes, regardless of buflen — same
+ * snprintf-style convention as anvil_statement_get_name. 0 if def is NULL or
+ * index is out of bounds. A label may contain NUL bytes (`"a\0b"` is 3 bytes):
+ * the length is exact, the copy includes them, and a buffer sized from the
+ * returned length gets every byte. At most buflen - 1 bytes are copied, then a
+ * terminator.
  */
 size_t anvil_type_def_get_value(anvil_type_def def, size_t index, char *buf, size_t buflen);
+
+/**
+ * @brief Opaque handle to one registry diagnostic - something the registry noticed while
+ * loading that a consumer can't otherwise see (a name collision, a malformed definition).
+ *
+ * The registry reports; whether a diagnostic is fatal is the consumer's call. Lifetime is tied
+ * to the anvil_type_registry it came from. Independent of the source documents: every string is
+ * copied out at load time, so diagnostics stay readable after those documents are disposed.
+ */
+typedef struct anvil_type_diagnostic_t *anvil_type_diagnostic;
+
+/**
+ * @brief Stable diagnostic categories - this API's own set, independent of errors.h. Only ever
+ * appended to.
+ */
+typedef enum {
+   ANVIL_TYPE_DIAG_NONE = 0,
+   ANVIL_TYPE_DIAG_NAME_COLLISION,        // a name was defined more than once; the later one wins
+   ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE,     // `type :=` is missing or names no recognized kind;
+                                          // the definition is not registered
+   ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT,  // a size/min/max isn't a valid number; that constraint
+                                          // is treated as not declared
+   ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES, // `values` is not an array; no labels are declared
+} anvil_type_diag_code;
+
+/**
+ * @brief How many diagnostics loading this registry produced, in the order they were found.
+ * @param reg The registry to read. NULL returns 0.
+ */
+size_t anvil_type_registry_get_diagnostic_count(anvil_type_registry reg);
+
+/**
+ * @brief One diagnostic by index.
+ * @return The handle, or NULL if reg is NULL or index is out of bounds.
+ */
+anvil_type_diagnostic anvil_type_registry_get_diagnostic(anvil_type_registry reg, size_t index);
+
+/**
+ * @brief The diagnostic's category. NULL returns ANVIL_TYPE_DIAG_NONE.
+ */
+anvil_type_diag_code anvil_type_diagnostic_get_category(anvil_type_diagnostic diag);
+
+/**
+ * @brief The name of the type the diagnostic is about (e.g. "VIN").
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full length (excluding NUL), regardless of buflen. 0 if diag is NULL.
+ */
+size_t anvil_type_diagnostic_get_name(anvil_type_diagnostic diag, char *buf, size_t buflen);
+
+/**
+ * @brief The path of the document the problem was found in (for a NAME_COLLISION, the later
+ * document - the one whose definition won). Same buffer convention as get_name.
+ */
+size_t anvil_type_diagnostic_get_source(anvil_type_diagnostic diag, char *buf, size_t buflen);
+
+/**
+ * @brief A human-readable description. A NAME_COLLISION message names both documents. Same
+ * buffer convention as get_name.
+ */
+size_t anvil_type_diagnostic_get_message(anvil_type_diagnostic diag, char *buf, size_t buflen);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif

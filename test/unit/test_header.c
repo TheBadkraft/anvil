@@ -26,7 +26,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -632,7 +631,7 @@ static void test_hdr20_registry_survives_diamond_duplicate_dispose(void) {
    uint64_t base_hash = Source.hash(base->source);
    TestBit.is_true(base_hash != 0, "HDR20: base document has a non-zero content hash");
 
-   module_document found = Registry.find(base_hash);
+   module_document found = Registry.find(ctx, base_hash);
    TestBit.is_not_null(found,
                        "HDR20: base document is still findable in the registry after the "
                        "diamond re-include's discarded duplicate was disposed");

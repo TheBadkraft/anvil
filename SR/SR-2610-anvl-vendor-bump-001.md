@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet, flywire (downstream consumers, indirectly)
-**Status:** open
+**Status:** resolved
 **Blocks:** FR-2610-anvl-bindings-001 (beyond slice 1's current surface), FR-2610-anvl-bindings-002,
 SR-2610-anvl-distribution-001, and every native BR/FR in the rivet-readiness set reaching Node
 **Tags:** bindings, anvil-node, anvil-wasm, vendor, sigma, rivet-readiness
@@ -61,3 +61,29 @@ SR-2610-anvl-distribution-001 asks for it.
 
 This is a pin bump, not new binding surface. New surface (types/schema, writer) is
 FR-2610-anvl-bindings-001/002.
+
+## Resolution
+
+Bindings agent, 2026-10-25. Both bindings are pinned at `f9ee783` (`v0.8.0-rc-142`, which includes
+the BR-2610-anvl-writer-001 fix). Branch `chore/SR-2610-anvl-vendor-bump-001` in each repo, not yet
+merged or pushed.
+
+- **`anvil.node`** (`8ce17f4`, `ffbe280`). 40/40 tests, 5 new in `test/vendor-pin.test.js`.
+  `binding.gyp` drops `memory.c`, links `/usr/local/packages/sigma.system.alloc.o`, adds the writer
+  sources. `src/binding.c` follows `ANVIL_VALUE_IDENTIFIER` to `ANVIL_VALUE_BARE`. The vendored
+  headers now mark the public API `visibility(default)`, which defeats `-fvisibility=hidden` in a
+  static link, so a linker version script (`exports.map`, Linux) exports only the two N-API entry
+  points. Test case 1 holds. Test case 2 is proved with `nm` on the built addon rather than by
+  calling the functions, because calling them needs new binding surface.
+- **`anvil.wasm`** (`852f0fa`, `134f74c`). 42/42 tests including the 5MB large-input regression.
+  `build-sigma-system-alloc.sh` compiles `sigma.system.alloc` from the `sigma.core` source with
+  `emcc` into `~/wasm-packages` on the Linode box (option 1; not vendored). `build.sh` links it,
+  compiles writer, types and schema in (D3), and writes `dist/BUILD_INFO.json` with the native
+  commit. Nothing exports the writer, types or schema yet, so the linker drops them; the README
+  section "Native modules carried" says so (test case 4).
+- **Not in scope but done in the same pass** (the pin was the only reason they were behind):
+  `anvil.py` (`efef678`, 98/98) and `anvil.net` (`13ae8b1`, 86/86) bumped to `f9ee783`. Both
+  vtable-drift tests failed on the bump, because native appended `get_path` to the `Document`
+  vtable (BR-2610-anvl-vtable-001). The struct member was added to each; no public accessor yet.
+  `anvil.java` has no pin and passed 75/75 against the rebuilt `libanvil.so` with no change.
+

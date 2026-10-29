@@ -1,11 +1,13 @@
 # Anvil Types — Language Reference
 
-Status: **partially implemented.** The grammar and semantics below are settled design (see
-`notes/native-schema.md` for the full design record); the runtime support column in each section
-says exactly what `types.c` (`src/anvil_types.c`, `include/anvil_type_registry.h`) can actually
-do today versus what's designed but not yet built. Schema (`@[schema]`, validating a *data*
-document's shape against a type-annotated field list) is design-only — nothing is implemented for
-it yet; this reference covers types only.
+Status: **implemented**, with the few items listed under "What's not built yet" still open. The
+grammar and semantics below are settled design (see `notes/native-schema.md` for the full design
+record); the runtime support note in each section says what `src/anvil_types.c`
+(`include/anvil_type_registry.h`) does today. AnvilSchema (`@[schema]`, validating a *data*
+document's shape against a type-annotated field list, `src/schema/schema.c`,
+`include/anvil_schema.h`) is implemented on top of it; this reference covers the type vocabulary
+and the schema behavior that depends on it (nested shapes, `nullable`, `integer`, `format`,
+diagnostics, introspection).
 
 ## What this is
 
@@ -77,24 +79,30 @@ reads its `type :=` field.*
 
 ## The native primitives
 
-Every type definition's `type :=` field names one of six native primitives, or the special `enum`
-kind:
+Every type definition's `type :=` field names one of seven native primitives, or the special
+`enum` kind:
 
 | Primitive | Meaning |
 |---|---|
 | `Numeric` | Any ANVL numeric value |
-| `String` | Any ANVL string value |
+| `String` | Textual content, however it is written: a quoted string, a bare word, or a backtick blob |
+| `Blob` | A backtick blob only; may require a tag with `tag := png;` |
 | `Bool` | A boolean value |
 | `Object` | A nested object shape |
 | `Tuple` | A fixed tuple shape |
 | `Array` | A variable-length array |
 | `enum` | An engine-understood enumeration — see below |
 
-Whether `Blob` becomes its own distinct primitive, or stays folded into `String` (structurally,
-today, a blob is already a string with a tag attribute), is still an open design question.
+**Blob.** A blob is structurally a string with a tag, so both readings are supported. `String`
+accepts a blob, which makes `type := String` mean "textual content" for a multi-line description or
+comment body written between backticks. `Blob` is stricter: it accepts only blobs, rejecting a
+quoted string or a bare word, and may declare `tag := png;` (an identifier or a string), in which
+case the data blob's `@tag` must equal it exactly. An untagged blob, or a different tag, is a
+`ANVIL_SCHEMA_ERR_VALIDATION_TAG` violation. For both, `size` counts the blob's **payload bytes**
+(the tag is not payload). An `enum` does not accept a blob.
 
-*Runtime support: implemented (`anvil_type_kind` / `anvil_type_def_get_kind`) for all seven kinds
-listed above.*
+*Runtime support: implemented (`anvil_type_kind` / `anvil_type_def_get_kind`, with
+`ANVIL_TYPE_BLOB` appended last) for all eight kinds listed above.*
 
 ## Constraints
 
@@ -109,9 +117,22 @@ VIN := {
 };
 ```
 
-*Runtime support: implemented (`anvil_type_def_get_size`/`get_min`/`get_max`). Each returns
-whether the constraint was actually declared, not just a default — a type with no `min` and one
-whose `min` happens to be 0 are distinguishable.*
+`min` and `max` may be fractional or in exponent form (`min := 0.25;`, `max := 1e+3;`), and
+comparisons are exact (an integer near 2^63 does not round). `size` counts **bytes** of the value's
+text, not characters, and must be a non-negative integer: `"héllo"` is 5 characters but 6 bytes
+(`é` is two in UTF-8), so it exceeds `size := 5`. (For a blob, `size` counts the payload bytes.) A constraint that is not a valid number is reported as a
+`MALFORMED_CONSTRAINT` diagnostic and treated as not declared, never as `0`.
+
+`integer := true` requires a numeric value to be whole. It is judged by the number's *value*, not
+how it is written: `2`, `2.0` and `1e+3` pass, `2.5` and `1e-1` fail (with a `TYPE_MISMATCH`
+violation saying "value must be an integer"). A field referencing the type inherits it, and may
+override it with its own `integer := false`.
+
+*Runtime support: implemented (`anvil_type_def_get_size`/`get_min`/`get_max`, plus
+`anvil_type_def_get_min_numeric`/`get_max_numeric` for fractional and exponent bounds). Each
+returns whether the constraint was actually declared, not just a default — a type with no `min` and
+one whose `min` happens to be 0 are distinguishable. The `long long` getters return false for a
+bound that is not a whole number rather than truncating it; use the `_numeric` ones for those.*
 
 ## Enums
 
@@ -133,6 +154,92 @@ Non-sequential ordinals (matching a database enum with intentional gaps) and fla
 *Runtime support: implemented (`anvil_type_def_get_value_count`/`get_value`) — each member's own
 label text is readable by its ordinal (array index).*
 
+## Object types with `fields`
+
+An `Object` type may describe its own shape, reusable by every schema field that references it:
+
+```anvl
+@[types]
+
+Person := {
+   type := Object;
+   fields := {
+      id   := { type := Numeric; required := true; };
+      name := { type := String; size := 40; };
+   };
+};
+```
+
+A schema field `owner := { type := types.Person; };` then validates the nested contents of `owner`
+(`owner.id` is required, `owner.name` is size-checked, any other member is an unknown field).
+The nested rules use the same vocabulary as top-level rules (and nest further, including
+`type := Array` with `items := { ... }`, `min_items` and `max_items`). If the schema field declares
+its own `fields`, they replace the type's; the two are never merged. A type whose `fields` refer back
+to itself (directly or through another type) is reported by the schema as a `SELF_REFERENCE`
+diagnostic and is not expanded. Violations name the full path, e.g. `links[2].target`.
+
+## Formats
+
+A `String` can be required to be a well-known lexical format with `format := <name>`. The set is
+small and closed on purpose, checked by hand-written validators (no regular-expression engine, no
+time-zone database):
+
+| Format | Accepts |
+|---|---|
+| `iso8601_date` | `YYYY-MM-DD`, with a real calendar check (month 01-12, the month's length, leap years) |
+| `iso8601_datetime` | RFC 3339: `YYYY-MM-DDTHH:MM:SS[.fraction](Z\|+HH:MM\|-HH:MM)`. The offset is required, so a timestamp is never ambiguous; `T` and `Z` are upper case; seconds may be 60 (leap second) |
+| `uuid` | 8-4-4-4-12 hexadecimal digits, either case, any version |
+
+```anvl
+@[types]
+
+Timestamp := { type := String; format := iso8601_datetime; };
+```
+
+A mismatch is an `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field. `format` is
+inherited like the other constraints (a field's own `format` replaces the type's) and applies at
+every depth. It is checked on string, bare-word and blob values (a blob's payload is the text); a
+number is not a format target. An unknown format name is a load-time diagnostic
+(`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the constraint is
+treated as not declared, not silently passed. `anvil_type_def_get_format` reads a type's format.
+
+## Closed schemas
+
+A schema is closed by default: a field in the data that the schema doesn't declare is an
+`UNKNOWN_FIELD` violation, at every depth. A caller that wants an open shape opts out per call with
+`anvil_schema_options.allow_unknown` (see `anvil_schema_validate_value`); a patch that omits
+required fields uses `skip_required`. Rule keys the *schema* doesn't know are the opposite case and
+are always allowed - see "Reading a schema back".
+
+## Nullable values
+
+A field with a declared type rejects an explicit `null` (`note := null;`) as a type mismatch, the
+same as any other wrong-kind value. `nullable := true` makes `null` a legal value for it, and a
+`null` then skips every other constraint (`size`, `min`/`max`, `values`, nested `fields`). Absent and
+null stay different things: an absent field is governed only by `required`, so
+`required := true; nullable := true;` means "must be present, and may be null". `nullable` can be
+declared on a type, is inherited by a field that references it (a field's own `nullable := false`
+overrides it), and applies at every depth, array items included. A field with no declared type has
+nothing for `null` to violate, so it accepts it either way.
+
+## Reading a schema back
+
+A loaded schema can be inspected, read-only: `anvil_schema_get_field_count` / `get_field` /
+`find_field` list the top-level rules in declaration order, and `anvil_schema_field_get_*` report each
+rule's effective settings - the kind, the `type :=` as written (`types.Id32`), `required`,
+`nullable`, `integer`, and every constraint (`size`, `min`/`max`, `min_items`/`max_items`,
+`values`, `format`, `tag`) with the usual "declared, not a default" return - exactly what
+validation enforces, with anything the rule left out filled in from its `types.X`. Nested rules are
+reachable through `get_nested` / `find_nested` (an Object's `fields`) and `get_items` (an Array's
+element rule).
+
+Rule keys the schema doesn't consume (a consumer's own annotations, such as FlyWire's `pooled` and
+`mask`) are exposed as **extras**: `get_extra_count`, `get_extra_name` and `get_extra_value`, in
+declaration order, on any rule at any depth. They are never diagnostics. Each value is a copy
+owned by the schema, readable with the ordinary `anvil_value` accessors, and stays valid after the
+source document is disposed (until the schema is disposed). A value containing a `$variable`
+reference can't be copied and reads as NULL.
+
 ## Using a type from another document
 
 A schema, or any other document, brings a type into scope by including the file that defines it,
@@ -148,12 +255,45 @@ vin_serial := { type := types.VIN; required := true; };
 has nothing to do with that file's own name. Two different `.types.anvl` files could both define
 types reachable as `types.X`, `types.Y` regardless of which physical file each include came from.
 
-*Runtime support: implemented (`anvil_type_registry_load_from_includes`) — walks `doc`'s own
-direct includes (not the whole transitive graph) and merges every `@[types]`-carrying one's
-definitions into a single combined registry, keyed by bare name. `types.` really is a flat
-namespace: two different included files could each define types reachable this same way,
-regardless of which file each name actually came from. A name collision between two includes
-currently resolves last-write-wins — no error reporting for that yet.*
+Includes are followed **transitively**. If `ticket.types.anvl` includes `common.types.anvl`, a
+schema that includes only `ticket.types.anvl` still sees `types.Timestamp` from `common.types.anvl`;
+it does not have to repeat the chain. A document without `@[types]` in the middle of a chain is
+walked through (its own includes may be types files) but contributes no definitions.
+
+*Runtime support: implemented (`anvil_type_registry_load_from_includes`) — walks `doc`'s include
+graph depth-first in include order, visiting each document once, and merges every
+`@[types]`-carrying document's definitions into a single combined registry, keyed by bare name.
+Deeper includes merge first and the including document's own definitions after, so a definition
+closer to the consumer overrides a deeper one. `types.` really is a flat namespace, regardless of
+which file each name actually came from. Any name collision resolves last-write-wins, and is
+reported (see Diagnostics below). An include cycle is a load error in the core
+(`ANVL_ERR_INCLUDE_CYCLIC`) and its bodies are never parsed, so a cyclic graph yields no
+definitions; the walk itself still terminates.*
+
+## Diagnostics
+
+Loading a registry never fails on a bad definition; it records what it noticed, and the consumer
+decides whether that is fatal. `anvil_type_registry_get_diagnostic_count` /
+`anvil_type_registry_get_diagnostic` list them in the order found, and each diagnostic has a
+category, the type's name, the path of the document it came from, and a message
+(`anvil_type_diagnostic_get_*`, snprintf-style buffers). Diagnostics are copied out at load time,
+so they stay readable after the source documents are disposed.
+
+| Category | Meaning | Effect on the registry |
+|---|---|---|
+| `ANVIL_TYPE_DIAG_NAME_COLLISION` | a name was defined more than once; the message names both documents | the later definition wins |
+| `ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE` | `type :=` is missing or names no recognized kind | not registered |
+| `ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT` | `size`/`min`/`max` isn't a valid number (`size` must be a non-negative integer) | that constraint is treated as not declared, never as `0` |
+| `ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES` | `values` is not an array | no labels are declared |
+
+A schema that includes types files reports these too: `anvil_schema_load` copies the registry's
+diagnostics into the schema's own list (`anvil_schema_get_diagnostic`, category
+`ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`, with the registry's category under
+`anvil_schema_diagnostic_get_type_category`), followed by the schema's own: `UNKNOWN_TYPE` (a typo
+such as `types.Prority`), `MALFORMED_CONSTRAINT`, `RULE_NOT_OBJECT`, and `CONFLICTING_CONSTRAINTS`
+(`min` greater than `max`). Unknown rule keys such as FlyWire's `pooled` or `mask` are never
+diagnostics. A schema with diagnostics still loads and validates; a CI gate is simply
+"`anvil_schema_get_diagnostic_count` is 0".
 
 ## What's not built yet
 
@@ -164,10 +304,6 @@ For a complete picture, the pieces of this design that are settled but not yet i
   yet).
 - Type inference through inheritance (`base`) — architecturally free once built, since inherited
   fields already alias their ancestor's real statement object, attributes and all.
-- Reporting a name collision when two includes both define the same type name, instead of
-  silently taking the later one.
-- Everything about `@[schema]` and schema validation — a separate, not-yet-started module
-  (`schema.c`) that will depend on `types.c`, never the reverse.
 
 See `notes/native-schema.md` for the full design record, including the reasoning behind each
 decision above.

@@ -15,7 +15,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (process)
+- **Tickets moved to Rivet.** As of the 2026-10-26 freeze, every anvil and anvil.java ticket lives in
+  Rivet; `BR/`, `FR/` and `SR/` are frozen history (a README notice in each folder says so). The
+  agent instruction files say the same.
+- **The ANVL team is one session with sub-agents** (2026-10-29). The ANVL Principal Engineer
+  (formerly the ANVL Engineer) leads and decides on every ANVL ticket, core and bindings. Eight
+  roles are now sub-agent definitions in `.claude/agents/anvl-*.md`:
+  - Core Engineer, Bindings Engineer;
+  - AnvilScript Language Engineer, AnvilScript Runtime Engineer;
+  - Verification Engineer (new: an independent check of every branch before it merges);
+  - Release Engineer, Technical Writer, Triage Analyst.
+
+  The shared rules they all follow (TDD, Rivet, finish rules, design principles, public-text
+  scrub) are in `agents/STANDARDS.md`, and the team's operating model is in `agents/README.md`.
+  Owner approvals reach a sub-agent as an `AUTHORIZED: <action>` line in its task. The open
+  release and docs work moved from `agents/ANVL-RELEASE.agent.md` and
+  `agents/ANVL-DOCUMENTOR.agent.md` to `agents/assignments/`. The docs assignment gained one item:
+  stating the RFC 3339 profile of `iso8601_datetime`.
+
+### Added (AnvilScript, behind `WITH_ASL=1`; off by default)
+- **AnvilScript parser branch brought up to date with `main`** (`SR-2610-anvl-asl-001`). The
+  `#!asl` signature parser (function declarations, parameters, defaults, parameter arrays) and the
+  body/AST parser (`var`, `return`, assignment, binary and unary operators, grouping) now build
+  on the current thread-safe loader, the hidden-visibility exports and the NUL-safe text model.
+  Default builds are unchanged: with `WITH_ASL=0` a `#!asl` document is still rejected with
+  `ANVL_ERR_HEADER_ASL_NOT_SUPPORTED`, and `anvil_is_script_enabled()` (flat API and
+  `Anvil.is_script_enabled`, appended last in the vtable) reports which way the library was built.
+  The load stress behind `make check-tsan` gained an `asl` mode that runs only with `WITH_ASL=1`.
+  Tests: `ASL01`-`ASL19`, `ASLAST01`-`ASLAST11`, `ANV66`/`ANV67`.
+
+### Added (planning)
+- **AnvilScript runtime: bytecode VM committed** (`FR-2610-anvl-asl-runtime-001`). The
+  tree-walk-vs-bytecode question in `notes/anvilscript-design.md` was tentative and is now decided:
+  bytecode, with the AST staying the canonical IR. The FR scopes the compiler, the VM, host
+  callback registration (Design Thread #3) and `import` with the `c:` resolver (Design Thread #1),
+  in six TDD slices. It pulls Threads #1 and #3 forward because embedding AnvilScript in a host
+  application such as Outpost needs both. The compiler+VM ships as an add-on behind the existing
+  `WITH_ASL` flag, in the same library, with its own vtable. Plan only; nothing implemented yet.
+
+---
+
+## [v0.10.0-rc] — (2026-10-26)
+
+First release cut by the release tooling: every artifact is built from this tag, reports
+`0.10.0-rc+<BUILD>` (`BUILD` = the tag's commit count, computed once), and is gated on the packaged
+file, not the build tree (`scripts/release/`: grammar and version, exports, install, README and the
+FlyWire guard). Supersedes the `0.8.0-rc` downloads, which predate the `import` -> `include` rename
+(`BR-2610-anvl-distribution-001`).
+
 ### Added
+- **All five bindings re-pinned to native `main` (`e089837`) and given a decoded attribute accessor**
+  (`SR-2610-anvl-vendor-bump-002`): `decodedValue` in `anvil.node`/`anvil.wasm`, `decoded_value` in `anvil.py`,
+  `DecodedValue` in `anvil.net`, `getDecodedValue()` in `anvil.java`, next to the unchanged raw `value`
+  (`status="done"` is `done`; a flag is null/None). The `Attribute` vtable's appended member is mirrored where it is read.
+  The identical-content workarounds are gone (the `anvil.net` xUnit switch and the special exception text in `anvil.net` and
+  `anvil.py`), the NUL tests are real tests, and the newer native's real `;` message, unterminated-comment error and
+  `nullable`/`truely` bare words are pinned in every binding. `anvil.java` gained a vtable drift test, which found its
+  `Document` group one member short.
+- **`anvil_attribute_get_value_handle`** (`FR-2610-anvl-public-api-004`; flat API and `Attribute.get_value_handle`,
+  both appended last): an attribute's value read AS A VALUE, so `anvil_value_get_type` (STRING / BARE /
+  NUMERIC / BOOL / NULL), `get_text` (escapes resolved, delimiters stripped), `get_numeric` and `get_bytes`
+  apply unchanged. `@[status="done"]` reads as the string `done`, `@[note="a\"b"]` as `a"b`, `@[n=42]` as the
+  number 42; a flag attribute (`@[active]`) returns NULL. Works for module and statement attributes, the
+  handle lives as long as its document, and a NUL inside a quoted value survives
+  (`BR-2610-anvl-nul-001`). `anvil_attribute_get_value` is unchanged: it is still the raw-source-text
+  reader and still returns `"done"` with its quotes. A value the scalar grammar doesn't accept as a whole
+  (`@[range=1..5]`) is exposed as a BARE value of its raw text; reading never fails and no document that
+  loaded before fails now. Bindings can drop any per-binding unquoting and add one decoded accessor.
+- **`anvil.node` and `anvil.wasm` expose statement attributes and attribute values** (`FR-2610-anvl-bindings-003`):
+  `node.attributes`/`findAttribute(key)` (module attributes with their values, on the root), `node.statements()`/`statement(name)`
+  (an object's statements in order, repeated names included), and `AnvlStatement { name, value, attributes, findAttribute }`,
+  with the same names and meaning as `anvil.py` and `anvil.net`. An attribute's value is native's text (a quoted string keeps
+  its quotes) and `null` for a flag. `hasAttribute` is unchanged, and an attribute-free document's envelope is byte-identical;
+  its `parse()` is about 4% slower in Node and 5% to 11% in WASM.
+- **`anvil.py` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 2): `AnvilTypeRegistry`/`TypeDef` and
+  `AnvilSchema` in Python idiom, over the `Schema` and `TypeRegistry` vtables. Validation with keyword-only
+  `skip_required`/`allow_unknown`, `validate_field` over text, bytes or a loaded document, load diagnostics, and field
+  introspection (nested rules, array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds.
+  Everything that owns a handle is a context manager, and the enums are pinned against the C headers. With this, every slice
+  of `FR-2610-anvl-bindings-001` is done: `anvil.node`, `anvil.net`, `anvil.wasm` and `anvil.py` share one surface.
+- **`anvil.wasm` gains the type registry, schema, writer and builder** (`FR-2610-anvl-bindings-001` slice 4 and
+  `FR-2610-anvl-bindings-002`'s wasm slice): the same surface and result shapes as `anvil.node`, including
+  `validateField` with `each` and `schema.fields`, so a JS caller has one API on the server and in the browser. The
+  module's in-memory filesystem is exposed (`writeFile`/`removeFile`) so schemas can include `@[types]` documents.
+  The `.wasm` grows to about 150 KB because the types, schema and writer code is now reachable. Built on the pin
+  `f9ee783`. Found while porting: `anvil.wasm`'s `parse()` cuts a document at an embedded NUL (`BR-2610-anvl-bindings-002`).
+- **`anvil.node` gains `schema.validateField` and schema introspection** (`FR-2610-anvl-bindings-001`,
+  slice 1b): `validateField(docText, name, opts)` validates a statement of a document you already
+  hold as ANVL text in one call, with an `each` form for batch bodies (violations at `[i].field`),
+  and `schema.fields`/`findField(name)` expose every rule's constraints, nested rules, array items,
+  blob tag and extension keys. An absent statement is one `Required` violation with an empty field,
+  the same as `anvil.net`.
+- **`anvil.net` gains the type registry and schema** (`FR-2610-anvl-bindings-001`, slice 3):
+  `AnvilTypeRegistry`/`AnvilTypeDef` and `AnvilSchema` in .NET idiom, over the `Schema` and
+  `TypeRegistry` vtables. Validation with `SkipRequired`/`AllowUnknown`, `ValidateField(text, name)`
+  for a request body held as ANVL text, load diagnostics, and field introspection (nested rules,
+  array items, blob tag, format, nullable/integer, extension keys), with exact numeric bounds. Every
+  handle is `IDisposable`, and the enums are pinned against the C headers. Built on the pin
+  `f9ee783`. The local package is versioned `0.10.0-dev.1`, provisional until the release decision.
+- **`Schema` and `TypeRegistry` vtables** (`FR-2610-anvl-public-api-003`, roadmap decision D4):
+  `include/anvil_schema_vtable.h` (`anvil_schema_i`, `extern const anvil_schema_i Schema;`, 40
+  members) and `include/anvil_type_registry_vtable.h` (`anvil_type_registry_i`,
+  `extern const anvil_type_registry_i TypeRegistry;`, 20 members), implemented in
+  `src/schema/schema_vtable.c` and `src/anvil_types_vtable.c`. Same convention as `Writer`/`Builder`:
+  every member is pointer-identical to its flat function, in header declaration order, named without
+  the module prefix; new flat functions are appended, never inserted. Exported from `libanvil.so`
+  (`libanvil.exports`). Tests pin identity and completeness (a flat function without a member fails
+  the suite) and run a load/validate/read-violations round trip through the vtable alone. This is
+  what `anvil.py` and `anvil.net` bind.
 - **Streaming writer** (`FR-2609-anvl-writer-001`): `include/anvil_writer.h` (flat),
   `anvil_writer_vtable.h` (`Writer`) and `anvil_writer_types.h`, implemented in `src/writer/`.
   Emits canonical AML/AMP, validated against the real grammar, and is a separate add-on from the
@@ -34,18 +142,337 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`anvil_value_get_bytes`** (flat + `Value.get_bytes`, appended last): the exact, uninterpreted source span of any scalar kind (a `STRING`'s escapes unresolved, a `BLOB` byte for byte, no NUL terminator); 0 for collections. The primitive that `get_text` is a view of, and the fallback for a number `get_numeric` can't hold. `get_text` is unchanged (still total) and re-documented as the string view. See decision #6 of `FR-2609-anvl-public-api-001`.
 - **`anvil_value_get_blob_tag`** (flat + `Value.get_blob_tag`, the 9th and last `Value` field): a blob's `@tag`, which no accessor exposed before (the content readers return only what is between the backticks). Text buffer convention; 0 for an untagged blob or any other kind. The writer/builder round-trip suites now carry tags through a reader→writer copy.
 
+- **Type-registry diagnostics** (`FR-2610-anvl-types-001`): `anvil_type_registry_get_diagnostic_count` /
+  `_get_diagnostic` and `anvil_type_diagnostic_get_category/_name/_source/_message` (new header
+  section in `anvil_type_registry.h`). The registry now reports what it used to resolve silently:
+  `NAME_COLLISION` (last-write-wins is unchanged; the message names both documents),
+  `UNKNOWN_BASE_TYPE`, `MALFORMED_CONSTRAINT` and `MALFORMED_ENUM_VALUES`. Diagnostics are copied at
+  load time and outlive the source documents. Also adds `anvil_document_get_path` (flat API) so a
+  diagnostic can name the document it came from. No existing signature changed.
+
+- **Transitive `@[types]` resolution** (`FR-2610-anvl-types-002`): `anvil_type_registry_load_from_includes`
+  now follows the whole include graph (depth-first, each document once) instead of only direct
+  includes, so a schema that includes `ticket.types.anvl` sees the types `ticket.types.anvl` itself
+  includes. A non-`@[types]` document in the chain is walked through. Deeper definitions merge
+  first, so one closer to the consumer overrides it, reported as a `NAME_COLLISION`. The old
+  direct-only behavior is not kept as a mode. `docs/types-reference.md` (and its site mirror,
+  which also picks up the diagnostics section from `FR-2610-anvl-types-001`) describes it.
+
+- **Schema load diagnostics** (`FR-2610-anvl-schema-004`): `anvil_schema_get_diagnostic_count` /
+  `_get_diagnostic` and `anvil_schema_diagnostic_get_category/_type_category/_field/_message`.
+  `anvil_schema_load` still returns a handle for a malformed schema, but now reports what it used to
+  weaken silently: `UNKNOWN_TYPE` (a typo such as `types.Prority`), `MALFORMED_CONSTRAINT`
+  (`size`/`min`/`max`/`values`/`required`), `RULE_NOT_OBJECT` and `CONFLICTING_CONSTRAINTS`
+  (`min` > `max`), plus the type registry's own diagnostics passed through as `TYPE_REGISTRY`
+  (collisions, bad definitions). `UNKNOWN_FORMAT` and `SELF_REFERENCE` are reserved for
+  `FR-2610-anvl-types-004` and `-schema-001`. Unknown rule keys (FlyWire's `pooled`, `mask`) are
+  deliberately not diagnostics. Gives CI a "schema is well-formed" gate: the count is 0.
+
+- **`anvil_schema_validate_value` + `anvil_schema_options`** (`FR-2610-anvl-schema-002`): validates an
+  OBJECT *value* (a request body such as `set := { ... };`, or one element of
+  `set := [ {...}, {...} ]`) against a schema exactly as if it were a document's top level. Options:
+  `skip_required` (patch semantics; every other check still runs on present fields) and
+  `allow_unknown`. The struct carries its own `size`, so it can grow without breaking compiled
+  callers. A non-object value yields one `TYPE_MISMATCH` with an empty field path. Each call replaces
+  the previous call's violations. `anvil_schema_validate` keeps its signature and results: it now
+  shares one validation pass with the value form. This is what lets FlyWire validate through
+  AnvilSchema instead of its own JavaScript validator.
+
+- **Nested schema validation** (`FR-2610-anvl-schema-001`): a schema rule is an ordinary nested object,
+  so `type := Object` may carry `fields := { name := { <rule> }; ... }` (recursive, unknown-field
+  checking included) and `type := Array` may carry `items := { <rule> }` for every element plus
+  `min_items` / `max_items`. A `@[types]` Object type may carry `fields` and is reusable by every field
+  referencing it (an inline `fields` replaces it, never merges); a self-referential type is reported
+  as `SELF_REFERENCE` and not expanded. Violations now name the full path (`links[2].target`,
+  `assignee.id`); top-level fields read exactly as before. New category
+  `ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT` (appended). Violation order is schema order, depth first.
+  Nested rules also produce load diagnostics with paths, and honour `anvil_schema_validate_value`'s
+  `skip_required` / `allow_unknown` at every depth.
+
+- **`nullable`** (`FR-2610-anvl-schema-003`): `nullable := true` makes an explicit `null` a legal value
+  for a declared field, so a patch that clears `assignee_id` validates. Without it, `null` for a typed
+  field is still `TYPE_MISMATCH`, now with the clearer message "field is not nullable". A nullable
+  `null` skips every other constraint; `required := true; nullable := true;` means present-and-may-be-null.
+  Inherited from a `@[types]` definition (a field's own `nullable := false` overrides it) and applied
+  at every depth, array items included. A malformed `nullable` is a `MALFORMED_CONSTRAINT` diagnostic.
+
+- **`integer` constraint and fractional bound getters** (`FR-2610-anvl-types-005`): `integer := true`
+  requires a numeric value to be whole, judged by value (roadmap decision D2): `2`, `2.0` and `1e+3`
+  pass, `2.5` fails with a `TYPE_MISMATCH` saying "value must be an integer" (no new category).
+  Inherited from a type; a field's own `integer := false` overrides it; applied at every depth.
+  `anvil_type_def_get_min_numeric` / `anvil_type_def_get_max_numeric` expose fractional and exponent
+  bounds exactly; the `long long` getters keep their signatures and return false for such a bound
+  instead of truncating. Appended API only.
+
+- **`Blob` primitive** (`FR-2610-anvl-types-003`, roadmap decision D1: both): `type := Blob` is a new
+  native primitive (`ANVIL_TYPE_BLOB`, appended to `anvil_type_kind`) that accepts only backtick
+  blobs and may require a tag with `tag := png;` (new category
+  `ANVIL_SCHEMA_ERR_VALIDATION_TAG`, appended). `type := String` now also accepts a blob, so long
+  multi-line text validates as a string; an `enum` still does not. `size` on a blob counts payload
+  bytes (the tag is not payload). `tag` is inherited from a type and applied at every depth. Quoted
+  strings and bare words validate exactly as before. The open question in
+  `docs/types-reference.md` is replaced by the decision.
+
+- **`format` constraint for String** (`FR-2610-anvl-types-004`): `format := iso8601_date | iso8601_datetime |
+  uuid`, checked by hand-written validators (no regex engine). `iso8601_date` has a real calendar check
+  (month lengths, leap years); `iso8601_datetime` is the RFC 3339 profile with a mandatory offset;
+  `uuid` is 8-4-4-4-12 hex, any case and version. A mismatch is the new
+  `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field (appended). Inherited from a type,
+  applied at every depth, checked on string, bare and blob values. An unknown format is a load
+  diagnostic (`UNKNOWN_FORMAT` on a schema field, `MALFORMED_CONSTRAINT` on a type) and the
+  constraint is treated as not declared. New `anvil_type_def_get_format`.
+
+- **Schema introspection** (`FR-2610-anvl-schema-005`): a loaded schema can be read back, read-only.
+  `anvil_schema_get_field_count` / `get_field` / `find_field` (declaration order) and
+  `anvil_schema_field_get_*`: name, kind, the `type :=` as written (`types.Id32`), `required`,
+  `nullable`, `integer`, and every constraint (`size`, `min`/`max` in numeric form, `min_items` /
+  `max_items`, `values`, `format`, `tag`) with the "declared, not a default" convention. Settings are
+  the effective ones - what validation enforces, inherited constraints included. Nested rules are
+  reachable through `get_nested` / `find_nested` / `get_items`. Rule keys the schema doesn't consume
+  (FlyWire's `pooled`, `mask`) are exposed as extras (`get_extra_count/_name/_value`) on any rule at
+  any depth; each value is a schema-owned copy readable with the ordinary `anvil_value` accessors and
+  valid after the source document is disposed. This lets FlyWire stop parsing the schema document
+  in parallel with AnvilSchema.
+
 ### Changed
+- **Bindings take `ANVL_BUILD` from the environment instead of hard-coding `0`** (`BR-2610-anvl-version-001`, build half):
+  `anvil.node`'s `binding.gyp` and `anvil.wasm`'s `build.sh` use `ANVL_BUILD` if set, else the commit count of a full
+  `vendor/anvil` checkout, else 0 (no `+BUILD`). All five bindings re-pinned to `78bb318` with a regression test for
+  attribute values that no longer carry trailing whitespace (`BR-2610-anvl-attr-001`). The binding READMEs now lead with
+  installing the prebuilt package, and `Anvil.Net` is repackaged as `0.10.0-dev.2`.
 - The writer now rejects a repeated top-level name (`ANVIL_WRITER_ERR_DUPLICATE_NAME`), as the
   reader's resolver does. Added `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` (builder).
 
 ### Added (planning)
-- **AnvilScript runtime: bytecode VM committed** (`FR-2610-anvl-asl-runtime-001`). The
-  tree-walk-vs-bytecode question in `notes/anvilscript-design.md` was tentative and is now decided:
-  bytecode, with the AST staying the canonical IR. The FR scopes the compiler, the VM, host
-  callback registration (Design Thread #3) and `import` with the `c:` resolver (Design Thread #1),
-  in six TDD slices. It pulls Threads #1 and #3 forward because embedding AnvilScript in a host
-  application such as Outpost needs both. The compiler+VM ships as an add-on behind the existing
-  `WITH_ASL` flag, in the same library, with its own vtable. Plan only; nothing implemented yet.
+- **Rivet-readiness ticket set.** These are the AnvilTypes/AnvilSchema/bindings gaps found while
+  building Rivet, the in-house ticketing system: `BR-2610-anvl-types-001`,
+  `BR-2610-anvl-schema-001`, `FR-2610-anvl-types-001`–`005`, `FR-2610-anvl-schema-001`–`005`,
+  `FR-2610-anvl-bindings-001`/`002`, `SR-2610-anvl-docs-001`, `SR-2610-anvl-distribution-001`,
+  and `SR-2610-anvl-vendor-bump-001`. That last one is new: `anvil.node`/`anvil.wasm` still pin
+  `vendor/anvil` 45 commits behind `main`. A planning review corrected four tickets, including
+  `is_integral`, which follows the number's spelling rather than its value, and three truncation
+  sites the schema-buffer BR had missed. Sequenced in `notes/roadmap-2610-rivet-readiness.md`:
+  Phases 1–3 are native work for the ANVL coder agent, and Phases 4–5 are bindings and release
+  work for the ANVL Bindings agent. Tickets and plan only; nothing implemented yet.
+- **`FR-2610-anvl-public-api-003`**: `Schema`/`TypeRegistry` vtables for the `anvil.py`/`anvil.net`
+  bindings (roadmap decision D4). Owned by the Bindings agent, and starts after roadmap Phase 3.
+- **`BR-2610-anvl-visibility-001`** (filed): `libanvil.so` exports none of the `anvil_schema_*` /
+  `anvil_type_registry_*` functions, because their headers lack the `visibility push(default)`
+  wrapper. Shared-library consumers (`anvil.py`, `anvil.net`, `anvil.java`) can't reach schema or
+  types until it's fixed. Added as roadmap addendum A1 for the coder agent.
+- **`BR-2610-anvl-vtable-001`** (filed): `anvil_document_get_path` exists only in the flat API, not
+  the `Document` vtable, and no test checks vtable completeness. Roadmap addendum A2. Both A1 and A2
+  must merge before the Bindings agent starts Phase 4.
+- **Phase 4 scope decisions** (owner-approved, on the Bindings agent's slice-1 findings):
+  `anvil.node` gains `schema.validateField(docText, name, opts)` (slice 1b), so a request body's
+  `set` object validates without re-serializing it. `anvil.wasm` gets the same types/schema
+  surface (FR-2610-anvl-bindings-001 slice 4) and the writer/builder (FR-2610-anvl-bindings-002
+  second slice); today it compiles them in but exports nothing from them. The release
+  (SR-2610-anvl-distribution-001, now owned by the Release agent) waits for all of Phase 4.
+- **`BR-2610-anvl-registry-001`** (filed): loading text identical to a live document fails with an
+  empty `Io` error. Underneath, the process-global source registry makes independent loads collide,
+  which three bindings have now hit separately. Part 1 fixes the message; Part 2 proposes scoping
+  dedup to one load's include graph.
+- **`BR-2610-anvl-nul-001`** (filed): the type registry and schema store copied text as C strings,
+  so an enum label containing a NUL is truncated and a string extension value containing one comes
+  back NULL. Found by the Bindings agent's cross-binding NUL audit. The core reader itself is correct.
+- **`FR-2610-anvl-bindings-003`** (filed): `anvil.node` and `anvil.wasm` expose only module
+  attribute *keys*, root-only. Statement attributes, and all attribute values, are unreachable from
+  JS, unlike `anvil.py`/`anvil.net`. Requested by Rivet for its q-or importer.
+- **`FR-2610-anvl-public-api-004`** (filed): an attribute's value can only be read as raw source
+  text (`status="done"` reads `"done"`, quotes and escapes included). Adds a decoded/typed read,
+  preferably as an `anvil_value`, so no binding reimplements unquoting.
+- **`BR-2610-anvl-bindings-003`** (filed): `anvil.node`/`anvil.wasm` collapse a repeated object
+  field name to its last occurrence (`count`, `get`, `entries`), while native/py/net keep all of
+  them and find the first.
+- Release agent instructions: FlyWire's guard test (`tests/test-anvl-binding-grammar.js`) runs
+  against the packaged node/wasm tarballs before upload, and FlyWire and Rivet are notified once
+  the release is live.
+- **Grammar decision: newlines are allowed inside an attribute list** (owner, 2026-10-26). A
+  multi-line `@[ … ]` is valid and purely a style choice. The parser already accepted it, and
+  BR-2610-anvl-attr-001 keeps the whitespace out of values; the language reference will state it.
+- **`BR-2610-anvl-version-001`** (filed): the reported version is `MAJOR.MINOR.PATCH+BUILD-TAG`
+  (not semver, so `0.8.0+0-rc` reads as a release), `ANVL_VERSION_STR` is a second, drifting
+  source of truth, and Node/WASM builds hard-code `BUILD=0`. From the Release agent's audit.
+- **`BR-2610-anvl-attr-001`** (filed): an attribute's raw value includes any whitespace before the
+  next `,` or `]`, and a newline there makes the decoded value fall back to BARE with its quotes
+  kept. From Rivet's q-or re-import.
+- **Release decisions and agent instructions:** the release is `v0.10.0-rc` (R1). The website,
+  including downloads, `version.js` and deploys, belongs to the ANVL Documentor, and the
+  `0.8.0-rc` downloads are removed with no archive (R2). `agents/ANVL-RELEASE.agent.md` now builds
+  and verifies artifacts and hands them to the Documentor. New `agents/ANVL-DOCUMENTOR.agent.md`
+  covers the stale schema README, the site's internal-name scrub, the docs sync check, a deploy of
+  already-merged docs, and preparing the downloads, Bindings-Guide and public changelog for the
+  release.
+- **`SR-2610-anvl-vendor-bump-002`** (filed): re-bump every binding to native `main` after the
+  2026-10-26 merges, drop the identical-content workarounds, flip the NUL tests, and add one decoded
+  attribute accessor across the bindings. It gates the v0.10.0-rc release.
+- **`BR-2610-anvl-parser-001`** (filed): a bare value that begins with `null`/`true`/`false`
+  (`nullable`, `truely`, `falsey`) fails to load. The literal is matched as a prefix. From Rivet's
+  q-or importer.
+- **`BR-2610-anvl-errors-001`** (filed): several parse errors report "Unknown error" (a missing
+  `;`, for example), and a repeated top-level name reports no position.
+- **`SR-2610-anvl-build-001`** (filed): `test/unit`'s `test_release` can link a stale
+  `libanvil.a`, because its archive rule has no prerequisites.
+- **`BR-2610-anvl-writer-001`** (filed): the writer's name-set hash (`hash_name`, `grammar.c`)
+  truncates its 64-bit FNV-1a constants on 32-bit `size_t`, so wasm32 builds warn and hash
+  differently from native. Lookups stay correct. Found building `anvil.wasm`; to land before the
+  writer is exposed to JS.
+- **`agents/ANVL-RELEASE.agent.md`**: instructions for a new ANVL Release agent. It builds from
+  tags only, packages with scripts rather than by hand, and runs release checks against the packaged
+  artifact: a grammar check for `include`, plus version, install, export, checksum and post-deploy
+  checks. Deploys and tag pushes happen only on the owner's go. First assignment:
+  SR-2610-anvl-distribution-001 and BR-2610-anvl-distribution-001, starting with an audit of all
+  five published `0.8.0-rc` tarballs.
+
+### Fixed
+- **The reported version is now valid semver** (`BR-2610-anvl-version-001`, native half): the library built
+  `MAJOR.MINOR.PATCH+BUILD-TAG` (`0.9.0+0-rc`), which any semver parser reads as the release `0.9.0` with
+  build metadata `0-rc`. It is now `MAJOR.MINOR.PATCH[-TAG][+BUILD]`, with the pre-release tag before the
+  build metadata (`0.10.0-rc+176`), and `+BUILD` is left out when the build number is 0 or not provided
+  ("unknown", never a fake `+0`). `ANVL_VERSION_STR` is now derived from the version parts and can no longer
+  drift from what the library reports; it is the reported version without `+BUILD`. Every Makefile takes an
+  explicit build number (`make ANVL_BUILD=176`, `BUILD_NUM=176`, or the environment), so a release build can
+  pass the tag's commit count and not depend on the checkout; the default is the commit count, and 0 (no
+  `+BUILD`) when there is no git (an extracted tarball). A build-number stamp makes `anvil.o` rebuild when the
+  number changes (a `-D` flag isn't tracked by dependency files). `-DANVL_BUILD=0` (what the node and wasm
+  builds hard-code today) now reports no `+BUILD`. New `make check-version`. The binding build halves are
+  tracked in the same ticket.
+- **An attribute value's span now ends at the value, not at the next delimiter** (`BR-2610-anvl-attr-001`):
+  the attribute scanners (statement and module attributes) ran each value on to the next `,` or `]`, so
+  whitespace before the delimiter became part of the raw value: `@[a="1" , b="2"]` gave `a` the raw value
+  `"1" `, and when the whitespace held a newline (`@[b="2"` newline `]`, the usual multi-line layout) the
+  decoded value from `anvil_attribute_get_value_handle` fell back to BARE with its quotes kept. Spaces,
+  tabs, CR and LF before the delimiter are no longer part of the value, so the raw value is exactly the
+  token (`"2"`, `bug`, `1..5`) and the decoded value is STRING `2` / BARE `bug` whatever whitespace follows,
+  including CRLF files. Whitespace after `=` was never affected. Every binding picks this up at its next
+  pin.
+- **An unterminated block comment is now an error wherever it opens** (`BR-2610-anvl-parser-002`): only the
+  header scanner checked for it, so `x := 1; /* never closed` loaded with no error, a statement after it was
+  silently lost, and inside an object, array, tuple or attribute list the error blamed the end of the file.
+  It is now reported as "Unterminated block comment" at the line and column where the comment OPENS, in AML
+  and AMP, from the body parser too. The header check also wrongly rejected a comment that closed as the very
+  last thing in a file. A newline between a value and its `;` stays an error: that rule is deliberate
+  (`notes/document-body-parse.md`) and is now stated in `docs/language-reference.md` and pinned for every
+  value kind.
+- **`make test_release` can no longer link a stale `libanvil.a`** (`SR-2610-anvl-build-001`):
+  `test/unit/Makefile` only built the release archive when it was missing, so after a branch switch or
+  rebase `test_release` linked an archive built from older sources and could fail (or pass) for no reason
+  that had to do with the code. It now asks the top-level make every time, which tracks sources and
+  headers and does nothing when the archive is current. New `make check-test-release-fresh` proves both
+  halves (rebuilds after a core source changes, recompiles nothing when nothing changed).
+- **Parse errors now say what is wrong, and a repeated top-level name has a position**
+  (`BR-2610-anvl-errors-001`): eight error codes were declared in `errors.h` with no entry in the message
+  table (and twelve with no name), so documented failures read "Unknown error". The worst offender was a
+  missing `;`, which now reads "Expected ';' to end the statement" (position unchanged); the others are
+  `ANVL_ERR_PARSER_EXPECTED_COLON`, the AMP object error, an invalid `$` reference, and the arena, source,
+  context and not-implemented codes. A repeated top-level name was reported at line 0 / column 0; it now
+  points at the SECOND occurrence and the message names the identifier and the first one's line
+  (`Duplicate top-level identifier 'x' (first declared at line 2)`). A completeness test reads `errors.h`
+  and fails when any code lacks a message or a name, so the tables can't fall behind again. "Unknown
+  error" is now reachable only for a genuinely unknown code.
+- **A bare value that merely begins with `null`, `true` or `false` now loads** (`BR-2610-anvl-parser-001`):
+  the scalar parser matched the reserved literal as a PREFIX, so `x := nullable;`, `nulls`, `truely` and
+  `falsey` were read as NULL/BOOL followed by stray characters and failed with an unhelpful error (Rivet's
+  q-or importer had to quote such values). `null`, `true` and `false` are literals only as whole tokens
+  now; everything else is an ordinary BARE word with its full text. Exact `null`/`true`/`false` are
+  unchanged, in statements, arrays, tuples, objects and attribute values. The writer already reserved
+  only the exact words, so `anvil_writer_bare("nullable")` was always accepted; it now reads back as BARE.
+- **Loading documents is now thread-safe across independent documents, and identical text no longer
+  collides** (`BR-2610-anvl-registry-001`, part 2). Any number of threads may call `anvil_load`,
+  `anvil_load_buffer` and `anvil_parse_value_fragment` at the same time, on the same text or different
+  text: each load owns its state and shares nothing with other loads. (Sharing ONE document handle
+  across threads is still the caller's job; `anvl_get_error()` is per-thread.) Before this, source
+  deduplication was a process-global, unsynchronized map, so: loading text identical to any live
+  document anywhere in the process failed (the `anvil.node` `parse()` race, the `anvil.net` xUnit
+  flake, `AnvilSchema.ValidateField(text)`); loading *different* text on several threads corrupted that
+  map and failed loads too; and a second shared structure in the parser raced as well. Now
+  deduplication is per module context (one load's include graph; a diamond include still loads each
+  shared document once), each source points directly at its document, and the parser's last-error code
+  is per-thread. Under ThreadSanitizer, 8 threads loading, reading and disposing now report 0 races and
+  0 failed loads; before: 88-169 race reports and up to 1590 failed loads. Internal only, no public ABI
+  change. New `make check-tsan`. Consumers that serialize loads to work around this can stop.
+- **Schema extension keys with identical text are no longer lost** (`BR-2610-anvl-registry-001`, found
+  while fixing the above; `FR-2610-anvl-schema-005`): extension-key values are copied into value
+  fragments, which went through the same registry, so when two extras had identical text (for example
+  `pooled := true` on two fields, or the same rule in two schemas) the second one silently read back as
+  NULL from `anvil_schema_field_get_extra_value`. All of them are now readable (SCH85).
+- **Loading text identical to a live document reports a real error** (`BR-2610-anvl-registry-001`,
+  part 1): `ANVL_ERR_SOURCE_ALREADY_LOADED` ("A document with identical content is already loaded")
+  replaced a reused parser code and is recorded on the load's error detail. Within one include graph it
+  is what the diamond-include handling keys on.
+- **Strings containing a NUL byte are no longer truncated or dropped by the type registry and schema**
+  (`BR-2610-anvl-nul-001`): the core reader always loaded them intact, but the registry and schema
+  copied text into C strings. An enum label `"a\0b"` read back as `"a"` from `anvil_type_def_get_value`
+  and `anvil_schema_field_get_value`; a string extension key containing a NUL came back as a
+  NULL-typed value from `anvil_schema_field_get_extra_value` (a NUL in an array/object/blob extra was lost
+  the same way); a type's nested `fields` were cut off at a NUL; and `values` membership compared with
+  `strcmp`, so `"a\0b"` matched a label `"a"`. Labels are now length-carried, the getters return the
+  exact byte length and copy every byte (NULs included), membership is by length then bytes, and extras
+  and a type's `fields` are re-parsed with their exact length. In the places that NAME something (a
+  `type`, `format`, `tag`, or a `required`/`nullable`/`integer` flag) a quoted value containing a NUL is
+  reported as malformed ("the value contains a NUL byte") instead of being truncated into a match
+  (`"uuid\0x"` is not `uuid`). A NUL in a statement name, rule key or bare word is rejected by the core
+  at load time, so those can't occur. No public signature changed.
+- **A quoted attribute value containing an escaped quote no longer swallows the rest of the document**
+  (`FR-2610-anvl-public-api-004`): the attribute scanner (statement and module attributes) toggled "inside
+  a string" on every `"`, escaped or not, so `@[note="a\"b"]` left the string open, ate the closing `]`
+  and failed the load (or mis-split later attributes). It is escape-aware now.
+- **`anvil.node` and `anvil.wasm` no longer collapse a repeated name inside an object** (`BR-2610-anvl-bindings-003`). For
+  `{ a := 1; a := 2; b := 3; }`, `count` is now 3, `get('a')` is the first (`1`) and `entries()` yields all three in order, as native,
+  `anvil.py` and `anvil.net` do; they used to report 2, the last, and `a` once. Objects without repeated names are unchanged. A
+  request body that repeats a column is no longer silently taken as its last value.
+- **A NUL character inside a string value no longer cuts a document short in `anvil.wasm` and `anvil.java`**
+  (`BR-2610-anvl-bindings-002`). In `anvil.wasm` every text entry point read its text with `strlen`, so
+  `s := "x";\0t := 1;` parsed as `s` alone with no error; they now pass the byte length. In `anvil.java` every
+  string value was decoded with a read that stops at the first NUL; it now decodes exactly the bytes native wrote.
+  `anvil.node`, `anvil.net` and `anvil.py` were audited and were correct. Native itself is correct for documents.
+  The type registry and schema's own loss (enum labels cut at a NUL, a string extension value lost) is fixed
+  natively by `BR-2610-anvl-nul-001`.
+- **`anvil.node` and `anvil.wasm`: `parse()` and `parseRawValue()` reject a non-string** (`BR-2610-anvl-bindings-001`).
+  They used to parse an empty buffer for a number, object or array (and, in `anvil.wasm`, fail with an
+  incidental internal error for a `Buffer`, `undefined` or `null`), returning a valid, empty document with no
+  error. They now throw a `TypeError` naming the function and the type. An empty string is unchanged.
+- **The writer's name-set hash is true 64-bit FNV-1a on every target** (`BR-2610-anvl-writer-001`):
+  `hash_name` accumulated in a `size_t`, so on a 32-bit target (wasm32, 32-bit ARM, `-m32`) both FNV
+  constants were silently truncated, giving a non-standard 32-bit hash and a `-Wconstant-conversion`
+  warning in every `anvil.wasm` build. It now accumulates in `uint64_t` with `UINT64_C` constants (as
+  `src/sigma/map.c` does) and folds to `size_t` only to pick a slot. Bit-identical on 64-bit targets;
+  duplicate-name detection is unchanged. New `make check-32bit` compiles the writer grammar with `-m32
+  -Werror` (skips with a message when the 32-bit headers aren't installed).
+- **`anvil_document_get_path` is now in the `Document` vtable** (`BR-2610-anvl-vtable-001`): it was
+  added to the flat API only, so bindings that bind the vtable struct (`anvil.py`, `anvil.net`,
+  `anvil.java`) could not reach it. `get_path` is appended last in `anvil_document_i`, so existing
+  member offsets don't move. A new completeness test (VT11) fails when any function declared in
+  `anvil_flat.h` has no vtable member and isn't listed flat-only with a reason.
+- **`libanvil.so` now exports the schema and type-registry API** (`BR-2610-anvl-visibility-001`):
+  `anvil_schema.h` and `anvil_type_registry.h` lacked the `visibility push(default)` wrapper the other
+  public headers carry, so with `-fvisibility=hidden` every `anvil_schema_*` / `anvil_type_*` function
+  was missing from the shared object, and `anvil.py`/`anvil.net`/`anvil.java` could parse but not use
+  types or schema. Both headers now carry it. New `make check-exports` (`scripts/check-exports.sh`)
+  fails when any function or vtable object declared in a public header is not exported, or when an
+  internal symbol is. A linker version script (`libanvil.exports`) now defines the exported set exactly,
+  which also hides `Allocator`, a global from the precompiled `sigma.system.alloc.o` that
+  `-fvisibility=hidden` cannot reach.
+- **Numeric constraints and values are no longer truncated** (`BR-2610-anvl-types-001`): schema and
+  type `min`/`max` were read with `strtoll`, so `min := 0.5` became `0`, data `3.7` passed
+  `max := 3`, `5e+10` read as `5`, and text past 31 characters was cut. Both now read through
+  `anvil_value_get_numeric` and compare exactly (no double rounding near 2^53/2^63; an overflowed
+  data value compares by sign). A non-numeric, overflowing or fractional-`size` declaration is
+  treated as not declared rather than as `0`. `anvil_type_def_get_min`/`_max` now return false for a
+  fractional bound instead of a truncated integer.
+- **No fixed-buffer truncation in types and schema** (`BR-2610-anvl-schema-001`): type names, field
+  names, rule keys, `type :=` references, `required`, enum `values` comparisons and violation
+  `field`/`message` text were read through fixed stack buffers (16/64/65/128 bytes) and compared by
+  their clipped prefix, so two long type names sharing 63 characters collided, a 200-character enum
+  label never matched, and an undeclared field could hide behind a declared one with the same
+  64-character prefix. Everything is now read and stored at its full length. Also fixes a leak of an
+  enum type's `values` when its `type :=` was unrecognised.
+- Documentation drift fixed (`SR-2610-anvl-docs-001`): `docs/types-reference.md` no longer says schema
+  is "design-only" (it describes the implemented type vocabulary and schema behavior, with a
+  "Closed schemas" section and a byte-length `size` example), and the README status lines for types and
+  schema agree with it. The stale "no numeric accessor" comments went away with
+  `BR-2610-anvl-types-001`.
 
 ---
 

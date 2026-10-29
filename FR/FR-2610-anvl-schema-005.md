@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** flywire, rivet (downstream consumers)
-**Status:** open — not started
+**Status:** resolved
 **Tags:** schema, introspection, public-api, flywire, rivet-readiness
 
 ---
@@ -55,3 +55,27 @@ API docs and client forms from the one schema.
 
 Soft: FR-2610-anvl-schema-001, FR-2610-anvl-schema-003, FR-2610-anvl-types-004 (their constraints
 gain accessors here as they land).
+
+## Resolution
+
+Branch `feat/FR-2610-anvl-schema-005`, commit `b0cc952`, merged to `main`. Tests SCH74-SCH80 (`test_schema.c`); fixtures
+`schema_introspect_*`. Full unit regression green with unchanged counts elsewhere, `test_release`
+and `make check-reader-only` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable,
+document, resolver (SCH79/SCH80 read everything after the source document is disposed). Docs:
+`docs/types-reference.md` "Reading a schema back" (and the site mirror).
+
+Decisions:
+- Accessors report the *effective* rule (inline plus inherited from `types.X`), so what is read back
+  is what validation enforces; SCH76 checks that agreement directly.
+- `anvil_schema_field_get_type_name` returns the `type :=` as written (`types.Id32`), which is how a
+  consumer like FlyWire learns which custom type a field uses.
+- **Extras** are copied into schema-owned fragment documents (`anvil_parse_value_fragment`), so they
+  are real `anvil_value`s, as the ticket asked, and independent of the source document. A string or
+  blob is re-wrapped from its exact bytes (the public API strips delimiters), a collection from its
+  raw span, so quoting and escapes survive (SCH80). A value containing a `$variable` reference can't
+  be parsed standalone and reads as NULL (the name is still listed).
+- Any key not consumed counts as an extra, on every rule at every depth, including an Array's
+  `items` rule. The `fields`/`items` containers and every known constraint key are consumed.
+- Read-only; the top-level list holds only the `{ ... }` rules (a stray non-rule statement is a
+  diagnostic, not a field).
+- Vtable exposure belongs to FR-2610-anvl-public-api-003 (Bindings agent).

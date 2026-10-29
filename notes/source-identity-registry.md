@@ -1,5 +1,30 @@
 # Source Identity Registry
 
+> **Superseded in part (BR-2610-anvl-registry-001; see `BR/BR-2610-anvl-registry-001.md`, "Part 2
+> Resolution").** The registry is no longer process-wide. Each `module_context` owns its own
+> hash -> document map (`ctx->sources`), deduplicating within one load's include graph only; a source
+> reaches its document through `anvl_source_t::owner`; the module reference count and
+> `Registry.init()/release()` in `mod_new`/`mod_dispose` are gone; and independent loads of identical text
+> no longer collide. Passages below marked **[superseded]** describe the original design and are kept
+> as history.
+>
+> ## Threading contract (current; this is the one place it is recorded)
+>
+> - **Loads of independent documents on different threads are safe.** Every `anvil_load`,
+>   `anvil_load_buffer` and `anvil_parse_value_fragment` builds its own `module_context`; nothing is
+>   shared between loads (no registry, no parser state). Verified under ThreadSanitizer
+>   (`make check-tsan`: 0 races with the allocator instrumented too).
+> - **Sharing one document handle across threads is the caller's job.** A handle, and every
+>   statement/value/iterator obtained from it, must not be used on several threads at once unless
+>   the caller serializes it, and must not be used at all during or after its disposal. The library
+>   takes no lock and makes no promise about concurrent readers of one handle (not tested). Dispose a
+>   handle on one thread only, after its users are done.
+> - **`anvl_get_error()` is per-thread:** it reports the calling thread's last parse (internal API;
+>   the public error is `anvil_document_get_error` on the handle). The parser's hook
+>   (`anvl_parser_set_hook`) is still a process-wide setting: configure it before starting threads.
+> - The one process-global left is the prebuilt `sigma.system.alloc` `Allocator`, which forwards to
+>   `malloc`/`free` and showed no race of its own under TSan.
+
 ## Status
 
 **Complete.** The transition from per-context namespace/doc_map identity to a
@@ -13,7 +38,7 @@ parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 ## Goal
 
 - Use `Source.hash(src)` as the canonical document identifier.
-- Maintain a process-wide registry mapping source hash → `module_document`.
+- Maintain a process-wide registry mapping source hash → `module_document`. **[superseded: per-context `ctx->sources`]**
 - Pass `anvl_source` through the parser; let parser errors route through
   `Source.set_error(src, ...)` → registry lookup → context error list.
 - Reuse one `anvl_parser` instance per context across all sources.
@@ -36,7 +61,7 @@ parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 - Updated `mod_ctx_register_doc` signature to
   `mod_ctx_register_doc(ctx, doc, filepath, err_code)`.
 - Implemented `mod_ctx_register_doc` to set `doc->context`, copy `filepath`,
-  register the document in the global `Registry`, and append it to `ctx->docs`.
+  register the document in the global `Registry` **[superseded: the context's own registry]**, and append it to `ctx->docs`.
 - Updated `doc_dispose` and `Debug.dispose_doc` to remove the document from the
   registry and dispose `filepath`.
 - Removed obsolete `make_stub_doc_identity` helper from `test/utilities/debug.c`.
@@ -56,7 +81,7 @@ parse, resolution) — see `document-header-scan.md`, `document-body-parse.md`,
 - Updated `test/unit/test_module.c` to remove assertions checking `ctx->doc_map`
   and `strict_namespace`.
 
-## Completed step 3
+## Completed step 3 **[superseded: the reference count and the global map no longer exist]**
 
 - Added module reference counting to the source registry
   (`module_ref_count` in `src/core/source_registry.c`).
@@ -125,9 +150,10 @@ Document header scanning and include resolution (see `document-header-scan.md`):
   cheap and the source object owns the canonical value.
 - Source reload is allowed: `doc_unload_source` must unregister the old hash;
   re-registration picks up the new hash.
-- Registry is process-wide with module reference counting to support the
+- **[superseded]** Registry is process-wide with module reference counting to support the
   intended one-module-per-process design while tolerating multiple modules in
-  tests.
+  tests. (Independent root loads were never meant to share state: the global scope made identical
+  text collide across loads and raced across threads. Now per context; see the banner above.)
 
 ## Source interface test coverage
 
@@ -135,7 +161,7 @@ A dedicated Source test suite was added in `test/unit/test_source.c` (SRC00–SR
 
 Shebang parsing was subsequently moved from the header scanner into `Source.from_buffer`/`Source.from_file`. The source object now carries a `has_shebang` flag and advances its position past the shebang line during load, so the header scanner starts on includes/attributes/body rather than re-reading the shebang. File-extension hints are applied only when no shebang is present.
 
-## Valgrind follow-up
+## Valgrind follow-up **[superseded: there is no global map to leak or clear; `Registry.clear()` takes a context and the unit-test teardowns no longer call it]**
 
 After the header scanner landed, `make test_document val` and `make test_header val` showed 2,072 bytes still reachable. The reachable blocks were the source-hash registry map allocated on the first `mod_ctx_register_doc` call inside a test. Tests that use `mod_ctx_initialize` directly (without `mod_new`) never called `Registry.release()`, so the map persisted until process exit.
 

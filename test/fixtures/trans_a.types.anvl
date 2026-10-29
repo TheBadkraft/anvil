@@ -1,0 +1,8 @@
+#!aml
+include "trans_b.types.anvl";
+@[types]
+
+TicketId := {
+   type := Numeric;
+   max := 999;
+};

@@ -49,6 +49,10 @@ struct anvl_source_t {
    usize col;
    uint64_t hash;    // FNV-1a 64-bit content hash; 0 = no content loaded
    bool has_shebang; // true when the source begins with a #! dialect directive
+   module_document owner; // the document registered with this source, NULL until
+                          // mod_ctx_register_doc (and again after it is unregistered). This is
+                          // how Source.* reaches its document and context: there is no global
+                          // lookup (BR-2610-anvl-registry-001).
 };
 
 /**

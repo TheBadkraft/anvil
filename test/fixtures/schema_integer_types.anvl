@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Ordinal := {
+   type := Numeric;
+   integer := true;
+};

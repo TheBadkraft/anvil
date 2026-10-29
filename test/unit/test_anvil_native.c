@@ -24,7 +24,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -989,7 +988,6 @@ static anvil_numeric_t numeric_of(const char *literal) {
       }
       anvil_dispose(doc);
    }
-   Registry.clear(); // the next call may load byte-identical text
    return result;
 }
 
@@ -1266,38 +1264,689 @@ static void test_anv43_value_get_blob_tag(void) {
    anvil_dispose(doc);
 }
 
+
+/* ANV44 (BR-2610-anvl-registry-001 part 1) asserted that loading text identical to a live document
+ * reported a specific message. Part 2 made that failure unreachable through the public API (an
+ * independent load has its own context), so the assertion became ANV45: both loads succeed. The
+ * dedicated code and message remain covered at the registry level (REG03, REG08). */
+
 /* ---------------------------------------------------------------------- *
- * ANV44 — this build's WITH_ASL setting is reported correctly. Default
+ * ANV45 (BR-2610-anvl-registry-001, part 2) - independent loads of identical text, all alive at
+ * once, all succeed and are independent of each other
+ * ---------------------------------------------------------------------- */
+static void test_anv45_identical_loads_are_independent(void) {
+   const char *src = "#!aml\nanv45_marker := 7;\nname := \"same\";\n";
+   anvil_document a = anvil_load_buffer(src, strlen(src));
+   anvil_document b = anvil_load_buffer(src, strlen(src));
+   anvil_document c = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(a && !anvil_has_errors(a), "ANV45: first load");
+   TestBit.is_true(b && !anvil_has_errors(b), "ANV45: identical second load, first still alive");
+   TestBit.is_true(c && !anvil_has_errors(c), "ANV45: identical third load");
+   TestBit.is_true(a != b && b != c, "ANV45: distinct handles");
+   // Dispose the middle one: the others stay fully usable (no shared bookkeeping evicted).
+   if (b) {
+      anvil_dispose(b);
+   }
+   anvil_statement sa = a ? anvil_document_find_statement(a, "anv45_marker") : NULL;
+   anvil_statement sc = c ? anvil_document_find_statement(c, "anv45_marker") : NULL;
+   TestBit.is_true(sa && sc && anvil_value_get_numeric(anvil_statement_get_value(sa)).as_int64 == 7 &&
+                      anvil_value_get_numeric(anvil_statement_get_value(sc)).as_int64 == 7,
+                   "ANV45: the survivors read correctly after a sibling is disposed");
+   if (a) {
+      anvil_dispose(a);
+   }
+   // Disposing one must not evict the other's identity: c still loads includes, errors, etc.
+   TestBit.is_true(c && !anvil_has_errors(c), "ANV45: the last one is still clean");
+   if (c) {
+      anvil_dispose(c);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV46 - the same, through a diamond include graph: each independent load of the same file gets
+ * its own graph, and within one graph the shared document still loads once
+ * ---------------------------------------------------------------------- */
+static void test_anv46_diamond_per_graph(void) {
+   const char *path = fixture_path("reg_diamond_root.anvl");
+   anvil_document a = anvil_load(path);
+   anvil_document b = anvil_load(path);
+   TestBit.is_true(a && !anvil_has_errors(a), "ANV46: first diamond load");
+   TestBit.is_true(b && !anvil_has_errors(b), "ANV46: the same file again, first alive");
+   size_t includes_a = 0, includes_b = 0;
+   anvil_document_iterator it = a ? anvil_document_get_includes(a) : NULL;
+   anvil_document inc = NULL;
+   while (it && anvil_document_iterator_next(it, &inc)) {
+      includes_a++;
+      anvil_dispose(inc);
+   }
+   if (it) {
+      anvil_document_iterator_dispose(it);
+   }
+   it = b ? anvil_document_get_includes(b) : NULL;
+   while (it && anvil_document_iterator_next(it, &inc)) {
+      includes_b++;
+      anvil_dispose(inc);
+   }
+   if (it) {
+      anvil_document_iterator_dispose(it);
+   }
+   TestBit.is_true(includes_a == 2 && includes_b == 2,
+                   "ANV46: both graphs resolve the root's two direct includes");
+   if (a) {
+      anvil_dispose(a);
+   }
+   if (b) {
+      anvil_dispose(b);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV47 - value fragments are documents too: two live fragments of identical text both parse
+ * (they register with their own context like any other load)
+ * ---------------------------------------------------------------------- */
+static void test_anv47_identical_fragments(void) {
+   const char *text = "[ 1, 2, 3 ]";
+   anvil_document f1 = anvil_parse_value_fragment(text, strlen(text));
+   anvil_document f2 = anvil_parse_value_fragment(text, strlen(text));
+   TestBit.is_true(f1 && !anvil_has_errors(f1), "ANV47: first fragment");
+   TestBit.is_true(f2 && !anvil_has_errors(f2), "ANV47: identical second fragment, first alive");
+   anvil_value v1 = f1 ? anvil_document_get_fragment_value(f1) : NULL;
+   anvil_value v2 = f2 ? anvil_document_get_fragment_value(f2) : NULL;
+   TestBit.is_true(v1 && v2 && anvil_value_get_count(v1) == 3 && anvil_value_get_count(v2) == 3,
+                   "ANV47: both readable");
+   // A document with the same text as a live fragment is also fine: different graphs.
+   anvil_document d = anvil_load_buffer(text, strlen(text));
+   TestBit.is_true(d != NULL, "ANV47: a document load with the fragment's text returns a handle");
+   if (d) {
+      anvil_dispose(d);
+   }
+   if (f1) {
+      anvil_dispose(f1);
+   }
+   if (f2) {
+      anvil_dispose(f2);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * FR-2610-anvl-public-api-004 - an attribute's value read as a value
+ * ---------------------------------------------------------------------- */
+#define ATTR_LOAD(lit) anvil_load_buffer((lit), sizeof(lit) - 1)
+
+// The statement `name`'s attribute `key`, or NULL.
+static anvil_attribute stmt_attr(anvil_document doc, const char *name, const char *key) {
+   anvil_statement st = anvil_document_find_statement(doc, name);
+   return st ? anvil_statement_find_attribute(st, key) : NULL;
+}
+
+static bool text_is(anvil_value v, const char *want, size_t want_len) {
+   char buf[64];
+   size_t n = v ? anvil_value_get_text(v, buf, sizeof(buf)) : 999;
+   return v && n == want_len && memcmp(buf, want, want_len) == 0;
+}
+
+static void test_anv48_attribute_value_handle_scalars(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\nx @[status=\"done\", note=\"a\\\"b\", type=bug, n=42, f=1.5, on=true, off=false, none=null] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV48: document with attributes loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "status"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "done", 4),
+                      "ANV48: status=\"done\" is a STRING with text done (quotes stripped)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "note"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "a\"b", 3),
+                      "ANV48: note=\"a\\\"b\" is a STRING with text a\"b (escape resolved)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "type"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "bug", 3),
+                      "ANV48: type=bug is BARE with text bug");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "n"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).is_integral && anvil_value_get_numeric(v).as_int64 == 42,
+                      "ANV48: n=42 is NUMERIC and get_numeric gives 42");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "f"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_double == 1.5, "ANV48: f=1.5 is NUMERIC 1.5");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "on"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BOOL && text_is(v, "true", 4),
+                      "ANV48: on=true is BOOL");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "none"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NULL, "ANV48: none=null is NULL");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv49_flag_attribute_has_no_value_handle(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\n@[schema, table=assets, active]\nx @[hot, k=v] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV49: loads");
+   if (doc) {
+      TestBit.is_true(anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "schema")) == NULL,
+                      "ANV49: a module flag attribute has a NULL handle");
+      TestBit.is_true(anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "active")) == NULL,
+                      "ANV49: so does a flag after valued ones");
+      TestBit.is_true(anvil_attribute_get_value_handle(stmt_attr(doc, "x", "hot")) == NULL,
+                      "ANV49: a statement flag attribute has a NULL handle");
+      anvil_value v = anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "table"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "assets", 6),
+                      "ANV49: a module attribute with a value has a handle");
+      TestBit.is_true(anvil_attribute_get_value_handle(NULL) == NULL, "ANV49: NULL attribute");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv50_raw_value_reader_is_unchanged(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[status=\"done\", note=\"a\\\"b\", type=bug, n=42] := 1;\n");
+   if (doc) {
+      const struct { const char *key, *raw; } want[] = {
+         {"status", "\"done\""}, {"note", "\"a\\\"b\""}, {"type", "bug"}, {"n", "42"}};
+      for (size_t i = 0; i < 4; i++) {
+         char buf[32] = {0};
+         anvil_attribute a = stmt_attr(doc, "x", want[i].key);
+         size_t n = a ? anvil_attribute_get_value(a, buf, sizeof(buf)) : 0;
+         TestBit.is_true(n == strlen(want[i].raw) && strcmp(buf, want[i].raw) == 0,
+                         "ANV50: anvil_attribute_get_value still returns the raw source text");
+      }
+      anvil_dispose(doc);
+   } else {
+      TestBit.is_not_null(doc, "ANV50: loaded");
+   }
+}
+
+static void test_anv51_nul_in_attribute_value(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\n@[m=\"p\0q\"]\nx @[s=\"a\0b\", t=after] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV51: a NUL inside a quoted attribute value loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "s"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "a\0b", 3),
+                      "ANV51: statement attribute text is 61 00 62");
+      char buf[8] = {0};
+      TestBit.is_equal_int(3, (long long)(v ? anvil_value_get_bytes(v, buf, sizeof(buf)) : 0),
+                           "ANV51: and get_bytes reports 3");
+      anvil_value after = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "t"));
+      TestBit.is_true(after && text_is(after, "after", 5), "ANV51: the attribute after it is intact");
+      v = anvil_attribute_get_value_handle(anvil_document_find_attribute(doc, "m"));
+      TestBit.is_true(v && text_is(v, "p\0q", 3), "ANV51: module attribute text is 70 00 71");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv52_undecodable_value_falls_back_to_bare(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[range=1..5, pair=1 2, ok=\"fine\"] := 1;\ny := 2;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc),
+                   "ANV52: values the scalar grammar rejects do not fail the load");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "range"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "1..5", 4),
+                      "ANV52: 1..5 is a BARE value of its raw text");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "pair"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "1 2", 3),
+                      "ANV52: so is `1 2` (a prefix that parses is not the whole value)");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "ok"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_STRING && text_is(v, "fine", 4),
+                      "ANV52: and the next attribute is unaffected");
+      TestBit.is_equal_int(0, (long long)(anvil_has_errors(doc)), "ANV52: no recorded errors");
+      TestBit.is_true(anvil_document_find_statement(doc, "y") != NULL, "ANV52: later statements load");
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv53_whitespace_and_escaped_quote_scanning(void) {
+   // Attribute values are scanned up to the next ',' or ']' outside a string; an escaped quote must
+   // not flip that state (it used to swallow the closing ']' and everything after it).
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[ a = \"p,]q\" , b = \"c\\\"d]\" , e = 7 ] := 1;\ny := 2;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV53: loads");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "a"));
+      TestBit.is_true(v && text_is(v, "p,]q", 4), "ANV53: ',' and ']' inside a string are content");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "b"));
+      TestBit.is_true(v && text_is(v, "c\"d]", 4), "ANV53: an escaped quote does not end the string");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "e"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_int64 == 7, "ANV53: and later attributes parse");
+      TestBit.is_true(anvil_document_find_statement(doc, "y") != NULL, "ANV53: as do later statements");
+      anvil_dispose(doc);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-parser-001 - null / true / false are recognized only as WHOLE tokens
+ * ---------------------------------------------------------------------- */
+static anvil_value value_at(anvil_document doc, const char *name) {
+   anvil_statement st = doc ? anvil_document_find_statement(doc, name) : NULL;
+   return st ? anvil_statement_get_value(st) : NULL;
+}
+
+static void test_anv54_bare_values_starting_with_a_literal(void) {
+   const char *words[] = {"nullable", "nulls", "truely", "falsey", "nullx", "true_", "false1",
+                          "null-ish", "true/x", "null.v", "falsehood"};
+   for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
+      char src[96];
+      snprintf(src, sizeof(src), "#!aml\nx := %s;\ny := 1;\n", words[i]);
+      anvil_document doc = anvil_load_buffer(src, strlen(src));
+      anvil_value v = value_at(doc, "x");
+      char text[32] = {0};
+      size_t n = v ? anvil_value_get_text(v, text, sizeof(text)) : 0;
+      TestBit.is_true(doc && !anvil_has_errors(doc) && v && anvil_value_get_type(v) == ANVIL_VALUE_BARE &&
+                         n == strlen(words[i]) && strcmp(text, words[i]) == 0 && value_at(doc, "y"),
+                      words[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document q = ATTR_LOAD("#!aml\nx := \"nullable\";\nz := includes;\n");
+   TestBit.is_true(q && !anvil_has_errors(q), "ANV54: the quoted and keyword-prefix rows still load");
+   if (q) {
+      anvil_dispose(q);
+   }
+}
+
+static void test_anv55_exact_literals_are_unchanged(void) {
+   // Followed by every terminator the grammar allows.
+   const struct { const char *src; anvil_value_type type; } cases[] = {
+      {"#!aml\nx := null;\n", ANVIL_VALUE_NULL},   {"#!aml\nx := true;\n", ANVIL_VALUE_BOOL},
+      {"#!aml\nx := false;\n", ANVIL_VALUE_BOOL},  {"#!aml\nx := null ;\n", ANVIL_VALUE_NULL},
+      {"#!aml\nx := true ;\n", ANVIL_VALUE_BOOL}, {"#!aml\nx := [ null, true, false ];\n", ANVIL_VALUE_ARRAY},
+      {"#!aml\nx := [null,true,false];\n", ANVIL_VALUE_ARRAY}, {"#!aml\nx := ( true, null );\n", ANVIL_VALUE_TUPLE},
+      {"#!aml\nx := {a := true;b := null;};\n", ANVIL_VALUE_OBJECT},
+      {"#!aml\nx := { a := false; };\n", ANVIL_VALUE_OBJECT},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      anvil_document doc = anvil_load_buffer(cases[i].src, strlen(cases[i].src));
+      anvil_value v = value_at(doc, "x");
+      TestBit.is_true(doc && !anvil_has_errors(doc) && v && anvil_value_get_type(v) == cases[i].type,
+                      cases[i].src);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document doc = ATTR_LOAD("#!aml\nx := [ null, true, false ];\n");
+   anvil_value arr = value_at(doc, "x");
+   TestBit.is_true(arr && anvil_value_get_type(anvil_value_get_element(arr, 0)) == ANVIL_VALUE_NULL &&
+                      anvil_value_get_type(anvil_value_get_element(arr, 1)) == ANVIL_VALUE_BOOL &&
+                      anvil_value_get_type(anvil_value_get_element(arr, 2)) == ANVIL_VALUE_BOOL,
+                   "ANV55: array elements keep their literal types");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv56_whole_token_in_collections_and_objects(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\narr := [ nullable, true, nulls ];\ntup := ( falsey, false );\nobj := { a := truely; b := null; };\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV56: collections of literal-prefixed words load");
+   if (doc) {
+      anvil_value arr = value_at(doc, "arr");
+      TestBit.is_true(arr && anvil_value_get_count(arr) == 3 &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 0)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 1)) == ANVIL_VALUE_BOOL &&
+                         anvil_value_get_type(anvil_value_get_element(arr, 2)) == ANVIL_VALUE_BARE,
+                      "ANV56: array: BARE, BOOL, BARE");
+      anvil_value tup = value_at(doc, "tup");
+      TestBit.is_true(tup && anvil_value_get_type(anvil_value_get_element(tup, 0)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_value_get_element(tup, 1)) == ANVIL_VALUE_BOOL,
+                      "ANV56: tuple: BARE, BOOL");
+      anvil_value obj = value_at(doc, "obj");
+      anvil_statement a = obj ? anvil_value_find_statement(obj, "a") : NULL;
+      anvil_statement b = obj ? anvil_value_find_statement(obj, "b") : NULL;
+      TestBit.is_true(a && b && anvil_value_get_type(anvil_statement_get_value(a)) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(anvil_statement_get_value(b)) == ANVIL_VALUE_NULL,
+                      "ANV56: object fields: BARE, NULL");
+      anvil_dispose(doc);
+   }
+   // AMP uses the same scalar grammar.
+   anvil_document amp = ATTR_LOAD("#!amp\nx := nullable;\ny := true;\n");
+   TestBit.is_true(amp && !anvil_has_errors(amp), "ANV56: AMP loads `nullable` too");
+   if (amp) {
+      TestBit.is_true(anvil_value_get_type(value_at(amp, "x")) == ANVIL_VALUE_BARE &&
+                         anvil_value_get_type(value_at(amp, "y")) == ANVIL_VALUE_BOOL, "ANV56: AMP types");
+      anvil_dispose(amp);
+   }
+}
+
+static void test_anv57_whole_token_in_attribute_values(void) {
+   anvil_document doc = ATTR_LOAD(
+      "#!aml\n@[a=nullable, b=true, c=null, d=falsey]\nx @[e=nulls, f=false, g=truely, h=null] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV57: attributes with literal-prefixed values load");
+   if (doc) {
+      const struct { const char *key; bool module; anvil_value_type type; const char *text; } want[] = {
+         {"a", true, ANVIL_VALUE_BARE, "nullable"}, {"b", true, ANVIL_VALUE_BOOL, "true"},
+         {"c", true, ANVIL_VALUE_NULL, "null"},     {"d", true, ANVIL_VALUE_BARE, "falsey"},
+         {"e", false, ANVIL_VALUE_BARE, "nulls"},   {"f", false, ANVIL_VALUE_BOOL, "false"},
+         {"g", false, ANVIL_VALUE_BARE, "truely"},  {"h", false, ANVIL_VALUE_NULL, "null"},
+      };
+      for (size_t i = 0; i < sizeof(want) / sizeof(want[0]); i++) {
+         anvil_attribute a = want[i].module ? anvil_document_find_attribute(doc, want[i].key)
+                                            : stmt_attr(doc, "x", want[i].key);
+         anvil_value v = anvil_attribute_get_value_handle(a);
+         TestBit.is_true(v && anvil_value_get_type(v) == want[i].type &&
+                            text_is(v, want[i].text, strlen(want[i].text)), want[i].key);
+      }
+      anvil_dispose(doc);
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-errors-001 - specific messages and real positions
+ * ---------------------------------------------------------------------- */
+static bool detail_of(anvil_document doc, char *msg, size_t cap, size_t *line, size_t *col) {
+   anvil_error e = doc ? anvil_document_get_error(doc) : NULL;
+   if (!e) {
+      return false;
+   }
+   anvil_error_get_message(e, msg, cap);
+   *line = anvil_error_get_line(e);
+   *col = anvil_error_get_column(e);
+   return true;
+}
+
+static void test_anv58_missing_semicolon_has_a_message(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx := 1\ny := 2;\n");
+   char msg[160] = {0};
+   size_t line = 0, col = 0;
+   TestBit.is_true(doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col),
+                   "ANV58: a missing ';' is an error with a detail");
+   TestBit.is_true(strcmp(msg, "Unknown error") != 0 && strstr(msg, "';'") != NULL,
+                   "ANV58: whose message names the missing ';' (not \"Unknown error\")");
+   TestBit.is_true(line == 2 && col == 7, "ANV58: and the position is unchanged (line 2, col 7)");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_anv59_duplicate_top_level_name_has_a_position(void) {
+   anvil_document doc = ATTR_LOAD("#!aml\nx := 1;\ny := 2;\n  x := 3;\n");
+   char msg[200] = {0};
+   size_t line = 0, col = 0;
+   TestBit.is_true(doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col),
+                   "ANV59: a repeated top-level name is an error with a detail");
+   TestBit.is_true(line == 4 && col == 3,
+                   "ANV59: at the SECOND occurrence (line 4, col 3), not line 0 / col 0");
+   TestBit.is_true(strstr(msg, "'x'") != NULL, "ANV59: the message names the identifier");
+   TestBit.is_true(strstr(msg, "line 2") != NULL, "ANV59: and the line of the first occurrence");
+   TestBit.is_true(strstr(msg, "Duplicate") != NULL, "ANV59: and still says it is a duplicate");
+   if (doc) {
+      anvil_dispose(doc);
+   }
+   // The first occurrence on line 2 of a shebang-less-looking file, and a duplicate in a later position.
+   anvil_document d2 = ATTR_LOAD("#!aml\na := 1;\nb := { c := 1; };\nb := 2;\n");
+   TestBit.is_true(d2 && anvil_has_errors(d2) && detail_of(d2, msg, sizeof(msg), &line, &col) &&
+                      line == 4 && col == 1 && strstr(msg, "'b'") != NULL && strstr(msg, "line 3") != NULL,
+                   "ANV59: another position (line 4, col 1, first at line 3)");
+   if (d2) {
+      anvil_dispose(d2);
+   }
+}
+
+// One input per parser failure that is reachable from the public API: every one must report a specific
+// message (never "Unknown error") at a real position.
+static void test_anv60_parser_errors_have_specific_messages(void) {
+   const char *bad[] = {
+      "#!aml\nx := 1\ny := 2;\n",            // missing ';'
+      "#!aml\nx := 1; ]\n",                  // stray token
+      "#!aml\nx := \"open;\n",               // unterminated string
+      "#!aml\nx := [];\n",                   // empty array
+      "#!aml\nx := ( 1 );\n",                // one-element tuple
+      "#!aml\nx := ();\n",                   // empty tuple
+      "#!aml\nx := { };\n",                  // empty object
+      "#!aml\n1x := 1;\n",                   // bad identifier
+      "#!aml\ninclude := 1;\n",              // keyword as an identifier
+      "#!aml\nx := include;\n",              // keyword as a value
+      "#!aml\n/* never closed\nx := 1;\n",    // unterminated block comment (header)
+      "#!aml\nx := $;\n",                    // bare '$'
+      "#!amp\nx := { a := 1; };\n",          // object in AMP
+      "#!aml\nx @[ := 1;\n",                 // broken attribute list
+      "#!aml\nx := `open\n",                 // unterminated blob
+      "#!aml\nx := 1;\nx := 2;\n",           // duplicate top-level name
+   };
+   for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      anvil_document doc = anvil_load_buffer(bad[i], strlen(bad[i]));
+      char msg[200] = {0};
+      size_t line = 0, col = 0;
+      bool have = doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col);
+      if (!have || strcmp(msg, "Unknown error") == 0 || !*msg || line == 0) {
+         printf("    ANV60: input %zu (%.30s...): have=%d line=%zu col=%zu msg=\"%s\"\n", i, bad[i] + 6,
+                (int)have, line, col, msg);
+      }
+      TestBit.is_true(have && strcmp(msg, "Unknown error") != 0 && *msg && line > 0, bad[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-parser-002 - an unterminated block comment is an error, wherever it opens
+ * ---------------------------------------------------------------------- */
+// Line/column (1-based, from the start of the text) of the first occurrence of `needle` in `src`.
+static void pos_of(const char *src, const char *needle, size_t *line, size_t *col) {
+   const char *at = strstr(src, needle);
+   *line = 1;
+   *col = 1;
+   for (const char *p = src; at && p < at; p++) {
+      if (*p == '\n') {
+         (*line)++;
+         *col = 1;
+      } else {
+         (*col)++;
+      }
+   }
+}
+
+static void test_anv61_unterminated_block_comment_is_an_error(void) {
+   const char *bad[] = {
+      "#!aml\nx := 1; /* never closed",                       // after the first statement, at EOF
+      "#!aml\nx := 1; /* never closed\ny := 2;\n",            // swallows the later statement
+      "#!aml\nx := {\n  a := 1; /* never closed\n  b := 2;\n};\n", // inside an object
+      "#!aml\nx := [ 1, /* never closed\n 2 ];\n",            // inside an array
+      "#!aml\nx := ( 1, /* never closed\n 2 );\n",            // inside a tuple
+      "#!aml\nx @[a=1, /* never closed\n b=2] := 1;\n",       // inside an attribute list
+      "#!aml\nx := 1;\n/* never closed\n",                    // on its own line
+      "#!amp\nx := 1; /* never closed\ny := 2;\n",            // AMP
+      "#!aml\nx := 1; /*",                                    // just the opener
+   };
+   for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      anvil_document doc = anvil_load_buffer(bad[i], strlen(bad[i]));
+      char msg[160] = {0};
+      size_t line = 0, col = 0, want_line = 0, want_col = 0;
+      bool have = doc && anvil_has_errors(doc) && detail_of(doc, msg, sizeof(msg), &line, &col);
+      pos_of(bad[i], "/*", &want_line, &want_col);
+      if (!have || strstr(msg, "Unterminated") == NULL || line != want_line || col != want_col) {
+         printf("    ANV61: input %zu: have=%d msg=\"%s\" at %zu:%zu, want %zu:%zu\n", i, (int)have, msg,
+                line, col, want_line, want_col);
+      }
+      TestBit.is_true(have && strstr(msg, "Unterminated block comment") != NULL && line == want_line &&
+                         col == want_col, bad[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+static void test_anv62_terminated_comments_still_load(void) {
+   const char *good[] = {
+      "#!aml\nx := 1; /* closed */",                  // closed comment ending exactly at EOF
+      "#!aml\n/* header-only, closed */",             // a document that is only a comment
+      "#!aml\nx := 1; /* closed */ y := 2;\n",        // between statements
+      "#!aml\nx := [ 1, /* c */ 2 ];\n",              // inside an array
+      "#!aml\nx := {\n /* c */ a := 1;\n};\n",        // inside an object
+      "#!aml\nx @[a=1, /* c */ b=2] := 1;\n",         // inside an attribute list
+      "#!aml\nx := 1; // line comment at EOF",        // a line comment is never 'unterminated'
+      "#!aml\nx := 1; /* multi\nline */ y := 2;\n",
+   };
+   for (size_t i = 0; i < sizeof(good) / sizeof(good[0]); i++) {
+      anvil_document doc = anvil_load_buffer(good[i], strlen(good[i]));
+      TestBit.is_true(doc && !anvil_has_errors(doc), good[i]);
+      if (doc) {
+         anvil_dispose(doc);
+      }
+   }
+}
+
+/* The terminator must stay on the same line as its value - deliberate, documented in
+ * notes/document-body-parse.md ("Resolved questions" #1), pinned here for every value kind. */
+static void test_anv63_terminator_must_share_the_values_line(void) {
+   const char *values[] = {"1", "1.5", "\"s\"", "bare", "true", "null", "`blob`", "[ 1, 2 ]", "( 1, 2 )",
+                           "{ a := 1; }"};
+   for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+      char same[96], split[96], tab[96];
+      snprintf(same, sizeof(same), "#!aml\nx := %s ;\ny := 2;\n", values[i]);
+      snprintf(tab, sizeof(tab), "#!aml\nx := %s\t;\ny := 2;\n", values[i]);
+      snprintf(split, sizeof(split), "#!aml\nx := %s\n;\ny := 2;\n", values[i]);
+      anvil_document ok = anvil_load_buffer(same, strlen(same));
+      anvil_document ok2 = anvil_load_buffer(tab, strlen(tab));
+      anvil_document bad = anvil_load_buffer(split, strlen(split));
+      char msg[120] = {0};
+      size_t line = 0, col = 0;
+      TestBit.is_true(ok && !anvil_has_errors(ok) && ok2 && !anvil_has_errors(ok2),
+                      values[i]);
+      TestBit.is_true(bad && anvil_has_errors(bad) && detail_of(bad, msg, sizeof(msg), &line, &col) &&
+                         strstr(msg, "';'") != NULL,
+                      "a newline before ';' is an error with the missing-';' message");
+      if (ok) anvil_dispose(ok);
+      if (ok2) anvil_dispose(ok2);
+      if (bad) anvil_dispose(bad);
+   }
+   anvil_document c = ATTR_LOAD("#!aml\nx := 1; // trailing comment after the ';'\ny := 2;\n");
+   TestBit.is_true(c && !anvil_has_errors(c), "a comment AFTER the ';' is fine");
+   if (c) anvil_dispose(c);
+   anvil_document cb = ATTR_LOAD("#!aml\nx := 1 // comment before the ';'\n;\n");
+   TestBit.is_true(cb && anvil_has_errors(cb), "a comment before the ';' is an error");
+   if (cb) anvil_dispose(cb);
+}
+
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-attr-001 - an attribute value's span ends at the TOKEN, not at the next delimiter
+ * ---------------------------------------------------------------------- */
+static bool raw_is(anvil_attribute a, const char *want) {
+   char buf[64] = {0};
+   size_t n = a ? anvil_attribute_get_value(a, buf, sizeof(buf)) : 999;
+   return a && n == strlen(want) && memcmp(buf, want, n) == 0;
+}
+
+// Checks one attribute (module or statement level): raw text is exactly `raw`, decoded is `type`/`text`.
+static void check_attr(anvil_document doc, bool module, const char *key, const char *raw,
+                       anvil_value_type type, const char *text, const char *label) {
+   anvil_attribute a = module ? anvil_document_find_attribute(doc, key) : stmt_attr(doc, "x", key);
+   anvil_value v = anvil_attribute_get_value_handle(a);
+   TestBit.is_true(raw_is(a, raw) && v && anvil_value_get_type(v) == type &&
+                      text_is(v, text, strlen(text)), label);
+}
+
+static void test_anv64_attribute_span_ends_at_the_token(void) {
+   // Statement attributes, the layouts from the ticket.
+   anvil_document d1 = ATTR_LOAD("#!aml\nx @[a=\"1\", b=\"2\"\n] := 1;\n");
+   anvil_document d2 = ATTR_LOAD("#!aml\nx @[\n  b=\"2\"\n] := 1;\n");
+   anvil_document d3 = ATTR_LOAD("#!aml\nx @[b=\"2\" ] := 1;\n");
+   anvil_document d4 = ATTR_LOAD("#!aml\nx @[b=bug\t] := 1;\n");
+   anvil_document d5 = ATTR_LOAD("#!aml\nx @[a=\"1\" , b=\"2\"] := 1;\n");
+   if (d1) {
+      check_attr(d1, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: @[a=\"1\", b=\"2\"<NL>]: a");
+      check_attr(d1, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: ... b is STRING 2, raw has no newline");
+   }
+   if (d2) check_attr(d2, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: @[<NL>  b=\"2\"<NL>]");
+   if (d3) check_attr(d3, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: a trailing space is not in the raw value");
+   if (d4) check_attr(d4, false, "b", "bug", ANVIL_VALUE_BARE, "bug", "ANV64: a trailing tab is not in the raw value");
+   if (d5) {
+      check_attr(d5, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: `\"1\" ,` - not only the last attribute");
+      check_attr(d5, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: and the one after the comma");
+   }
+   TestBit.is_true(d1 && d2 && d3 && d4 && d5, "ANV64: all of them load");
+   anvil_document all[] = {d1, d2, d3, d4, d5};
+   for (size_t i = 0; i < 5; i++) {
+      if (all[i]) anvil_dispose(all[i]);
+   }
+
+   // CRLF line endings inside the list.
+   anvil_document crlf = ATTR_LOAD("#!aml\r\nx @[a=\"1\",\r\n b=\"2\"\r\n] := 1;\r\n");
+   TestBit.is_true(crlf && !anvil_has_errors(crlf), "ANV64: a CRLF attribute list loads");
+   if (crlf) {
+      check_attr(crlf, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: CRLF: a");
+      check_attr(crlf, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: CRLF: b, newline before ']'");
+      anvil_dispose(crlf);
+   }
+
+   // Whitespace after '=' (a newline included) was never a problem; pinned.
+   anvil_document lead = ATTR_LOAD("#!aml\nx @[a =\n  \"1\" , b =\t\"2\"] := 1;\n");
+   if (lead) {
+      check_attr(lead, false, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV64: a newline after '=' is skipped");
+      check_attr(lead, false, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV64: and so is a tab");
+      anvil_dispose(lead);
+   } else {
+      TestBit.is_not_null(lead, "ANV64: whitespace after '=' loads");
+   }
+
+   // Unchanged: a bare value with internal non-whitespace characters, numbers, an escaped quote and
+   // a ']' inside a string.
+   anvil_document keep = ATTR_LOAD(
+      "#!aml\nx @[range=1..5\n, n=42 , s=\"c\\\"d]\"\n, t=\"a b\" ,\n u=1.5\n] := 1;\n");
+   TestBit.is_true(keep && !anvil_has_errors(keep), "ANV64: mixed layouts load");
+   if (keep) {
+      check_attr(keep, false, "range", "1..5", ANVIL_VALUE_BARE, "1..5", "ANV64: range=1..5 is unchanged");
+      check_attr(keep, false, "n", "42", ANVIL_VALUE_NUMERIC, "42", "ANV64: n=42");
+      check_attr(keep, false, "s", "\"c\\\"d]\"", ANVIL_VALUE_STRING, "c\"d]", "ANV64: escaped quote and ']' in a string");
+      check_attr(keep, false, "t", "\"a b\"", ANVIL_VALUE_STRING, "a b", "ANV64: internal space is kept");
+      check_attr(keep, false, "u", "1.5", ANVIL_VALUE_NUMERIC, "1.5", "ANV64: u=1.5");
+      anvil_dispose(keep);
+   }
+}
+
+static void test_anv65_module_attribute_span_ends_at_the_token(void) {
+   const char *layouts[] = {
+      "#!aml\n@[a=\"1\", b=\"2\"\n]\nx := 1;\n",
+      "#!aml\n@[\n  a=\"1\",\n  b=\"2\"\n]\nx := 1;\n",
+      "#!aml\n@[a=\"1\" , b=\"2\" ]\nx := 1;\n",
+      "#!aml\r\n@[a=\"1\",\r\n b=\"2\"\r\n]\r\nx := 1;\r\n",
+   };
+   for (size_t i = 0; i < sizeof(layouts) / sizeof(layouts[0]); i++) {
+      anvil_document doc = anvil_load_buffer(layouts[i], strlen(layouts[i]));
+      TestBit.is_true(doc && !anvil_has_errors(doc), "ANV65: module attributes load");
+      if (doc) {
+         check_attr(doc, true, "a", "\"1\"", ANVIL_VALUE_STRING, "1", "ANV65: module a");
+         check_attr(doc, true, "b", "\"2\"", ANVIL_VALUE_STRING, "2", "ANV65: module b");
+         anvil_dispose(doc);
+      }
+   }
+   anvil_document bare = ATTR_LOAD("#!aml\n@[kind=bug\t,\n  range=1..5\n]\nx := 1;\n");
+   if (bare) {
+      check_attr(bare, true, "kind", "bug", ANVIL_VALUE_BARE, "bug", "ANV65: module bare value, tab before ','");
+      check_attr(bare, true, "range", "1..5", ANVIL_VALUE_BARE, "1..5", "ANV65: module range=1..5 unchanged");
+      anvil_dispose(bare);
+   } else {
+      TestBit.is_not_null(bare, "ANV65: loads");
+   }
+}
+
+/* ---------------------------------------------------------------------- *
+ * ANV66 — this build's WITH_ASL setting is reported correctly. Default
  * test build is WITH_ASL=0 (see test/unit/Makefile); building this suite
  * with WITH_ASL=1 should flip the expectation accordingly.
  * ---------------------------------------------------------------------- */
-static void test_anv44_script_enabled_reports_build_flag(void) {
+static void test_anv66_script_enabled_reports_build_flag(void) {
 #if WITH_ASL
-   TestBit.is_true(anvil_is_script_enabled(), "ANV44: script support reported enabled (WITH_ASL=1)");
+   TestBit.is_true(anvil_is_script_enabled(), "ANV66: script support reported enabled (WITH_ASL=1)");
 #else
    TestBit.is_false(anvil_is_script_enabled(),
-                     "ANV44: script support reported disabled (WITH_ASL=0)");
+                     "ANV66: script support reported disabled (WITH_ASL=0)");
 #endif
 }
 
 /* ---------------------------------------------------------------------- *
- * ANV45 — a '#!asl' document is rejected loudly, at header-scan time,
+ * ANV67 — a '#!asl' document is rejected loudly, at header-scan time,
  * when this build has no AnvlScript support (WITH_ASL=0) — regardless of
  * whether the document contains a function declaration at all.
  * ---------------------------------------------------------------------- */
-static void test_anv45_asl_rejected_without_with_asl(void) {
+static void test_anv67_asl_rejected_without_with_asl(void) {
 #if !WITH_ASL
    anvil_document doc = anvil_load(fixture_path("anvil_err_header_asl_not_supported.anvl"));
-   TestBit.is_not_null(doc, "ANV45: document handle still returned despite the error");
+   TestBit.is_not_null(doc, "ANV67: document handle still returned despite the error");
    if (!doc) {
       return;
    }
-   TestBit.is_true(anvil_has_errors(doc), "ANV45: errors recorded");
+   TestBit.is_true(anvil_has_errors(doc), "ANV67: errors recorded");
    TestBit.is_equal_int(ANVIL_ERR_HEADER, anvil_get_error(doc),
-                        "ANV45: error category is ANVIL_ERR_HEADER");
+                        "ANV67: error category is ANVIL_ERR_HEADER");
    anvil_dispose(doc);
 #else
-   TestBit.skip("ANV45: this build has WITH_ASL=1, nothing to reject");
+   TestBit.skip("ANV67: this build has WITH_ASL=1, nothing to reject");
 #endif
 }
 
@@ -1356,10 +2005,56 @@ int main(void) {
                   test_anv41_value_get_bytes_buffer_convention, th);
    TestBit.run_ex("ANV42_value_get_bytes_not_scalar", NULL, test_anv42_value_get_bytes_not_scalar, th);
    TestBit.run_ex("ANV43_value_get_blob_tag", NULL, test_anv43_value_get_blob_tag, th);
-   TestBit.run_ex("ANV44_script_enabled_reports_build_flag", NULL,
-                  test_anv44_script_enabled_reports_build_flag, th);
-   TestBit.run_ex("ANV45_asl_rejected_without_with_asl", NULL,
-                  test_anv45_asl_rejected_without_with_asl, th);
+   TestBit.run_ex("ANV45_identical_loads_are_independent", NULL,
+                  test_anv45_identical_loads_are_independent, th);
+   TestBit.run_ex("ANV46_diamond_per_graph", NULL, test_anv46_diamond_per_graph, th);
+   TestBit.run_ex("ANV47_identical_fragments", NULL, test_anv47_identical_fragments, th);
+
+   TestBit.run_ex("ANV48_ATTRIBUTE_VALUE_HANDLE_SCALARS", NULL,
+                  test_anv48_attribute_value_handle_scalars, th);
+   TestBit.run_ex("ANV49_FLAG_ATTRIBUTE_HAS_NO_VALUE_HANDLE", NULL,
+                  test_anv49_flag_attribute_has_no_value_handle, th);
+   TestBit.run_ex("ANV50_RAW_VALUE_READER_IS_UNCHANGED", NULL,
+                  test_anv50_raw_value_reader_is_unchanged, th);
+   TestBit.run_ex("ANV51_NUL_IN_ATTRIBUTE_VALUE", NULL,
+                  test_anv51_nul_in_attribute_value, th);
+   TestBit.run_ex("ANV52_UNDECODABLE_VALUE_FALLS_BACK_TO_BARE", NULL,
+                  test_anv52_undecodable_value_falls_back_to_bare, th);
+   TestBit.run_ex("ANV53_WHITESPACE_AND_ESCAPED_QUOTE_SCANNING", NULL,
+                  test_anv53_whitespace_and_escaped_quote_scanning, th);
+
+   TestBit.run_ex("ANV54_BARE_VALUES_STARTING_WITH_A_LITERAL", NULL,
+                  test_anv54_bare_values_starting_with_a_literal, th);
+   TestBit.run_ex("ANV55_EXACT_LITERALS_ARE_UNCHANGED", NULL,
+                  test_anv55_exact_literals_are_unchanged, th);
+   TestBit.run_ex("ANV56_WHOLE_TOKEN_IN_COLLECTIONS_AND_OBJECTS", NULL,
+                  test_anv56_whole_token_in_collections_and_objects, th);
+   TestBit.run_ex("ANV57_WHOLE_TOKEN_IN_ATTRIBUTE_VALUES", NULL,
+                  test_anv57_whole_token_in_attribute_values, th);
+
+   TestBit.run_ex("ANV58_MISSING_SEMICOLON_HAS_A_MESSAGE", NULL,
+                  test_anv58_missing_semicolon_has_a_message, th);
+   TestBit.run_ex("ANV59_DUPLICATE_TOP_LEVEL_NAME_HAS_A_POSITION", NULL,
+                  test_anv59_duplicate_top_level_name_has_a_position, th);
+
+   TestBit.run_ex("ANV60_PARSER_ERRORS_HAVE_SPECIFIC_MESSAGES", NULL,
+                  test_anv60_parser_errors_have_specific_messages, th);
+
+   TestBit.run_ex("ANV61_UNTERMINATED_BLOCK_COMMENT_IS_AN_ERROR", NULL,
+                  test_anv61_unterminated_block_comment_is_an_error, th);
+   TestBit.run_ex("ANV62_TERMINATED_COMMENTS_STILL_LOAD", NULL,
+                  test_anv62_terminated_comments_still_load, th);
+   TestBit.run_ex("ANV63_TERMINATOR_MUST_SHARE_THE_VALUES_LINE", NULL,
+                  test_anv63_terminator_must_share_the_values_line, th);
+
+   TestBit.run_ex("ANV64_ATTRIBUTE_SPAN_ENDS_AT_THE_TOKEN", NULL,
+                  test_anv64_attribute_span_ends_at_the_token, th);
+   TestBit.run_ex("ANV65_MODULE_ATTRIBUTE_SPAN_ENDS_AT_THE_TOKEN", NULL,
+                  test_anv65_module_attribute_span_ends_at_the_token, th);
+   TestBit.run_ex("ANV66_script_enabled_reports_build_flag", NULL,
+                  test_anv66_script_enabled_reports_build_flag, th);
+   TestBit.run_ex("ANV67_asl_rejected_without_with_asl", NULL,
+                  test_anv67_asl_rejected_without_with_asl, th);
 
    return TestBit.report();
 }

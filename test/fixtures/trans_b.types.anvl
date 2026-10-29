@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Id := {
+   type := Numeric;
+   min := 1;
+};

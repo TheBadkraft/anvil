@@ -1,0 +1,3 @@
+#!aml
+include "reg_diamond_shared.anvl";
+left := 2;

@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Ratio := {
+   type := Numeric;
+   min := 0.5;
+};

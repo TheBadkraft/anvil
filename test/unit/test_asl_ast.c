@@ -29,7 +29,6 @@
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
-   Registry.clear();
 }
 
 /* Loads a fixture through header-scan + include-loading, ready for doc_parse_body. */

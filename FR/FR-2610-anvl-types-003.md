@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer)
-**Status:** open — needs decision, then implementation
+**Status:** resolved
 **Tags:** types, schema, blob, primitives, rivet-readiness
 
 ---
@@ -57,3 +57,22 @@ can then require "binary payload with tag X."
 ## Dependencies
 
 None. Binding exposure follows via FR-2610-anvl-bindings-001.
+
+## Resolution
+
+Decision **D1: both** (recorded in `notes/roadmap-2610-rivet-readiness.md`). Branch
+`feat/FR-2610-anvl-types-003`, commit `6f85bce`, merged to `main`. Tests SCH62–SCH67 (`test_schema.c`) and TYP31
+(`test_types.c`); fixtures `schema_blob_*`. Full unit regression green with unchanged counts elsewhere,
+`test_release` green, Valgrind-clean on schema, types, anvil_native, anvil_vtable, document, resolver.
+Docs: `docs/types-reference.md` primitives table and Blob paragraph (and the site mirror).
+
+Notes:
+- `ANVIL_TYPE_BLOB` is appended after `ANVIL_TYPE_ENUM`; `ANVIL_SCHEMA_ERR_VALIDATION_TAG` after
+  `ITEM_COUNT`. No existing value moved. Bindings that mirror `anvil_type_kind` need the new value
+  (FR-2610-anvl-bindings-001).
+- `size` on a blob is measured with `anvil_value_get_bytes`, on every other value with
+  `anvil_value_get_text`, so a String field given a blob counts bytes, as the ticket specifies.
+- A `tag` constraint is checked whenever the data value is a blob and the rule declares a tag
+  (not only under `type := Blob`); a non-scalar `tag` is a `MALFORMED_CONSTRAINT` diagnostic.
+- The type's tag is held internally (`anvil_type_def_tag`); public introspection of `tag` is
+  FR-2610-anvl-schema-005's job.

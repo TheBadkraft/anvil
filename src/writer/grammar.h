@@ -41,6 +41,9 @@ typedef struct {
    size_t count;
 } wg_nameset;
 
+/** The name set's hash: 64-bit FNV-1a on every target (exposed for the tests; BR-2610-anvl-writer-001). */
+uint64_t wg_hash_name(const char *s);
+
 /** @return 1 if added, 0 if already present, -1 on allocation failure. */
 int wg_nameset_add(wg_nameset *set, const char *name);
 void wg_nameset_free(wg_nameset *set);

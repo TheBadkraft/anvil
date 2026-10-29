@@ -3,8 +3,8 @@ STD     = c2x
 ANVL   = ../..
 TESTBIT = ../../../testbit
 
-BUILD_NUM := $(shell git rev-list --count HEAD)
-
+# Build number: explicit override, else the commit count, else 0 (= unknown); see ../../Makefile.
+BUILD_NUM := $(or $(ANVL_BUILD),$(BUILD_NUM),$(shell git rev-list --count HEAD 2>/dev/null),0)
 # See root Makefile: off by default, always defined (0 or 1).
 WITH_ASL ?= 0
 
@@ -55,12 +55,12 @@ TESTBIT_SRC = $(TESTBIT)/src/testbit.c
 # core/ and sigma/ under src/, not nested under src/schema/. schema.c (not yet built) is the
 # actual add-on layered on top of it — src/schema/ is reserved for that, and will depend on
 # TYPES_SRCS, never the reverse.
-TYPES_SRCS  = $(ANVL)/src/anvil_types.c
+TYPES_SRCS  = $(ANVL)/src/anvil_types.c $(ANVL)/src/anvil_types_vtable.c
 TYPES_LIB   = $(ANVIL_SRCS) $(TYPES_SRCS)
 
 # schema.c is the real add-on layered on top of TYPES_LIB — lives under src/schema/, reserved
 # for it. Depends on types, never the reverse.
-SCHEMA_SRCS = $(ANVL)/src/schema/schema.c
+SCHEMA_SRCS = $(ANVL)/src/schema/schema.c $(ANVL)/src/schema/schema_vtable.c
 SCHEMA_LIB  = $(TYPES_LIB) $(SCHEMA_SRCS)
 
 # The writer is a standalone add-on (src/writer/): it links no reader code, and the reader links
@@ -77,11 +77,23 @@ LIB_RELEASE   = $(ANVL)/lib/release/libanvil.a
 
 # Built by the root Makefile (core + types + schema bundled — see notes/deferred-work.md),
 # not compiled here — test_release links against the real artifact, not source files.
-$(LIB_DEBUG):
+#
+# The archive is a file that this Makefile cannot see the inputs of, so the rule must NOT be "build it
+# if it is missing": that linked an archive built from older sources after a branch switch or rebase
+# (SR-2610-anvl-build-001). Depend on a phony target that always asks the top-level make, which tracks
+# every source and header (-MMD -MP) and so does nothing when the archive is current. Same pattern as
+# test/functional/Makefile.
+.PHONY: lib-debug lib-release
+
+lib-debug:
 	$(MAKE) -C $(ANVL) lib-debug
 
-$(LIB_RELEASE):
+lib-release:
 	$(MAKE) -C $(ANVL) lib-release
+
+$(LIB_DEBUG): lib-debug
+
+$(LIB_RELEASE): lib-release
 
 BIN = bin
 VALGRIND_LOG = $(BIN)/valgrind_test.log

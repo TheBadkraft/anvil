@@ -3,7 +3,11 @@ STD = c2x
 AR = ar
 STRIP = strip
 
-BUILD_NUM := $(shell git rev-list --count HEAD)
+# The build number reported as `+BUILD`: an explicit override (make ANVL_BUILD=176, or BUILD_NUM=176, or
+# the environment) wins, so a release build can pass the tag's count and not depend on the checkout; else
+# the commit count of HEAD; else 0, which the library reports as "unknown" (no `+BUILD`), e.g. in an
+# extracted tarball with no .git. (BR-2610-anvl-version-001.)
+BUILD_NUM := $(or $(ANVL_BUILD),$(BUILD_NUM),$(shell git rev-list --count HEAD 2>/dev/null),0)
 
 # sigma.core: a real system-installed dependency, not vendored into this repo and not a
 # sibling-relative path either (FR-2609-sigmem-001) -- see notes/sigma-system-alloc-dependency.md
@@ -50,8 +54,8 @@ CORE_SRCS = src/core/anvil.c \
             src/sigma/collections.c \
             src/sigma/query.c
 
-TYPES_SRCS  = src/anvil_types.c
-SCHEMA_SRCS = src/schema/schema.c
+TYPES_SRCS  = src/anvil_types.c src/anvil_types_vtable.c
+SCHEMA_SRCS = src/schema/schema.c src/schema/schema_vtable.c
 
 # sigma.system.alloc (FR-2609-sigmem-001): the Allocator/bump-arena provider, formerly
 # src/sigma/memory.c's own vendored-and-modified copy. A real prebuilt package, installed once
@@ -101,8 +105,16 @@ RELEASE_OBJ  = build/release
 # against an old header layout can silently link into the archive/.so alongside fresh ones,
 # producing a corrupted artifact with no build error (found the hard way: a new anvl_source_i
 # vtable field left non-recompiled objects reading every later field one slot off).
-DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
-RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
+# -fvisibility=hidden: internal implementation symbols (src/sigma/*'s Math/List/Map/... vtable
+# globals, mod_*/doc_*/collection_*/array_*/etc.) have no business in a consumer's dynamic
+# symbol table at all -- a native addon process hosting anvil_node.node alongside unrelated
+# other native code found this out the hard way (a same-named global in another addon silently
+# won symbol resolution over one of these, segfaulting on a bogus pointer). The public ABI
+# (anvil_flat.h, anvil_vtable.h, anvil_writer*.h, anvil_builder*.h) stays exported exactly as
+# before via `#pragma GCC visibility push(default)/pop` wrapping each of those headers' own
+# declarations -- see notes/symbol-visibility.md.
+DEBUG_CFLAGS   = -Wall -Wextra -g -O0 -fPIC -fvisibility=hidden -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
+RELEASE_CFLAGS = -Wall -Wextra -O2 -DNDEBUG -fPIC -fvisibility=hidden -std=$(STD) $(INCLUDE) $(DEFS) -MMD -MP
 
 DEBUG_OBJS   = $(patsubst src/%.c,$(DEBUG_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)
 RELEASE_OBJS = $(patsubst src/%.c,$(RELEASE_OBJ)/%.o,$(LIB_SRCS)) $(SIGMA_SYSTEM_ALLOC_PKG)
@@ -113,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only
+.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -138,13 +150,13 @@ $(LIB_RELEASE): $(RELEASE_OBJS)
 	$(AR) rcs $@ $^
 	$(STRIP) --strip-debug --strip-unneeded $@
 
-$(SO_DEBUG): $(DEBUG_OBJS)
+$(SO_DEBUG): $(DEBUG_OBJS) libanvil.exports
 	@mkdir -p $(DEBUG_DIR)
-	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
+	$(CC) -shared -Wl,-soname,libanvil.so -Wl,--version-script=libanvil.exports -o $@ $(filter-out libanvil.exports,$^)
 
-$(SO_RELEASE): $(RELEASE_OBJS)
+$(SO_RELEASE): $(RELEASE_OBJS) libanvil.exports
 	@mkdir -p $(RELEASE_DIR)
-	$(CC) -shared -Wl,-soname,libanvil.so -o $@ $^
+	$(CC) -shared -Wl,-soname,libanvil.so -Wl,--version-script=libanvil.exports -o $@ $(filter-out libanvil.exports,$^)
 	$(STRIP) --strip-debug --strip-unneeded $@
 
 $(DEBUG_OBJ)/%.o: src/%.c
@@ -158,10 +170,63 @@ $(RELEASE_OBJ)/%.o: src/%.c
 -include $(DEBUG_OBJS:.o=.d)
 -include $(RELEASE_OBJS:.o=.d)
 
+# -D flags are not tracked by -MMD, so anvil.o (the only object that reads ANVL_BUILD) would keep a stale
+# `+BUILD` after the number changes (a new commit, or an explicit ANVL_BUILD=). A stamp file holding the
+# number, rewritten only when it changes, makes the object depend on it (BR-2610-anvl-version-001).
+BUILD_STAMP = build/.anvl_build_number
+$(shell mkdir -p build; printf '%s\n' '$(BUILD_NUM)' | cmp -s - $(BUILD_STAMP) 2>/dev/null || printf '%s\n' '$(BUILD_NUM)' > $(BUILD_STAMP))
+$(DEBUG_OBJ)/core/anvil.o $(RELEASE_OBJ)/core/anvil.o: $(BUILD_STAMP)
+
 # Builds the reader-only bundle (WITH_WRITER=0) into its own directories, then checks it: no
 # anvil_writer_*/anvil_builder_* function or `Writer`/`Builder` vtable symbol, and a program using only the reader API links
 # against it. The full bundle must still carry both.
 READER_ONLY_DIR = build/reader-only
+# Every function declared in a public header must be exported from the release shared object, and
+# no internal symbol may be (scripts/check-exports.sh).
+check-exports: so-release
+	sh scripts/check-exports.sh $(SO_RELEASE) include
+
+# Compile-only check of the code that must be correct where size_t is 32 bits (wasm32, 32-bit ARM):
+# -Werror turns any silent 64->32 constant truncation into a failure. Needs the 32-bit libc headers
+# (gcc-multilib); skips with a message when they are absent. Emscripten reproduces it too.
+check-32bit:
+	@if echo '#include <stdint.h>' | $(CC) -m32 -E -x c - >/dev/null 2>&1; then \
+		$(CC) -m32 -std=$(STD) -Wall -Wextra -Werror -Woverflow $(INCLUDE) $(DEFS) -c src/writer/grammar.c -o /dev/null && \
+		echo "check-32bit OK: src/writer/grammar.c compiles clean with -m32"; \
+	else echo "check-32bit SKIPPED: no -m32 headers here (install gcc-multilib, or build with emcc)"; fi
+
+# Concurrent load/read/dispose under ThreadSanitizer (test/infra/tsan_load_stress.c): any data race in
+# anvil, or in a global it calls, is reported and fails the target. TSAN_ALLOC=source also rebuilds
+# sigma.system.alloc from $(SIGMA_CORE)/src/system_alloc.c with the sanitizer, since races inside the
+# prebuilt (uninstrumented) allocator object are otherwise invisible. BR-2610-anvl-registry-001.
+SIGMA_CORE ?= ../sigma.core
+TSAN_DIR    = build/tsan
+TSAN_MODES ?= different identical diamond
+ifeq ($(WITH_ASL),1)
+TSAN_MODES += asl
+endif
+TSAN_ALLOC ?= prebuilt
+check-tsan:
+	@mkdir -p $(TSAN_DIR)
+	@if [ "$(TSAN_ALLOC)" = "source" ]; then \
+		$(CC) -fsanitize=thread -g -O1 -std=$(STD) -I/usr/local/include $(DEFS) -c $(SIGMA_CORE)/src/system_alloc.c -o $(TSAN_DIR)/alloc.o; \
+		cp $(TSAN_DIR)/alloc.o $(TSAN_DIR)/alloc.use.o; \
+	else cp $(SIGMA_SYSTEM_ALLOC_PKG) $(TSAN_DIR)/alloc.use.o; fi
+	$(CC) -fsanitize=thread -g -O1 -std=$(STD) $(INCLUDE) $(DEFS) $(LIB_SRCS) test/infra/tsan_load_stress.c $(TSAN_DIR)/alloc.use.o -lpthread -o $(TSAN_DIR)/stress
+	@rc=0; for m in $(TSAN_MODES); do \
+		TSAN_OPTIONS="halt_on_error=0 exitcode=66 report_signal_unsafe=0" $(TSAN_DIR)/stress $$m > $(TSAN_DIR)/$$m.log 2>&1; r=$$?; \
+		echo "check-tsan [$$m, alloc=$(TSAN_ALLOC)]: exit $$r, $$(grep -c 'WARNING: ThreadSanitizer' $(TSAN_DIR)/$$m.log) race report(s), $$(grep -c '^FAIL' $(TSAN_DIR)/$$m.log) load failure(s)"; \
+		[ $$r -eq 0 ] || rc=1; \
+	done; exit $$rc
+
+# test_release must never link a stale archive (SR-2610-anvl-build-001); scripts/check-test-release-fresh.sh.
+check-test-release-fresh:
+	sh scripts/check-test-release-fresh.sh
+
+# The reported version is semver and honors an explicit build number (scripts/check-version.sh).
+check-version:
+	sh scripts/check-version.sh
+
 check-reader-only:
 	$(MAKE) WITH_WRITER=0 RELEASE_DIR=$(READER_ONLY_DIR)/lib RELEASE_OBJ=$(READER_ONLY_DIR)/obj lib-release
 	$(MAKE) WITH_WRITER=1 RELEASE_DIR=$(READER_ONLY_DIR)/full-lib RELEASE_OBJ=$(READER_ONLY_DIR)/full-obj lib-release

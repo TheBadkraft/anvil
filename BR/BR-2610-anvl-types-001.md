@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** rivet (downstream consumer, via flywire)
-**Status:** open
+**Status:** resolved
 **Tags:** types, schema, numeric, constraints, correctness, rivet-readiness
 
 ---
@@ -79,3 +79,17 @@ The public getters `anvil_type_def_get_min/max/size` take `long long *`. Fractio
 public API decision (widen the out-param, or add `_get_min_numeric` variants). That decision is
 scoped in FR-2610-anvl-types-005. This BR fixes the truncation for integral bounds and the
 data-side comparison now, and must not wait on that FR.
+
+## Resolution
+
+Branch `fix/BR-2610-anvl-types-001`, commit `7b1b718`. Both `read_numeric()` helpers are gone; constraints
+and data go through `anvil_value_get_numeric()` with exact comparison (`include/internal/numeric_bound.h`,
+defined in `anvil_types.c`). New tests: SCH13–SCH20 (`test_schema.c`), TYP11 (`test_types.c`).
+All unit suites green; `make schema val` and `make types val` Valgrind-clean.
+
+Findings for the owner:
+- Test case 1 says `anvil_type_def_get_min` "reports the constraint" for `min := 0.5`. A `long long`
+  getter cannot do that without truncating, so it returns **false** for a fractional bound (matches
+  FR-2610-anvl-types-005's design). Schema inheritance still sees the exact bound through an internal accessor.
+- An exponent with no sign (`9.3e18`) is not a numeric literal in this grammar (type mismatch); `e+18` is.
+- `make fixtures test` fails to build and a bare `make test` runs nothing (pre-existing; not touched).

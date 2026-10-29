@@ -71,6 +71,17 @@ anvl_result anvl_parse(anvl_source);
  */
 anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value,
                                       anvl_err_code *out_err_code);
+/**
+ * @brief Read an attribute's value text as a value (`attr->decoded`), through the scalar grammar.
+ * @details Called for statement attributes as they are parsed and for module attributes at the
+ * start of a document's body parse (the arena that owns value nodes does not exist before that).
+ * A flag attribute (empty value) leaves `decoded` NULL. A value the scalar grammar does not accept
+ * as a whole is exposed as a BARE value of its trimmed raw text; the trial parse leaves no trace:
+ * source position, recorded errors and the parser's last-error code are all restored, so decoding
+ * can never fail a load that scanning accepted. Fails only on allocation failure.
+ * @param src The attribute's source, positioned anywhere (it is restored).
+ */
+bool anvl_attribute_decode(anvl_source src, anvl_attribute attr);
 void anvl_cleanup(void);
 anvl_err_code anvl_get_error(void);
 

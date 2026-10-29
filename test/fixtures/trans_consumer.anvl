@@ -1,0 +1,6 @@
+#!aml
+include "trans_a.types.anvl";
+@[schema]
+
+ticket := { type := types.TicketId; };
+ref := { type := types.Id; };

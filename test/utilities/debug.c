@@ -34,7 +34,9 @@ void dispose_doc_manual(module_document doc) {
       return;
 
    if (doc->source) {
-      Registry.remove(Source.hash(doc->source));
+      if (doc->context) {
+         Registry.remove(doc->context, Source.hash(doc->source));
+      }
       Source.dispose(doc->source);
       doc->source = NULL;
    }
@@ -70,7 +72,7 @@ void dispose_err_manual(anvl_error err) {
    if (!err)
       return;
 
-   Allocator.dispose(err);
+   anvl_error_dispose(err);
 }
 /*
  * Clear a list of errors, disposing each error and then the list itself.
@@ -79,9 +81,7 @@ void clear_errs_manual(list errors) {
    for (usize i = 0; i < List.size(errors); i++) {
       anvl_error err = NULL;
       List.get(errors, i, (object *)&err);
-      if (err) {
-         Allocator.dispose(err);
-      }
+      anvl_error_dispose(err);
    }
    List.dispose(errors);
 }
@@ -97,6 +97,7 @@ void dispose_ctx_manual(module_context ctx) {
       clear_docs_manual(ctx->docs);
       ctx->docs = NULL;
    }
+   Registry.release(ctx); // the per-context source map (after the documents unregistered from it)
    if (ctx->errors) {
       clear_errs_manual(ctx->errors);
       ctx->errors = NULL;
@@ -126,9 +127,6 @@ void dispose_mod_manual(AnvlMod mod) {
    dispose_ctx_manual(mod->context);
    mod->context = NULL;
    mod->root = NULL;
-
-   // release the registry reference acquired by mod_new
-   Registry.release();
 
    Allocator.dispose(mod);
 }

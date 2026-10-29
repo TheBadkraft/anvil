@@ -1,0 +1,7 @@
+#!aml
+include "schema_nullable_types.anvl";
+@[schema]
+
+inherits := { type := types.MaybeId; };
+strict := { type := types.MaybeId; nullable := false; };
+restated := { type := types.MaybeId; nullable := true; };

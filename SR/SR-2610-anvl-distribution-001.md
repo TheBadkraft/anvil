@@ -6,7 +6,7 @@
 **Filed:** 2026-10-25
 **Filed by:** anvil
 **Requested by:** flywire, rivet (downstream consumers)
-**Status:** open — blocked on FR-2610-anvl-bindings-001 slice 1
+**Status:** open — blocked on all of roadmap Phase 4 (see Update below)
 **Continues:** SR-2609-anvl-distribution-001 (established the tarball-on-anvldata.com path)
 **Tags:** distribution, packaging, anvil-node, anvil-wasm, flywire, rivet-readiness
 
@@ -36,3 +36,11 @@ release mechanics, not the binding code.
    wasm doesn't carry schema, with the reason).
 3. The 0.8.0-rc URLs still resolve.
 4. The release notes name the native commit for each artifact.
+
+## Update (planning, 2026-10-25, owner-approved)
+
+- **Owner:** the ANVL Release agent (`agents/ANVL-RELEASE.agent.md`), not the binding repos.
+- **Blocked on all of Phase 4**, not slice 1 alone: FR-2610-anvl-bindings-001 slices 1b, 2, 3 and 4,
+  and FR-2610-anvl-bindings-002 for both `anvil.node` and `anvil.wasm`.
+- "0.9.x" above is superseded by release decision R1 (recommended `v0.10.0-rc`; owner to confirm).
+  Scope item 4 (keep `0.8.0-rc` live) is superseded by R2 and BR-2610-anvl-distribution-001.

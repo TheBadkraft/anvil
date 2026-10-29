@@ -42,6 +42,15 @@
  * get_version stays here — genuinely implemented, and test_version.c  *
  * (which runs after every test suite) depends on it.                 *
  * ----------------------------------------------------------------- */
+/**
+ * @brief Format a version as semver, `MAJOR.MINOR.PATCH[-TAG][+BUILD]`: the pre-release tag comes
+ * BEFORE the build metadata (`0.10.0-rc+176`). `-TAG` is omitted when `tag` is NULL or empty, and
+ * `+BUILD` when `build` is 0 or negative ("not provided", never a fake 0). Truncates (always
+ * NUL-terminated) if `cap` is too small. Exposed so the shape is testable with any inputs.
+ */
+void anvl_format_version(char *buf, size_t cap, int major, int minor, int patch, const char *tag,
+                         int build);
+
 typedef struct anvl_i {
    const char *(*get_version)(void);
 } anvl_i;

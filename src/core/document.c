@@ -91,12 +91,12 @@ void doc_dispose(module_document doc) {
       // Only remove the registry entry if this doc is actually the one
       // registered under that hash. A document whose own registration
       // failed (e.g. the discarded duplicate in a diamond include — see
-      // include_load_child's ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT
+      // include_load_child's ANVL_ERR_SOURCE_ALREADY_LOADED
       // handling) shares its content hash with a different, still-alive
       // document; disposing it must not evict that document's entry.
       uint64_t hash = Source.hash(doc->source);
-      if (Registry.find(hash) == doc) {
-         Registry.remove(hash);
+      if (doc->context && Registry.find(doc->context, hash) == doc) {
+         Registry.remove(doc->context, hash);
       }
       Source.dispose(doc->source);
       doc->source = NULL;
@@ -172,15 +172,18 @@ static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code
 
       if (c == '/' && Source.peek_offset(src, 1) == '*') {
          Source.consume(src, 2);
+         bool closed = false;
          while (!Source.is_eof(src)) {
             if (Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/') {
                Source.consume(src, 2);
+               closed = true;
                break;
             }
             Source.consume(src, 1);
          }
-         if (Source.is_eof(src) &&
-             !(Source.peek(src) == '*' && Source.peek_offset(src, 1) == '/')) {
+         if (!closed) {
+            // (This used to test "at EOF and not looking at '*/'", which is also true right after
+            // a comment that closed as the very last thing in the file.)
             *err_code = ANVL_ERR_PARSER_UNTERMINATED_COMMENT;
             return false;
          }
@@ -330,12 +333,26 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                if (!in_string && (c == ',' || c == ']')) {
                   break;
                }
-               if (c == '"') {
+               if (in_string && c == '\\') {
+                  Source.consume(src, 1); // an escape: the next character never toggles the string
+                  if (Source.is_eof(src)) {
+                     break;
+                  }
+               } else if (c == '"') {
                   in_string = !in_string;
                }
                Source.consume(src, 1);
             }
             usize value_end = Source.position(src);
+            // The value ends at the end of its TOKEN, not at the delimiter: whitespace before the ','
+            // or ']' (spaces, tabs, CR, LF) is not part of it (BR-2610-anvl-attr-001).
+            while (value_end > value_start) {
+               char last = ((const char *)src->buffer.bucket)[value_end - 1];
+               if (last != ' ' && last != '\t' && last != '\r' && last != '\n') {
+                  break;
+               }
+               value_end--;
+            }
             attr->value.data = src->buffer.bucket;
             attr->value.start = src->buffer.bucket + value_start;
             attr->value.end = src->buffer.bucket + value_end;
@@ -543,6 +560,9 @@ void doc_unload_source(module_document doc) {
    // unload the source return the source object to a pristine state (creates a new source object).
    if (!doc || !doc->source) {
       return;
+   }
+   if (doc->context) {
+      Registry.remove(doc->context, Source.hash(doc->source)); // the old content's identity
    }
    Source.dispose(doc->source);
    anvl_err_code err_code = ANVL_ERR_NONE;

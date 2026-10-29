@@ -231,13 +231,25 @@ bool wg_format_double(double value, char out[40]) {
 /* ----------------------------------------------------------------------- *
  * Name set: open addressing, FNV-1a, grown at 50% load
  * ----------------------------------------------------------------------- */
-static size_t hash_name(const char *s) {
-   size_t h = 14695981039346656037ull;
+// True 64-bit FNV-1a on every target (same constants as src/sigma/map.c). It used to accumulate in
+// a size_t, which silently truncated both constants on 32-bit targets (wasm32, 32-bit ARM, -m32):
+// BR-2610-anvl-writer-001. Folded to size_t only where it indexes the table.
+#define FNV1A_OFFSET UINT64_C(14695981039346656037)
+#define FNV1A_PRIME UINT64_C(1099511628211)
+_Static_assert(sizeof(uint64_t) == 8, "the name hash needs a 64-bit accumulator");
+
+uint64_t wg_hash_name(const char *s) {
+   uint64_t h = FNV1A_OFFSET;
    for (; *s; s++) {
       h ^= (unsigned char)*s;
-      h *= 1099511628211ull;
+      h *= FNV1A_PRIME;
    }
    return h;
+}
+
+// A slot index: the low bits of the hash. capacity is a power of two, so the mask is < capacity.
+static size_t slot_for(const char *name, size_t capacity) {
+   return (size_t)(wg_hash_name(name) & (uint64_t)(capacity - 1));
 }
 
 static bool nameset_grow(wg_nameset *set) {
@@ -248,7 +260,7 @@ static bool nameset_grow(wg_nameset *set) {
    }
    for (size_t i = 0; i < set->capacity; i++) {
       if (set->slots[i]) {
-         size_t at = hash_name(set->slots[i]) & (capacity - 1);
+         size_t at = slot_for(set->slots[i], capacity);
          while (slots[at]) {
             at = (at + 1) & (capacity - 1);
          }
@@ -265,7 +277,7 @@ int wg_nameset_add(wg_nameset *set, const char *name) {
    if (set->count * 2 >= set->capacity && !nameset_grow(set)) {
       return -1;
    }
-   size_t at = hash_name(name) & (set->capacity - 1);
+   size_t at = slot_for(name, set->capacity);
    while (set->slots[at]) {
       if (strcmp(set->slots[at], name) == 0) {
          return 0;

@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+MaybeId := {
+   type := Numeric;
+   nullable := true;
+};

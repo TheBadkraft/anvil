@@ -1,5 +1,22 @@
 # Roadmap: rivet-readiness (types, schema, bindings)
 
+> **Status (2026-10-29):** Phases 1–4 are done. Phase 5 continues as the Release Engineer's
+> assignment in `agents/assignments/release-v0.10.0-rc.md`. The agent names below predate the move
+> to one session with sub-agents (`agents/README.md`): the coder agent is now the Core Engineer, the
+> Bindings agent the Bindings Engineer, and the Release agent the Release Engineer.
+
+> **NOTE to the ANVL coder agent: follow this roadmap strictly.**
+> - Your scope is **Phases 1–3 plus Addendum A1–A2**: the native tickets numbered 1–12 below, in
+>   that order, then A1 and A2,
+>   plus the `SR-2610-anvl-docs-001` items mapped to them. Phases 4–5 are listed for sequencing
+>   only. They belong to the ANVL Bindings agent, so don't start them.
+> - Work **only** on tickets named in Phases 1–3. If a ticket in `BR/`, `FR/` or `SR/` isn't listed
+>   there, it isn't yours, even if it looks related or is tagged `rivet-readiness`. Don't implement
+>   it, edit it or change its status.
+> - Don't reorder, merge or skip tickets. If one turns out to be blocked, mis-scoped or wrong,
+>   stop, record the finding in that ticket, and report it to the repo owner rather than working
+>   around it.
+
 **Written:** 2026-10-25 (planning review)
 **For:** the ANVL coder agent picking up this ticket set, and the repo owner
 **Scope:** every open ticket tagged `rivet-readiness`, plus the two distribution SRs. It covers
@@ -22,6 +39,9 @@ Out of scope: `FR-2610-anvl-asl-runtime-001` (its own agent), `FR-2603-sigma-col
   Valgrind before calling a ticket done.
 - **Close the loop in the ticket.** Set `Status:` and add a short Resolution section naming the
   branch and commit. Update `notes/deferred-work.md` if anything was deferred.
+- **Every ticket finishes with a changelog entry.** Add it to `docs/changelog.md` under
+  `## [Unreleased]` (`### Fixed` for a BR, `### Added`/`### Changed` for an FR), naming the ticket
+  ID and the user-visible effect. Commit it on the ticket's branch. A ticket isn't done without it.
 - **New public API is appended, never renumbered.** Enums only grow at the end. Existing
   signatures and behavior stay identical, and every ticket has a regression case for that.
 - **Docs ride along.** Each `SR-2610-anvl-docs-001` item lands with the ticket that makes it
@@ -36,6 +56,13 @@ Out of scope: `FR-2610-anvl-asl-runtime-001` (its own agent), `FR-2603-sigma-col
 | D3 | SR-2610-anvl-vendor-bump-001 | How does `anvil.wasm` get `sigma.system.alloc` under Emscripten? Does wasm carry types/schema? | Build the allocator from source with `emcc` on the Linode box. Carry types+schema, since FlyWire's browser side validates too. |
 | D4 | FR-2610-anvl-bindings-001 (py/net slices) | Add `Schema`/`TypeRegistry` vtables? Today both headers are flat-only, and py/net bind through vtables. | **Yes.** Add them once, after Phase 3 when the native surface has settled, the same way as `Writer`/`Builder`. |
 
+Answers:
+**D1**: Both
+**D2**: Value-based
+**D3**: Build the allocator on the Linode box (follow recommendation)
+**D4**: Add vtables after Phase 3 (new FR???)
+
+NOTE: I will set up an agent specifically for bindings
 ---
 
 ## Phase 1: native correctness (do first, sequentially)
@@ -77,23 +104,41 @@ reshape it. Everything after them is a per-rule check slotted into the reshaped 
     it exposes an accessor for every constraint above. Doing it earlier means re-opening it
     after each one.
 
-Then **D4**: add the `Schema`/`TypeRegistry` vtables over the finished surface.
+Phase 3 ends at #12. D4 (vtables) isn't a coder-agent task.
 
 *Docs: SR-docs items 1, 2, 4 can land any time in Phase 1–3, but before the first binding release.*
 
-## Phase 4: bindings (separate repos; can overlap Phase 3)
+## Addendum (coder agent, after Phase 3)
+
+A1. **BR-2610-anvl-visibility-001**: `anvil_schema.h`/`anvil_type_registry.h` get the
+    `visibility push(default)` wrapper, plus a `make check-exports` gate. Found in the coder's own
+    FR-2610-anvl-types-001 findings. It blocks `FR-2610-anvl-public-api-003` and the
+    py/net/java binding slices. It doesn't block `anvil.node`/`anvil.wasm`.
+A2. **BR-2610-anvl-vtable-001**: append `get_path` to the `Document` vtable, plus a vtable
+    completeness test (every flat function has a member). Also from FR-2610-anvl-types-001's
+    findings.
+
+Both must be merged before the Bindings agent starts Phase 4.
+
+## Phase 4: bindings (separate repos; can overlap Phase 3) [ANVL Bindings agent, not the coder agent]
 
 13. **SR-2610-anvl-vendor-bump-001**: bump `anvil.node` and `anvil.wasm` off `52f29bf`. *(needs
     D3 for wasm)* Node can start as soon as Phase 1 is merged, so the fixes travel with it.
 14. **FR-2610-anvl-bindings-001, slice 1 (`anvil.node`)**: `TypeRegistry`/`Schema` over what's
     landed. Re-bump and add accessors as Phase 3 tickets merge.
-15. **FR-2610-anvl-bindings-002**: writer/builder in `anvil.node`. *(after #13)*
-16. **FR-2610-anvl-bindings-001, slices 2–3 (`anvil.py`, `anvil.net`)**. *(after D4)*
+14b. **FR-2610-anvl-bindings-001, slice 1b (`anvil.node`)**: `schema.validateField(docText,
+    name, opts)` plus `schema.fields` introspection. *(added 2026-10-25)*
+15. **FR-2610-anvl-bindings-002**: writer/builder in `anvil.node`, then in `anvil.wasm` (second
+    slice, added 2026-10-25). *(after #13)*
+16. **FR-2610-anvl-bindings-001, slices 2–3 (`anvil.py`, `anvil.net`)**. *(after D4; unblocked)*
+16b. **FR-2610-anvl-bindings-001, slice 4 (`anvil.wasm`)**: the same `TypeRegistry`/`Schema`
+    surface as `anvil.node`. *(added 2026-10-25)*
 
-## Phase 5: release
+## Phase 5: release [ANVL Release agent; now the Release Engineer, `agents/assignments/release-v0.10.0-rc.md`]
 
-17. **SR-2610-anvl-distribution-001**: `anvil-node`/`anvil-wasm` 0.9.x on anvldata.com, built
-    from a recorded native commit, with 0.8.0-rc kept live. *(after #13 and #14)*
+17. **SR-2610-anvl-distribution-001** and **BR-2610-anvl-distribution-001**: a tagged core release
+    and binding tarballs on anvldata.com, built from that tag. *(after **all** of Phase 4: owner
+    decision 2026-10-25. Version and the fate of the `0.8.0-rc` files are release decisions R1/R2.)*
 
 ---
 

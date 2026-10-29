@@ -24,6 +24,14 @@
 #include "anvil_types.h"
 #include <stddef.h>
 
+// The library is built with -fvisibility=hidden (src/sigma/* and other internals must never
+// leak into a consumer's global dynamic symbol table -- see notes/symbol-visibility.md); this
+// pragma pins every declaration below back to default visibility so the public ABI stays
+// exported from libanvil.so/anvil_node.node exactly as before.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(default)
+#endif
+
 /**
  * @brief Load, scan, include, parse, and resolve a document from a file path.
  * @param filepath Path to the root .anvl/.aml/.amp source file.
@@ -393,6 +401,18 @@ anvil_attribute anvil_document_get_attribute(anvil_document doc, size_t index);
 anvil_attribute anvil_document_find_attribute(anvil_document doc, const char *key);
 
 /**
+ * @brief The path a document was loaded from, as registered with its context: the file path
+ * for anvil_load (and for each resolved include), a fixed placeholder label for
+ * anvil_load_buffer. Lets a consumer name the document a diagnostic came from.
+ * @param doc The document to read. NULL writes nothing and returns 0.
+ * @param buf Destination buffer, or NULL to only query the required length.
+ * @param buflen Size of buf in bytes, including room for the NUL terminator.
+ * @return The full path length (excluding NUL), regardless of buflen - same
+ * snprintf-style convention as anvil_statement_get_name.
+ */
+size_t anvil_document_get_path(anvil_document doc, char *buf, size_t buflen);
+
+/**
  * @brief A statement's own `@[...]` attribute count.
  * @param stmt The statement to check. NULL returns 0.
  */
@@ -429,3 +449,23 @@ size_t anvil_attribute_get_key(anvil_attribute attr, char *buf, size_t buflen);
  * @param attr The attribute to read. NULL writes nothing and returns 0.
  */
 size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen);
+
+/**
+ * @brief An attribute's value read AS A VALUE, so the whole value API applies unchanged:
+ * anvil_value_get_type (STRING / BARE / NUMERIC / BOOL / NULL), anvil_value_get_text (escapes
+ * resolved, delimiters stripped: `@[status="done"]` reads as `done`), anvil_value_get_numeric and
+ * anvil_value_get_bytes. anvil_attribute_get_value is the raw-source-text reader and stays
+ * unchanged (it still returns `"done"` with its quotes).
+ *
+ * A value the scalar grammar does not accept as a whole (for example `@[range=1..5]` or
+ * `@[x=1 2]`) is exposed as a BARE value of its raw text, trimmed: reading it never fails and the
+ * document still loads. Like every string, the text may contain NUL bytes: use the returned length.
+ * @param attr The attribute to read. NULL returns NULL.
+ * @return The value handle, or NULL for a flag attribute (`@[active]`, no `=value`). It lives as
+ * long as the document the attribute came from; never dispose it.
+ */
+anvil_value anvil_attribute_get_value_handle(anvil_attribute attr);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif
