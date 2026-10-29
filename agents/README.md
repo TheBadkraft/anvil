@@ -18,7 +18,7 @@ that owns the work. Sub-agents last for one task and report only to the Principa
 | **Bindings Engineer** | `anvl-bindings-engineer` | `anvl-bindings` | Sonnet | ANVL Bindings |
 | **AnvilScript Language Engineer** | `anvl-asl-language-engineer` | `anvl-scribe` | Sonnet | Scribe |
 | **AnvilScript Runtime Engineer** | `anvl-asl-runtime-engineer` | `anvl-runner` | Sonnet | Runner |
-| **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification` (requested) | Sonnet | *new* |
+| **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification` | Sonnet | *new* |
 | **Release Engineer** | `anvl-release-engineer` | `anvl-release` | Sonnet | ANVL Release |
 | **Technical Writer** | `anvl-technical-writer` | `anvl-documentor` | Sonnet | ANVL Documentor |
 | **Triage Analyst** | `anvl-triage-analyst` | `anvl-triage` | Haiku | ANVL Triage |
