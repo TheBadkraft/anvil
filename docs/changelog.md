@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tickets moved to Rivet.** As of the 2026-10-26 freeze, every anvil and anvil.java ticket lives in
   Rivet; `BR/`, `FR/` and `SR/` are frozen history (a README notice in each folder says so). The
   agent instruction files say the same.
+- **The ANVL team is one session with sub-agents** (2026-10-29). The ANVL Principal Engineer
+  (formerly the ANVL Engineer) leads and decides on every ANVL ticket, core and bindings. Eight
+  roles are now sub-agent definitions in `.claude/agents/anvl-*.md`:
+  - Core Engineer, Bindings Engineer;
+  - AnvilScript Language Engineer, AnvilScript Runtime Engineer;
+  - Verification Engineer (new: an independent check of every branch before it merges);
+  - Release Engineer, Technical Writer, Triage Analyst.
+
+  The shared rules they all follow (TDD, Rivet, finish rules, design principles, public-text
+  scrub) are in `agents/STANDARDS.md`, and the team's operating model is in `agents/README.md`.
+  Owner approvals reach a sub-agent as an `AUTHORIZED: <action>` line in its task. The open
+  release and docs work moved from `agents/ANVL-RELEASE.agent.md` and
+  `agents/ANVL-DOCUMENTOR.agent.md` to `agents/assignments/`. The docs assignment gained one item:
+  stating the RFC 3339 profile of `iso8601_datetime`.
 
 ---
 
