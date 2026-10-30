@@ -88,10 +88,14 @@ typedef enum { ID_PLAIN = 0, ID_STMT_TOP, ID_STMT_NESTED } id_kind;
 typedef struct {
    const char *p;
    usize n;
+   uint64_t w; // the first 8 bytes of the name (zero-padded): for a name of up to 8 bytes, with n,
+               // this IS the name, so an equal pair needs no byte comparison
 } name_ref;
 typedef struct {
    name_ref small[NAME_SET_SMALL];
    usize count;
+   uint64_t seen;   // one bit per name (6 bits of its hash): a name whose bit is clear is new, and the
+                    // scan of `small` is skipped
    name_ref *table; // NULL until count passes NAME_SET_SMALL; capacity is a power of two
    usize cap;
 } name_set;
@@ -158,23 +162,38 @@ static void parser_set_error_at(anvl_source, anvl_err_code, usize line, usize co
 static bool name_equals(const char *a, usize an, const char *b, usize bn) {
    return an == bn && memcmp(a, b, an) == 0;
 }
-static usize name_hash(const char *p, usize n) {
-   usize h = (usize)1469598103934665603ULL; // FNV-1a
-   for (usize i = 0; i < n; i++) {
-      h = (h ^ (unsigned char)p[i]) * (usize)1099511628211ULL;
+// The first (up to) 8 bytes of a name as one word. `limit` is the end of the buffer the name is in:
+// a name that ends within 8 bytes of it is gathered a byte at a time instead of read past the end.
+static uint64_t name_word(const char *p, usize n, const char *limit) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+   if ((usize)(limit - p) >= 8) {
+      uint64_t w;
+      memcpy(&w, p, 8);
+      return n >= 8 ? w : (w & (((uint64_t)1 << (8 * n)) - 1));
    }
-   return h;
+#endif
+   uint64_t w = 0;
+   for (usize i = 0; i < n && i < 8; i++) {
+      w |= (uint64_t)(unsigned char)p[i] << (8 * i);
+   }
+   return w;
+}
+static bool name_ref_equals(const name_ref *a, const name_ref *b) {
+   return a->n == b->n && a->w == b->w && (a->n <= 8 || memcmp(a->p + 8, b->p + 8, a->n - 8) == 0);
+}
+static usize name_hash(const name_ref *r) {
+   return (usize)((r->w ^ ((uint64_t)r->n << 56)) * 0x9E3779B97F4A7C15ULL >> 24);
 }
 // Inserts into the table (which has room: load factor stays under one half). True if the name was
 // already there; the table is left unchanged in that case.
 static bool name_table_insert(name_ref *table, usize cap, name_ref ref) {
    usize mask = cap - 1;
-   for (usize i = name_hash(ref.p, ref.n) & mask;; i = (i + 1) & mask) {
+   for (usize i = name_hash(&ref) & mask;; i = (i + 1) & mask) {
       if (!table[i].p) {
          table[i] = ref;
          return false;
       }
-      if (name_equals(table[i].p, table[i].n, ref.p, ref.n)) {
+      if (name_ref_equals(&table[i], &ref)) {
          return true;
       }
    }
@@ -187,17 +206,22 @@ static void name_set_dispose(name_set *set) {
 }
 // Records a name. *duplicate is set when the set already held it. False only when the table
 // could not be allocated (out of memory).
-static bool name_set_add(name_set *set, anvl_slice name, bool *duplicate) {
-   name_ref ref = {name.start, (usize)(name.end - name.start)};
+static bool name_set_add(name_set *set, anvl_slice name, const char *limit, bool *duplicate) {
+   usize n = (usize)(name.end - name.start);
+   name_ref ref = {name.start, n, name_word(name.start, n, limit)};
    *duplicate = false;
    if (!set->table) {
-      for (usize i = 0; i < set->count; i++) {
-         if (name_equals(set->small[i].p, set->small[i].n, ref.p, ref.n)) {
-            *duplicate = true;
-            return true;
+      uint64_t bit = (uint64_t)1 << (name_hash(&ref) & 63);
+      if (set->seen & bit) {
+         for (usize i = 0; i < set->count; i++) {
+            if (name_ref_equals(&set->small[i], &ref)) {
+               *duplicate = true;
+               return true;
+            }
          }
       }
       if (set->count < NAME_SET_SMALL) {
+         set->seen |= bit;
          set->small[set->count++] = ref;
          return true;
       }
@@ -847,6 +871,7 @@ static bool parse_statement_list(anvl_source src, list *out_statements) {
    // the names this body has declared so far: a repeated one is 4001, at the repeat
    name_set names;
    names.count = 0;
+   names.seen = 0;
    names.table = NULL;
    names.cap = 0;
 
@@ -894,7 +919,8 @@ static bool parse_statement_in(anvl_source src, anvl_statement *out_stmt, name_s
    }
    if (names) {
       bool duplicate = false;
-      if (!name_set_add(names, (*out_stmt)->name, &duplicate)) {
+      if (!name_set_add(names, (*out_stmt)->name, (const char *)src->buffer.bucket + src->length,
+                        &duplicate)) {
          parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
          return false;
       }
