@@ -37,6 +37,8 @@ typedef struct {
                       // a non-NULL .data to report correctly) work on them.
    const char *pos;
    const char *end;
+   usize depth; // open '(' groups + prefix unary operators on the current parse path;
+                // bounded by ASL_MAX_NESTING_DEPTH so recursion can't exhaust the C stack.
 } asl_cursor_t;
 
 static bool asl_body_is_eof(const asl_cursor_t *cur) {
@@ -138,6 +140,22 @@ static bool asl_body_match_word(const asl_cursor_t *cur, const char *word) {
    return !Source.is_identifier_part(asl_body_peek_offset(cur, len));
 }
 
+// Enters one level of recursive nesting (a '(' group or a prefix unary operator). Fails with
+// ANVL_ERR_ASL_NESTING_TOO_DEEP past ASL_MAX_NESTING_DEPTH; every successful enter is paired
+// with asl_body_leave_nesting on every return path of the caller.
+static bool asl_body_enter_nesting(asl_cursor_t *cur, anvl_err_code *out_err) {
+   if (cur->depth >= ASL_MAX_NESTING_DEPTH) {
+      *out_err = ANVL_ERR_ASL_NESTING_TOO_DEEP;
+      return false;
+   }
+   cur->depth++;
+   return true;
+}
+
+static void asl_body_leave_nesting(asl_cursor_t *cur) {
+   cur->depth--;
+}
+
 static struct asl_ast_node *asl_body_alloc_node(bump_allocator arena, asl_ast_kind kind) {
    struct asl_ast_node *node = arena->alloc(arena, sizeof(struct asl_ast_node));
    if (node) {
@@ -161,7 +179,11 @@ static struct asl_ast_node *asl_body_parse_primary(asl_cursor_t *cur, bump_alloc
 
    if (asl_body_peek(cur) == '(') {
       asl_body_consume(cur, 1);
+      if (!asl_body_enter_nesting(cur, out_err)) {
+         return NULL;
+      }
       struct asl_ast_node *inner = asl_body_parse_expr(cur, arena, out_err);
+      asl_body_leave_nesting(cur);
       if (!inner) {
          return NULL;
       }
@@ -223,7 +245,11 @@ static struct asl_ast_node *asl_body_parse_unary(asl_cursor_t *cur, bump_allocat
       const char *op_start = cur->pos;
       asl_body_consume(cur, 1);
 
+      if (!asl_body_enter_nesting(cur, out_err)) {
+         return NULL;
+      }
       struct asl_ast_node *operand = asl_body_parse_unary(cur, arena, out_err);
+      asl_body_leave_nesting(cur);
       if (!operand) {
          return NULL;
       }
@@ -562,7 +588,7 @@ asl_ast_node asl_parse_body(anvl_slice body, bump_allocator arena, anvl_err_code
       return NULL;
    }
 
-   asl_cursor_t cur = {.data = body.data, .pos = body.start, .end = body.end};
+   asl_cursor_t cur = {.data = body.data, .pos = body.start, .end = body.end, .depth = 0};
 
    // Scratch, heap-backed while the statement count is unknown; copied into a fixed-size
    // arena array once parsing finishes -- a bump allocator can't grow an allocation in

@@ -804,6 +804,184 @@ static void test_aslast11_unterminated_grouping_fails_cleanly(void) {
    mod_ctx_dispose(ctx);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ASLAST12.. -- nesting-depth limit (BR-2610-anvl-asl-001). Each recursive
+ * production ('(' group, prefix unary) counts one level; past
+ * ASL_MAX_NESTING_DEPTH the parse fails with ANVL_ERR_ASL_NESTING_TOO_DEEP
+ * instead of overflowing the C stack. The input is generated here and fed
+ * straight to asl_parse_body; only the arena comes from a loaded fixture.
+ * ---------------------------------------------------------------------- */
+
+/* Builds '<head>' + `n` copies of `open` + 'x' + `n` copies of `close` + '<tail>' (close may
+ * be "" for unary). Caller frees. */
+static char *asl_nest_src(const char *head, const char *open, usize n, const char *close,
+                          const char *tail, usize *out_len) {
+   usize lo = strlen(open), lc = strlen(close);
+   usize total = strlen(head) + n * lo + 1 + n * lc + strlen(tail);
+   char *buf = malloc(total + 1);
+   if (!buf) {
+      return NULL;
+   }
+   char *p = buf;
+   memcpy(p, head, strlen(head));
+   p += strlen(head);
+   for (usize i = 0; i < n; i++) {
+      memcpy(p, open, lo);
+      p += lo;
+   }
+   *p++ = 'x';
+   for (usize i = 0; i < n; i++) {
+      memcpy(p, close, lc);
+      p += lc;
+   }
+   memcpy(p, tail, strlen(tail));
+   p += strlen(tail);
+   *p = '\0';
+   *out_len = (usize)(p - buf);
+   return buf;
+}
+
+/* Parses `src` as a function body; returns the root (NULL on error) and sets *err. */
+static void asl_depth_case(const char *label, const char *head, const char *open, usize n,
+                           const char *close, const char *tail, bool expect_ok) {
+   module_context ctx = NULL;
+   module_document doc = setup_asl_doc("asl_function_decl_empty.anvl", &ctx);
+   TestBit.is_not_null(doc, label);
+   if (!doc) {
+      return;
+   }
+   usize len = 0;
+   char *src = asl_nest_src(head, open, n, close, tail, &len);
+   TestBit.is_not_null(src, label);
+   if (!src) {
+      mod_ctx_dispose(ctx);
+      return;
+   }
+   anvl_slice body = {.data = src, .start = src, .end = src + len};
+   anvl_err_code err = ANVL_ERR_NONE;
+   asl_ast_node root = asl_parse_body(body, ctx->arena, &err);
+   if (expect_ok) {
+      TestBit.is_not_null(root, label);
+      TestBit.is_equal_int(ANVL_ERR_NONE, err, label);
+   } else {
+      TestBit.is_null(root, label);
+      TestBit.is_equal_int(ANVL_ERR_ASL_NESTING_TOO_DEEP, err, label);
+   }
+   free(src);
+   mod_ctx_dispose(ctx);
+}
+
+static void test_aslast12_parens_at_limit_ok(void) {
+   asl_depth_case("ASLAST12: parens exactly at the limit parse", "return ", "(",
+                  ASL_MAX_NESTING_DEPTH, ")", ";", true);
+}
+
+static void test_aslast13_parens_past_limit_rejected(void) {
+   asl_depth_case("ASLAST13: parens one past the limit -> NESTING_TOO_DEEP", "return ", "(",
+                  ASL_MAX_NESTING_DEPTH + 1, ")", ";", false);
+   asl_depth_case("ASLAST13: 1000 nested parens -> NESTING_TOO_DEEP", "return ", "(", 1000, ")",
+                  ";", false);
+}
+
+static void test_aslast14_unary_at_limit_ok(void) {
+   asl_depth_case("ASLAST14: unary chain exactly at the limit parses", "return ", "-",
+                  ASL_MAX_NESTING_DEPTH, "", ";", true);
+}
+
+static void test_aslast15_unary_past_limit_rejected(void) {
+   asl_depth_case("ASLAST15: unary chain one past the limit -> NESTING_TOO_DEEP", "return ", "-",
+                  ASL_MAX_NESTING_DEPTH + 1, "", ";", false);
+   asl_depth_case("ASLAST15: 1000 chained '!' -> NESTING_TOO_DEEP", "var y = ", "!", 1000, "", ";",
+                  false);
+}
+
+static void test_aslast16_mixed_paren_and_unary_share_one_budget(void) {
+   /* '-(' repeated: each pair is two levels, so 129 pairs = 258 levels > 256. */
+   asl_depth_case("ASLAST16: 128 '-(' pairs (256 levels) parse", "return ", "-(",
+                  ASL_MAX_NESTING_DEPTH / 2, ")", ";", true);
+   asl_depth_case("ASLAST16: 129 '-(' pairs (258 levels) -> NESTING_TOO_DEEP", "return ", "-(",
+                  ASL_MAX_NESTING_DEPTH / 2 + 1, ")", ";", false);
+}
+
+static void test_aslast17_depth_resets_between_expressions(void) {
+   /* Two statements, each 200 deep: neither exceeds the limit, so depth must not accumulate. */
+   usize len = 0;
+   char *a = asl_nest_src("var a = ", "(", 200, ")", ";\n", &len);
+   char *b = asl_nest_src("var b = ", "(", 200, ")", ";", &len);
+   TestBit.is_not_null(a, "ASLAST17: first generated");
+   TestBit.is_not_null(b, "ASLAST17: second generated");
+   if (a && b) {
+      usize la = strlen(a), lb = strlen(b);
+      char *src = malloc(la + lb + 1);
+      memcpy(src, a, la);
+      memcpy(src + la, b, lb + 1);
+      module_context ctx = NULL;
+      module_document doc = setup_asl_doc("asl_function_decl_empty.anvl", &ctx);
+      TestBit.is_not_null(doc, "ASLAST17: document loaded");
+      if (doc) {
+         anvl_slice body = {.data = src, .start = src, .end = src + la + lb};
+         anvl_err_code err = ANVL_ERR_NONE;
+         asl_ast_node root = asl_parse_body(body, ctx->arena, &err);
+         TestBit.is_not_null(root, "ASLAST17: two 200-deep statements parse");
+         TestBit.is_equal_int(ANVL_ERR_NONE, err, "ASLAST17: no error");
+         if (root) {
+            TestBit.is_equal_int(2, (long long)root->block.count, "ASLAST17: two statements");
+         }
+         mod_ctx_dispose(ctx);
+      }
+      free(src);
+   }
+   free(a);
+   free(b);
+}
+
+static void test_aslast18_siblings_in_one_expression_do_not_accumulate(void) {
+   /* '(((...x...))) + (((...x...)))': sibling groups, 200 deep each. */
+   usize len = 0;
+   char *a = asl_nest_src("return ", "(", 200, ")", " + ", &len);
+   char *b = asl_nest_src("", "(", 200, ")", ";", &len);
+   if (a && b) {
+      usize la = strlen(a), lb = strlen(b);
+      char *src = malloc(la + lb + 1);
+      memcpy(src, a, la);
+      memcpy(src + la, b, lb + 1);
+      module_context ctx = NULL;
+      module_document doc = setup_asl_doc("asl_function_decl_empty.anvl", &ctx);
+      TestBit.is_not_null(doc, "ASLAST18: document loaded");
+      if (doc) {
+         anvl_slice body = {.data = src, .start = src, .end = src + la + lb};
+         anvl_err_code err = ANVL_ERR_NONE;
+         asl_ast_node root = asl_parse_body(body, ctx->arena, &err);
+         TestBit.is_not_null(root, "ASLAST18: sibling deep groups parse");
+         TestBit.is_equal_int(ANVL_ERR_NONE, err, "ASLAST18: no error");
+         mod_ctx_dispose(ctx);
+      }
+      free(src);
+   }
+   free(a);
+   free(b);
+}
+
+static void test_aslast20_huge_nesting_fails_cleanly(void) {
+   /* Far past what the C stack could recurse; must be a clean error, not a crash. */
+   asl_depth_case("ASLAST20: 500000 nested parens -> NESTING_TOO_DEEP", "return ", "(", 500000, ")",
+                  ";", false);
+   asl_depth_case("ASLAST20: 500000 chained '-' -> NESTING_TOO_DEEP", "return ", "-", 500000, "",
+                  ";", false);
+   asl_depth_case("ASLAST20: 500000 alternating '-(' -> NESTING_TOO_DEEP", "return ", "-(", 500000,
+                  ")", ";", false);
+   asl_depth_case("ASLAST20: 500000 unclosed '(' -> NESTING_TOO_DEEP", "return ", "(", 500000, "",
+                  ";", false);
+}
+
+static void test_aslast19_nesting_error_is_its_own_code(void) {
+   TestBit.is_equal_int(5106, (long long)ANVL_ERR_ASL_NESTING_TOO_DEEP,
+                        "ASLAST19: nesting code is 5106");
+   TestBit.is_true(ANVL_ERR_ASL_NESTING_TOO_DEEP != ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED &&
+                      ANVL_ERR_ASL_NESTING_TOO_DEEP != ANVL_ERR_PARSER_EXPECTED_VALUE,
+                   "ASLAST19: distinct from call-depth and expected-value codes");
+}
+
 int main(void) {
    TestBit.run_ex("ASLAST01_var_and_return", NULL, test_aslast01_var_and_return, th);
    TestBit.run_ex("ASLAST02_additive_left_associative", NULL,
@@ -824,6 +1002,23 @@ int main(void) {
                   test_aslast10_grouping_with_unary_and_nesting, th);
    TestBit.run_ex("ASLAST11_unterminated_grouping_fails_cleanly", NULL,
                   test_aslast11_unterminated_grouping_fails_cleanly, th);
+   TestBit.run_ex("ASLAST12_parens_at_limit_ok", NULL, test_aslast12_parens_at_limit_ok, th);
+   TestBit.run_ex("ASLAST13_parens_past_limit_rejected", NULL,
+                  test_aslast13_parens_past_limit_rejected, th);
+   TestBit.run_ex("ASLAST14_unary_at_limit_ok", NULL, test_aslast14_unary_at_limit_ok, th);
+   TestBit.run_ex("ASLAST15_unary_past_limit_rejected", NULL,
+                  test_aslast15_unary_past_limit_rejected, th);
+   TestBit.run_ex("ASLAST16_mixed_share_one_budget", NULL,
+                  test_aslast16_mixed_paren_and_unary_share_one_budget, th);
+   TestBit.run_ex("ASLAST17_depth_resets_between_statements", NULL,
+                  test_aslast17_depth_resets_between_expressions, th);
+   TestBit.run_ex("ASLAST18_siblings_do_not_accumulate", NULL,
+                  test_aslast18_siblings_in_one_expression_do_not_accumulate, th);
+   TestBit.run_ex("ASLAST19_nesting_error_is_its_own_code", NULL,
+                  test_aslast19_nesting_error_is_its_own_code, th);
+
+   TestBit.run_ex("ASLAST20_huge_nesting_fails_cleanly", NULL,
+                  test_aslast20_huge_nesting_fails_cleanly, th);
 
    return TestBit.report();
 }

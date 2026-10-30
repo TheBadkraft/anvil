@@ -1,7 +1,7 @@
 # Conformance error-code coverage (FR-2610-anvl-conformance-002)
 
-`include/errors.h` declares 106 internal error codes (`anvl_err_code`). The conformance corpus (`conformance/cases/`)
-reaches **56** of them (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 50 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
+`include/errors.h` declares 107 internal error codes (`anvl_err_code`). The conformance corpus (`conformance/cases/`)
+reaches **56** of them (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 51 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
 established three ways: (1) a search of `src/` for a site that records each code finds none for most of them (the
 rest are listed with their reason below); (2) 200000 generated and mutated documents and fragments
 (`conformance/fuzz` generator, seed 7, one 200k chunk under the memory cap) reached no code outside the 40 the corpus held
@@ -120,6 +120,7 @@ record what native does today, and a port must match it.
 | 5103 | `ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED` | no | AnvilScript runtime error: declared and named, but nothing in `src/` records it; the runtime is a separate build. |
 | 5104 | `ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP` | no | AnvilScript runtime error: declared and named, but nothing in `src/` records it; the runtime is a separate build. |
 | 5105 | `ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP` | no | AnvilScript runtime error: declared and named, but nothing in `src/` records it; the runtime is a separate build. |
+| 5106 | `ANVL_ERR_ASL_NESTING_TOO_DEEP` | no | AnvilScript parse error (BR-2610-anvl-asl-001): expression nesting past `ASL_MAX_NESTING_DEPTH` (256); recorded only by the `WITH_ASL=1` body parser, which the conformance corpus does not reach. Tested in `test/unit/test_asl_ast.c`. |
 | 7001 | `ANVL_ERR_MEMORY_ALLOC_FAILED` | no | Allocation failure; not reachable from a well-formed input. |
 | 7002 | `ANVL_ERR_ARENA_NOT_INITIALIZED` | no | The arena is not initialised: an internal state a loaded document never reaches. |
 | 9001 | `ANVL_ERR_INVALID_OPERATION` | no | Reserved, out of scope for BR-2610-anvl-parser-005 (backlogged as FR-2610-anvl-errors-001); declared and named in `errors.c`, but nothing in `src/` ever records it; native reports the mistake under another code or accepts it. See the cases named in the section below. |

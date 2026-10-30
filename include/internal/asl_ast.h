@@ -36,6 +36,11 @@
 
 #if WITH_ASL
 
+/* Deepest expression nesting asl_parse_body accepts: each '(' group and each prefix unary
+ * operator counts one level. Past it the parse fails with ANVL_ERR_ASL_NESTING_TOO_DEEP
+ * instead of overflowing the C stack. */
+#define ASL_MAX_NESTING_DEPTH 256
+
 typedef enum {
    ASL_STMT_BLOCK,
    ASL_STMT_VAR_DECL,
