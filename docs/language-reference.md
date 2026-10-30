@@ -139,10 +139,13 @@ significant, a statement's `;`, which must stay on its value's line (§3).
   `ANVL_ERR_PARSER_INVALID_ATTRIBUTE` (4012).
 - A value is a single scalar: `null`, a bool, a number, a quoted string or a bare word. Quoting is never required:
   `@[env=production]` and `@[env="production"]` are both valid, and the first reads as the bare word `production`.
-  It can't be an array, an object or a tuple, and a `$` reference is refused too (2009). The attribute list ends at the first `,` or `]`, so an array, object or
-  tuple that is cut there (`@[k=[1,2]]`, `@[k=(1,2)]`, `@[k={a:=1,b:=2}]`, or one that never closes) is
-  `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` (2006), at the value. A bracketed value that closes before the
-  next `,` or `]` (`@[k={a}]`, `@[k=(1)]`) is read as a bare word, text with the brackets in it.
+  Anything else is refused. A value that starts with `[`, `(` or `{` (an array, tuple or object) or with a
+  backtick or `@` (a blob, tagged or not) is `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` (2006), at the value,
+  wherever a `,` or `]` falls: `@[k={a}]`, `@[k=(1)]`, `@[k=[x]]` and `@[k=@t`z`]` are all 2006. A blob is refused
+  because attributes are metadata about a statement and must stay small; anything as large as a blob belongs in
+  the statement's value (`x @[a=1] := @t`z`;`). A quoted string may hold any of those characters
+  (`@[k="{a}"]`). A `$` reference is refused too (2009). The writer and the builder refuse the same values
+  (`ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE`).
 - `@[]` is `ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK` (2008).
 - Two keys with no comma between them (`@[a b]`) are `ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES` (3014).
 - An `@` that does not open `@[` is `ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK` (4011).
@@ -263,7 +266,7 @@ rules in §3 to §7 (a rejected input keeps its category and place; only the cod
 |---|---|---|
 | 2004 | `ANVL_ERR_PARSER_MULTIPLE_SHEBANG` | a second `#!` after an opening shebang |
 | 2005 | `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS` | a `#!` with no opening shebang on the first line |
-| 2006 | `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` | an array, object or tuple as an attribute value (cut short or unclosed) |
+| 2006 | `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` | an attribute value that is an array, tuple, object or blob (starts with `[`, `(`, `{`, a backtick or `@`) |
 | 2008 | `ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK` | `@[]` |
 | 3001 | `ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD` | a missing field name in an object body |
 | 3004 | `ANVL_ERR_PARSER_TRAILING_COMMA_IN_OBJECT` | a comma before `}` in an object body |
