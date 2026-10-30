@@ -38,9 +38,10 @@ assert.strictEqual(a.parse('#!aml\nname := "David";\n').get('name').asString(), 
 })().catch((e) => { console.error(e); process.exit(1); });
 JS
 cat > "$work/proj/esm.mjs" <<'JS'
-import anvl, { parse, getVersion } from 'anvil.js';
+import anvl from 'anvil.js';
+const { parse, getVersion } = anvl;
 if (anvl.implementation !== 'anvil.js' || typeof parse !== 'function' || !getVersion().includes('+')) process.exit(1);
-console.log('PASS js: static ESM import (default and named) works');
+console.log('PASS js: static ESM default import works (named imports from the CommonJS entry are not offered)');
 JS
 node "$work/proj/esm.mjs" || fail "static ESM import"
 # conformance through the installed copy
