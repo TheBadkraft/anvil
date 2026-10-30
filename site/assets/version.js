@@ -1,1 +1,1 @@
-window.ANVL_VERSION = "0.11.0-rc";
+window.ANVL_VERSION = "0.12.0-rc";
