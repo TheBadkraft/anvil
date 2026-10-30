@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed (downloads)
 
+- **`SHA256SUMS` is cumulative.** It lists every published tarball, v0.11.0-rc first, then v0.10.0-rc, so pins on earlier releases still verify against it. `SHA256SUMS-v0.10.0-rc` stays and `SHA256SUMS-v0.11.0-rc` is added, so each version also has its own file. No tarball changed. `/download` words this.
 - **Previous release candidates stay downloadable at their URLs.** The v0.10.0-rc tarballs removed by the
   v0.11.0-rc deploy are restored, byte-identical, with `SHA256SUMS-v0.10.0-rc`, because consumers pin them
   (FlyWire installs `anvil-node` and `anvil-wasm` straight from these URLs). `/download` links them under
