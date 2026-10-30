@@ -87,6 +87,11 @@ Principal Engineer asks for once the release is staged.
 
 | Step | State |
 |---|---|
-| 1. Cut core: `0.12.1-rc`, `[Unreleased]` -> `[v0.12.1-rc]` | done on `release/v0.12.1-rc`, waiting for the merge and tag |
-| 2. Tooling fix (package-js.sh exports) | on `release/v0.12.1-rc-tooling` |
-| 3. Pins, builds, checks, benches, staging | after the tag |
+| 1. Cut core `0.12.1-rc` | done; tag `v0.12.1-rc` on `d10c9df`, BUILD 420, pushed |
+| 2. Tooling fix | done: anvil.js `package-js.sh` takes `exports` from the repo; installed-copy checks in `check-js-package.sh` |
+| 3. Pins on `release/v0.12.1-rc` | done, waiting for the merge: py `6d1edad`, net `56f2066`, anvil.js `fe233a3` |
+| 4. Build twice | byte-identical |
+| 5. Checks on the packaged files | pass (see the handoff); browsers 11 checks each |
+| 6. Benchmarks | pass: native 0.97x to 1.004x, net 0.995x to 1.000x vs v0.12.0-rc; anvil.js read worst 0.49x, write worst 0.67x vs anvil-node v0.10.0-rc |
+| 7. Stage | done in `~/release-staging/v0.12.1-rc/` |
+| 8. Deploy and live check | after the owner's go and the Technical Writer's deploy |
