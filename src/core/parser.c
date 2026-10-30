@@ -744,6 +744,17 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
       }
       const char *key_end = Source.at(src);
 
+      // a keyword or reserved word is not an attribute name (4004), reported where the key starts
+      anvl_slice key_slice = {0};
+      Source.init_slice(src, &key_slice);
+      key_slice.start = key_start;
+      key_slice.end = key_end;
+      if (Source.is_keyword(key_slice)) {
+         parser_set_error_at(src, ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD, key_line, key_col);
+         dispose_attribute_list(attrs);
+         return false;
+      }
+
       // a key repeated within the block (4013), reported at the repeat
       for (usize i = 0, n = List.size(attrs); i < n; i++) {
          anvl_attribute prev = NULL;

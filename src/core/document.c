@@ -314,6 +314,16 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
          }
          usize key_end = Source.position(src);
 
+         // a keyword or reserved word is not an attribute name (4004), reported where the key starts
+         anvl_slice key_slice = {0};
+         Source.init_slice(src, &key_slice);
+         key_slice.start = (const char *)src->buffer.bucket + key_start;
+         key_slice.end = (const char *)src->buffer.bucket + key_end;
+         if (Source.is_keyword(key_slice)) {
+            header_fail_at(doc, err_code, ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD, key_line, key_col);
+            return false;
+         }
+
          // a key repeated anywhere in the module's attributes (4013), reported at the repeat
          for (usize i = 0, n = List.size(doc->header->attributes); i < n; i++) {
             anvl_attribute prev = NULL;

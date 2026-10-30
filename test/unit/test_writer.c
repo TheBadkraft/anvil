@@ -927,6 +927,66 @@ static void test_w21_duplicate_attribute_keys(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * W22 (BR-2610-anvl-parser-005) - a keyword or reserved word is refused as a
+ * name at any level: statement, field at every depth, attribute key. The
+ * reader refuses them (4003, 4004).
+ * ---------------------------------------------------------------------- */
+static bool kw_attr_statement(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "include", NULL);
+}
+static bool kw_attr_statement_string(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute_string(w, "true", "s", 1);
+}
+static bool kw_attr_module(anvil_writer w) { return anvil_writer_attribute(w, "vars", "1"); }
+static bool kw_attr_module_string(anvil_writer w) {
+   return anvil_writer_attribute_string(w, "null", "s", 1);
+}
+static bool kw_attr_nested(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "import", NULL);
+}
+static bool kw_statement(anvil_writer w) { return anvil_writer_statement(w, "false", NULL); }
+static bool kw_field(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "null", NULL);
+}
+static bool kw_field_depth2(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "p", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "include", NULL);
+}
+static bool kw_field_in_array(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "vars", NULL);
+}
+static void test_w22_keyword_names(void) {
+   const anvil_writer_err_code R = ANVIL_WRITER_ERR_RESERVED_WORD;
+   expect_error(ANVIL_WRITER_AML, kw_attr_statement, R, "W22: attribute key, statement");
+   expect_error(ANVIL_WRITER_AML, kw_attr_statement_string, R, "W22: attribute key, statement, string");
+   expect_error(ANVIL_WRITER_AML, kw_attr_module, R, "W22: attribute key, module");
+   expect_error(ANVIL_WRITER_AML, kw_attr_module_string, R, "W22: attribute key, module, string");
+   expect_error(ANVIL_WRITER_AML, kw_attr_nested, R, "W22: attribute key, nested statement");
+   expect_error(ANVIL_WRITER_AML, kw_statement, R, "W22: statement name");
+   expect_error(ANVIL_WRITER_AML, kw_field, R, "W22: field, depth 1");
+   expect_error(ANVIL_WRITER_AML, kw_field_depth2, R, "W22: field, depth 2");
+   expect_error(ANVIL_WRITER_AML, kw_field_in_array, R, "W22: field of an object in an array");
+   const char *words[] = {"include", "import", "vars", "true", "false", "null"};
+   for (size_t i = 0; i < 6; i++) {
+      anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+      TestBit.is_false(anvil_writer_attribute(w, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_writer_get_error(w), words[i]);
+      anvil_writer_dispose(w);
+   }
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_attribute(w, "included", NULL);
+   anvil_writer_attribute(w, "Include", NULL);
+   anvil_writer_int(w, 1);
+   TestBit.is_true(anvil_writer_finish(w), "W22: a longer or differently cased word is a fine key");
+   anvil_writer_dispose(w);
+}
+
+/* ---------------------------------------------------------------------- *
  * W18 (BR-2610-anvl-writer-001) - the name-set hash is true 64-bit FNV-1a, whatever size_t is
  * ---------------------------------------------------------------------- */
 static void test_w18_hash_is_fnv1a_64(void) {
@@ -981,5 +1041,6 @@ int main(void) {
    TestBit.run_ex("W19_nameset_survives_growth", NULL, test_w19_nameset_survives_growth, th);
    TestBit.run_ex("W20_duplicate_fields", NULL, test_w20_duplicate_fields, th);
    TestBit.run_ex("W21_duplicate_attribute_keys", NULL, test_w21_duplicate_attribute_keys, th);
+   TestBit.run_ex("W22_keyword_names", NULL, test_w22_keyword_names, th);
    return TestBit.report();
 }

@@ -1,7 +1,7 @@
 # Conformance error-code coverage (FR-2610-anvl-conformance-002)
 
 `include/errors.h` declares 106 internal error codes (`anvl_err_code`). The conformance corpus (`conformance/cases/`)
-reaches **55** of them (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 51 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
+reaches **56** of them (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 50 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
 established three ways: (1) a search of `src/` for a site that records each code finds none for most of them (the
 rest are listed with their reason below); (2) 200000 generated and mutated documents and fragments
 (`conformance/fuzz` generator, seed 7, one 200k chunk under the memory cap) reached no code outside the 40 the corpus held
@@ -27,11 +27,11 @@ record what native does today, and a port must match it.
 | 1002 | `ANVL_ERR_IO_FILE_NOT_FOUND` | no | Raised only when the root file does not exist. An included file that does not exist is 4204. |
 | 1003 | `ANVL_ERR_IO_INVALID_PATH` | no | Raised for an empty or invalid root path, never for document content. An include with such a path is 4204. |
 | 2000 | `ANVL_ERR_PARSER_INITIALIZATION_FAILED` | no | Written only when the parser cannot be set up or fails without recording a cause (out of memory). |
-| 2001 | `ANVL_ERR_PARSER_EXPECTED_IDENTIFIER` | yes (70 dumps) | `coverage/columns/bom_ok.anvl` |
-| 2002 | `ANVL_ERR_PARSER_EXPECTED_ASSIGN` | yes (39 dumps) | `coverage/columns/before_assign__bad_utf8.anvl` |
-| 2003 | `ANVL_ERR_PARSER_EXPECTED_VALUE` | yes (68 dumps) | `coverage/columns/mb_ident_value.anvl` |
+| 2001 | `ANVL_ERR_PARSER_EXPECTED_IDENTIFIER` | yes (59 dumps) | `coverage/columns/bom_ok.anvl` |
+| 2002 | `ANVL_ERR_PARSER_EXPECTED_ASSIGN` | yes (32 dumps) | `coverage/columns/before_assign__bad_utf8.anvl` |
+| 2003 | `ANVL_ERR_PARSER_EXPECTED_VALUE` | yes (69 dumps) | `coverage/columns/mb_ident_value.anvl` |
 | 2004 | `ANVL_ERR_PARSER_MULTIPLE_SHEBANG` | yes (8 dumps) | `coverage/errors/second_shebang.anvl` |
-| 2005 | `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS` | yes (12 dumps) | `coverage/errors/second_shebang.anvl` |
+| 2005 | `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS` | yes (6 dumps) | `coverage/errors/shebang_after_statement.anvl` |
 | 2006 | `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` | yes (9 dumps) | `coverage/errors/attr_value_array.anvl` |
 | 2007 | `ANVL_ERR_PARSER_INVALID_IDENTIFIER` | no | Nothing records it any more (BR-2610-anvl-parser-005): its only producer was an invalid attribute key, which is now 4012 (`errors/attr_invalid_key_digit.anvl`), or 2008 for an empty block. |
 | 2008 | `ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK` | yes (4 dumps) | `coverage/errors/attr_empty_with_comment.anvl` |
@@ -53,11 +53,11 @@ record what native does today, and a port must match it.
 | 3014 | `ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES` | yes (3 dumps) | `coverage/errors/attr_missing_comma_flags.anvl` |
 | 3015 | `ANVL_ERR_PARSER_UNEXPECTED_MODULE_ATTRIBUTES` | yes (5 dumps) | `coverage/errors/module_attr_after_statement.anvl` |
 | 3016 | `ANVL_ERR_PARSER_EXPECTED_COLON` | no | No input fits: a missing `:=` is 2002 (`errors/assign_equals.anvl`), and no other position expects a colon. Left reserved (BR-2610-anvl-parser-005). |
-| 3100 | `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` | yes (38 dumps) | `coverage/errors/amp_no_shebang.amp` |
+| 3100 | `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` | yes (37 dumps) | `coverage/errors/amp_no_shebang.amp` |
 | 4001 | `ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT` | yes (11 dumps) | `coverage/errors/object_duplicate_assign_then_block.anvl` |
 | 4002 | `ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT` | yes (9 dumps) | `coverage/errors/object_key_attribute_block.anvl` |
-| 4003 | `ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD` | yes (22 dumps) | `coverage/errors/amp_import_not_allowed.amp` |
-| 4004 | `ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD` | no | Not enforced: the language reference does not say an attribute name cannot be a keyword, and `x @[include] := 1;` loads today (`errors/attr_keyword_key.anvl`). Awaiting an owner decision (BR-2610-anvl-parser-005). |
+| 4003 | `ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD` | yes (27 dumps) | `coverage/errors/amp_import_not_allowed.amp` |
+| 4004 | `ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD` | yes (15 dumps) | `coverage/errors/attr_key_keyword_false.anvl` |
 | 4005 | `ANVL_ERR_PARSER_TUPLE_TOO_SHORT` | no | A synonym of 3013 (`errors/tuple_one_element.anvl`); no input gets a generic code, so native keeps reporting 3013. Left as is (BR-2610-anvl-parser-005). |
 | 4006 | `ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE` | yes (4 dumps) | `coverage/errors/tuple_missing_comma_eof.anvl` |
 | 4007 | `ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT` | yes (5 dumps) | `coverage/errors/tuple_empty_element.frag` |
@@ -68,16 +68,16 @@ record what native does today, and a port must match it.
 | 4012 | `ANVL_ERR_PARSER_INVALID_ATTRIBUTE` | yes (12 dumps) | `coverage/columns/mb_attr_error.anvl` |
 | 4013 | `ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY` | yes (9 dumps) | `coverage/errors/attr_duplicate_flag.anvl` |
 | 4014 | `ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE` | no | Reserved, out of scope for BR-2610-anvl-parser-005 (backlogged as FR-2610-anvl-errors-001); declared and named in `errors.c`, but nothing in `src/` ever records it; native reports the mistake under another code or accepts it. See the cases named in the section below. |
-| 4015 | `ANVL_ERR_ANON_BLOCK_REDECLARATION` | no | Not used: a block and a later name collision at top level is 4053 (`errors/document_duplicate_name.anvl`, `errors/object_duplicate_assign_then_block.anvl` is 4001 in an object), because the reference makes `ident { }` and `ident := { }` the same statement. Awaiting an owner decision (BR-2610-anvl-parser-005). |
+| 4015 | `ANVL_ERR_ANON_BLOCK_REDECLARATION` | no | Not used: a block and a later name collision at top level is 4053 (`errors/document_duplicate_name.anvl`, `errors/object_duplicate_assign_then_block.anvl` is 4001 in an object), because the reference makes `ident { }` and `ident := { }` the same statement. Owner decision 2026-10-30: stays reserved and unused. |
 | 4016 | `ANVL_ERR_PARSER_UNTERMINATED_COMMENT` | yes (13 dumps) | `coverage/errors/block_comment_unterminated.anvl` |
-| 4017 | `ANVL_ERR_PARSER_UNTERMINATED_STATEMENT` | yes (66 dumps) | `coverage/columns/multiline_string__bad_utf8.anvl` |
+| 4017 | `ANVL_ERR_PARSER_UNTERMINATED_STATEMENT` | yes (67 dumps) | `coverage/columns/multiline_string__bad_utf8.anvl` |
 | 4018 | `ANVL_ERR_PARSER_VALUE_IS_KEYWORD` | yes (5 dumps) | `grammar/bare_import.anvl` |
 | 4019 | `ANVL_ERR_PARSER_INVALID_BLOB_TAG` | yes (5 dumps) | `coverage/errors/blob_tag_invalid.anvl` |
-| 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | yes (2 dumps) | `fixtures/body_err_base_non_object.anvl` |
+| 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | yes (17 dumps) | `coverage/errors/inherit_from_array.anvl` |
 | 4021 | `ANVL_ERR_PARSER_INVALID_BARE_LITERAL` | yes (2 dumps) | `unit/body_amp_L1029.anvl` |
 | 4050 | `ANVL_ERR_RESOLVER_CYCLE_DETECTED` | yes (4 dumps) | `coverage/errors/inherit_cycle.anvl` |
 | 4051 | `ANVL_ERR_RESOLVER_MISSING_BASE` | yes (4 dumps) | `coverage/errors/inherit_unknown_base.anvl` |
-| 4052 | `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` | yes (1 dumps) | `unit/resolver_L288.anvl` |
+| 4052 | `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` | yes (2 dumps) | `coverage/errors/inherit_from_anonymous.anvl` |
 | 4053 | `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` | yes (17 dumps) | `coverage/errors/document_duplicate_name.anvl` |
 | 4101 | `ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |
 | 4102 | `ANVL_ERR_VARS_NOT_FIRST` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |
@@ -86,7 +86,7 @@ record what native does today, and a port must match it.
 | 4105 | `ANVL_ERR_VARS_KEY_NOT_FOUND` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |
 | 4201 | `ANVL_ERR_INCLUDE_NOT_FIRST` | yes (9 dumps) | `coverage/errors/include_after_attr_and_statement.anvl` |
 | 4202 | `ANVL_ERR_INCLUDE_AMP_FORBIDDEN` | yes (3 dumps) | `coverage/errors/amp_include_not_allowed.amp` |
-| 4203 | `ANVL_ERR_INCLUDE_DUPLICATE_ALIAS` | no | Not enforced: the reference has no include aliases ("no aliasing and no namespaces"), so there is nothing to duplicate. Awaiting an owner decision (BR-2610-anvl-parser-005). |
+| 4203 | `ANVL_ERR_INCLUDE_DUPLICATE_ALIAS` | no | Not enforced: the reference has no include aliases ("no aliasing and no namespaces"), so there is nothing to duplicate. Owner decision 2026-10-30: stays reserved and unused. |
 | 4204 | `ANVL_ERR_INCLUDE_FILE_NOT_FOUND` | yes (12 dumps) | `coverage/includes/abs_missing.anvl` |
 | 4206 | `ANVL_ERR_INCLUDE_CYCLIC` | yes (10 dumps) | `coverage/includes/mutual_a.anvl` |
 | 4305 | `ANVL_ERR_IMPORT_MODULE_NOT_FOUND` | no | For `import`, an AnvilScript feature: with WITH_ASL=0 it is a reserved word (4003, `errors/import_in_aml.anvl`, `errors/amp_import_not_allowed.amp`). Nothing records it. |
@@ -132,12 +132,12 @@ record what native does today, and a port must match it.
 
 ## BR-2610-anvl-parser-005: what changed
 
-Codes now reached by the corpus (15 more, 2007 no longer): 2004, 2006, 2008, 3001, 3004, 3014, 3015, 4001, 4002, 4007,
+Codes now reached by the corpus (16 more, 2007 no longer): 2004, 4004, 2006, 2008, 3001, 3004, 3014, 3015, 4001, 4002, 4007,
 4011, 4012, 4013, 4201, 5001 (and 4020 now also by a non-object base). Several rows above that read "native reports the
 mistake under another code or accepts it" were written before this ticket: the duplicate attribute key
 (`errors/attr_duplicate_key.anvl`), the duplicate object field (`errors/object_duplicate_field.anvl`) and inheritance
 from a scalar (`errors/inherit_from_scalar.anvl`) are now errors with the code in their dump.
 
-Codes the ticket asked for and left, with the reason, are in the rows above: 4004, 4015, 4203 (the language
-reference defines no such rule), 3011, 4005 (synonyms of 4009 and 3013) and 3016 (no input). The leftover reserved codes
+Codes the ticket asked for and left, with the reason, are in the rows above: 4015 and 4203 (the language
+reference defines no such rule; the owner confirmed they stay reserved and unused), 3011, 4005 (synonyms of 4009 and 3013) and 3016 (no input). The leftover reserved codes
 (4008, 4010, 4014, 4501, 5004, 5006, 5007, 5011, 5012, 9001, 9999) are backlogged as FR-2610-anvl-errors-001.

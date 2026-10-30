@@ -633,6 +633,36 @@ static void test_b14_duplicates(void) {
    anvil_builder_dispose(b);
 }
 
+/* B15 (BR-2610-anvl-parser-005) - keywords and reserved words are refused as names at any level */
+static void test_b15_keyword_names(void) {
+   const anvil_writer_err_code R = ANVIL_WRITER_ERR_RESERVED_WORD;
+   const char *words[] = {"include", "import", "vars", "true", "false", "null"};
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node o = anvil_builder_object(b);
+   anvil_node deep = anvil_builder_object(b);
+   anvil_member holder = anvil_builder_add(b, o, "p", deep);
+   TestBit.is_not_null(holder, "B15: a plain field");
+   anvil_member m = ADD(b, "x", anvil_builder_int(b, 1));
+   for (size_t i = 0; i < 6; i++) {
+      TestBit.is_false(anvil_builder_attribute(b, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_attribute_string(b, words[i], "s", 1), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_member_attribute(b, m, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_member_attribute_string(b, m, words[i], "s", 1), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(ADD(b, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(anvil_builder_add(b, o, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(anvil_builder_add(b, deep, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+   }
+   TestBit.is_true(anvil_builder_member_attribute(b, m, "included", NULL), "B15: a longer word is fine");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -648,5 +678,6 @@ int main(void) {
    TestBit.run_ex("B12_many_statements", NULL, test_b12_many_statements, th);
    TestBit.run_ex("B13_vtable_matches_flat", NULL, test_b13_vtable_matches_flat, th);
    TestBit.run_ex("B14_duplicates", NULL, test_b14_duplicates, th);
+   TestBit.run_ex("B15_keyword_names", NULL, test_b15_keyword_names, th);
    return TestBit.report();
 }

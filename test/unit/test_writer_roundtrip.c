@@ -820,19 +820,20 @@ static unsigned sweep_next(unsigned n) {
    sweep_state ^= sweep_state << 17;
    return (unsigned)(sweep_state % n);
 }
-static const char *const SWEEP_NAMES[] = {"a", "b", "c", "d"};
-static const char *const SWEEP_KEYS[] = {"k", "m", "n"};
+// two of the draws are reserved words, so keyword names are exercised as well as repeats
+static const char *const SWEEP_NAMES[] = {"a", "b", "c", "d", "include", "true"};
+static const char *const SWEEP_KEYS[] = {"k", "m", "n", "vars", "null"};
 
 // Writes one statement (and, for an object, its fields) with random content. False once the
 // writer has rejected something.
 static bool sweep_writer_value(anvil_writer w, int depth);
 static bool sweep_writer_statement(anvil_writer w, int depth) {
-   if (!anvil_writer_statement(w, SWEEP_NAMES[sweep_next(4)], NULL)) {
+   if (!anvil_writer_statement(w, SWEEP_NAMES[sweep_next(6)], NULL)) {
       return false;
    }
    unsigned na = sweep_next(3);
    for (unsigned i = 0; i < na; i++) {
-      const char *key = SWEEP_KEYS[sweep_next(3)];
+      const char *key = SWEEP_KEYS[sweep_next(5)];
       bool ok = sweep_next(2) ? anvil_writer_attribute(w, key, NULL)
                               : anvil_writer_attribute_string(w, key, "v", 1);
       if (!ok) {
@@ -874,7 +875,7 @@ static bool sweep_writer_value(anvil_writer w, int depth) {
 }
 static bool dup_code(anvil_writer_err_code c) {
    return c == ANVIL_WRITER_ERR_DUPLICATE_NAME || c == ANVIL_WRITER_ERR_DUPLICATE_FIELD ||
-          c == ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY;
+          c == ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY || c == ANVIL_WRITER_ERR_RESERVED_WORD;
 }
 
 static void test_rt14_writer_sweep(void) {
@@ -885,7 +886,7 @@ static void test_rt14_writer_sweep(void) {
       bool ok = true;
       unsigned nm = sweep_next(3);
       for (unsigned i = 0; ok && i < nm; i++) {
-         ok = anvil_writer_attribute(w, SWEEP_KEYS[sweep_next(3)], NULL);
+         ok = anvil_writer_attribute(w, SWEEP_KEYS[sweep_next(5)], NULL);
       }
       unsigned ns = 1 + sweep_next(4);
       for (unsigned i = 0; ok && i < ns; i++) {
@@ -909,23 +910,23 @@ static void test_rt14_writer_sweep(void) {
       }
       anvil_writer_dispose(w);
    }
-   TestBit.is_true(accepted > 300, "RT14: the writer sweep accepted a good share of documents");
+   TestBit.is_true(accepted > 100, "RT14: the writer sweep accepted a good share of documents");
    TestBit.is_true(rejected > 300, "RT14: the writer sweep hit repeats");
    TestBit.is_equal_int(0, not_loading, "RT14: every document the writer accepted loads");
-   TestBit.is_equal_int(0, wrong_reject, "RT14: the writer rejected only repeats");
+   TestBit.is_equal_int(0, wrong_reject, "RT14: the writer rejected only repeats and reserved words");
 }
 
 static anvil_node sweep_builder_value(anvil_builder b, int depth);
 static void sweep_builder_fill(anvil_builder b, anvil_node object, int depth, unsigned n) {
    for (unsigned i = 0; i < n; i++) {
       anvil_node v = sweep_builder_value(b, depth + 1);
-      anvil_member m = anvil_builder_add(b, object, SWEEP_NAMES[sweep_next(4)], v);
+      anvil_member m = anvil_builder_add(b, object, SWEEP_NAMES[sweep_next(6)], v);
       if (!m) {
          continue; // a repeat: rejected, the document goes on without it
       }
       unsigned na = sweep_next(3);
       for (unsigned k = 0; k < na; k++) {
-         const char *key = SWEEP_KEYS[sweep_next(3)];
+         const char *key = SWEEP_KEYS[sweep_next(5)];
          if (sweep_next(2)) {
             (void)anvil_builder_member_attribute(b, m, key, NULL);
          } else {
@@ -962,7 +963,7 @@ static void test_rt14_builder_sweep(void) {
       anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
       unsigned nm = sweep_next(3);
       for (unsigned i = 0; i < nm; i++) {
-         (void)anvil_builder_attribute(b, SWEEP_KEYS[sweep_next(3)], NULL);
+         (void)anvil_builder_attribute(b, SWEEP_KEYS[sweep_next(5)], NULL);
       }
       sweep_builder_fill(b, NULL, 0, 1 + sweep_next(4));
       size_t len = 0;
@@ -979,7 +980,7 @@ static void test_rt14_builder_sweep(void) {
       }
       anvil_builder_dispose(b);
    }
-   TestBit.is_true(emitted > 1000, "RT14: the builder sweep emitted a good share of documents");
+   TestBit.is_true(emitted > 300, "RT14: the builder sweep emitted a good share of documents");
    TestBit.is_equal_int(0, not_loading, "RT14: every document the builder emits loads");
    (void)refused;
 }

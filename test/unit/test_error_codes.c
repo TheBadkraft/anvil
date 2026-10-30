@@ -289,6 +289,33 @@ static void test_p4_unexpected_char(void) {
 }
 
 /* ====================================================================== *
+ * Part 6: keywords and reserved words are refused as names at any level
+ * ====================================================================== */
+static void test_p6_keywords_as_names(void) {
+   static const ec_case cases[] = {
+      CASE_ERR("P6.01 include as an attribute key", "x @[include] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P6.02 import", "x @[import] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P6.03 vars", "x @[vars] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P6.04 true", "x @[true] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P6.05 false", "x @[false=1] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P6.06 null after another key", "x @[a, null] := 1;", 4004, SYN, 1, 8),
+      CASE_ERR("P6.07 module attribute", "@[vars]\nx := 1;", 4004, HDR, 1, 3),
+      CASE_ERR("P6.08 module attribute, second block", "@[a]\n@[null]\nx := 1;", 4004, HDR, 2, 3),
+      CASE_ERR("P6.09 nested statement", "x := { y @[false] := 1; };", 4004, SYN, 1, 12),
+      CASE_ERR("P6.10 multi-line", "x @[\n  a,\n  include\n] := 1;", 4004, SYN, 3, 3),
+      CASE_OK("P6.11 a longer word is not a keyword", "x @[included, trueish, nulls] := 1;"),
+      CASE_OK("P6.12 keywords are case sensitive", "x @[Include, TRUE, Null] := 1;"),
+      CASE_ERR("P6.20 statement name, top level (4003)", "true := 1;", 4003, SYN, 1, 5),
+      CASE_ERR("P6.21 object field (4003)", "x := { true := 1; };", 4003, SYN, 1, 12),
+      CASE_ERR("P6.22 object field, import", "x := { import := 1; };", 4003, SYN, 1, 14),
+      CASE_ERR("P6.23 field of a block", "x {\n  vars := 1;\n};", 4003, SYN, 2, 7),
+      CASE_ERR("P6.24 field at depth 2", "x := { y := { null := 1; }; };", 4003, SYN, 1, 19),
+      CASE_ERR("P6.25 field inside an array", "x := [ { false := 1; } ];", 4003, SYN, 1, 16),
+   };
+   RUN(cases);
+}
+
+/* ====================================================================== *
  * Part 5: what stays as it was
  * ====================================================================== */
 static void test_p5_unchanged(void) {
@@ -297,8 +324,8 @@ static void test_p5_unchanged(void) {
       CASE_ERR("P5.02 one-element tuple is 3013 (4005 is a synonym)", "x := (1);", 3013, SYN, 1, 8),
       CASE_ERR("P5.03 empty tuple", "x := ();", 3012, SYN, 1, 7),
       CASE_ERR("P5.04 empty object", "x := {};", 3010, SYN, 1, 7),
-      CASE_OK("P5.05 a keyword attribute name is legal today (4004 is not enforced)", "x @[include] := 1;"),
-      CASE_OK("P5.06 an attribute named like a keyword with a value", "x @[import=1, vars=2] := 1;"),
+      CASE_ERR("P5.05 a keyword attribute name is 4004 (owner decision)", "x @[include] := 1;", 4004, SYN, 1, 5),
+      CASE_ERR("P5.06 a keyword attribute name with a value", "x @[import=1, vars=2] := 1;", 4004, SYN, 1, 5),
       CASE_ERR("P5.07 a block and a name repeated at top level is 4053 (4015 is not used)", "x { a := 1; };\nx := 2;", 4053, RES, 2, 1),
       CASE_ERR("P5.08 a missing := is 2002 (3016 is not used)", "x = 1;", 2002, SYN, 1, 3),
       CASE_ERR("P5.09 include as a name at the start is a header error", "include := 1;", 3100, HDR, 1, 9),
@@ -322,5 +349,6 @@ int main(void) {
    TestBit.run_ex("P4_attribute_value", NULL, test_p4_attribute_value, th);
    TestBit.run_ex("P4_unexpected_char", NULL, test_p4_unexpected_char, th);
    TestBit.run_ex("P5_unchanged", NULL, test_p5_unchanged, th);
+   TestBit.run_ex("P6_keywords_as_names", NULL, test_p6_keywords_as_names, th);
    return TestBit.report();
 }

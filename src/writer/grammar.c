@@ -53,7 +53,11 @@ anvil_writer_err_code wg_check_attribute_key(const char *s) {
    if (!s) {
       return ANVIL_WRITER_ERR_INVALID_ARGUMENT;
    }
-   return valid_identifier(s, 0) ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_INVALID_IDENTIFIER;
+   if (!valid_identifier(s, 0)) {
+      return ANVIL_WRITER_ERR_INVALID_IDENTIFIER;
+   }
+   // a keyword is no more an attribute name than a statement name (the reader's 4004)
+   return is_keyword(s) ? ANVIL_WRITER_ERR_RESERVED_WORD : ANVIL_WRITER_OK;
 }
 
 // Attribute values are raw text ended by ',' or ']' outside double quotes (parse_attribute_list).

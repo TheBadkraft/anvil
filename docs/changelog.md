@@ -35,9 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   array, tuple or object cut short as an attribute value is 2006 (was 2007/2002); `@` that does not open `@[` is 4011
   (was 2001/2002); `(1,,2)` and `(,1)` are 4007 (was 2003); in an object body, a comma before `}` is 3004 (was 4017 or
   2001), a missing key is 3001 and a token that cannot be a key is 4002 (both were 2001); an unexpected control
-  character where a token belongs is 5001 (was 2001, 2002 or 2003). 58 conformance dumps changed for these reasons.
-- Not enforced, because the language reference defines no such rule (left for the owner): 4004 (a keyword as an
-  attribute name is legal), 4015 (a block and a name repeated at top level is 4053, as the two forms are the same
+  character where a token belongs is 5001 (was 2001, 2002 or 2003). 58 conformance dumps changed for these reasons, 3 more for the keyword attribute keys.
+- **Behaviour change: a keyword or reserved word is refused as an attribute key** (`ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD`,
+  4004; owner decision), for statement and module attributes. Statement names and object fields, at every depth, were
+  already refused (4003). The writer and builder refuse the same names (`ANVIL_WRITER_ERR_RESERVED_WORD`) in all three places.
+- Not enforced, and reserved: 4015 (a block and a name repeated at top level is 4053, as the two forms are the same
   statement), 4203 (includes have no aliases). 3011, 4005 and 3016 fit no input that gets a generic code
   (empty array is 4009, a one-element tuple 3013, a missing `:=` 2002).
 - **The writer and the builder reject what the reader now rejects** (behaviour change): a field name repeated in one object
@@ -45,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   header is `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` (both new, appended to `anvil_writer_err_code`, so existing values
   keep their numbers). A repeated top-level name stays `ANVIL_WRITER_ERR_DUPLICATE_NAME`. A generated sweep of 4,000 writer
   and 4,000 builder documents checks that everything they accept loads.
-- 102 new conformance cases (the new errors, their legal neighbours, and fragment `@2`, which reads as the bare
+- 122 new conformance cases (the new errors, their legal neighbours, and fragment `@2`, which reads as the bare
   word `2`).
 
 ### Fixed (downloads)
