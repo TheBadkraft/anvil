@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (downloads)
+
+- **Previous release candidates stay downloadable at their URLs.** The v0.10.0-rc tarballs removed by the
+  v0.11.0-rc deploy are restored, byte-identical, with `SHA256SUMS-v0.10.0-rc`, because consumers pin them
+  (FlyWire installs `anvil-node` and `anvil-wasm` straight from these URLs). `/download` links them under
+  "Previous release". Older release files are never removed.
+
 ### Added (parity tooling for the pure-JS reader, FR-2610-anvl-conformance-001)
 
 - **`anvil-dump`** (`make anvil-dump`, `tools/anvil-dump.c`) prints a canonical, deterministic description of
