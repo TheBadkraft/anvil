@@ -64,7 +64,7 @@ sub-agents it starts for single tasks. See `agents/README.md` for the roles.
   read them, never edit them.
 - Use **only your own role's handle**. Never read another role's credentials file.
   ```sh
-  export RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/<your-handle>.anvl
+  export RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-<role>.anvl   # e.g. anvl-coder.anvl; your handle is anvl-<role>.badkraft
   alias rivet='node ~/Projects/repos/rivet-live/src/cli/main.js'
   rivet whoami
   ```
