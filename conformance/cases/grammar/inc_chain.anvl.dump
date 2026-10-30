@@ -6,8 +6,7 @@ dialect AML
 doc 0 path="<root>" dialect=AML bytes=49
   include decl-span=6-34 decl="include \"inc_chain_mid.anvl\"" path-span=14-34 path="\"inc_chain_mid.anvl\"" resolved=1
   stmt kind=ASSIGN name="top" name-span=36-39 base="" base-span=none attrs=0
-    value type=VARREF span=43-47 text="$mid" target="mid" public=NUMERIC resolved=1
-      value type=NUMERIC span=40-41 text="1" kind=integer overflow=0 i64=1
+    value type=VARREF span=43-47 text="$mid" target="mid" public=NUMERIC resolved=1 resolved-doc=1 resolved-span=40-41
 doc 1 path="inc_chain_mid.anvl" dialect=AML bytes=43
   include decl-span=6-31 decl="include \"inc_target.anvl\"" path-span=14-31 path="\"inc_target.anvl\"" resolved=2
   stmt kind=ASSIGN name="mid" name-span=33-36 base="" base-span=none attrs=0

@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -298,3 +298,7 @@ check-dump-valgrind: $(DUMP_BIN)
 # by the differential fuzzer, while native against itself shows 0 differences (conformance/fuzz/prove.sh).
 fuzz-prove: $(DUMP_BIN)
 	sh conformance/fuzz/prove.sh
+
+# 200k fuzz cases under a 1 GiB memory cap, foreground; reports the harness's peak RSS.
+fuzz-memory-test: $(DUMP_BIN)
+	sh conformance/fuzz/test-memory.sh $(DUMP_BIN)

@@ -12,12 +12,19 @@ output a sequence of `@@ <path>` lines each followed by that input's dump (anvil
 that does not can be run per input with --no-batch). Per input, `CMD [--fragment] <path>` is the plain form;
 a `.frag` input is a value fragment.
 
-A tool failure (a crash, a timeout, stderr output) counts as a difference even when both sides fail alike.
+Memory is bounded: at most jobs * 2 batches are in flight, a child gets 1 GiB of address space and may write 64 MiB, a case is at most 20,000 bytes and 6 levels deep. A tool failure (a crash, a timeout, stderr output) counts as a difference even when both sides fail alike.
 Exit status: 0 when no difference was found, 1 when one was, 2 on a harness error.
 Python 3 standard library only.
 """
-import argparse, difflib, os, random, shlex, shutil, subprocess, sys, tempfile
-from concurrent.futures import ThreadPoolExecutor
+import argparse, collections, difflib, os, random, resource, shlex, shutil, subprocess, sys, tempfile
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
+
+# Hard bounds: a child gets at most CHILD_MEMORY of address space and writes at most MAX_OUTPUT bytes (a larger
+# output is a failure of the tool), a generated case is at most MAX_CASE bytes and MAX_DEPTH deep.
+CHILD_MEMORY = 1 << 30
+MAX_OUTPUT = 64 << 20
+MAX_CASE = 20000
+MAX_DEPTH = 6
 
 # ---------------------------------------------------------------------------------------------- generator
 
@@ -65,6 +72,7 @@ def ws(r):
 
 def gen_value(r, depth, names):
     k = r.randrange(16 if depth < 3 else 8)
+    if depth > MAX_DEPTH: k = 2
     if k == 0: return r.choice([b'true', b'false', b'null', b'True', b'NULL'])
     if k == 1: return r.choice([b'hello', b'a.b', b'a-b', b'x1', b'\xc3\xa9t\xc3\xa9', b'1a', b'09-02-2026', b'a/b', b'a:b'] + ([] if r.clean else [r.choice(KEYWORDS)]))
     if k in (2, 3, 4): return gen_number(r)
@@ -98,6 +106,7 @@ def gen_attrs(r):
     return b'@[' + b', '.join(items) + b']'
 
 def gen_stmt(r, depth, names, top):
+    if depth > MAX_DEPTH: return b'x :=1;'
     name = r.choice(IDENTS) if (r.clean or r.randrange(12)) else r.choice(KEYWORDS + ODD_IDENTS + [b'1x', b''])
     if top and r.clean:  # top-level names must be unique in a valid document
         r.counter += 1
@@ -168,6 +177,10 @@ def mutate(r, data, corpus):
     return bytes(data)
 
 def make_case(seed, index, corpus):
+    ext, data = _make_case(seed, index, corpus)
+    return ext, data[:MAX_CASE]
+
+def _make_case(seed, index, corpus):
     r = random.Random(seed * 1000003 + index)
     r.clean = r.randrange(100) < 55  # clean cases stay inside the grammar; the rest also inject errors
     pick = r.randrange(100)
@@ -182,20 +195,34 @@ def make_case(seed, index, corpus):
 
 # ---------------------------------------------------------------------------------------------- running
 
+def _limits():
+    resource.setrlimit(resource.RLIMIT_AS, (CHILD_MEMORY, CHILD_MEMORY))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
+
+def run_limited(args, timeout, stdin=None, cwd=None):
+    """Runs a command with bounded memory and output (stdout goes to a file, not into this process); returns (stdout, stderr, returncode)."""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        p = subprocess.Popen(args, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL, stdout=out, stderr=err, cwd=cwd, preexec_fn=_limits)
+        try:
+            p.communicate(stdin, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            p.kill(); p.wait(); return b'[timeout]\n', b'', -9
+        out.seek(0); err.seek(0)
+        return out.read(MAX_OUTPUT + 1), err.read(4096), p.returncode
+
 def run_plain(cmd, path, timeout):
     args = cmd + (['--fragment'] if path.endswith('.frag') else []) + [path]
-    try:
-        p = subprocess.run(args, capture_output=True, timeout=timeout)
-        return p.stdout + (b'\n[stderr]\n' + p.stderr if p.stderr else b'') + (b'\n[exit %d]\n' % p.returncode if p.returncode else b'')
-    except subprocess.TimeoutExpired:
-        return b'[timeout]\n'
+    so, se, rc = run_limited(args, timeout)
+    if so == b'[timeout]\n': return so
+    return so[:MAX_OUTPUT] + (b'\n[stderr]\n' + se if se else b'') + (b'\n[exit %d]\n' % rc if rc else b'')
 
 def run_batch(cmd, paths, timeout, cwd):
-    p = subprocess.run(cmd + ['--batch'], input=('\n'.join(paths) + '\n').encode(), capture_output=True, timeout=timeout * max(1, len(paths) // 50 + 1), cwd=cwd)
+    so, se, rc = run_limited(cmd + ['--batch'], timeout * max(1, len(paths) // 50 + 1), stdin=('\n'.join(paths) + '\n').encode(), cwd=cwd)
+    p = collections.namedtuple('P', 'returncode stderr')(rc, se)
     out = {}
     cur = None
     chunks = {}
-    for line in p.stdout.splitlines(keepends=True):
+    for line in so.splitlines(keepends=True):
         if line.startswith(b'@@ '):
             cur = line[3:].rstrip(b'\n').decode(); chunks[cur] = []
         elif cur is not None: chunks[cur].append(line)
@@ -323,13 +350,19 @@ def main():
 
     nb = (args.cases + args.batch - 1) // args.batch
     try:
+        # at most jobs * 2 batches in flight; a result is dealt with and dropped as soon as it completes
         with ThreadPoolExecutor(max_workers=args.jobs) as ex:
-            for bad in ex.map(run_batch_index, range(nb)):
-                for (i, ext, data, a, b) in bad:
-                    if diffs[0] >= args.max_diffs: break
-                    diffs[0] += 1
-                    report(args, i, ext, data, a, b, tmp)
-                if diffs[0] >= args.max_diffs: break
+            pending = set(); nxt = 0
+            while (nxt < nb or pending) and diffs[0] < args.max_diffs:
+                while nxt < nb and len(pending) < args.jobs * 2:
+                    pending.add(ex.submit(run_batch_index, nxt)); nxt += 1
+                finished, pending = wait(pending, return_when=FIRST_COMPLETED)
+                for fut in finished:
+                    for (i, ext, data, a, b) in fut.result():
+                        if diffs[0] >= args.max_diffs: break
+                        diffs[0] += 1
+                        report(args, i, ext, data, a, b, tmp)
+            for fut in pending: fut.cancel()
     finally:
         if not args.keep: shutil.rmtree(tmp, ignore_errors=True)
     print('fuzz: cases=%d differences=%d seed=%d a=%s b=%s' % (done[0], diffs[0], args.seed, ' '.join(args.a), ' '.join(args.b)))

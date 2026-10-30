@@ -168,6 +168,13 @@ static const char *category_name(anvil_err_code c) {
  * Nodes
  * ---------------------------------------------------------------------- */
 
+typedef struct {
+   module_document *docs;
+   size_t count;
+   size_t cap;
+} doc_set;
+static const doc_set *g_docs; // the documents being dumped, to name the owner of a resolved reference
+
 static void dump_value(anvl_value v, int depth);
 static void dump_statement(anvl_statement s, int depth);
 
@@ -234,6 +241,19 @@ static void dump_value(anvl_value v, int depth) {
       put_text("target", v->varref.target);
       printf(" public=%s resolved=%d", public_type_name(anvil_value_get_type((anvil_value)v)),
              v->varref.resolved ? 1 : 0);
+      if (v->varref.resolved) {
+         // Only a reference to the target, which is dumped where it is declared: expanding it here
+         // would make a chain of references print exponentially many lines.
+         const anvl_slice t = v->varref.resolved->text;
+         long owner = -1;
+         for (size_t i = 0; g_docs && i < g_docs->count; i++) {
+            if (g_docs->docs[i]->source && (const char *)g_docs->docs[i]->source->buffer.bucket == t.data) {
+               owner = (long)i;
+            }
+         }
+         printf(" resolved-doc=%ld", owner);
+         put_span("resolved-span", t);
+      }
       break;
    default:
       break;
@@ -254,8 +274,6 @@ static void dump_value(anvl_value v, int depth) {
          List.get(v->object.statements, i, (object *)&s);
          dump_statement(s, depth + 1);
       }
-   } else if (v->type == ANVL_VALUE_VARREF && v->varref.resolved) {
-      dump_value(v->varref.resolved, depth + 1);
    }
 }
 
@@ -305,12 +323,6 @@ static void dump_statement(anvl_statement s, int depth) {
 /* ---------------------------------------------------------------------- *
  * Documents (the root, then each document its includes resolved to)
  * ---------------------------------------------------------------------- */
-
-typedef struct {
-   module_document *docs;
-   size_t count;
-   size_t cap;
-} doc_set;
 
 static long doc_index(const doc_set *set, module_document d) {
    for (size_t i = 0; i < set->count; i++) {
@@ -525,9 +537,11 @@ static int dump_one(const char *path, bool fragment) {
    } else {
       doc_set set = {0};
       collect_docs(&set, root);
+      g_docs = &set;
       for (size_t i = 0; i < set.count; i++) {
          dump_document(&set, i);
       }
+      g_docs = NULL;
       free(set.docs);
    }
 

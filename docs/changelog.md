@@ -23,14 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved, module attributes, and every error with its code, name, category, message, line and column. It
   reads a file, stdin, a value fragment (`--fragment`) or a list of files (`--batch`). The format is
   versioned and documented in `conformance/FORMAT.md`.
-- **A native-owned conformance corpus**, `conformance/cases/`: 1,164 inputs (every `test/fixtures` file, the
+- **A native-owned conformance corpus**, `conformance/cases/`: 1,165 inputs (every `test/fixtures` file, the
   inline inputs of the unit tests, and generated number, string, blob, attribute, empty/one-element, statement,
   include and error cases) with native's expected dump beside each. `make check-conformance` regenerates every
   dump and fails on any difference, a missing dump or a stale copy of a fixture; `make update-conformance`
   rewrites them alongside a deliberate native change.
 - **A differential fuzz harness**, `conformance/fuzz/fuzz.py`: a grammar-aware generator and a byte-level
   mutator over the corpus, a driver that runs two dump executables and reports the first difference minimised.
-  `make fuzz-prove` shows it can fail: native against itself finds nothing, an altered scratch build is found
+  Its memory is bounded (a sliding window of batches, capped child memory and output, capped case size and depth; `make fuzz-memory-test` runs 200,000 cases under a 1 GiB limit). `make fuzz-prove` shows it can fail: native against itself finds nothing, an altered scratch build is found
   and `check-conformance` goes red on it.
 - **Drift tables**, `conformance/drift-tables.txt`, generated from `include/*.h` (every enum, the keywords and
   grammar tokens, the format names); `make check-conformance` fails when they are stale.

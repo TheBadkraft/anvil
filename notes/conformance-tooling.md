@@ -33,3 +33,14 @@ Format and usage: `conformance/FORMAT.md`, `conformance/fuzz/README.md`.
   re-running the load pipeline, so it cannot drift from `anvil_load`.
 - The seed scripts (`conformance/seed/*.py`) are one-shot and refuse to overwrite the committed corpus without `--force`;
   `check-conformance` needs only `sh`, `cpp` and `awk`.
+
+## Memory incident (2026-10-30)
+
+A 2M-case fuzz run grew to about 28 GB and the OOM killer took down the editor and every agent. The cause: a chain of
+`$name` references that each name the previous one twice (`a1 := [$a0, $a0]; a2 := [$a1, $a1]; ...`) made the dump print
+the resolved value under every reference, so 22 statements printed 3.7 GB and 40 would print 2^40 lines; the harness
+read whole outputs into memory. Fixes: a `VARREF` now prints `resolved-doc`/`resolved-span` and not the expanded value
+(FORMAT.md); the harness keeps at most jobs x 2 batches in flight, gives a child 1 GiB of address space and 64 MiB of
+output, caps a case at 20,000 bytes and 6 levels, and drops every batch's state when the batch is compared. The doubling
+chain is now a corpus case (`grammar/varref_chain_doubling.anvl`). Fuzz runs go in the foreground under
+`systemd-run --user --scope -p MemoryMax=...` (STANDARDS section 8).

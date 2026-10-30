@@ -68,6 +68,7 @@ bare = {"word": b"hello", "dotted": b"a.b.c", "trailing_dot": b"a.", "leading_do
   "varref_space": b"$ other", "varref_missing": b"$nothing", "varref_bad": b"$1", "varref_self": b"$x", "varref_dollar_only": b"$"}
 for k, v in bare.items(): stmt("bare_" + k, v)
 doc("varref_target", b"a := 1;\nb := $a;\nc := [$a, $b];\nd := { e := $a; };\n")
+doc("varref_chain_doubling", b"a0 := [1, 2];\n" + b"".join(b"a%d := [$a%d, $a%d];\n" % (i, i - 1, i - 1) for i in range(1, 40)))  # expanding references would print 2^39 lines
 doc("varref_cycle", b"a := $b;\nb := $a;\n")
 doc("varref_to_object", b"a := { k := 1; };\nb := $a;\n")
 doc("varref_forward", b"b := $a;\na := 2;\n")

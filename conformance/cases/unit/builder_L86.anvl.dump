@@ -23,8 +23,7 @@ doc 0 path="<root>" dialect=AML bytes=222
   stmt kind=ASSIGN name="untagged" name-span=148-156 base="" base-span=none attrs=0
     value type=BLOB span=161-164 text="raw" tag="" tag-span=none bytes=726177
   stmt kind=ASSIGN name="alias" name-span=167-172 base="" base-span=none attrs=0
-    value type=VARREF span=176-181 text="$name" target="name" public=BARE resolved=1
-      value type=BARE span=15-20 text="David"
+    value type=VARREF span=176-181 text="$name" target="name" public=BARE resolved=1 resolved-doc=0 resolved-span=15-20
   stmt kind=ASSIGN name="i" name-span=183-184 base="" base-span=none attrs=0
     value type=NUMERIC span=188-208 text="-9223372036854775808" kind=integer overflow=0 i64=-9223372036854775808
   stmt kind=ASSIGN name="d" name-span=210-211 base="" base-span=none attrs=0

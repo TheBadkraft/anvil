@@ -111,7 +111,7 @@ value's span (the contents only for a string and a blob; no delimiters):
 | `STRING` | `decoded="..."`: the string after native's escape resolution (`\n \t \r \\ \"`; any other backslash pair is kept as written) |
 | `BLOB` | `tag="..." tag-span=a-b bytes=<hex>`: the tag (`""` and `none` when untagged) and the content bytes |
 | `ARRAY`, `TUPLE`, `OBJECT` | `count=n`; the children follow, one level deeper: `value` records (array, tuple) or `stmt` records (object) |
-| `VARREF` | `target="name" public=T resolved=0\|1`; when resolved, the value it resolved to follows, one level deeper |
+| `VARREF` | `target="name" public=T resolved=0\|1`; when resolved also `resolved-doc=N resolved-span=a-b`: the document index and span of the value it resolved to, which is dumped where it is declared (it is not repeated under the reference, or a chain of references would print exponentially many lines) |
 | `FUNCTION`, `NONE` | none |
 
 `VARREF` is the one place the tree is not the public view: native's accessors see through a resolved `$name`

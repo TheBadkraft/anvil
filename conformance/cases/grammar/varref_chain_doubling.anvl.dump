@@ -1,0 +1,166 @@
+anvil-dump 1
+mode document
+input-bytes 810
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=810
+  stmt kind=ASSIGN name="a0" name-span=6-8 base="" base-span=none attrs=0
+    value type=ARRAY span=12-18 text="[1, 2]" count=2
+      value type=NUMERIC span=13-14 text="1" kind=integer overflow=0 i64=1
+      value type=NUMERIC span=16-17 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="a1" name-span=20-22 base="" base-span=none attrs=0
+    value type=ARRAY span=26-36 text="[$a0, $a0]" count=2
+      value type=VARREF span=27-30 text="$a0" target="a0" public=ARRAY resolved=1 resolved-doc=0 resolved-span=12-18
+      value type=VARREF span=32-35 text="$a0" target="a0" public=ARRAY resolved=1 resolved-doc=0 resolved-span=12-18
+  stmt kind=ASSIGN name="a2" name-span=38-40 base="" base-span=none attrs=0
+    value type=ARRAY span=44-54 text="[$a1, $a1]" count=2
+      value type=VARREF span=45-48 text="$a1" target="a1" public=ARRAY resolved=1 resolved-doc=0 resolved-span=26-36
+      value type=VARREF span=50-53 text="$a1" target="a1" public=ARRAY resolved=1 resolved-doc=0 resolved-span=26-36
+  stmt kind=ASSIGN name="a3" name-span=56-58 base="" base-span=none attrs=0
+    value type=ARRAY span=62-72 text="[$a2, $a2]" count=2
+      value type=VARREF span=63-66 text="$a2" target="a2" public=ARRAY resolved=1 resolved-doc=0 resolved-span=44-54
+      value type=VARREF span=68-71 text="$a2" target="a2" public=ARRAY resolved=1 resolved-doc=0 resolved-span=44-54
+  stmt kind=ASSIGN name="a4" name-span=74-76 base="" base-span=none attrs=0
+    value type=ARRAY span=80-90 text="[$a3, $a3]" count=2
+      value type=VARREF span=81-84 text="$a3" target="a3" public=ARRAY resolved=1 resolved-doc=0 resolved-span=62-72
+      value type=VARREF span=86-89 text="$a3" target="a3" public=ARRAY resolved=1 resolved-doc=0 resolved-span=62-72
+  stmt kind=ASSIGN name="a5" name-span=92-94 base="" base-span=none attrs=0
+    value type=ARRAY span=98-108 text="[$a4, $a4]" count=2
+      value type=VARREF span=99-102 text="$a4" target="a4" public=ARRAY resolved=1 resolved-doc=0 resolved-span=80-90
+      value type=VARREF span=104-107 text="$a4" target="a4" public=ARRAY resolved=1 resolved-doc=0 resolved-span=80-90
+  stmt kind=ASSIGN name="a6" name-span=110-112 base="" base-span=none attrs=0
+    value type=ARRAY span=116-126 text="[$a5, $a5]" count=2
+      value type=VARREF span=117-120 text="$a5" target="a5" public=ARRAY resolved=1 resolved-doc=0 resolved-span=98-108
+      value type=VARREF span=122-125 text="$a5" target="a5" public=ARRAY resolved=1 resolved-doc=0 resolved-span=98-108
+  stmt kind=ASSIGN name="a7" name-span=128-130 base="" base-span=none attrs=0
+    value type=ARRAY span=134-144 text="[$a6, $a6]" count=2
+      value type=VARREF span=135-138 text="$a6" target="a6" public=ARRAY resolved=1 resolved-doc=0 resolved-span=116-126
+      value type=VARREF span=140-143 text="$a6" target="a6" public=ARRAY resolved=1 resolved-doc=0 resolved-span=116-126
+  stmt kind=ASSIGN name="a8" name-span=146-148 base="" base-span=none attrs=0
+    value type=ARRAY span=152-162 text="[$a7, $a7]" count=2
+      value type=VARREF span=153-156 text="$a7" target="a7" public=ARRAY resolved=1 resolved-doc=0 resolved-span=134-144
+      value type=VARREF span=158-161 text="$a7" target="a7" public=ARRAY resolved=1 resolved-doc=0 resolved-span=134-144
+  stmt kind=ASSIGN name="a9" name-span=164-166 base="" base-span=none attrs=0
+    value type=ARRAY span=170-180 text="[$a8, $a8]" count=2
+      value type=VARREF span=171-174 text="$a8" target="a8" public=ARRAY resolved=1 resolved-doc=0 resolved-span=152-162
+      value type=VARREF span=176-179 text="$a8" target="a8" public=ARRAY resolved=1 resolved-doc=0 resolved-span=152-162
+  stmt kind=ASSIGN name="a10" name-span=182-185 base="" base-span=none attrs=0
+    value type=ARRAY span=189-199 text="[$a9, $a9]" count=2
+      value type=VARREF span=190-193 text="$a9" target="a9" public=ARRAY resolved=1 resolved-doc=0 resolved-span=170-180
+      value type=VARREF span=195-198 text="$a9" target="a9" public=ARRAY resolved=1 resolved-doc=0 resolved-span=170-180
+  stmt kind=ASSIGN name="a11" name-span=201-204 base="" base-span=none attrs=0
+    value type=ARRAY span=208-220 text="[$a10, $a10]" count=2
+      value type=VARREF span=209-213 text="$a10" target="a10" public=ARRAY resolved=1 resolved-doc=0 resolved-span=189-199
+      value type=VARREF span=215-219 text="$a10" target="a10" public=ARRAY resolved=1 resolved-doc=0 resolved-span=189-199
+  stmt kind=ASSIGN name="a12" name-span=222-225 base="" base-span=none attrs=0
+    value type=ARRAY span=229-241 text="[$a11, $a11]" count=2
+      value type=VARREF span=230-234 text="$a11" target="a11" public=ARRAY resolved=1 resolved-doc=0 resolved-span=208-220
+      value type=VARREF span=236-240 text="$a11" target="a11" public=ARRAY resolved=1 resolved-doc=0 resolved-span=208-220
+  stmt kind=ASSIGN name="a13" name-span=243-246 base="" base-span=none attrs=0
+    value type=ARRAY span=250-262 text="[$a12, $a12]" count=2
+      value type=VARREF span=251-255 text="$a12" target="a12" public=ARRAY resolved=1 resolved-doc=0 resolved-span=229-241
+      value type=VARREF span=257-261 text="$a12" target="a12" public=ARRAY resolved=1 resolved-doc=0 resolved-span=229-241
+  stmt kind=ASSIGN name="a14" name-span=264-267 base="" base-span=none attrs=0
+    value type=ARRAY span=271-283 text="[$a13, $a13]" count=2
+      value type=VARREF span=272-276 text="$a13" target="a13" public=ARRAY resolved=1 resolved-doc=0 resolved-span=250-262
+      value type=VARREF span=278-282 text="$a13" target="a13" public=ARRAY resolved=1 resolved-doc=0 resolved-span=250-262
+  stmt kind=ASSIGN name="a15" name-span=285-288 base="" base-span=none attrs=0
+    value type=ARRAY span=292-304 text="[$a14, $a14]" count=2
+      value type=VARREF span=293-297 text="$a14" target="a14" public=ARRAY resolved=1 resolved-doc=0 resolved-span=271-283
+      value type=VARREF span=299-303 text="$a14" target="a14" public=ARRAY resolved=1 resolved-doc=0 resolved-span=271-283
+  stmt kind=ASSIGN name="a16" name-span=306-309 base="" base-span=none attrs=0
+    value type=ARRAY span=313-325 text="[$a15, $a15]" count=2
+      value type=VARREF span=314-318 text="$a15" target="a15" public=ARRAY resolved=1 resolved-doc=0 resolved-span=292-304
+      value type=VARREF span=320-324 text="$a15" target="a15" public=ARRAY resolved=1 resolved-doc=0 resolved-span=292-304
+  stmt kind=ASSIGN name="a17" name-span=327-330 base="" base-span=none attrs=0
+    value type=ARRAY span=334-346 text="[$a16, $a16]" count=2
+      value type=VARREF span=335-339 text="$a16" target="a16" public=ARRAY resolved=1 resolved-doc=0 resolved-span=313-325
+      value type=VARREF span=341-345 text="$a16" target="a16" public=ARRAY resolved=1 resolved-doc=0 resolved-span=313-325
+  stmt kind=ASSIGN name="a18" name-span=348-351 base="" base-span=none attrs=0
+    value type=ARRAY span=355-367 text="[$a17, $a17]" count=2
+      value type=VARREF span=356-360 text="$a17" target="a17" public=ARRAY resolved=1 resolved-doc=0 resolved-span=334-346
+      value type=VARREF span=362-366 text="$a17" target="a17" public=ARRAY resolved=1 resolved-doc=0 resolved-span=334-346
+  stmt kind=ASSIGN name="a19" name-span=369-372 base="" base-span=none attrs=0
+    value type=ARRAY span=376-388 text="[$a18, $a18]" count=2
+      value type=VARREF span=377-381 text="$a18" target="a18" public=ARRAY resolved=1 resolved-doc=0 resolved-span=355-367
+      value type=VARREF span=383-387 text="$a18" target="a18" public=ARRAY resolved=1 resolved-doc=0 resolved-span=355-367
+  stmt kind=ASSIGN name="a20" name-span=390-393 base="" base-span=none attrs=0
+    value type=ARRAY span=397-409 text="[$a19, $a19]" count=2
+      value type=VARREF span=398-402 text="$a19" target="a19" public=ARRAY resolved=1 resolved-doc=0 resolved-span=376-388
+      value type=VARREF span=404-408 text="$a19" target="a19" public=ARRAY resolved=1 resolved-doc=0 resolved-span=376-388
+  stmt kind=ASSIGN name="a21" name-span=411-414 base="" base-span=none attrs=0
+    value type=ARRAY span=418-430 text="[$a20, $a20]" count=2
+      value type=VARREF span=419-423 text="$a20" target="a20" public=ARRAY resolved=1 resolved-doc=0 resolved-span=397-409
+      value type=VARREF span=425-429 text="$a20" target="a20" public=ARRAY resolved=1 resolved-doc=0 resolved-span=397-409
+  stmt kind=ASSIGN name="a22" name-span=432-435 base="" base-span=none attrs=0
+    value type=ARRAY span=439-451 text="[$a21, $a21]" count=2
+      value type=VARREF span=440-444 text="$a21" target="a21" public=ARRAY resolved=1 resolved-doc=0 resolved-span=418-430
+      value type=VARREF span=446-450 text="$a21" target="a21" public=ARRAY resolved=1 resolved-doc=0 resolved-span=418-430
+  stmt kind=ASSIGN name="a23" name-span=453-456 base="" base-span=none attrs=0
+    value type=ARRAY span=460-472 text="[$a22, $a22]" count=2
+      value type=VARREF span=461-465 text="$a22" target="a22" public=ARRAY resolved=1 resolved-doc=0 resolved-span=439-451
+      value type=VARREF span=467-471 text="$a22" target="a22" public=ARRAY resolved=1 resolved-doc=0 resolved-span=439-451
+  stmt kind=ASSIGN name="a24" name-span=474-477 base="" base-span=none attrs=0
+    value type=ARRAY span=481-493 text="[$a23, $a23]" count=2
+      value type=VARREF span=482-486 text="$a23" target="a23" public=ARRAY resolved=1 resolved-doc=0 resolved-span=460-472
+      value type=VARREF span=488-492 text="$a23" target="a23" public=ARRAY resolved=1 resolved-doc=0 resolved-span=460-472
+  stmt kind=ASSIGN name="a25" name-span=495-498 base="" base-span=none attrs=0
+    value type=ARRAY span=502-514 text="[$a24, $a24]" count=2
+      value type=VARREF span=503-507 text="$a24" target="a24" public=ARRAY resolved=1 resolved-doc=0 resolved-span=481-493
+      value type=VARREF span=509-513 text="$a24" target="a24" public=ARRAY resolved=1 resolved-doc=0 resolved-span=481-493
+  stmt kind=ASSIGN name="a26" name-span=516-519 base="" base-span=none attrs=0
+    value type=ARRAY span=523-535 text="[$a25, $a25]" count=2
+      value type=VARREF span=524-528 text="$a25" target="a25" public=ARRAY resolved=1 resolved-doc=0 resolved-span=502-514
+      value type=VARREF span=530-534 text="$a25" target="a25" public=ARRAY resolved=1 resolved-doc=0 resolved-span=502-514
+  stmt kind=ASSIGN name="a27" name-span=537-540 base="" base-span=none attrs=0
+    value type=ARRAY span=544-556 text="[$a26, $a26]" count=2
+      value type=VARREF span=545-549 text="$a26" target="a26" public=ARRAY resolved=1 resolved-doc=0 resolved-span=523-535
+      value type=VARREF span=551-555 text="$a26" target="a26" public=ARRAY resolved=1 resolved-doc=0 resolved-span=523-535
+  stmt kind=ASSIGN name="a28" name-span=558-561 base="" base-span=none attrs=0
+    value type=ARRAY span=565-577 text="[$a27, $a27]" count=2
+      value type=VARREF span=566-570 text="$a27" target="a27" public=ARRAY resolved=1 resolved-doc=0 resolved-span=544-556
+      value type=VARREF span=572-576 text="$a27" target="a27" public=ARRAY resolved=1 resolved-doc=0 resolved-span=544-556
+  stmt kind=ASSIGN name="a29" name-span=579-582 base="" base-span=none attrs=0
+    value type=ARRAY span=586-598 text="[$a28, $a28]" count=2
+      value type=VARREF span=587-591 text="$a28" target="a28" public=ARRAY resolved=1 resolved-doc=0 resolved-span=565-577
+      value type=VARREF span=593-597 text="$a28" target="a28" public=ARRAY resolved=1 resolved-doc=0 resolved-span=565-577
+  stmt kind=ASSIGN name="a30" name-span=600-603 base="" base-span=none attrs=0
+    value type=ARRAY span=607-619 text="[$a29, $a29]" count=2
+      value type=VARREF span=608-612 text="$a29" target="a29" public=ARRAY resolved=1 resolved-doc=0 resolved-span=586-598
+      value type=VARREF span=614-618 text="$a29" target="a29" public=ARRAY resolved=1 resolved-doc=0 resolved-span=586-598
+  stmt kind=ASSIGN name="a31" name-span=621-624 base="" base-span=none attrs=0
+    value type=ARRAY span=628-640 text="[$a30, $a30]" count=2
+      value type=VARREF span=629-633 text="$a30" target="a30" public=ARRAY resolved=1 resolved-doc=0 resolved-span=607-619
+      value type=VARREF span=635-639 text="$a30" target="a30" public=ARRAY resolved=1 resolved-doc=0 resolved-span=607-619
+  stmt kind=ASSIGN name="a32" name-span=642-645 base="" base-span=none attrs=0
+    value type=ARRAY span=649-661 text="[$a31, $a31]" count=2
+      value type=VARREF span=650-654 text="$a31" target="a31" public=ARRAY resolved=1 resolved-doc=0 resolved-span=628-640
+      value type=VARREF span=656-660 text="$a31" target="a31" public=ARRAY resolved=1 resolved-doc=0 resolved-span=628-640
+  stmt kind=ASSIGN name="a33" name-span=663-666 base="" base-span=none attrs=0
+    value type=ARRAY span=670-682 text="[$a32, $a32]" count=2
+      value type=VARREF span=671-675 text="$a32" target="a32" public=ARRAY resolved=1 resolved-doc=0 resolved-span=649-661
+      value type=VARREF span=677-681 text="$a32" target="a32" public=ARRAY resolved=1 resolved-doc=0 resolved-span=649-661
+  stmt kind=ASSIGN name="a34" name-span=684-687 base="" base-span=none attrs=0
+    value type=ARRAY span=691-703 text="[$a33, $a33]" count=2
+      value type=VARREF span=692-696 text="$a33" target="a33" public=ARRAY resolved=1 resolved-doc=0 resolved-span=670-682
+      value type=VARREF span=698-702 text="$a33" target="a33" public=ARRAY resolved=1 resolved-doc=0 resolved-span=670-682
+  stmt kind=ASSIGN name="a35" name-span=705-708 base="" base-span=none attrs=0
+    value type=ARRAY span=712-724 text="[$a34, $a34]" count=2
+      value type=VARREF span=713-717 text="$a34" target="a34" public=ARRAY resolved=1 resolved-doc=0 resolved-span=691-703
+      value type=VARREF span=719-723 text="$a34" target="a34" public=ARRAY resolved=1 resolved-doc=0 resolved-span=691-703
+  stmt kind=ASSIGN name="a36" name-span=726-729 base="" base-span=none attrs=0
+    value type=ARRAY span=733-745 text="[$a35, $a35]" count=2
+      value type=VARREF span=734-738 text="$a35" target="a35" public=ARRAY resolved=1 resolved-doc=0 resolved-span=712-724
+      value type=VARREF span=740-744 text="$a35" target="a35" public=ARRAY resolved=1 resolved-doc=0 resolved-span=712-724
+  stmt kind=ASSIGN name="a37" name-span=747-750 base="" base-span=none attrs=0
+    value type=ARRAY span=754-766 text="[$a36, $a36]" count=2
+      value type=VARREF span=755-759 text="$a36" target="a36" public=ARRAY resolved=1 resolved-doc=0 resolved-span=733-745
+      value type=VARREF span=761-765 text="$a36" target="a36" public=ARRAY resolved=1 resolved-doc=0 resolved-span=733-745
+  stmt kind=ASSIGN name="a38" name-span=768-771 base="" base-span=none attrs=0
+    value type=ARRAY span=775-787 text="[$a37, $a37]" count=2
+      value type=VARREF span=776-780 text="$a37" target="a37" public=ARRAY resolved=1 resolved-doc=0 resolved-span=754-766
+      value type=VARREF span=782-786 text="$a37" target="a37" public=ARRAY resolved=1 resolved-doc=0 resolved-span=754-766
+  stmt kind=ASSIGN name="a39" name-span=789-792 base="" base-span=none attrs=0
+    value type=ARRAY span=796-808 text="[$a38, $a38]" count=2
+      value type=VARREF span=797-801 text="$a38" target="a38" public=ARRAY resolved=1 resolved-doc=0 resolved-span=775-787
+      value type=VARREF span=803-807 text="$a38" target="a38" public=ARRAY resolved=1 resolved-doc=0 resolved-span=775-787

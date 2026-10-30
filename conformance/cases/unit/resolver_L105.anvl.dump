@@ -7,5 +7,4 @@ doc 0 path="<root>" dialect=AML bytes=34
   stmt kind=ASSIGN name="name" name-span=6-10 base="" base-span=none attrs=0
     value type=NUMERIC span=14-16 text="42" kind=integer overflow=0 i64=42
   stmt kind=ASSIGN name="alias" name-span=18-23 base="" base-span=none attrs=0
-    value type=VARREF span=27-32 text="$name" target="name" public=NUMERIC resolved=1
-      value type=NUMERIC span=14-16 text="42" kind=integer overflow=0 i64=42
+    value type=VARREF span=27-32 text="$name" target="name" public=NUMERIC resolved=1 resolved-doc=0 resolved-span=14-16

@@ -6,8 +6,7 @@ dialect AML
 doc 0 path="<root>" dialect=AML bytes=47
   include decl-span=6-31 decl="include \"inc_target.anvl\"" path-span=14-31 path="\"inc_target.anvl\"" resolved=1
   stmt kind=ASSIGN name="y" name-span=33-34 base="" base-span=none attrs=0
-    value type=VARREF span=38-45 text="$shared" target="shared" public=NUMERIC resolved=1
-      value type=NUMERIC span=16-17 text="1" kind=integer overflow=0 i64=1
+    value type=VARREF span=38-45 text="$shared" target="shared" public=NUMERIC resolved=1 resolved-doc=1 resolved-span=16-17
 doc 1 path="inc_target.anvl" dialect=AML bytes=41
   stmt kind=ASSIGN name="shared" name-span=6-12 base="" base-span=none attrs=0
     value type=NUMERIC span=16-17 text="1" kind=integer overflow=0 i64=1

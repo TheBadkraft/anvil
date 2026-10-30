@@ -23,5 +23,4 @@ doc 0 path="<root>" dialect=AML bytes=183
   stmt kind=ASSIGN name="untagged" name-span=148-156 base="" base-span=none attrs=0
     value type=BLOB span=161-164 text="raw" tag="" tag-span=none bytes=726177
   stmt kind=ASSIGN name="alias" name-span=167-172 base="" base-span=none attrs=0
-    value type=VARREF span=176-181 text="$name" target="name" public=BARE resolved=1
-      value type=BARE span=15-20 text="David"
+    value type=VARREF span=176-181 text="$name" target="name" public=BARE resolved=1 resolved-doc=0 resolved-span=15-20

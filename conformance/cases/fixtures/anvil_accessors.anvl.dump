@@ -32,12 +32,6 @@ doc 0 path="<root>" dialect=AML bytes=281
       stmt kind=ASSIGN name="port" name-span=216-220 base="" base-span=none attrs=0
         value type=NUMERIC span=224-228 text="8080" kind=integer overflow=0 i64=8080
   stmt kind=ASSIGN name="alias_count" name-span=233-244 base="" base-span=none attrs=0
-    value type=VARREF span=248-254 text="$count" target="count" public=NUMERIC resolved=1
-      value type=NUMERIC span=30-32 text="42" kind=integer overflow=0 i64=42
+    value type=VARREF span=248-254 text="$count" target="count" public=NUMERIC resolved=1 resolved-doc=0 resolved-span=30-32
   stmt kind=ASSIGN name="alias_config" name-span=256-268 base="" base-span=none attrs=0
-    value type=VARREF span=272-279 text="$config" target="config" public=OBJECT resolved=1
-      value type=OBJECT span=189-231 text="{\n   host := localhost;\n   port := 8080;\n}" count=2
-        stmt kind=ASSIGN name="host" name-span=194-198 base="" base-span=none attrs=0
-          value type=BARE span=202-211 text="localhost"
-        stmt kind=ASSIGN name="port" name-span=216-220 base="" base-span=none attrs=0
-          value type=NUMERIC span=224-228 text="8080" kind=integer overflow=0 i64=8080
+    value type=VARREF span=272-279 text="$config" target="config" public=OBJECT resolved=1 resolved-doc=0 resolved-span=189-231
