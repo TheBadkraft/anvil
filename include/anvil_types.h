@@ -21,6 +21,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Opaque handle to a loaded, fully-resolved Anvil document.
  *
@@ -162,3 +166,7 @@ typedef enum {
    ANVIL_ERR_MEMORY,            // allocation failure
    ANVIL_ERR_INVALID_ARGUMENT,  // bad call into the API itself
 } anvil_err_code;
+
+#ifdef __cplusplus
+}
+#endif

@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (C++ consumers can link the public headers, BR-2610-anvl-003) -- no ABI change
+
+- **The public headers now have `extern "C"` guards.** Only `anvil_vtable.h` had one, so a C++ program that
+  included `anvil_flat.h`, `anvil_writer.h`, `anvil_builder.h`, `anvil_schema.h` or `anvil_type_registry.h`
+  compiled but failed to link (`undefined reference to anvil_load_buffer(char const*, unsigned long)`). Every
+  shipped `anvil_*.h` header now carries the guard. The C ABI, the exported symbols (`make check-exports`) and
+  the library binaries' behaviour are unchanged.
+- **New gate `make check-cxx`** (`scripts/check-cxx.sh`, probes in `test/infra/cxx/`). For each shipped header
+  it builds a program that includes only that header and calls what it declares, with `g++` (and `clang++` when
+  installed) at C++11 and C++17 under `-Wall -Wextra -pedantic -Werror`, links it against `libanvil.so` and
+  `libanvil.a`, and runs it; one more program includes all the headers together. New headers are found by glob
+  and fail the gate until they get a probe. The core packaging and the staged-release verification run it too.
+
 ---
 
 ## [v0.12.0-rc] — (2026-10-30)

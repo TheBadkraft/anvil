@@ -14,6 +14,7 @@ core=$(x core anvil-v$ver-linux-x86_64.tar.gz)
 run "$here/check-grammar.sh" core "$core" "$ver" "$build"
 run "$here/check-readme.sh" "$core"
 run sh "$here/../check-exports.sh" "$core/lib/libanvil.so" "$core/include"
+run sh "$here/../check-cxx.sh" "$core/include" "$core/lib" "$here/../../test/infra/cxx"
 for k in py net; do
   p=$(x $k anvil-$k-v$ver-linux-x64.tar.gz)
   run "$here/check-grammar.sh" $k "$p" "$ver" "$build"

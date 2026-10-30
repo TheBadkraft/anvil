@@ -23,6 +23,10 @@
 
 #include "anvil_schema.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
 // pragma keeps the vtable global below exported. It must also be listed in libanvil.exports.
 #if defined(__GNUC__) || defined(__clang__)
@@ -75,4 +79,8 @@ extern const anvil_schema_i Schema;
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility pop
+#endif
+
+#ifdef __cplusplus
+}
 #endif

@@ -24,6 +24,10 @@
 #include "anvil_types.h"
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // The library is built with -fvisibility=hidden (src/sigma/* and other internals must never
 // leak into a consumer's global dynamic symbol table -- see notes/symbol-visibility.md); this
 // pragma pins every declaration below back to default visibility so the public ABI stays
@@ -470,4 +474,8 @@ anvil_value anvil_attribute_get_value_handle(anvil_attribute attr);
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility pop
+#endif
+
+#ifdef __cplusplus
+}
 #endif
