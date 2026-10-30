@@ -1,0 +1,6 @@
+#!aml
+@[types]
+Ts := { type := String; format := iso8601_datetime; };
+Quoted := { type := String; format := "uuid"; };
+Plain := { type := String; };
+Nope := { type := String; format := nope; };

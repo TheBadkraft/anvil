@@ -1,0 +1,8 @@
+#!asl
+
+foo () => {
+   var x = -5;
+   var y = !1;
+   var z = +3;
+   return x;
+};

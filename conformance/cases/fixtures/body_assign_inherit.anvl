@@ -1,0 +1,10 @@
+#!aml
+
+// inheritance via the assignment form (':=' required; base must resolve to an object)
+base := {
+   name := "base";
+};
+
+derived : base := {
+   override := 2;
+};

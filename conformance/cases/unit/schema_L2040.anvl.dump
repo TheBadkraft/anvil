@@ -1,0 +1,21 @@
+anvil-dump 1
+mode document
+input-bytes 114
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=114
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="a" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-41 text="{ type := Numeric; }" count=1
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-38 text="Numeric"
+  stmt kind=ASSIGN name="b" name-span=43-44 base="" base-span=none attrs=0
+    value type=OBJECT span=48-67 text="{ type := String; }" count=1
+      stmt kind=ASSIGN name="type" name-span=50-54 base="" base-span=none attrs=0
+        value type=BARE span=58-64 text="String"
+  stmt kind=ASSIGN name="c" name-span=69-70 base="" base-span=none attrs=0
+    value type=OBJECT span=74-95 text="{ required := true; }" count=1
+      stmt kind=ASSIGN name="required" name-span=76-84 base="" base-span=none attrs=0
+        value type=BOOL span=88-92 text="true" bool=true
+  stmt kind=ASSIGN name="not_a_rule" name-span=97-107 base="" base-span=none attrs=0
+    value type=NUMERIC span=111-112 text="5" kind=integer overflow=0 i64=5

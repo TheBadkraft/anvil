@@ -1,0 +1,4 @@
+#!aml
+image := @png`x`;
+bad_image := @jpg`x`;
+other := @jpg`x`;

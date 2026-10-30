@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 58
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=58
+  stmt kind=ASSIGN name="inherits" name-span=6-14 base="" base-span=none attrs=0
+    value type=NULL span=18-22 text="null"
+  stmt kind=ASSIGN name="strict" name-span=24-30 base="" base-span=none attrs=0
+    value type=NULL span=34-38 text="null"
+  stmt kind=ASSIGN name="restated" name-span=40-48 base="" base-span=none attrs=0
+    value type=NULL span=52-56 text="null"

@@ -1,0 +1,2 @@
+#!aml
+files := [ @png`a`, null, @gif`b` ];

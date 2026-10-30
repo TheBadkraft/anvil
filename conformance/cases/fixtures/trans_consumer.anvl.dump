@@ -1,0 +1,33 @@
+anvil-dump 1
+mode document
+input-bytes 116
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=116
+  attr key="schema" key-span=38-44 raw="" raw-span=none flag=1
+  include decl-span=6-34 decl="include \"trans_a.types.anvl\"" path-span=14-34 path="\"trans_a.types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="ticket" name-span=47-53 base="" base-span=none attrs=0
+    value type=OBJECT span=57-84 text="{ type := types.TicketId; }" count=1
+      stmt kind=ASSIGN name="type" name-span=59-63 base="" base-span=none attrs=0
+        value type=BARE span=67-81 text="types.TicketId"
+  stmt kind=ASSIGN name="ref" name-span=86-89 base="" base-span=none attrs=0
+    value type=OBJECT span=93-114 text="{ type := types.Id; }" count=1
+      stmt kind=ASSIGN name="type" name-span=95-99 base="" base-span=none attrs=0
+        value type=BARE span=103-111 text="types.Id"
+doc 1 path="trans_a.types.anvl" dialect=AML bytes=98
+  attr key="types" key-span=38-43 raw="" raw-span=none flag=1
+  include decl-span=6-34 decl="include \"trans_b.types.anvl\"" path-span=14-34 path="\"trans_b.types.anvl\"" resolved=2
+  stmt kind=ASSIGN name="TicketId" name-span=46-54 base="" base-span=none attrs=0
+    value type=OBJECT span=58-96 text="{\n   type := Numeric;\n   max := 999;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=63-67 base="" base-span=none attrs=0
+        value type=BARE span=71-78 text="Numeric"
+      stmt kind=ASSIGN name="max" name-span=83-86 base="" base-span=none attrs=0
+        value type=NUMERIC span=90-93 text="999" kind=integer overflow=0 i64=999
+doc 2 path="trans_b.types.anvl" dialect=AML bytes=60
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Id" name-span=16-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-58 text="{\n   type := Numeric;\n   min := 1;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-42 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=47-50 base="" base-span=none attrs=0
+        value type=NUMERIC span=54-55 text="1" kind=integer overflow=0 i64=1

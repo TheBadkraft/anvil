@@ -1,0 +1,23 @@
+anvil-dump 1
+mode document
+input-bytes 124
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=124
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="VIN" name-span=15-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-53 text="{ type := String; size := 17; }" count=2
+      stmt kind=ASSIGN name="type" name-span=24-28 base="" base-span=none attrs=0
+        value type=BARE span=32-38 text="String"
+      stmt kind=ASSIGN name="size" name-span=40-44 base="" base-span=none attrs=0
+        value type=NUMERIC span=48-50 text="17" kind=integer overflow=0 i64=17
+  stmt kind=ASSIGN name="Half" name-span=55-59 base="" base-span=none attrs=0
+    value type=OBJECT span=63-95 text="{ type := Numeric; min := 0.5; }" count=2
+      stmt kind=ASSIGN name="type" name-span=65-69 base="" base-span=none attrs=0
+        value type=BARE span=73-80 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=82-85 base="" base-span=none attrs=0
+        value type=NUMERIC span=89-92 text="0.5" kind=float overflow=0 f64=0x3fe0000000000000
+  stmt kind=ASSIGN name="Bad" name-span=97-100 base="" base-span=none attrs=0
+    value type=OBJECT span=104-122 text="{ type := Strng; }" count=1
+      stmt kind=ASSIGN name="type" name-span=106-110 base="" base-span=none attrs=0
+        value type=BARE span=114-119 text="Strng"

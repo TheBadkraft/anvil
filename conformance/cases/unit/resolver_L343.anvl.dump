@@ -1,0 +1,20 @@
+anvil-dump 1
+mode document
+input-bytes 87
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=87
+  stmt kind=ASSIGN name="base" name-span=6-10 base="" base-span=none attrs=0
+    value type=OBJECT span=14-39 text="{\n   x := 1;\n   y := 2;\n}" count=2
+      stmt kind=ASSIGN name="x" name-span=19-20 base="" base-span=none attrs=0
+        value type=NUMERIC span=24-25 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="y" name-span=30-31 base="" base-span=none attrs=0
+        value type=NUMERIC span=35-36 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="derived" name-span=41-48 base="base" base-span=51-55 attrs=0
+    value type=OBJECT span=59-85 text="{\n   y := 20;\n   z := 3;\n}" count=3
+      stmt kind=ASSIGN name="y" name-span=64-65 base="" base-span=none attrs=0
+        value type=NUMERIC span=69-71 text="20" kind=integer overflow=0 i64=20
+      stmt kind=ASSIGN name="z" name-span=76-77 base="" base-span=none attrs=0
+        value type=NUMERIC span=81-82 text="3" kind=integer overflow=0 i64=3
+      stmt kind=ASSIGN name="x" name-span=19-20 base="" base-span=none attrs=0
+        value type=NUMERIC span=24-25 text="1" kind=integer overflow=0 i64=1

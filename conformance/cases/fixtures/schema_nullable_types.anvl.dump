@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 73
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=73
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="MaybeId" name-span=16-23 base="" base-span=none attrs=0
+    value type=OBJECT span=27-71 text="{\n   type := Numeric;\n   nullable := true;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=32-36 base="" base-span=none attrs=0
+        value type=BARE span=40-47 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=52-60 base="" base-span=none attrs=0
+        value type=BOOL span=64-68 text="true" bool=true

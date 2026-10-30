@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+s := { type := String; integer := true; };

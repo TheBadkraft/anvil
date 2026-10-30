@@ -1,0 +1,4 @@
+#!aml
+arr := [ nullable, true, nulls ];
+tup := ( falsey, false );
+obj := { a := truely; b := null; };

@@ -1,0 +1,14 @@
+anvil-dump 1
+mode document
+input-bytes 132
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=132
+  include decl-span=7-38 decl="include \"f01_bare_literal.anvl\"" path-span=15-38 path="\"f01_bare_literal.anvl\"" resolved=1
+  stmt kind=ASSIGN name="alias" name-span=117-122 base="" base-span=none attrs=0
+    value type=BARE span=126-130 text="name"
+doc 1 path="f01_bare_literal.anvl" dialect=AML bytes=205
+  stmt kind=ASSIGN name="val" name-span=177-180 base="" base-span=none attrs=0
+    value type=NULL span=184-188 text="null"
+  stmt kind=ASSIGN name="name" name-span=190-194 base="" base-span=none attrs=0
+    value type=BARE span=198-203 text="David"

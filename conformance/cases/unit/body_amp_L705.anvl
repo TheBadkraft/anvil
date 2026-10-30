@@ -1,0 +1,5 @@
+#!amp
+base := 1;
+derived : base {
+   override := 2;
+};

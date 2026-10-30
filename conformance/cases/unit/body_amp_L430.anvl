@@ -1,0 +1,6 @@
+#!amp
+tags := [1, 2, 3];
+cars := [
+    Toyota,
+    Honda,
+    Ford,

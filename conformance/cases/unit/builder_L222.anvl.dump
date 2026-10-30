@@ -1,0 +1,18 @@
+anvil-dump 1
+mode document
+input-bytes 66
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=66
+  stmt kind=ASSIGN name="id" name-span=7-9 base="" base-span=none attrs=0
+    value type=NUMERIC span=13-14 text="7" kind=integer overflow=0 i64=7
+  stmt kind=ASSIGN name="tags" name-span=16-20 base="" base-span=none attrs=0
+    value type=ARRAY span=24-30 text="[a, b]" count=2
+      value type=BARE span=25-26 text="a"
+      value type=BARE span=28-29 text="b"
+  stmt kind=ASSIGN name="pos" name-span=32-35 base="" base-span=none attrs=0
+    value type=TUPLE span=39-45 text="(1, 2)" count=2
+      value type=NUMERIC span=40-41 text="1" kind=integer overflow=0 i64=1
+      value type=NUMERIC span=43-44 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="data" name-span=47-51 base="" base-span=none attrs=0
+    value type=BLOB span=60-63 text="xyz" tag="bin" tag-span=56-59 bytes=78797a

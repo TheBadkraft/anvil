@@ -1,0 +1,34 @@
+anvil-dump 1
+mode document
+input-bytes 53
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=53
+  include decl-span=6-32 decl="include \"types_basic.anvl\"" path-span=14-32 path="\"types_basic.anvl\"" resolved=1
+  stmt kind=ASSIGN name="placeholder" name-span=35-46 base="" base-span=none attrs=0
+    value type=NUMERIC span=50-51 text="1" kind=integer overflow=0 i64=1
+doc 1 path="types_basic.anvl" dialect=AML bytes=225
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="VIN" name-span=16-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-60 text="{\n   type := String;\n   size := 17;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-42 text="String"
+      stmt kind=ASSIGN name="size" name-span=47-51 base="" base-span=none attrs=0
+        value type=NUMERIC span=55-57 text="17" kind=integer overflow=0 i64=17
+  stmt kind=ASSIGN name="AssetStatus" name-span=63-74 base="" base-span=none attrs=0
+    value type=OBJECT span=78-152 text="{\n   type := enum;\n   values := [ active, maintenance, out_of_service ];\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=83-87 base="" base-span=none attrs=0
+        value type=BARE span=91-95 text="enum"
+      stmt kind=ASSIGN name="values" name-span=100-106 base="" base-span=none attrs=0
+        value type=ARRAY span=110-149 text="[ active, maintenance, out_of_service ]" count=3
+          value type=BARE span=112-118 text="active"
+          value type=BARE span=120-131 text="maintenance"
+          value type=BARE span=133-147 text="out_of_service"
+  stmt kind=ASSIGN name="AssetYear" name-span=155-164 base="" base-span=none attrs=0
+    value type=OBJECT span=168-223 text="{\n   type := Numeric;\n   min := 1900;\n   max := 2100;\n}" count=3
+      stmt kind=ASSIGN name="type" name-span=173-177 base="" base-span=none attrs=0
+        value type=BARE span=181-188 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=193-196 base="" base-span=none attrs=0
+        value type=NUMERIC span=200-204 text="1900" kind=integer overflow=0 i64=1900
+      stmt kind=ASSIGN name="max" name-span=209-212 base="" base-span=none attrs=0
+        value type=NUMERIC span=216-220 text="2100" kind=integer overflow=0 i64=2100

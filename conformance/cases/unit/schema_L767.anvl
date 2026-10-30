@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+bad := 5;
+good := { type := Numeric; };

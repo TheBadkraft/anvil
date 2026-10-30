@@ -1,0 +1,19 @@
+anvil-dump 1
+mode document
+input-bytes 104
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=104
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="labels" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-102 text="{ type := Array; items := { type := String; values := [ bug, feature ]; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-41 text="Array"
+      stmt kind=ASSIGN name="items" name-span=43-48 base="" base-span=none attrs=0
+        value type=OBJECT span=52-99 text="{ type := String; values := [ bug, feature ]; }" count=2
+          stmt kind=ASSIGN name="type" name-span=54-58 base="" base-span=none attrs=0
+            value type=BARE span=62-68 text="String"
+          stmt kind=ASSIGN name="values" name-span=70-76 base="" base-span=none attrs=0
+            value type=ARRAY span=80-96 text="[ bug, feature ]" count=2
+              value type=BARE span=82-85 text="bug"
+              value type=BARE span=87-94 text="feature"

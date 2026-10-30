@@ -1,0 +1,11 @@
+#!aml
+
+/* ************************************ *
+ * Tuple variants:                      *
+ * - numeric elements                   *
+ * - mixed scalar elements              *
+ * - nested elements                    *
+ * ************************************ */
+coords := (10, 20);
+mixed := (1, "two", true);
+nested := (1, (2, 3), 4);

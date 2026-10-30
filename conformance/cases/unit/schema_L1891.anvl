@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+files := { type := Array; items := { type := Blob; tag := png; nullable := true; }; };

@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 57
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=57
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="p" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-55 text="{ type := Ghost; type := String; }" count=2
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-36 text="Ghost"
+      stmt kind=ASSIGN name="type" name-span=38-42 base="" base-span=none attrs=0
+        value type=BARE span=46-52 text="String"

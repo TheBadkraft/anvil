@@ -1,0 +1,14 @@
+anvil-dump 1
+mode document
+input-bytes 59
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=59
+  stmt kind=ASSIGN name="owner" name-span=6-11 base="" base-span=none attrs=0
+    value type=OBJECT span=15-27 text="{ id := 1; }" count=1
+      stmt kind=ASSIGN name="id" name-span=17-19 base="" base-span=none attrs=0
+        value type=NUMERIC span=23-24 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="reporter" name-span=29-37 base="" base-span=none attrs=0
+    value type=OBJECT span=41-57 text="{ name := \"x\"; }" count=1
+      stmt kind=ASSIGN name="name" name-span=43-47 base="" base-span=none attrs=0
+        value type=STRING span=52-53 text="x" decoded="x"

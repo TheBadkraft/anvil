@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 61
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=61
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="score" name-span=16-21 base="" base-span=none attrs=0
+    value type=OBJECT span=25-59 text="{ type := Numeric; min := \"abc\"; }" count=2
+      stmt kind=ASSIGN name="type" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-42 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=44-47 base="" base-span=none attrs=0
+        value type=STRING span=52-55 text="abc" decoded="abc"

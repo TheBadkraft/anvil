@@ -1,0 +1,5 @@
+#!aml
+@[types]
+Raw := { type := Blob; };
+Png := { type := Blob; tag := png; };
+Quoted := { type := Blob; tag := "jpg"; };

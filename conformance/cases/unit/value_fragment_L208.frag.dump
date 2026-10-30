@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 4
+status ok
+value type=BOOL span=0-4 text="true" bool=true

@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 54
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=54

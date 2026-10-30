@@ -1,0 +1,14 @@
+anvil-dump 1
+mode document
+input-bytes 98
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=98
+  stmt kind=ASSIGN name="pi" name-span=6-8 base="" base-span=none attrs=0
+    value type=NUMERIC span=12-19 text="3.14159" kind=float overflow=0 f64=0x400921f9f01b866e
+  stmt kind=ASSIGN name="negflt" name-span=21-27 base="" base-span=none attrs=0
+    value type=NUMERIC span=31-37 text="-12.85" kind=float overflow=0 f64=0xc029b33333333333
+  stmt kind=ASSIGN name="large" name-span=39-44 base="" base-span=none attrs=0
+    value type=NUMERIC span=48-69 text="184467440737.09551615" kind=float overflow=0 f64=0x4245798ee2308c3a
+  stmt kind=ASSIGN name="tiny" name-span=71-75 base="" base-span=none attrs=0
+    value type=NUMERIC span=79-96 text="0.000000000000001" kind=float overflow=0 f64=0x3cd203af9ee75616

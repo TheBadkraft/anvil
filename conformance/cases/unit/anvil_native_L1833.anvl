@@ -1,0 +1,5 @@
+#!aml
+x := {
+  a := 1; /* never closed
+  b := 2;
+};

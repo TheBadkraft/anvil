@@ -1,0 +1,4 @@
+#!aml
+inherits := null;
+strict := null;
+restated := null;

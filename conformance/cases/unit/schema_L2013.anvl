@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+ids := { type := Array; items := { type := String; format := uuid; nullable := true; }; };

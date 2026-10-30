@@ -1,0 +1,3 @@
+#!aml
+@[types]
+E := { type := enum; values := red; };

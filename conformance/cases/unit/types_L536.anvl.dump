@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 54
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=54
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="E" name-span=15-16 base="" base-span=none attrs=0
+    value type=OBJECT span=20-52 text="{ type := enum; values := red; }" count=2
+      stmt kind=ASSIGN name="type" name-span=22-26 base="" base-span=none attrs=0
+        value type=BARE span=30-34 text="enum"
+      stmt kind=ASSIGN name="values" name-span=36-42 base="" base-span=none attrs=0
+        value type=BARE span=46-49 text="red"

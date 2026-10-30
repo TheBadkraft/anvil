@@ -1,0 +1,3 @@
+#!amp
+first := 1;
+second := import;

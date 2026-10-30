@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 18
+status error
+dialect AML
+error code=4017 name=ANVL_ERR_PARSER_UNTERMINATED_STATEMENT category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=8 message="Expected ';' to end the statement"

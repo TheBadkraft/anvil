@@ -1,0 +1,4 @@
+#!aml
+include "reg_diamond_left.anvl";
+include "reg_diamond_right.anvl";
+root := 4;

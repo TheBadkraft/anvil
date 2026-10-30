@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+scores := { type := Array; items := { type := Numeric; max := 3; }; };

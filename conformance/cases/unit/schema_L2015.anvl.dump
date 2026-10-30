@@ -1,0 +1,11 @@
+anvil-dump 1
+mode document
+input-bytes 71
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=71
+  stmt kind=ASSIGN name="ids" name-span=6-9 base="" base-span=none attrs=0
+    value type=ARRAY span=13-69 text="[ \"0f8fad5b-d9cb-469f-a165-70867728950e\", null, \"nope\" ]" count=3
+      value type=STRING span=16-52 text="0f8fad5b-d9cb-469f-a165-70867728950e" decoded="0f8fad5b-d9cb-469f-a165-70867728950e"
+      value type=NULL span=55-59 text="null"
+      value type=STRING span=62-66 text="nope" decoded="nope"

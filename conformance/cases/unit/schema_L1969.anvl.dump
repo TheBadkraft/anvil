@@ -1,0 +1,16 @@
+anvil-dump 1
+mode document
+input-bytes 114
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=114
+  stmt kind=ASSIGN name="created_at" name-span=6-16 base="" base-span=none attrs=0
+    value type=STRING span=21-30 text="yesterday" decoded="yesterday"
+  stmt kind=ASSIGN name="other" name-span=33-38 base="" base-span=none attrs=0
+    value type=STRING span=43-51 text="also bad" decoded="also bad"
+  stmt kind=ASSIGN name="body" name-span=54-58 base="" base-span=none attrs=0
+    value type=BLOB span=63-83 text="2026-10-25T14:03:00Z" tag="" tag-span=none bytes=323032362d31302d32355431343a30333a30305a
+  stmt kind=ASSIGN name="bad_body" name-span=86-94 base="" base-span=none attrs=0
+    value type=BLOB span=99-103 text="nope" tag="" tag-span=none bytes=6e6f7065
+  stmt kind=ASSIGN name="n" name-span=106-107 base="" base-span=none attrs=0
+    value type=NUMERIC span=111-112 text="5" kind=integer overflow=0 i64=5

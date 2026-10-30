@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Timestamp := {
+   type := String;
+   format := iso8601_datetime;
+};

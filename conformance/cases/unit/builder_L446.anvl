@@ -1,0 +1,6 @@
+#!aml
+
+cfg := {
+   host := h;
+   port := 1;
+};

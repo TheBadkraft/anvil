@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+n := { type := Numeric; max := 3; };
+s := { type := String; pooled := true; };

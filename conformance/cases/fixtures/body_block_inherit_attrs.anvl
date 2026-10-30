@@ -1,0 +1,10 @@
+#!aml
+
+// base and attributes together, object-block form
+base := {
+   name := "base";
+};
+
+derived : base @[active] {
+   override := 2;
+};

@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+a := { type := Numeric; pooled := true; tags := [ 1, 2 ]; };
+b := { type := Numeric; pooled := true; tags := [ 1, 2 ]; };

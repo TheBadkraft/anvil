@@ -1,0 +1,3 @@
+#!aml
+/* never closed
+x := 1;

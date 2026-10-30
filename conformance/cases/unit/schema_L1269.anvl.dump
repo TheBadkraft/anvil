@@ -1,0 +1,33 @@
+anvil-dump 1
+mode document
+input-bytes 222
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=222
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="links" name-span=16-21 base="" base-span=none attrs=0
+    value type=OBJECT span=25-220 text="{ type := Array; items := { type := Object; fields := {\n   kind := { type := enum; values := [ blocks, relates ]; required := true; };\n   target := { type := Numeric; required := true; };\n}; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-40 text="Array"
+      stmt kind=ASSIGN name="items" name-span=42-47 base="" base-span=none attrs=0
+        value type=OBJECT span=51-217 text="{ type := Object; fields := {\n   kind := { type := enum; values := [ blocks, relates ]; required := true; };\n   target := { type := Numeric; required := true; };\n}; }" count=2
+          stmt kind=ASSIGN name="type" name-span=53-57 base="" base-span=none attrs=0
+            value type=BARE span=61-67 text="Object"
+          stmt kind=ASSIGN name="fields" name-span=69-75 base="" base-span=none attrs=0
+            value type=OBJECT span=79-214 text="{\n   kind := { type := enum; values := [ blocks, relates ]; required := true; };\n   target := { type := Numeric; required := true; };\n}" count=2
+              stmt kind=ASSIGN name="kind" name-span=84-88 base="" base-span=none attrs=0
+                value type=OBJECT span=92-158 text="{ type := enum; values := [ blocks, relates ]; required := true; }" count=3
+                  stmt kind=ASSIGN name="type" name-span=94-98 base="" base-span=none attrs=0
+                    value type=BARE span=102-106 text="enum"
+                  stmt kind=ASSIGN name="values" name-span=108-114 base="" base-span=none attrs=0
+                    value type=ARRAY span=118-137 text="[ blocks, relates ]" count=2
+                      value type=BARE span=120-126 text="blocks"
+                      value type=BARE span=128-135 text="relates"
+                  stmt kind=ASSIGN name="required" name-span=139-147 base="" base-span=none attrs=0
+                    value type=BOOL span=151-155 text="true" bool=true
+              stmt kind=ASSIGN name="target" name-span=163-169 base="" base-span=none attrs=0
+                value type=OBJECT span=173-211 text="{ type := Numeric; required := true; }" count=2
+                  stmt kind=ASSIGN name="type" name-span=175-179 base="" base-span=none attrs=0
+                    value type=BARE span=183-190 text="Numeric"
+                  stmt kind=ASSIGN name="required" name-span=192-200 base="" base-span=none attrs=0
+                    value type=BOOL span=204-208 text="true" bool=true

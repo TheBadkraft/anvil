@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 30
+status error
+dialect AML
+error code=4016 name=ANVL_ERR_PARSER_UNTERMINATED_COMMENT category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=1 message="Unterminated block comment"

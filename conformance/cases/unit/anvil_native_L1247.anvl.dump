@@ -1,0 +1,14 @@
+anvil-dump 1
+mode document
+input-bytes 131
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=131
+  stmt kind=ASSIGN name="dated" name-span=7-12 base="" base-span=none attrs=0
+    value type=BLOB span=22-32 text="2026-07-07" tag="date" tag-span=17-21 bytes=323032362d30372d3037
+  stmt kind=ASSIGN name="sel" name-span=35-38 base="" base-span=none attrs=0
+    value type=BLOB span=47-58 text="#input-date" tag="sel" tag-span=43-46 bytes=23696e7075742d64617465
+  stmt kind=ASSIGN name="raw" name-span=61-64 base="" base-span=none attrs=0
+    value type=BLOB span=69-80 text="no tag here" tag="" tag-span=none bytes=6e6f207461672068657265
+  stmt kind=ASSIGN name="longest" name-span=83-90 base="" base-span=none attrs=0
+    value type=BLOB span=127-128 text="x" tag="abcdefghijklmnopqrstuvwxyz01234" tag-span=95-126 bytes=78

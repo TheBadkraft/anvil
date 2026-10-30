@@ -1,0 +1,8 @@
+#!aml
+
+server @[env=production, active, label="a b"] := {
+   host := localhost;
+};
+derived : server @[x] := {
+   port := 8080;
+};

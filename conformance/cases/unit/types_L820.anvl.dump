@@ -1,0 +1,41 @@
+anvil-dump 1
+mode document
+input-bytes 250
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=250
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Frac" name-span=15-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-69 text="{ type := Numeric; min := 0.25; max := 1e+3; }" count=3
+      stmt kind=ASSIGN name="type" name-span=25-29 base="" base-span=none attrs=0
+        value type=BARE span=33-40 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=42-45 base="" base-span=none attrs=0
+        value type=NUMERIC span=49-53 text="0.25" kind=float overflow=0 f64=0x3fd0000000000000
+      stmt kind=ASSIGN name="max" name-span=55-58 base="" base-span=none attrs=0
+        value type=NUMERIC span=62-66 text="1e+3" kind=float overflow=0 f64=0x408f400000000000
+  stmt kind=ASSIGN name="Whole" name-span=71-76 base="" base-span=none attrs=0
+    value type=OBJECT span=80-120 text="{ type := Numeric; min := 1; max := 9; }" count=3
+      stmt kind=ASSIGN name="type" name-span=82-86 base="" base-span=none attrs=0
+        value type=BARE span=90-97 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=99-102 base="" base-span=none attrs=0
+        value type=NUMERIC span=106-107 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="max" name-span=109-112 base="" base-span=none attrs=0
+        value type=NUMERIC span=116-117 text="9" kind=integer overflow=0 i64=9
+  stmt kind=ASSIGN name="None" name-span=122-126 base="" base-span=none attrs=0
+    value type=OBJECT span=130-150 text="{ type := Numeric; }" count=1
+      stmt kind=ASSIGN name="type" name-span=132-136 base="" base-span=none attrs=0
+        value type=BARE span=140-147 text="Numeric"
+  stmt kind=ASSIGN name="Bare" name-span=152-156 base="" base-span=none attrs=0
+    value type=OBJECT span=160-192 text="{ type := Numeric; max := 1e3; }" count=2
+      stmt kind=ASSIGN name="type" name-span=162-166 base="" base-span=none attrs=0
+        value type=BARE span=170-177 text="Numeric"
+      stmt kind=ASSIGN name="max" name-span=179-182 base="" base-span=none attrs=0
+        value type=NUMERIC span=186-189 text="1e3" kind=float overflow=0 f64=0x408f400000000000
+  stmt kind=ASSIGN name="Bad" name-span=194-197 base="" base-span=none attrs=0
+    value type=OBJECT span=201-248 text="{ type := Numeric; min := \"x\"; max := 1e+999; }" count=3
+      stmt kind=ASSIGN name="type" name-span=203-207 base="" base-span=none attrs=0
+        value type=BARE span=211-218 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=220-223 base="" base-span=none attrs=0
+        value type=STRING span=228-229 text="x" decoded="x"
+      stmt kind=ASSIGN name="max" name-span=232-235 base="" base-span=none attrs=0
+        value type=NUMERIC span=239-245 text="1e+999" kind=float overflow=1

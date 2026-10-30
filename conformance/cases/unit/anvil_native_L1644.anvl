@@ -1,0 +1,2 @@
+#!aml
+x := {a := true;b := null;};

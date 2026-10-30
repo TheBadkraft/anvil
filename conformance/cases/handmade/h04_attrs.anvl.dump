@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 44
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=44
+  attr key="owner" key-span=8-13 raw="\"me\"" raw-span=14-18 flag=0
+    value type=STRING span=15-17 text="me" decoded="me"
+  stmt kind=ASSIGN name="x" name-span=20-21 base="" base-span=none attrs=2
+    attr key="a" key-span=24-25 raw="1" raw-span=26-27 flag=0
+      value type=NUMERIC span=26-27 text="1" kind=integer overflow=0 i64=1
+    attr key="flag" key-span=29-33 raw="" raw-span=none flag=1
+    value type=BOOL span=38-42 text="true" bool=true

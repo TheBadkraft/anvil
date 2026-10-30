@@ -1,0 +1,2 @@
+#!aml
+f (a, b) => { return a; };

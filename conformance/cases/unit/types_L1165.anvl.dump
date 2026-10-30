@@ -1,0 +1,31 @@
+anvil-dump 1
+mode document
+input-bytes 202
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=202
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="A" name-span=15-16 base="" base-span=none attrs=0
+    value type=OBJECT span=20-44 text="{ type := \"Numeric\x00x\"; }" count=1
+      stmt kind=ASSIGN name="type" name-span=22-26 base="" base-span=none attrs=0
+        value type=STRING span=31-40 text="Numeric\x00x" decoded="Numeric\x00x"
+  stmt kind=ASSIGN name="B" name-span=46-47 base="" base-span=none attrs=0
+    value type=OBJECT span=51-90 text="{ type := String; format := \"uuid\x00x\"; }" count=2
+      stmt kind=ASSIGN name="type" name-span=53-57 base="" base-span=none attrs=0
+        value type=BARE span=61-67 text="String"
+      stmt kind=ASSIGN name="format" name-span=69-75 base="" base-span=none attrs=0
+        value type=STRING span=80-86 text="uuid\x00x" decoded="uuid\x00x"
+  stmt kind=ASSIGN name="C" name-span=92-93 base="" base-span=none attrs=0
+    value type=OBJECT span=97-130 text="{ type := Blob; tag := \"png\x00x\"; }" count=2
+      stmt kind=ASSIGN name="type" name-span=99-103 base="" base-span=none attrs=0
+        value type=BARE span=107-111 text="Blob"
+      stmt kind=ASSIGN name="tag" name-span=113-116 base="" base-span=none attrs=0
+        value type=STRING span=121-126 text="png\x00x" decoded="png\x00x"
+  stmt kind=ASSIGN name="D" name-span=132-133 base="" base-span=none attrs=0
+    value type=OBJECT span=137-200 text="{ type := Numeric; nullable := \"true\x00x\"; integer := \"true\x00x\"; }" count=3
+      stmt kind=ASSIGN name="type" name-span=139-143 base="" base-span=none attrs=0
+        value type=BARE span=147-154 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=156-164 base="" base-span=none attrs=0
+        value type=STRING span=169-175 text="true\x00x" decoded="true\x00x"
+      stmt kind=ASSIGN name="integer" name-span=178-185 base="" base-span=none attrs=0
+        value type=STRING span=190-196 text="true\x00x" decoded="true\x00x"

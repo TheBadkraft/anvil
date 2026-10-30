@@ -1,0 +1,5 @@
+#!aml
+foo {
+   x := 1;
+};
+alias := $foo;

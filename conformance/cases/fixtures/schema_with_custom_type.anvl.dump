@@ -1,0 +1,30 @@
+anvil-dump 1
+mode document
+input-bytes 171
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=171
+  attr key="schema" key-span=45-51 raw="" raw-span=none flag=1
+  attr key="table" key-span=53-58 raw="vehicles" raw-span=59-67 flag=0
+    value type=BARE span=59-67 text="vehicles"
+  include decl-span=6-41 decl="include \"schema_vehicle_types.anvl\"" path-span=14-41 path="\"schema_vehicle_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="vin" name-span=70-73 base="" base-span=none attrs=0
+    value type=OBJECT span=77-117 text="{ type := types.VIN; required := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=79-83 base="" base-span=none attrs=0
+        value type=BARE span=87-96 text="types.VIN"
+      stmt kind=ASSIGN name="required" name-span=98-106 base="" base-span=none attrs=0
+        value type=BOOL span=110-114 text="true" bool=true
+  stmt kind=ASSIGN name="vin_override" name-span=119-131 base="" base-span=none attrs=0
+    value type=OBJECT span=135-169 text="{ type := types.VIN; size := 25; }" count=2
+      stmt kind=ASSIGN name="type" name-span=137-141 base="" base-span=none attrs=0
+        value type=BARE span=145-154 text="types.VIN"
+      stmt kind=ASSIGN name="size" name-span=156-160 base="" base-span=none attrs=0
+        value type=NUMERIC span=164-166 text="25" kind=integer overflow=0 i64=25
+doc 1 path="schema_vehicle_types.anvl" dialect=AML bytes=62
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="VIN" name-span=16-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-60 text="{\n   type := String;\n   size := 17;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-42 text="String"
+      stmt kind=ASSIGN name="size" name-span=47-51 base="" base-span=none attrs=0
+        value type=NUMERIC span=55-57 text="17" kind=integer overflow=0 i64=17

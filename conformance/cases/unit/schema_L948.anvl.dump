@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 32
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=32
+  stmt kind=ASSIGN name="set" name-span=6-9 base="" base-span=none attrs=0
+    value type=OBJECT span=13-30 text="{ title := \"x\"; }" count=1
+      stmt kind=ASSIGN name="title" name-span=15-20 base="" base-span=none attrs=0
+        value type=STRING span=25-26 text="x" decoded="x"

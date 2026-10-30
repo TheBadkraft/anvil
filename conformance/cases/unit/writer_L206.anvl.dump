@@ -1,0 +1,22 @@
+anvil-dump 1
+mode document
+input-bytes 130
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=130
+  stmt kind=ASSIGN name="server" name-span=7-13 base="" base-span=none attrs=3
+    attr key="env" key-span=16-19 raw="production" raw-span=20-30 flag=0
+      value type=BARE span=20-30 text="production"
+    attr key="active" key-span=32-38 raw="" raw-span=none flag=1
+    attr key="label" key-span=40-45 raw="\"a b\"" raw-span=46-51 flag=0
+      value type=STRING span=47-50 text="a b" decoded="a b"
+    value type=OBJECT span=56-81 text="{\n   host := localhost;\n}" count=1
+      stmt kind=ASSIGN name="host" name-span=61-65 base="" base-span=none attrs=0
+        value type=BARE span=69-78 text="localhost"
+  stmt kind=ASSIGN name="derived" name-span=83-90 base="server" base-span=93-99 attrs=1
+    attr key="x" key-span=102-103 raw="" raw-span=none flag=1
+    value type=OBJECT span=108-128 text="{\n   port := 8080;\n}" count=2
+      stmt kind=ASSIGN name="port" name-span=113-117 base="" base-span=none attrs=0
+        value type=NUMERIC span=121-125 text="8080" kind=integer overflow=0 i64=8080
+      stmt kind=ASSIGN name="host" name-span=61-65 base="" base-span=none attrs=0
+        value type=BARE span=69-78 text="localhost"

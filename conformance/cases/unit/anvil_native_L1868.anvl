@@ -1,0 +1,3 @@
+#!aml
+x := 1; /* multi
+line */ y := 2;

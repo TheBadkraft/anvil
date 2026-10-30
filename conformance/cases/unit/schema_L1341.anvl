@@ -1,0 +1,3 @@
+#!aml
+owner := { id := 1; };
+reporter := { name := "x"; };

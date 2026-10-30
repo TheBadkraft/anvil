@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+o := { type := Object; fields := { a := { type := Nope; }; b := { type := String; }; }; };
+l := { type := Array; items := { type := Nope; }; };

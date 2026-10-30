@@ -1,0 +1,8 @@
+#!aml
+include "ovr_b.types.anvl";
+@[types]
+
+Id := {
+   type := Numeric;
+   max := 5;
+};

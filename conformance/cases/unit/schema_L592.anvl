@@ -1,0 +1,3 @@
+#!aml
+ref_b := "abc";
+ref_a := 5;

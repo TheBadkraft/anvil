@@ -1,0 +1,15 @@
+anvil-dump 1
+mode document
+input-bytes 71
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=71
+  stmt kind=ASSIGN name="cfg" name-span=7-10 base="" base-span=none attrs=1
+    attr key="late" key-span=13-17 raw="" raw-span=none flag=1
+    value type=OBJECT span=22-69 text="{\n   host := h;\n   port := 1;\n   tls := true;\n}" count=3
+      stmt kind=ASSIGN name="host" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-36 text="h"
+      stmt kind=ASSIGN name="port" name-span=41-45 base="" base-span=none attrs=0
+        value type=NUMERIC span=49-50 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="tls" name-span=55-58 base="" base-span=none attrs=0
+        value type=BOOL span=62-66 text="true" bool=true

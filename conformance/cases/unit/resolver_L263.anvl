@@ -1,0 +1,4 @@
+#!aml
+derived : nope := {
+   y := 2;
+};

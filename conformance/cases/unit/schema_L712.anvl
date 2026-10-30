@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+priority := { type := types.Prority; required := true; };

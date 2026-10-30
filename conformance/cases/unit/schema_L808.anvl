@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+name := { type := String; pooled := true; mask := "***"; };
+bare := { pooled := true; };

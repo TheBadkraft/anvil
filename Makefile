@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -265,3 +265,40 @@ coverage:
 # Fast decimal-to-double path vs strtod: edge cases, fuzz, and the x87 / rounding-mode gates.
 check-numeric-fastpath:
 	sh scripts/check-numeric-fastpath.sh
+
+# anvil-dump (tools/anvil-dump.c): prints the canonical description of what native parsed, the contract
+# in conformance/FORMAT.md. Built against the debug objects (valgrind-readable), static, with the
+# internal headers it needs for source spans. conformance/ holds the cases and native's expected dumps.
+DUMP_BIN = build/tools/anvil-dump
+anvil-dump: $(DUMP_BIN)
+
+$(DUMP_BIN): tools/anvil-dump.c $(DEBUG_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c $(DEBUG_OBJS) -o $@
+
+# Regenerates every expected dump and diffs it against the committed one; any difference fails.
+# ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).
+check-conformance: $(DUMP_BIN) check-drift-tables
+	sh scripts/check-conformance.sh check $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The drift tables (conformance/drift-tables.txt) are generated from include/*.h; stale ones fail.
+check-drift-tables:
+	sh scripts/check-drift-tables.sh
+
+# Rewrites the expected dumps. Only alongside a deliberate native change, committed with it.
+update-conformance: $(DUMP_BIN)
+	sh scripts/check-drift-tables.sh write
+	sh scripts/check-conformance.sh update $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# anvil-dump over the whole corpus under valgrind: no leak, no memory error (slow: one valgrind run per input).
+check-dump-valgrind: $(DUMP_BIN)
+	sh scripts/check-dump-valgrind.sh $(DUMP_BIN)
+
+# Proves the conformance tooling can fail: an altered scratch build must turn check-conformance RED and be found
+# by the differential fuzzer, while native against itself shows 0 differences (conformance/fuzz/prove.sh).
+fuzz-prove: $(DUMP_BIN)
+	sh conformance/fuzz/prove.sh
+
+# 200k fuzz cases under a 1 GiB memory cap, foreground; reports the harness's peak RSS.
+fuzz-memory-test: $(DUMP_BIN)
+	sh conformance/fuzz/test-memory.sh $(DUMP_BIN)

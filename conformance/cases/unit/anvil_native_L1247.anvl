@@ -1,0 +1,6 @@
+#!aml
+
+dated := @date`2026-07-07`;
+sel := @sel`#input-date`;
+raw := `no tag here`;
+longest := @abcdefghijklmnopqrstuvwxyz01234`x`;

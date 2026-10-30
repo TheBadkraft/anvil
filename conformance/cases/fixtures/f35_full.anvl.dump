@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 954
+status error
+dialect AML
+error code=4003 name=ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD category=4 category-name=ANVIL_ERR_SYNTAX line=5 column=7 message="Identifier cannot be a keyword"

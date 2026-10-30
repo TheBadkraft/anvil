@@ -1,0 +1,3 @@
+#!aml
+asset_id := 1;
+name := "this name is definitely over twenty characters";

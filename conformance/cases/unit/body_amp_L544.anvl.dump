@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 43
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=43
+  stmt kind=ASSIGN name="first" name-span=6-11 base="" base-span=none attrs=0
+    value type=NUMERIC span=15-16 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="second" name-span=18-24 base="" base-span=none attrs=0
+    value type=NUMERIC span=28-29 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="third" name-span=31-36 base="" base-span=none attrs=0
+    value type=NUMERIC span=40-41 text="3" kind=integer overflow=0 i64=3

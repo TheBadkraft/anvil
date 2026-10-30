@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 17
+status error
+dialect AML
+error code=3010 name=ANVL_ERR_PARSER_EMPTY_OBJECT_NOT_ALLOWED category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=9 message="Empty objects are not allowed"

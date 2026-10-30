@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 27
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=27
+  stmt kind=ASSIGN name="x" name-span=6-7 base="" base-span=none attrs=0
+    value type=TUPLE span=11-25 text="( true, null )" count=2
+      value type=BOOL span=13-17 text="true" bool=true
+      value type=NULL span=19-23 text="null"

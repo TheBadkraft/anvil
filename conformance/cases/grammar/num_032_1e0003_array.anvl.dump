@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 24
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=24
+  stmt kind=ASSIGN name="x" name-span=6-7 base="" base-span=none attrs=0
+    value type=ARRAY span=11-22 text="[1e0003, 1]" count=2
+      value type=NUMERIC span=12-18 text="1e0003" kind=float overflow=0 f64=0x408f400000000000
+      value type=NUMERIC span=20-21 text="1" kind=integer overflow=0 i64=1

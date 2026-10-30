@@ -1,0 +1,4 @@
+#!amp
+flag_true := true;
+flag_false := false;
+empty := null;

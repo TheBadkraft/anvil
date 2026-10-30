@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 123
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=123
+  stmt kind=OBJECT_BLOCK name="config" name-span=62-68 base="" base-span=none attrs=1
+    attr key="attrib" key-span=71-77 raw="" raw-span=none flag=1
+    value type=OBJECT span=79-121 text="{\n   addr := 0.0.0.127;\n   port := 8080;\n}" count=2
+      stmt kind=ASSIGN name="addr" name-span=84-88 base="" base-span=none attrs=0
+        value type=BARE span=92-101 text="0.0.0.127"
+      stmt kind=ASSIGN name="port" name-span=106-110 base="" base-span=none attrs=0
+        value type=NUMERIC span=114-118 text="8080" kind=integer overflow=0 i64=8080

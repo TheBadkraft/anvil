@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+body := { type := String; size := 5; };

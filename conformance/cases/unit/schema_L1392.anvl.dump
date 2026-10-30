@@ -1,0 +1,17 @@
+anvil-dump 1
+mode document
+input-bytes 87
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=87
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="scores" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-85 text="{ type := Array; items := { type := Numeric; max := 3; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-41 text="Array"
+      stmt kind=ASSIGN name="items" name-span=43-48 base="" base-span=none attrs=0
+        value type=OBJECT span=52-82 text="{ type := Numeric; max := 3; }" count=2
+          stmt kind=ASSIGN name="type" name-span=54-58 base="" base-span=none attrs=0
+            value type=BARE span=62-69 text="Numeric"
+          stmt kind=ASSIGN name="max" name-span=71-74 base="" base-span=none attrs=0
+            value type=NUMERIC span=78-79 text="3" kind=integer overflow=0 i64=3

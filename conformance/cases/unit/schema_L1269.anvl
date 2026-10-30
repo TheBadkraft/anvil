@@ -1,0 +1,6 @@
+#!aml
+@[schema]
+links := { type := Array; items := { type := Object; fields := {
+   kind := { type := enum; values := [ blocks, relates ]; required := true; };
+   target := { type := Numeric; required := true; };
+}; }; };

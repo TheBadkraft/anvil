@@ -1,0 +1,6 @@
+#!aml
+@[types]
+Yes := { type := Numeric; nullable := true; };
+No := { type := Numeric; nullable := false; };
+Unset := { type := Numeric; };
+Bad := { type := Numeric; nullable := maybe; };

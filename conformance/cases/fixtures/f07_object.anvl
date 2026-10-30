@@ -1,0 +1,18 @@
+#!aml
+
+/* ************************************ *
+ * Object variants:                     *
+ * - scalar members                     *
+ * - mixed scalar members               *
+ * - nested members                     *
+ * - anonymous object                   *
+ * ************************************ */
+config := {
+    host := localhost;
+    port := 8080;
+};
+
+document {
+    name := "ANVL For Dummies";
+    author := "The Badkraft";
+};

@@ -1,0 +1,27 @@
+anvil-dump 1
+mode document
+input-bytes 131
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=131
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="f" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-129 text="{ n := 7; s := \"a b\\\"c\"; b := @png`bytes here`; o := { k := 1; }; t := ( 1, 2 ); z := null; w := bareword; }" count=7
+      stmt kind=ASSIGN name="n" name-span=23-24 base="" base-span=none attrs=0
+        value type=NUMERIC span=28-29 text="7" kind=integer overflow=0 i64=7
+      stmt kind=ASSIGN name="s" name-span=31-32 base="" base-span=none attrs=0
+        value type=STRING span=37-43 text="a b\\\"c" decoded="a b\"c"
+      stmt kind=ASSIGN name="b" name-span=46-47 base="" base-span=none attrs=0
+        value type=BLOB span=56-66 text="bytes here" tag="png" tag-span=52-55 bytes=62797465732068657265
+      stmt kind=ASSIGN name="o" name-span=69-70 base="" base-span=none attrs=0
+        value type=OBJECT span=74-85 text="{ k := 1; }" count=1
+          stmt kind=ASSIGN name="k" name-span=76-77 base="" base-span=none attrs=0
+            value type=NUMERIC span=81-82 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="t" name-span=87-88 base="" base-span=none attrs=0
+        value type=TUPLE span=92-100 text="( 1, 2 )" count=2
+          value type=NUMERIC span=94-95 text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC span=97-98 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="z" name-span=102-103 base="" base-span=none attrs=0
+        value type=NULL span=107-111 text="null"
+      stmt kind=ASSIGN name="w" name-span=113-114 base="" base-span=none attrs=0
+        value type=BARE span=118-126 text="bareword"

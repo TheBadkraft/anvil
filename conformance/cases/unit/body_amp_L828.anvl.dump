@@ -1,0 +1,11 @@
+anvil-dump 1
+mode document
+input-bytes 30
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=30
+  stmt kind=ASSIGN name="coords" name-span=6-12 base="" base-span=none attrs=0
+    value type=TUPLE span=16-28 text="(10, 20, 30)" count=3
+      value type=NUMERIC span=17-19 text="10" kind=integer overflow=0 i64=10
+      value type=NUMERIC span=21-23 text="20" kind=integer overflow=0 i64=20
+      value type=NUMERIC span=25-27 text="30" kind=integer overflow=0 i64=30

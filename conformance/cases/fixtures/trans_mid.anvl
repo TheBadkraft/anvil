@@ -1,0 +1,4 @@
+#!aml
+include "trans_b.types.anvl";
+
+plain := 1;

@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 61
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=61
+  stmt kind=ASSIGN name="flag_true" name-span=6-15 base="" base-span=none attrs=0
+    value type=BOOL span=19-23 text="true" bool=true
+  stmt kind=ASSIGN name="flag_false" name-span=25-35 base="" base-span=none attrs=0
+    value type=BOOL span=39-44 text="false" bool=false
+  stmt kind=ASSIGN name="empty" name-span=46-51 base="" base-span=none attrs=0
+    value type=NULL span=55-59 text="null"

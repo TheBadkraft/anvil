@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 40
+status error
+dialect AML
+error code=4051 name=ANVL_ERR_RESOLVER_MISSING_BASE category=5 category-name=ANVIL_ERR_RESOLVE line=0 column=0 message="Base identifier not found in document"

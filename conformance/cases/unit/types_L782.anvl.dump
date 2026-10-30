@@ -1,0 +1,29 @@
+anvil-dump 1
+mode document
+input-bytes 188
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=188
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Yes" name-span=15-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-60 text="{ type := Numeric; nullable := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=24-28 base="" base-span=none attrs=0
+        value type=BARE span=32-39 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=41-49 base="" base-span=none attrs=0
+        value type=BOOL span=53-57 text="true" bool=true
+  stmt kind=ASSIGN name="No" name-span=62-64 base="" base-span=none attrs=0
+    value type=OBJECT span=68-107 text="{ type := Numeric; nullable := false; }" count=2
+      stmt kind=ASSIGN name="type" name-span=70-74 base="" base-span=none attrs=0
+        value type=BARE span=78-85 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=87-95 base="" base-span=none attrs=0
+        value type=BOOL span=99-104 text="false" bool=false
+  stmt kind=ASSIGN name="Unset" name-span=109-114 base="" base-span=none attrs=0
+    value type=OBJECT span=118-138 text="{ type := Numeric; }" count=1
+      stmt kind=ASSIGN name="type" name-span=120-124 base="" base-span=none attrs=0
+        value type=BARE span=128-135 text="Numeric"
+  stmt kind=ASSIGN name="Bad" name-span=140-143 base="" base-span=none attrs=0
+    value type=OBJECT span=147-186 text="{ type := Numeric; nullable := maybe; }" count=2
+      stmt kind=ASSIGN name="type" name-span=149-153 base="" base-span=none attrs=0
+        value type=BARE span=157-164 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=166-174 base="" base-span=none attrs=0
+        value type=BARE span=178-183 text="maybe"

@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+%s := { type := Numeric; required := true; };

@@ -1,0 +1,3 @@
+#!aml
+include "inc_chain_mid.anvl";
+top := $mid;

@@ -1,0 +1,32 @@
+anvil-dump 1
+mode document
+input-bytes 208
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=208
+  attr key="schema" key-span=45-51 raw="" raw-span=none flag=1
+  include decl-span=6-41 decl="include \"schema_integer_types.anvl\"" path-span=14-41 path="\"schema_integer_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="inherits" name-span=54-62 base="" base-span=none attrs=0
+    value type=OBJECT span=66-92 text="{ type := types.Ordinal; }" count=1
+      stmt kind=ASSIGN name="type" name-span=68-72 base="" base-span=none attrs=0
+        value type=BARE span=76-89 text="types.Ordinal"
+  stmt kind=ASSIGN name="relaxed" name-span=94-101 base="" base-span=none attrs=0
+    value type=OBJECT span=105-149 text="{ type := types.Ordinal; integer := false; }" count=2
+      stmt kind=ASSIGN name="type" name-span=107-111 base="" base-span=none attrs=0
+        value type=BARE span=115-128 text="types.Ordinal"
+      stmt kind=ASSIGN name="integer" name-span=130-137 base="" base-span=none attrs=0
+        value type=BOOL span=141-146 text="false" bool=false
+  stmt kind=ASSIGN name="restated" name-span=151-159 base="" base-span=none attrs=0
+    value type=OBJECT span=163-206 text="{ type := types.Ordinal; integer := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=165-169 base="" base-span=none attrs=0
+        value type=BARE span=173-186 text="types.Ordinal"
+      stmt kind=ASSIGN name="integer" name-span=188-195 base="" base-span=none attrs=0
+        value type=BOOL span=199-203 text="true" bool=true
+doc 1 path="schema_integer_types.anvl" dialect=AML bytes=72
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Ordinal" name-span=16-23 base="" base-span=none attrs=0
+    value type=OBJECT span=27-70 text="{\n   type := Numeric;\n   integer := true;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=32-36 base="" base-span=none attrs=0
+        value type=BARE span=40-47 text="Numeric"
+      stmt kind=ASSIGN name="integer" name-span=52-59 base="" base-span=none attrs=0
+        value type=BOOL span=63-67 text="true" bool=true

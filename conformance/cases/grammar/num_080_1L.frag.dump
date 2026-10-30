@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 2
+status ok
+value type=BARE span=0-2 text="1L"

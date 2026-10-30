@@ -1,0 +1,3 @@
+#!aml
+name := 42;
+alias := $name;

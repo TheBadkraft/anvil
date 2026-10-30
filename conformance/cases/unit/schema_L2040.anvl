@@ -1,0 +1,6 @@
+#!aml
+@[schema]
+a := { type := Numeric; };
+b := { type := String; };
+c := { required := true; };
+not_a_rule := 5;

@@ -1,0 +1,2 @@
+#!aml
+root := { label := 5; };

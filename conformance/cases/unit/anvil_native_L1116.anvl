@@ -1,0 +1,7 @@
+#!aml
+
+n := 007;
+b := true;
+z := null;
+s := "a\"b\n";
+w := bare-word;

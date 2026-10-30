@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 65
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=65
+  stmt kind=ASSIGN name="age" name-span=6-9 base="" base-span=none attrs=0
+    value type=NUMERIC span=13-15 text="42" kind=integer overflow=0 i64=42
+  stmt kind=ASSIGN name="negint" name-span=17-23 base="" base-span=none attrs=0
+    value type=NUMERIC span=27-32 text="-1285" kind=integer overflow=0 i64=-1285
+  stmt kind=ASSIGN name="large" name-span=34-39 base="" base-span=none attrs=0
+    value type=NUMERIC span=43-63 text="18446744073709551615" kind=integer overflow=1

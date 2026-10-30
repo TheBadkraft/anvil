@@ -1,0 +1,16 @@
+anvil-dump 1
+mode document
+input-bytes 70
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=70
+  stmt kind=ASSIGN name="n" name-span=7-8 base="" base-span=none attrs=0
+    value type=NUMERIC span=12-15 text="007" kind=integer overflow=0 i64=7
+  stmt kind=ASSIGN name="b" name-span=17-18 base="" base-span=none attrs=0
+    value type=BOOL span=22-26 text="true" bool=true
+  stmt kind=ASSIGN name="z" name-span=28-29 base="" base-span=none attrs=0
+    value type=NULL span=33-37 text="null"
+  stmt kind=ASSIGN name="s" name-span=39-40 base="" base-span=none attrs=0
+    value type=STRING span=45-51 text="a\\\"b\\n" decoded="a\"b\n"
+  stmt kind=ASSIGN name="w" name-span=54-55 base="" base-span=none attrs=0
+    value type=BARE span=59-68 text="bare-word"

@@ -1,0 +1,7 @@
+#!aml
+include "schema_integer_types.anvl";
+@[schema]
+
+inherits := { type := types.Ordinal; };
+relaxed := { type := types.Ordinal; integer := false; };
+restated := { type := types.Ordinal; integer := true; };

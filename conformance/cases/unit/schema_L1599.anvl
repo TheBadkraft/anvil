@@ -1,0 +1,3 @@
+#!aml
+o := { a := null; b := null; };
+l := [ x, null, y ];

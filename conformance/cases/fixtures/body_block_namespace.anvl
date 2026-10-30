@@ -1,0 +1,7 @@
+#!aml
+
+// object-block form (no ':='), no base, no attributes — namespace/scoping container
+label {
+   field := 1;
+   other := "value";
+};

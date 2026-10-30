@@ -1,0 +1,3 @@
+#!aml
+links := [ { kind := blocks; target := 1; }, { kind := bogus; target := 2; },
+                 { kind := relates; } ];

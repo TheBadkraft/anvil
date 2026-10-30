@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 202
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=202
+  stmt kind=ASSIGN name="base_var" name-span=160-168 base="" base-span=none attrs=0
+    value type=NUMERIC span=172-174 text="42" kind=integer overflow=0 i64=42
+  stmt kind=ASSIGN name="derived_var" name-span=176-187 base="" base-span=none attrs=0
+    value type=VARREF span=191-200 text="$base_var" target="base_var" public=NUMERIC resolved=1 resolved-doc=0 resolved-span=172-174

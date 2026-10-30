@@ -1,0 +1,32 @@
+anvil-dump 1
+mode document
+input-bytes 210
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=210
+  attr key="schema" key-span=46-52 raw="" raw-span=none flag=1
+  include decl-span=6-42 decl="include \"schema_nullable_types.anvl\"" path-span=14-42 path="\"schema_nullable_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="inherits" name-span=55-63 base="" base-span=none attrs=0
+    value type=OBJECT span=67-93 text="{ type := types.MaybeId; }" count=1
+      stmt kind=ASSIGN name="type" name-span=69-73 base="" base-span=none attrs=0
+        value type=BARE span=77-90 text="types.MaybeId"
+  stmt kind=ASSIGN name="strict" name-span=95-101 base="" base-span=none attrs=0
+    value type=OBJECT span=105-150 text="{ type := types.MaybeId; nullable := false; }" count=2
+      stmt kind=ASSIGN name="type" name-span=107-111 base="" base-span=none attrs=0
+        value type=BARE span=115-128 text="types.MaybeId"
+      stmt kind=ASSIGN name="nullable" name-span=130-138 base="" base-span=none attrs=0
+        value type=BOOL span=142-147 text="false" bool=false
+  stmt kind=ASSIGN name="restated" name-span=152-160 base="" base-span=none attrs=0
+    value type=OBJECT span=164-208 text="{ type := types.MaybeId; nullable := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=166-170 base="" base-span=none attrs=0
+        value type=BARE span=174-187 text="types.MaybeId"
+      stmt kind=ASSIGN name="nullable" name-span=189-197 base="" base-span=none attrs=0
+        value type=BOOL span=201-205 text="true" bool=true
+doc 1 path="schema_nullable_types.anvl" dialect=AML bytes=73
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="MaybeId" name-span=16-23 base="" base-span=none attrs=0
+    value type=OBJECT span=27-71 text="{\n   type := Numeric;\n   nullable := true;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=32-36 base="" base-span=none attrs=0
+        value type=BARE span=40-47 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=52-60 base="" base-span=none attrs=0
+        value type=BOOL span=64-68 text="true" bool=true

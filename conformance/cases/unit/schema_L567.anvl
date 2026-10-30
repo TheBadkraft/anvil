@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+score := { type := Numeric; min := "abc"; };

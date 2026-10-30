@@ -1,0 +1,3 @@
+#!aml
+@[owner="me"]
+x @[a=1, flag] := true;

@@ -85,3 +85,7 @@ diagnose_tests.c
 
 # Generated binding handoff artifact
 bindings/.handoff/binding-handoff.json
+__pycache__/
+
+# The conformance drift tables are a committed contract, not build output.
+!conformance/drift-tables.txt

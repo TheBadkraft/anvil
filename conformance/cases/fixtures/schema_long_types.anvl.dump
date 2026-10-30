@@ -1,0 +1,17 @@
+anvil-dump 1
+mode document
+input-bytes 248
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=248
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxBBBBBBBBBBBBBBBBB" name-span=16-96 base="" base-span=none attrs=0
+    value type=OBJECT span=100-136 text="{\n   type := String;\n   size := 3;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=105-109 base="" base-span=none attrs=0
+        value type=BARE span=113-119 text="String"
+      stmt kind=ASSIGN name="size" name-span=124-128 base="" base-span=none attrs=0
+        value type=NUMERIC span=132-133 text="3" kind=integer overflow=0 i64=3
+  stmt kind=ASSIGN name="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxAAAAAAAAAAAAAAAAA" name-span=139-219 base="" base-span=none attrs=0
+    value type=OBJECT span=223-246 text="{\n   type := Numeric;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=228-232 base="" base-span=none attrs=0
+        value type=BARE span=236-243 text="Numeric"

@@ -1,0 +1,5 @@
+#!aml
+@[types]
+Good := { type := Object; fields := { id := { type := Numeric; }; }; };
+Plain := { type := Object; };
+Bad := { type := Object; fields := 5; };

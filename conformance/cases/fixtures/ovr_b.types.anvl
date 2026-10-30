@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Id := {
+   type := Numeric;
+   max := 9;
+};

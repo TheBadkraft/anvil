@@ -1,0 +1,29 @@
+anvil-dump 1
+mode document
+input-bytes 194
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=194
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Ts" name-span=15-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-68 text="{ type := String; format := iso8601_datetime; }" count=2
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-37 text="String"
+      stmt kind=ASSIGN name="format" name-span=39-45 base="" base-span=none attrs=0
+        value type=BARE span=49-65 text="iso8601_datetime"
+  stmt kind=ASSIGN name="Quoted" name-span=70-76 base="" base-span=none attrs=0
+    value type=OBJECT span=80-117 text="{ type := String; format := \"uuid\"; }" count=2
+      stmt kind=ASSIGN name="type" name-span=82-86 base="" base-span=none attrs=0
+        value type=BARE span=90-96 text="String"
+      stmt kind=ASSIGN name="format" name-span=98-104 base="" base-span=none attrs=0
+        value type=STRING span=109-113 text="uuid" decoded="uuid"
+  stmt kind=ASSIGN name="Plain" name-span=119-124 base="" base-span=none attrs=0
+    value type=OBJECT span=128-147 text="{ type := String; }" count=1
+      stmt kind=ASSIGN name="type" name-span=130-134 base="" base-span=none attrs=0
+        value type=BARE span=138-144 text="String"
+  stmt kind=ASSIGN name="Nope" name-span=149-153 base="" base-span=none attrs=0
+    value type=OBJECT span=157-192 text="{ type := String; format := nope; }" count=2
+      stmt kind=ASSIGN name="type" name-span=159-163 base="" base-span=none attrs=0
+        value type=BARE span=167-173 text="String"
+      stmt kind=ASSIGN name="format" name-span=175-181 base="" base-span=none attrs=0
+        value type=BARE span=185-189 text="nope"

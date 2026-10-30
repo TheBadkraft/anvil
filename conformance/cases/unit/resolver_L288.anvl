@@ -1,0 +1,7 @@
+#!aml
+foo {
+   x := 1;
+};
+derived : foo := {
+   y := 2;
+};

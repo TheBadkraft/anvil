@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 54
+status ok
+dialect AMP
+doc 0 path="<root>" dialect=AMP bytes=54
+  stmt kind=ASSIGN name="created" name-span=6-13 base="" base-span=none attrs=0
+    value type=BLOB span=23-33 text="2026-07-07" tag="date" tag-span=18-22 bytes=323032362d30372d3037
+  stmt kind=ASSIGN name="raw" name-span=36-39 base="" base-span=none attrs=0
+    value type=BLOB span=44-51 text="payload" tag="" tag-span=none bytes=7061796c6f6164

@@ -15,13 +15,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (parity tooling for the pure-JS reader, FR-2610-anvl-conformance-001)
+
+- **`anvil-dump`** (`make anvil-dump`, `tools/anvil-dump.c`) prints a canonical, deterministic description of
+  what native parsed: the dialect, every statement and value with its source span, text, decoded value,
+  `numericKind`, number bits, blob tag and bytes, attributes (raw and decoded), includes and how they
+  resolved, module attributes, and every error with its code, name, category, message, line and column. It
+  reads a file, stdin, a value fragment (`--fragment`) or a list of files (`--batch`). The format is
+  versioned and documented in `conformance/FORMAT.md`.
+- **A native-owned conformance corpus**, `conformance/cases/`: 1,165 inputs (every `test/fixtures` file, the
+  inline inputs of the unit tests, and generated number, string, blob, attribute, empty/one-element, statement,
+  include and error cases) with native's expected dump beside each. `make check-conformance` regenerates every
+  dump and fails on any difference, a missing dump or a stale copy of a fixture; `make update-conformance`
+  rewrites them alongside a deliberate native change.
+- **A differential fuzz harness**, `conformance/fuzz/fuzz.py`: a grammar-aware generator and a byte-level
+  mutator over the corpus, a driver that runs two dump executables and reports the first difference minimised.
+  Its memory is bounded (a sliding window of batches, capped child memory and output, capped case size and depth; `make fuzz-memory-test` runs 200,000 cases under a 1 GiB limit). `make fuzz-prove` shows it can fail: native against itself finds nothing, an altered scratch build is found
+  and `check-conformance` goes red on it.
+- **Drift tables**, `conformance/drift-tables.txt`, generated from `include/*.h` (every enum, the keywords and
+  grammar tokens, the format names); `make check-conformance` fails when they are stale.
+- Library: two hidden accessors in `include/internal/flat_internal.h` give the dump tool the structures behind
+  an `anvil_document`. Not public, not exported.
+
 ### Changed (site)
 
 - Deployed v0.11.0-rc to anvldata.com on 2026-10-30 from main `234fbe4` (Worker version `5cfca12f-436b-47fa-8888-e2fea6143fa8`). Live checks: pages, docs copies, `version.js` (`0.11.0-rc`), the five tarballs against the live `SHA256SUMS`; the v0.10.0-rc tarballs now return 404.
 
 ### Changed (site)
 
-- Site publishes v0.11.0-rc: new downloads and `SHA256SUMS`, `version.js`, the download page (browser bundle usage), the site copies of the language reference, types reference and schema docs (number grammar, fail-closed `UNRESOLVED_TYPE`), the Bindings Guide (`numericKind`, `asNumber()`, `asBigInt()`, exact BigInt reads, `5.` errors, `anvil.browser.js`, `ready({ wasmUrl | locateFile })`, service-worker precache, `UNRESOLVED_TYPE`) and the public changelog entry. Not yet deployed.
+- Site publishes v0.11.0-rc: new downloads and `SHA256SUMS`, `version.js`, the download page (browser bundle usage), the site copies of the language reference, types reference and schema docs (number grammar, fail-closed `UNRESOLVED_TYPE`), the Bindings Guide (`numericKind`, `asNumber()`, `asBigInt()`, exact BigInt reads, `5.` errors, `anvil.browser.js`, `ready({ wasmUrl | locateFile })`, service-worker precache, `UNRESOLVED_TYPE`) and the public changelog entry.
 
 ---
 

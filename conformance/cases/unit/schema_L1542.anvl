@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+s := { type := String; nullable := true; size := 1; values := [ a, b ]; };
+n := { type := Numeric; nullable := true; min := 5; };

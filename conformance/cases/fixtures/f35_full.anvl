@@ -1,0 +1,53 @@
+#!aml
+// single-line comment
+
+// import another document to be included in the module
+import 'other.anvl'
+
+   /* ***************************** *
+    * Multi-line block comment         *
+    * ***************************** */
+   @[ doc - level ] // document-level attributes
+
+   // basic statement
+   age: = 42;
+host : = localhost;
+port : = 8080;
+val : = null;
+
+// blobs
+date : = @sel`#input - date`;
+remark : = @md`* *ANVL * *is boss !`;
+
+// numerics
+integers : = 32;
+negint : = -1285;
+pi : = 3.14;
+decimal : = -3.402823466;
+hex : = #12D4F;
+exp : = 1.7976931348623157e+308;
+large : = 18446744073709551615;
+
+// array
+tags : = [ alpha, beta ];
+
+// tuple
+coords : = (10, 20);
+
+// object
+config : = {
+   host : = localhost;
+   port : = 8080;
+};
+
+// anonymous object (read-only)
+document {
+   name:= "ANVL For Dummies";
+   author:= "The Badkraft";
+};
+
+// attributed entry
+server @[ env = production, active ] : = {
+   host : = localhost;
+   port : = 8080;
+};

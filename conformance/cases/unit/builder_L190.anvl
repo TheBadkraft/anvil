@@ -1,0 +1,13 @@
+#!aml
+
+@[types]
+@[mixed=true]
+@[note="hello, world]"]
+include "base.anvl";
+
+server @[env=production, active, label="a b"] := {
+   host := localhost;
+};
+derived : server @[x] := {
+   port := 8080;
+};

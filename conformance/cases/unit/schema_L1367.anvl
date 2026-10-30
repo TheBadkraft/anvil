@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+a := { type := Object; fields := { x := { type := Numeric; }; y := { type := Numeric; }; }; };
+b := { type := Numeric; };

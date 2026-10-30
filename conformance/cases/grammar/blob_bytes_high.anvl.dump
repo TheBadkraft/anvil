@@ -1,0 +1,8 @@
+anvil-dump 1
+mode document
+input-bytes 18
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=18
+  stmt kind=ASSIGN name="x" name-span=6-7 base="" base-span=none attrs=0
+    value type=BLOB span=12-15 text="\x80\xff\xfe" tag="" tag-span=none bytes=80fffe

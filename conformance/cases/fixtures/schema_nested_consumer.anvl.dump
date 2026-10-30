@@ -1,0 +1,46 @@
+anvil-dump 1
+mode document
+input-bytes 211
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=211
+  attr key="schema" key-span=44-50 raw="" raw-span=none flag=1
+  include decl-span=6-40 decl="include \"schema_nested_types.anvl\"" path-span=14-40 path="\"schema_nested_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="owner" name-span=53-58 base="" base-span=none attrs=0
+    value type=OBJECT span=62-87 text="{ type := types.Person; }" count=1
+      stmt kind=ASSIGN name="type" name-span=64-68 base="" base-span=none attrs=0
+        value type=BARE span=72-84 text="types.Person"
+  stmt kind=ASSIGN name="reporter" name-span=89-97 base="" base-span=none attrs=0
+    value type=OBJECT span=101-126 text="{ type := types.Person; }" count=1
+      stmt kind=ASSIGN name="type" name-span=103-107 base="" base-span=none attrs=0
+        value type=BARE span=111-123 text="types.Person"
+  stmt kind=ASSIGN name="override" name-span=128-136 base="" base-span=none attrs=0
+    value type=OBJECT span=140-209 text="{ type := types.Person; fields := { code := { type := String; }; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=142-146 base="" base-span=none attrs=0
+        value type=BARE span=150-162 text="types.Person"
+      stmt kind=ASSIGN name="fields" name-span=164-170 base="" base-span=none attrs=0
+        value type=OBJECT span=174-206 text="{ code := { type := String; }; }" count=1
+          stmt kind=ASSIGN name="code" name-span=176-180 base="" base-span=none attrs=0
+            value type=OBJECT span=184-203 text="{ type := String; }" count=1
+              stmt kind=ASSIGN name="type" name-span=186-190 base="" base-span=none attrs=0
+                value type=BARE span=194-200 text="String"
+doc 1 path="schema_nested_types.anvl" dialect=AML bytes=169
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Person" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-167 text="{\n   type := Object;\n   fields := {\n      id := { type := Numeric; required := true; };\n      name := { type := String; size := 5; };\n   };\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=31-35 base="" base-span=none attrs=0
+        value type=BARE span=39-45 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=50-56 base="" base-span=none attrs=0
+        value type=OBJECT span=60-164 text="{\n      id := { type := Numeric; required := true; };\n      name := { type := String; size := 5; };\n   }" count=2
+          stmt kind=ASSIGN name="id" name-span=68-70 base="" base-span=none attrs=0
+            value type=OBJECT span=74-112 text="{ type := Numeric; required := true; }" count=2
+              stmt kind=ASSIGN name="type" name-span=76-80 base="" base-span=none attrs=0
+                value type=BARE span=84-91 text="Numeric"
+              stmt kind=ASSIGN name="required" name-span=93-101 base="" base-span=none attrs=0
+                value type=BOOL span=105-109 text="true" bool=true
+          stmt kind=ASSIGN name="name" name-span=120-124 base="" base-span=none attrs=0
+            value type=OBJECT span=128-158 text="{ type := String; size := 5; }" count=2
+              stmt kind=ASSIGN name="type" name-span=130-134 base="" base-span=none attrs=0
+                value type=BARE span=138-144 text="String"
+              stmt kind=ASSIGN name="size" name-span=146-150 base="" base-span=none attrs=0
+                value type=NUMERIC span=154-155 text="5" kind=integer overflow=0 i64=5

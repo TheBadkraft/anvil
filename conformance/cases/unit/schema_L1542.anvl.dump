@@ -1,0 +1,27 @@
+anvil-dump 1
+mode document
+input-bytes 146
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=146
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="s" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-89 text="{ type := String; nullable := true; size := 1; values := [ a, b ]; }" count=4
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-37 text="String"
+      stmt kind=ASSIGN name="nullable" name-span=39-47 base="" base-span=none attrs=0
+        value type=BOOL span=51-55 text="true" bool=true
+      stmt kind=ASSIGN name="size" name-span=57-61 base="" base-span=none attrs=0
+        value type=NUMERIC span=65-66 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="values" name-span=68-74 base="" base-span=none attrs=0
+        value type=ARRAY span=78-86 text="[ a, b ]" count=2
+          value type=BARE span=80-81 text="a"
+          value type=BARE span=83-84 text="b"
+  stmt kind=ASSIGN name="n" name-span=91-92 base="" base-span=none attrs=0
+    value type=OBJECT span=96-144 text="{ type := Numeric; nullable := true; min := 5; }" count=3
+      stmt kind=ASSIGN name="type" name-span=98-102 base="" base-span=none attrs=0
+        value type=BARE span=106-113 text="Numeric"
+      stmt kind=ASSIGN name="nullable" name-span=115-123 base="" base-span=none attrs=0
+        value type=BOOL span=127-131 text="true" bool=true
+      stmt kind=ASSIGN name="min" name-span=133-136 base="" base-span=none attrs=0
+        value type=NUMERIC span=140-141 text="5" kind=integer overflow=0 i64=5

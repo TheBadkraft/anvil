@@ -1,0 +1,6 @@
+#!aml
+created_at := "yesterday";
+other := "also bad";
+body := `2026-10-25T14:03:00Z`;
+bad_body := `nope`;
+n := 5;
