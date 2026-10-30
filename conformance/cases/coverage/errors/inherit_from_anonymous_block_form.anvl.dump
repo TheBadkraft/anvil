@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 34
+status error
+dialect AML
+error code=4052 name=ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS category=5 category-name=ANVIL_ERR_RESOLVE line=0 column=0 message="Cannot inherit from anonymous object (use ':=' for inheritable declarations)"

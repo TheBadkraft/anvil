@@ -224,16 +224,20 @@ static void test_rsv06_varref_missing_target_resolves_to_null(void) {
    mod_ctx_dispose(ctx);
 }
 /* ---------------------------------------------------------------------- *
- * RSV07 — VarRef targeting an anonymous (OBJECT_BLOCK) statement resolves
- * to null, not an error — no value of its own to alias
+ * RSV07 - a VarRef targeting a block-form (OBJECT_BLOCK) statement resolves
+ * to that statement's object value, like any other target (BR-2610-anvl-resolver-001):
+ * a block is read-only (it cannot be a base), and a reference is a read.
  * ---------------------------------------------------------------------- */
-static void test_rsv07_varref_to_anonymous_resolves_to_null(void) {
+static void test_rsv07_varref_to_block_form_resolves(void) {
    module_context ctx = NULL;
    module_document doc = setup_amp_doc("#!aml\n"
                                        "foo {\n"
                                        "   x := 1;\n"
                                        "};\n"
-                                       "alias := $foo;\n",
+                                       "alias := $foo;\n"
+                                       "chain := $alias;\n"
+                                       "o := { inner := $foo; deeper := { r := $alias; }; };\n"
+                                       "p { q := $foo; };\n",
                                        &ctx);
    TestBit.is_not_null(doc, "RSV07: document loaded");
    if (!doc) {
@@ -243,15 +247,33 @@ static void test_rsv07_varref_to_anonymous_resolves_to_null(void) {
 
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = mod_resolve_context(ctx, &err_code);
-   TestBit.is_equal_int(ANVL_RES_OK, res,
-                        "RSV07: resolve returns OK (anonymous target is not an error)");
+   TestBit.is_equal_int(ANVL_RES_OK, res, "RSV07: resolve returns OK");
 
-   anvl_statement alias_stmt = NULL;
-   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&alias_stmt);
-   TestBit.is_not_null(alias_stmt, "RSV07: 'alias' statement retrieved");
-   if (alias_stmt && alias_stmt->value) {
-      TestBit.is_null(alias_stmt->value->varref.resolved, "RSV07: alias's resolved is NULL");
+   anvl_statement foo = NULL, alias = NULL, chain = NULL;
+   FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&foo);
+   FArray.get(doc->body, 1, sizeof(anvl_statement), (object *)&alias);
+   FArray.get(doc->body, 2, sizeof(anvl_statement), (object *)&chain);
+   TestBit.is_true(foo && alias && chain && foo->value && alias->value && chain->value,
+                   "RSV07: statements retrieved");
+   if (foo && alias && chain && foo->value && alias->value && chain->value) {
+      TestBit.is_true(alias->value->varref.resolved == foo->value,
+                      "RSV07: alias resolves to the block's object value");
+      TestBit.is_true(chain->value->varref.resolved == foo->value,
+                      "RSV07: a chain through a reference to a block resolves to the block's value");
+      TestBit.is_equal_int(ANVL_VALUE_OBJECT, foo->value->type, "RSV07: that value is an object");
    }
+   // every reference in the document, at any depth, resolved
+   usize unresolved = 0, refs = 0;
+   for (usize i = 0; i < List.size(ctx->values); i++) {
+      anvl_value v = NULL;
+      List.get(ctx->values, i, (object *)&v);
+      if (v && v->type == ANVL_VALUE_VARREF) {
+         refs++;
+         unresolved += v->varref.resolved ? 0 : 1;
+      }
+   }
+   TestBit.is_equal_int(5, (long long)refs, "RSV07: five references in the document");
+   TestBit.is_equal_int(0, (long long)unresolved, "RSV07: none left unresolved");
 
    mod_ctx_dispose(ctx);
 }
@@ -521,8 +543,8 @@ int main(void) {
                   test_rsv05_varref_cycle_resolves_to_null, th);
    TestBit.run_ex("RSV06_varref_missing_target_resolves_to_null", NULL,
                   test_rsv06_varref_missing_target_resolves_to_null, th);
-   TestBit.run_ex("RSV07_varref_to_anonymous_resolves_to_null", NULL,
-                  test_rsv07_varref_to_anonymous_resolves_to_null, th);
+   TestBit.run_ex("RSV07_varref_to_block_form_resolves", NULL,
+                  test_rsv07_varref_to_block_form_resolves, th);
    TestBit.run_ex("RSV08_missing_base_rejected", NULL, test_rsv08_missing_base_rejected, th);
    TestBit.run_ex("RSV09_anonymous_base_rejected", NULL, test_rsv09_anonymous_base_rejected, th);
    TestBit.run_ex("RSV10_valid_base_resolves", NULL, test_rsv10_valid_base_resolves, th);

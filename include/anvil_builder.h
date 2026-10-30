@@ -115,13 +115,16 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  * @brief Stream the whole document into `w`: header, then every statement. `w` must be a fresh
  * writer of the same dialect; it is not finished - that, and reading its data, is the caller's.
  * On failure the writer's error is also reported by anvil_builder_get_error.
+ * Before anything is written, every member's base that names a top-level member must name an
+ * object (else ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT). This is checked across every member
+ * the builder created, including members never attached to the tree.
  */
 bool anvil_builder_write(anvil_builder b, anvil_writer w);
 
 /**
  * @brief Emit the document as text, NUL-terminated (the NUL is not counted in `*length`).
  * Borrowed: valid until the next emit or anvil_builder_dispose. NULL on error. May be called
- * again after changing the builder.
+ * again after changing the builder. Checks bases as anvil_builder_write does.
  */
 const char *anvil_builder_emit(anvil_builder b, size_t *length);
 

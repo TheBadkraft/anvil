@@ -1,0 +1,20 @@
+anvil-dump 1
+mode document
+input-bytes 61
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=61
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=6
+    attr key="n" key-span=4-5 raw="5" raw-span=6-7 flag=0
+      value type=NUMERIC span=6-7 text="5" kind=integer overflow=0 i64=5
+    attr key="f" key-span=9-10 raw="-1.5e3" raw-span=11-17 flag=0
+      value type=NUMERIC span=11-17 text="-1.5e3" kind=float overflow=0 f64=0xc097700000000000
+    attr key="on" key-span=19-21 raw="true" raw-span=22-26 flag=0
+      value type=BOOL span=22-26 text="true" bool=true
+    attr key="off" key-span=28-31 raw="false" raw-span=32-37 flag=0
+      value type=BOOL span=32-37 text="false" bool=false
+    attr key="z" key-span=39-40 raw="null" raw-span=41-45 flag=0
+      value type=NULL span=41-45 text="null"
+    attr key="s" key-span=47-48 raw="done" raw-span=49-53 flag=0
+      value type=BARE span=49-53 text="done"
+    value type=NUMERIC span=58-59 text="1" kind=integer overflow=0 i64=1

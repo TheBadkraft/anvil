@@ -408,6 +408,20 @@ VALUE_STEP(blob_backtick, anvil_writer_blob(w, "t", "a`b", 3))
 VALUE_STEP(blob_long_tag, anvil_writer_blob(w, "abcdefghijklmnopqrstuvwxyz0123456", "x", 1))
 VALUE_STEP(blob_bad_tag, anvil_writer_blob(w, "1x", "x", 1))
 
+static bool attr_array(anvil_writer w) { return anvil_writer_attribute(w, "k", "[x"); }
+static bool attr_array_closed(anvil_writer w) { return anvil_writer_attribute(w, "k", "[x\"]\""); }
+static bool attr_tuple(anvil_writer w) { return anvil_writer_attribute(w, "k", "(1)"); }
+static bool attr_object(anvil_writer w) { return anvil_writer_attribute(w, "k", "{a}"); }
+static bool attr_object_empty(anvil_writer w) { return anvil_writer_attribute(w, "k", "{}"); }
+static bool attr_module_object(anvil_writer w) { return anvil_writer_attribute(w, "k", "{a}"); }
+static bool attr_scalars_ok(anvil_writer w) {
+   return anvil_writer_attribute(w, "a", "done") && anvil_writer_attribute(w, "b", "5") &&
+          anvil_writer_attribute(w, "c", "true") && anvil_writer_attribute(w, "d", "\"[x]\"") &&
+          anvil_writer_attribute(w, "e", "b{c}") && anvil_writer_attribute_string(w, "f", "(1)", 3) &&
+          anvil_writer_attribute_string(w, "g", "{a}", 3);
+}
+static bool attr_blob(anvil_writer w) { return anvil_writer_attribute(w, "k", "@t`z`"); }
+static bool attr_blob_untagged(anvil_writer w) { return anvil_writer_attribute(w, "k", "`z`"); }
 static bool attr_comma(anvil_writer w) { return anvil_writer_attribute(w, "k", "a,b"); }
 static bool attr_bracket(anvil_writer w) { return anvil_writer_attribute(w, "k", "a]"); }
 static bool attr_varref(anvil_writer w) { return anvil_writer_attribute(w, "k", "$x"); }
@@ -454,6 +468,23 @@ static void test_w10_value_validation(void) {
    expect_error(ANVIL_WRITER_AML, blob_long_tag, ANVIL_WRITER_ERR_INVALID_BLOB, "W10: 33-char tag");
    expect_error(ANVIL_WRITER_AML, blob_bad_tag, ANVIL_WRITER_ERR_INVALID_BLOB, "W10: bad blob tag");
 
+   expect_error(ANVIL_WRITER_AML, attr_array, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr '[x'");
+   expect_error(ANVIL_WRITER_AML, attr_array_closed, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE,
+                "W10: attr starting with '[' (the reader's 2006)");
+   expect_error(ANVIL_WRITER_AML, attr_tuple, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr '(1)'");
+   expect_error(ANVIL_WRITER_AML, attr_object, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr '{a}'");
+   expect_error(ANVIL_WRITER_AML, attr_object_empty, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE,
+                "W10: attr '{}'");
+   expect_error(ANVIL_WRITER_AML, attr_module_object, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE,
+                "W10: module attr '{a}'");
+   {
+      anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+      TestBit.is_true(attr_scalars_ok(w), "W10: bare scalars and quoted text with brackets are accepted");
+      anvil_writer_dispose(w);
+   }
+   expect_error(ANVIL_WRITER_AML, attr_blob, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr tagged blob");
+   expect_error(ANVIL_WRITER_AML, attr_blob_untagged, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE,
+                "W10: attr untagged blob");
    expect_error(ANVIL_WRITER_AML, attr_comma, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr ','");
    expect_error(ANVIL_WRITER_AML, attr_bracket, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr ']'");
    expect_error(ANVIL_WRITER_AML, attr_varref, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr '$'");

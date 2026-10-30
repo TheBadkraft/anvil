@@ -708,12 +708,34 @@ static anvil_writer_err_code check_depth(anvil_builder b) {
    return result;
 }
 
+// A member's base that names a top-level member of this builder must name an object, as the
+// reader requires (4020). The builder only writes `name := { ... }`, never the anonymous block
+// form `name { ... }` (4052), so an object is the one thing a base can legally be. A base the
+// builder does not hold (one from an include) is left to the reader.
+static anvil_writer_err_code check_bases(anvil_builder b) {
+   for (size_t i = 0; i < b->all_member_count; i++) {
+      const struct anvil_member_t *m = b->all_members[i];
+      if (!m->base) {
+         continue;
+      }
+      anvil_member target = anvil_builder_find(b, NULL, m->base);
+      if (target && target->value->kind != NODE_OBJECT) {
+         return ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      }
+   }
+   return ANVIL_WRITER_OK;
+}
+
 bool anvil_builder_write(anvil_builder b, anvil_writer w) {
    if (!b) {
       return false;
    }
    if (!w) {
       return outcome(b, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
+   }
+   anvil_writer_err_code bases = check_bases(b);
+   if (bases != ANVIL_WRITER_OK) {
+      return outcome(b, bases);
    }
    anvil_writer_err_code depth = check_depth(b);
    if (depth != ANVIL_WRITER_OK) {

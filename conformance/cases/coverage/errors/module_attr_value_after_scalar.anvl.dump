@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 22
+status error
+dialect AML
+error code=2006 name=ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE category=2 category-name=ANVIL_ERR_HEADER line=1 column=10 message="Attribute values must be scalars (bare or quoted), not an array, tuple, object or blob"

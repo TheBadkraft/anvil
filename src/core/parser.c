@@ -312,32 +312,12 @@ static anvl_err_code statement_start_error(anvl_source src, id_kind kind) {
    }
    return ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT;
 }
-// True if an attribute value that starts a `[`, `{` or `(` was cut short by the scan for the
-// next `,` or `]`: it is the front of an array, object or tuple, which an attribute value cannot
-// be. A bracketed value that closes within the scan (`{1}`, `(1 2)`) is still a plain bare word.
-bool anvl_attr_value_is_split_compound(const char *begin, const char *end) {
-   if (begin >= end || (*begin != '[' && *begin != '{' && *begin != '(')) {
-      return false;
-   }
-   int depth = 0;
-   bool in_string = false;
-   for (const char *q = begin; q < end; q++) {
-      char c = *q;
-      if (in_string) {
-         if (c == '\\' && q + 1 < end) {
-            q++;
-         } else if (c == '"') {
-            in_string = false;
-         }
-      } else if (c == '"') {
-         in_string = true;
-      } else if (c == '[' || c == '{' || c == '(') {
-         depth++;
-      } else if (c == ']' || c == '}' || c == ')') {
-         depth--;
-      }
-   }
-   return depth > 0;
+// True if an attribute value starts with `[`, `{` or `(` (an array, object or tuple), or with a
+// backtick or `@` (a blob, tagged or not): none can be an attribute value, which is a small scalar;
+// anything as large as a blob belongs in the statement's value. Decided by the first character
+// alone, wherever a `,` or `]` falls in the rest (BR-2610-anvl-parser-007).
+bool anvl_attr_value_is_compound(const char *begin, const char *end) {
+   return begin < end && (*begin == '[' || *begin == '{' || *begin == '(' || *begin == '`' || *begin == '@');
 }
 // True for an ASCII control character that cannot begin or continue anything: not space, tab or a
 // line break. (End of input is not one; callers check it first.)
@@ -818,8 +798,8 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
             value_end--;
          }
          attr->value.end = value_end;
-         if (anvl_attr_value_is_split_compound(value_start, value_end)) {
-            // the front of an array, object or tuple, cut at its first ',' or ']' (2006)
+         if (anvl_attr_value_is_compound(value_start, value_end)) {
+            // an array, object or tuple (2006)
             parser_set_error_at(src, ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, value_line,
                                 value_col);
             Allocator.dispose(attr);

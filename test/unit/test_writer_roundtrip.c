@@ -699,7 +699,7 @@ static void test_rt11_accepted_candidates_read_back(void) {
    const char *bare_alpha = "ab1_-./:$e+.,;@`\"{}[]()#\\ x09";
    const char *num_alpha = "0123456789-+.eE";
    const char *string_alpha = "ab \"\\\n\t\r;:=,{}[]()@`$/*#'";
-   const char *attr_alpha = "ab1=,]\" $-.";
+   const char *attr_alpha = "ab1=,]\" $-.[({`@";
    int accepted_bare = 0, accepted_numeric = 0, accepted_attr = 0;
 
    for (int round = 0; round < 3000; round++) {
@@ -985,6 +985,110 @@ static void test_rt14_builder_sweep(void) {
    (void)refused;
 }
 
+// RT14, bases (BR-2610-anvl-writer-002): for every kind of value a top-level member can hold, a
+// member that derives from it is emitted exactly when that value is an object, and what is
+// emitted loads. The reader's 4020 is the reason for every refusal.
+static void test_rt14_builder_bases(void) {
+   for (int kind = 0; kind < 8; kind++) {
+      anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+      anvil_node t;
+      switch (kind) {
+      case 0: t = anvil_builder_int(b, 1); break;
+      case 1: t = anvil_builder_bare(b, "word"); break;
+      case 2: t = anvil_builder_string(b, "s", 1); break;
+      case 3: t = anvil_builder_null(b); break;
+      case 4: t = anvil_builder_bool(b, true); break;
+      case 5:
+         t = anvil_builder_array(b);
+         anvil_builder_append(b, t, anvil_builder_int(b, 1));
+         break;
+      case 6:
+         t = anvil_builder_tuple(b);
+         anvil_builder_append(b, t, anvil_builder_int(b, 1));
+         anvil_builder_append(b, t, anvil_builder_int(b, 2));
+         break;
+      default:
+         t = anvil_builder_object(b);
+         anvil_builder_add(b, t, "f", anvil_builder_int(b, 1));
+         break;
+      }
+      anvil_builder_add(b, NULL, "t", t);
+      anvil_node d = anvil_builder_object(b);
+      anvil_builder_add(b, d, "g", anvil_builder_int(b, 2));
+      anvil_member dm = anvil_builder_add(b, NULL, "d", d);
+      anvil_builder_set_base(b, dm, "t");
+      size_t len = 0;
+      const char *text = anvil_builder_emit(b, &len);
+      TestBit.is_equal_int(kind == 7, text != NULL, "RT14: a base is emitted exactly when it is an object");
+      if (text) {
+         anvil_document doc = anvil_load_buffer(text, len);
+         TestBit.is_true(doc && !anvil_has_errors(doc), "RT14: an object base loads");
+         anvil_dispose(doc);
+      } else {
+         const char src[] = "#!aml\n\nt := 1;\nd : t := { g := 2; };\n";
+         anvil_document doc = anvil_load_buffer(src, sizeof src - 1);
+         TestBit.is_true(doc && anvil_has_errors(doc), "RT14: the reader refuses what the builder refused");
+         anvil_dispose(doc);
+      }
+      anvil_builder_dispose(b);
+   }
+}
+
+// The block form `ident { ... }` is an anonymous, read-only block: it cannot be a base (4052). The
+// builder only ever writes `name := { ... }`, so it cannot name a block as a base at all; what it
+// writes always loads.
+static void test_rt14_anonymous_block_base(void) {
+   const char src[] = "#!aml\n\nblk { f := 1; };\nd : blk := { g := 2; };\n";
+   anvil_document doc = anvil_load_buffer(src, sizeof src - 1);
+   TestBit.is_true(doc && anvil_has_errors(doc), "RT14: the reader refuses a block as a base");
+   anvil_dispose(doc);
+
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+   anvil_builder_add(b, NULL, "blk", o);
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_true(text && !strstr(text, "blk {"), "RT14: the builder writes an object as 'name := {', never as a block");
+   anvil_builder_dispose(b);
+}
+
+// RT14, attribute values: whatever the builder takes as an attribute value loads.
+static void test_rt14_builder_attribute_values(void) {
+   sweep_state = UINT64_C(0xA24BAED4963EE407);
+   const char *alpha = "ab1=,]\" $-.[({)}`@";
+   int accepted = 0, refused = 0, not_loading = 0;
+   for (int round = 0; round < 3000; round++) {
+      char v[12];
+      for (int i = 0; i < 6; i++) {
+         v[i] = alpha[sweep_next((unsigned)strlen(alpha))];
+      }
+      v[1 + sweep_next(5)] = '\0';
+      anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+      anvil_member m = anvil_builder_add(b, NULL, "a", anvil_builder_int(b, 1));
+      bool member = sweep_next(2);
+      bool ok = member ? anvil_builder_member_attribute(b, m, "k", v) : anvil_builder_attribute(b, "k", v);
+      if (!ok) {
+         refused++;
+         TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, anvil_builder_get_error(b),
+                              "RT14: an attribute value is refused as INVALID_ATTRIBUTE_VALUE");
+         anvil_builder_dispose(b);
+         continue;
+      }
+      accepted++;
+      size_t len = 0;
+      const char *text = anvil_builder_emit(b, &len);
+      anvil_document doc = text ? anvil_load_buffer(text, len) : NULL;
+      if (!doc || anvil_has_errors(doc)) {
+         not_loading++;
+      }
+      anvil_dispose(doc);
+      anvil_builder_dispose(b);
+   }
+   TestBit.is_true(accepted > 100 && refused > 100, "RT14: the attribute sweep hits both outcomes");
+   TestBit.is_equal_int(0, not_loading, "RT14: every attribute value the builder accepts loads");
+}
+
 /* ---------------------------------------------------------------------- *
  * RT13 - a blob's tag survives write -> read -> write
  * ---------------------------------------------------------------------- */
@@ -1059,6 +1163,9 @@ int main(void) {
                   th);
    TestBit.run_ex("RT14_writer_sweep", NULL, test_rt14_writer_sweep, th);
    TestBit.run_ex("RT14_builder_sweep", NULL, test_rt14_builder_sweep, th);
+   TestBit.run_ex("RT14_builder_bases", NULL, test_rt14_builder_bases, th);
+   TestBit.run_ex("RT14_anonymous_block_base", NULL, test_rt14_anonymous_block_base, th);
+   TestBit.run_ex("RT14_builder_attribute_values", NULL, test_rt14_builder_attribute_values, th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,
                   th);
    TestBit.run_ex("RT_LITERAL_PREFIXED_BARE_WORDS", NULL, test_rt_literal_prefixed_bare_words, th);

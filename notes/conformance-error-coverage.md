@@ -68,7 +68,7 @@ record what native does today, and a port must match it.
 | 4012 | `ANVL_ERR_PARSER_INVALID_ATTRIBUTE` | yes (12 dumps) | `coverage/columns/mb_attr_error.anvl` |
 | 4013 | `ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY` | yes (9 dumps) | `coverage/errors/attr_duplicate_flag.anvl` |
 | 4014 | `ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE` | no | Reserved, out of scope for BR-2610-anvl-parser-005 (backlogged as FR-2610-anvl-errors-001); declared and named in `errors.c`, but nothing in `src/` ever records it; native reports the mistake under another code or accepts it. See the cases named in the section below. |
-| 4015 | `ANVL_ERR_ANON_BLOCK_REDECLARATION` | no | Not used: a block and a later name collision at top level is 4053 (`errors/document_duplicate_name.anvl`, `errors/object_duplicate_assign_then_block.anvl` is 4001 in an object), because the reference makes `ident { }` and `ident := { }` the same statement. Owner decision 2026-10-30: stays reserved and unused. |
+| 4015 | `ANVL_ERR_ANON_BLOCK_REDECLARATION` | no | Not used: a block and a later name collision at top level is 4053 (`errors/document_duplicate_name.anvl`, `errors/object_duplicate_assign_then_block.anvl` is 4001 in an object), because a second statement with the same name is already caught where it happens, whatever the form of either: 4053 at top level, 4001 inside an object. Owner decision 2026-10-30: stays reserved and unused. |
 | 4016 | `ANVL_ERR_PARSER_UNTERMINATED_COMMENT` | yes (13 dumps) | `coverage/errors/block_comment_unterminated.anvl` |
 | 4017 | `ANVL_ERR_PARSER_UNTERMINATED_STATEMENT` | yes (67 dumps) | `coverage/columns/multiline_string__bad_utf8.anvl` |
 | 4018 | `ANVL_ERR_PARSER_VALUE_IS_KEYWORD` | yes (5 dumps) | `grammar/bare_import.anvl` |

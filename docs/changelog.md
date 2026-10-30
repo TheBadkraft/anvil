@@ -15,6 +15,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (attribute values are scalars; builder checks bases, BR-2610-anvl-parser-007, BR-2610-anvl-writer-002) -- BEHAVIOUR CHANGE
+
+- **Behaviour change: an attribute value must be a scalar.** Any attribute value starting with `[`, `(` or `{`
+  is `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` (2006), reported at the value, wherever a `,` or `]` falls. Before,
+  the reader cut the value at the first `,` or `]`, so `@[k={a}]` and `@[k=(1)]` loaded as bare text while `@[k=[x]]`,
+  `@[k=[1,2]]` and `@[k={a:=1,b:=2}]` were 2006. Scalars are never required to be quoted: `@[status=done]`, `@[n=5]`
+  and `@[on=true]` are valid, as are quoted strings holding brackets. A `$` reference stays 2009. **A blob is
+  not an attribute value either**: a value starting with a backtick or `@` (`@[a=@t`z`]`, `@[a=`z`]`) is now 2006
+  (it used to load). Attributes are small metadata; a blob belongs in the statement's value. The 2006 message now reads "Attribute values must be scalars (bare or quoted), not an
+  array, tuple, object or blob". Applies to statement and module attributes.
+- **The writer and builder refuse the same values.** `anvil_writer_attribute`, `anvil_builder_attribute` and
+  `anvil_builder_member_attribute` return `ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE` for a value starting with `[`,
+  `(` or `{`; also for a blob value (backtick or `@`); `..._attribute_string` is unaffected (its text is quoted). No new writer code.
+- **Behaviour change: the builder refuses a same-document non-object base at write/emit.** `anvil_builder_write` and
+  `anvil_builder_emit` look each member's base up among the top-level members and fail with
+  `ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT` when it names a scalar, string, array, tuple or other non-object
+  (the reader's 4020). `anvil_builder_set_base` is unchanged (a base can be added after the member that derives from
+  it). A base the builder does not hold, such as one from an include, is accepted and left to the reader. The builder
+  never writes the block form `ident { ... }`, an anonymous read-only block that cannot be a base (reader 4052), so it
+  cannot name one. The check covers every member the builder created, including members never attached to the tree.
+- Conformance corpus: 9 dumps changed message text only, 6 changed from `ok` to 2006 (3 in place: an object value and two
+  blob values; 3 renamed to drop `_ok`: a tagged blob, a balanced object, a balanced tuple), 1 resolver dump changed
+  `resolved=0` to `resolved=1`, 44 cases added (1,823 to 1,867 in all).
+  Property RT14 now covers attribute values and scalar bases.
+- **Behaviour change: a `$ident` reference to a block-form statement resolves** (BR-2610-anvl-resolver-001). `a { x := 1; }; b := $a;`
+  used to leave `b` unresolved, silently; it now resolves to `a`'s object value, as `a := { x := 1; };` always did, also
+  through a chain (`c := $b`) and from inside an object. A block is read-only, so using one as a base is still 4052;
+  a reference is a read. Nothing else depended on the old behaviour.
+
 ### Fixed (docs)
 
 - **Language reference: block statements and attribute values.** The reference no longer says `ident { ... };` and `ident := { ... };` are the same statement. The block form is an anonymous, read-only block that cannot be inherited (using one as a base is 4052); the assignment form is an ordinary statement and the only one that can be a base. Attribute values are stated as `null`, bool, number, quoted string or bare word, with quoting never required.

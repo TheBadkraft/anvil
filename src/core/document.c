@@ -393,8 +393,8 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
             attr->value.data = src->buffer.bucket;
             attr->value.start = src->buffer.bucket + value_start;
             attr->value.end = src->buffer.bucket + value_end;
-            if (anvl_attr_value_is_split_compound(attr->value.start, attr->value.end)) {
-               // the front of an array, object or tuple, cut at its first ',' or ']' (2006)
+            if (anvl_attr_value_is_compound(attr->value.start, attr->value.end)) {
+               // an array, object or tuple (2006)
                header_fail_at(doc, err_code, ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, value_line,
                               value_col);
                Allocator.dispose(attr);

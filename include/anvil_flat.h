@@ -224,11 +224,13 @@ void anvil_document_iterator_dispose(anvil_document_iterator it);
  * @brief A statement's own value.
  * @param stmt The statement to read.
  * @return The value handle, or NULL if stmt is NULL. A bare anonymous
- * OBJECT_BLOCK statement ('ident { ... };') reports an ANVIL_VALUE_OBJECT
- * value here exactly like an ASSIGN statement with an object value
- * ('ident := { ... };') would — the two forms are indistinguishable through
- * this accessor, matching how they're already treated identically
- * everywhere else (base/attributes/inheritance).
+ * block statement ('ident { ... };') reports an ANVIL_VALUE_OBJECT value
+ * here, like an ASSIGN statement with an object value ('ident := { ... };'),
+ * so this accessor cannot tell the two forms apart. They are not the same
+ * statement elsewhere: the block form is an anonymous, read-only block. It
+ * cannot be a base (inheriting from it is ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
+ * 4052). A '$ident' reference to it resolves like any other statement,
+ * because a reference is a read. See the language reference, section 3.
  */
 anvil_value anvil_statement_get_value(anvil_statement stmt);
 

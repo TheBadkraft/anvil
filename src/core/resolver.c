@@ -290,9 +290,10 @@ static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_
 // Cycle-safe without a visited set: with N distinct top-level names in ctx->identifiers, any
 // non-cyclic chase terminates (hits a concrete value or a miss) within N hops, since each hop
 // consumes one distinct name — so a chase still going after N+1 hops must have revisited a
-// name, i.e. a cycle. Returns NULL for a missing target, a cycle, or a target that names an
-// anonymous (OBJECT_BLOCK) statement (no value of its own to alias) — none of those are
-// errors for a VarRef, only an unset `.varref.resolved`.
+// name, i.e. a cycle. Returns NULL for a missing target or a cycle — neither is an error for a
+// VarRef, only an unset `.varref.resolved`. A block-form (OBJECT_BLOCK) target resolves like any
+// other: the parser gives it an OBJECT value of its own, and a reference is a read (a block cannot
+// be a base, but it can be read — BR-2610-anvl-resolver-001).
 static anvl_value resolve_varref_chain(module_context ctx, anvl_slice target) {
    usize max_hops = Map.count(ctx->identifiers) + 1;
    anvl_slice current = target;
@@ -304,8 +305,8 @@ static anvl_value resolve_varref_chain(module_context ctx, anvl_slice target) {
          return NULL; // missing target
       }
       anvl_statement stmt = (anvl_statement)val;
-      if (stmt->kind == ANVL_STMT_OBJECT_BLOCK || !stmt->value) {
-         return NULL; // anonymous object - no value to alias
+      if (!stmt->value) {
+         return NULL; // nothing to alias
       }
       if (stmt->value->type != ANVL_VALUE_VARREF) {
          return stmt->value; // final concrete value
