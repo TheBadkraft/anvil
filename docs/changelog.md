@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `0.8.0-rc` files are removed. `download.html`, `version.js` and the page footers say
   `0.10.0-rc`. The Bindings guide is rewritten for the release (types and schema, attributes, writer
   and builder, WebAssembly's in-memory filesystem, layouts, the version string) and the site gains
-  a public Changelog page (`site/assets/docs/changelog.md`). Not yet deployed.
+  a public Changelog page (`site/assets/docs/changelog.md`). The site's language reference no longer links `dialect-ownership-matrix.md`, which is internal. Not yet deployed.
 
 ### Changed (process)
 - **Tickets moved to Rivet.** As of the 2026-10-26 freeze, every anvil and anvil.java ticket lives in

@@ -27,8 +27,7 @@ conditions (heap dump, memory probe, fuzzer), because it never held any.
 | **ASL** | `#!asl` | Embedded scripting *(design only — not implemented)* |
 
 The shebang on the first line selects the dialect; the parser enforces that dialect's rules
-immediately, not as a post-hoc check. See [`dialect-ownership-matrix.md`](dialect-ownership-matrix.md)
-for the full per-feature ownership table (which dialect owns which grammar construct).
+immediately, not as a post-hoc check.
 
 ## 3. Document Structure
 
