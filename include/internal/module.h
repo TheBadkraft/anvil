@@ -148,9 +148,13 @@ typedef struct anvl_value_t {
       struct {
          list params;     // list of anvl_slice* parameter names; empty is NULL, matching
                            // anvl_statement_t.attributes' own "NULL means none" convention.
-         anvl_slice body;  // raw source span of the '{ ... }' interior -- AnvlScript's own
-                           // grammar, never parsed by the ANVL parser itself. See
-                           // notes/anvilscript-design.md Open Question #1.
+         const char *body_start; // raw source span of the '{ ... }' interior -- AnvlScript's own
+         const char *body_end;   // grammar, never parsed by the ANVL parser itself. Stored as two
+                           // pointers, not an anvl_slice: the union must stay within 32 bytes so
+                           // anvl_value_t stays 64 bytes (one cache line); a 40-byte member grew
+                           // every value of every document to 72 bytes and cost ~5% parse time
+                           // (BR-2610-anvl-parser-004). Read it with anvl_function_body().
+                           // See notes/anvilscript-design.md Open Question #1.
          struct asl_ast_node *ast; // lazily-parsed runtime AST; NULL until the ScriptEngine
                            // first compiles this function. Always NULL when WITH_ASL=0 --
                            // nothing exists to ever set it.
@@ -158,6 +162,15 @@ typedef struct anvl_value_t {
    };
 } anvl_value_t;
 typedef anvl_value_t *anvl_value;
+
+// Keeps anvl_value_t at one cache line: see the function member's comment above.
+_Static_assert(sizeof(anvl_value_t) <= 64, "anvl_value_t must stay within 64 bytes (BR-2610-anvl-parser-004)");
+
+// The function value's body span ('{' ... '}' interior) as an anvl_slice.
+static inline anvl_slice anvl_function_body(const anvl_value_t *v) {
+   anvl_slice body = {v->text.data, v->function.body_start, v->function.body_end};
+   return body;
+}
 
 /* ---------------------------------------------------------------------- *
  * Body statements — two forms, both may carry `base` and `attributes`:

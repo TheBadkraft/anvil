@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (parse and validate slowdown since v0.10.0-rc, BR-2610-anvl-parser-004)
+
+- Parsing was 1.05-1.14x and validation about 1.03-1.06x slower than v0.10.0-rc. The cause was the
+  AnvilScript function value: its 40-byte member grew the internal `anvl_value_t` union from 64 to
+  72 bytes, so every value in every document, AnvilScript or not, was no longer one cache line.
+  The member is now 32 bytes (the body span is two pointers, read through `anvl_function_body`),
+  `anvl_value_t` is 64 bytes again, and a `_Static_assert` keeps it there. No behaviour or public
+  ABI change. Added `bench/parse_validate.c` and `bench/compare.sh`, a per-commit interleaved,
+  CPU-pinned benchmark of parse (floats, integers, a mixed message) and schema validate.
+
 ### Changed (schema validation fails closed, BR-2610-anvl-schema-002)
 - **Behaviour change: a field whose `type` can't be resolved no longer accepts anything.** Loading
   such a schema still succeeds and still reports `ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE`, but

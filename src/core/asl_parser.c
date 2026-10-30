@@ -330,7 +330,8 @@ bool asl_parse_function_decl(anvl_source src, anvl_statement *out_stmt) {
    (*out_stmt)->value->text = body; // step 1: mirrors the body span; widen to the full
                                     // '(' ... '}' signature once something actually needs it.
    (*out_stmt)->value->function.params = params;
-   (*out_stmt)->value->function.body = body;
+   (*out_stmt)->value->function.body_start = body.start;
+   (*out_stmt)->value->function.body_end = body.end;
    (*out_stmt)->value->function.ast = NULL; // lazily compiled by the ScriptEngine, not here
 
    Source.skip_whitespace_and_comments(src);

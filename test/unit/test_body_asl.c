@@ -192,7 +192,7 @@ static void test_asl06_function_body_span(void) {
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "ASL06: 'foo' statement retrieved");
    if (stmt && stmt->value) {
-      anvl_slice body = stmt->value->function.body;
+      anvl_slice body = anvl_function_body(stmt->value);
       TestBit.is_true(body.start == body.end, "ASL06: body span is empty (start == end)");
    }
 
@@ -545,7 +545,7 @@ static void test_asl17_body_span_nested_braces(void) {
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "ASL17: 'foo' statement retrieved");
    if (stmt && stmt->value) {
-      TestBit.is_true(Source.slice_equals(stmt->value->function.body, "{}"),
+      TestBit.is_true(Source.slice_equals(anvl_function_body(stmt->value), "{}"),
                       "ASL17: body spans the full nested '{}', not just to the inner '}'");
    }
 
@@ -572,7 +572,7 @@ static void test_asl18_body_span_brace_in_string(void) {
    FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
    TestBit.is_not_null(stmt, "ASL18: 'foo' statement retrieved");
    if (stmt && stmt->value) {
-      TestBit.is_true(Source.slice_equals(stmt->value->function.body, "\"}\""),
+      TestBit.is_true(Source.slice_equals(anvl_function_body(stmt->value), "\"}\""),
                       "ASL18: body spans the full string literal, '}' inside it not miscounted");
    }
 

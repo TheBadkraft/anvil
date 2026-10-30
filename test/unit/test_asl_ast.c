@@ -74,7 +74,7 @@ static void test_aslast01_var_and_return(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST01: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST01: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -150,7 +150,7 @@ static void test_aslast02_additive_left_associative(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST02: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST02: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -230,7 +230,7 @@ static void test_aslast03_multiplicative_precedence(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST03: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST03: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -306,7 +306,7 @@ static void test_aslast04_plain_assignment(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST04: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST04: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -360,7 +360,7 @@ static void test_aslast05_compound_assign_and_increment(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST05: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST05: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -453,7 +453,7 @@ static void test_aslast06_comparison_equality_logical_precedence(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST06: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST06: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -533,7 +533,7 @@ static void test_aslast07_unary_operators(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST07: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST07: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -592,7 +592,7 @@ static void test_aslast08_unary_precedence_and_chaining(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST08: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST08: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -676,7 +676,7 @@ static void test_aslast09_grouping_overrides_precedence(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST09: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST09: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -735,7 +735,7 @@ static void test_aslast10_grouping_with_unary_and_nesting(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_not_null(root, "ASLAST10: body parses to a non-NULL root");
    TestBit.is_equal_int(ANVL_ERR_NONE, ast_err, "ASLAST10: ast_err is ANVL_ERR_NONE");
    if (!root) {
@@ -797,7 +797,7 @@ static void test_aslast11_unterminated_grouping_fails_cleanly(void) {
    }
 
    anvl_err_code ast_err = ANVL_ERR_NONE;
-   asl_ast_node root = asl_parse_body(stmt->value->function.body, ctx->arena, &ast_err);
+   asl_ast_node root = asl_parse_body(anvl_function_body(stmt->value), ctx->arena, &ast_err);
    TestBit.is_null(root, "ASLAST11: unterminated group yields a NULL root");
    TestBit.is_true(ast_err != ANVL_ERR_NONE, "ASLAST11: ast_err is a real error code");
 
