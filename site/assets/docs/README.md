@@ -4,8 +4,9 @@
 
 A text format with two dialects — **AML** for declarative modelling and configuration, and
 **AMP** for restricted, scalar-only messaging payloads. Anvil Native, the reference
-implementation, is one C parser with no runtime dependencies; Node.js and WebAssembly bindings
-wrap it directly, so a document parses identically no matter which one reads it.
+implementation, is one C parser with no runtime dependencies; .NET and Python bindings wrap it directly, and anvil.js
+reads the same documents in pure JavaScript (Node and browsers), so a document parses identically
+no matter which one reads it.
 
 > **Status:** release-candidate software. The grammar and public API are stable enough to build
 > against, but the surface may still move before a 1.0 release.
@@ -43,7 +44,7 @@ for the Node.js/WebAssembly/native-C equivalents of the snippet above.
   Schema are, and what's actually implemented.
 - **[AML Guide](AML-Guide.md)** — objects, arrays, tuples, attributes, inheritance, `$` VarRefs, blobs
 - **[AMP Guide](AMP-Guide.md)** — the restricted messaging dialect and what it forbids
-- **[Bindings](Bindings-Guide.md)** — native C library, Node.js, and WebAssembly: usage guides and downloads
+- **[Bindings](Bindings-Guide.md)** — native C library, anvil.js, .NET, Python (and the frozen Node.js and WebAssembly builds): usage guides and downloads
 
 ## Why not just JSON?
 
@@ -53,4 +54,4 @@ to grow arbitrary structure. See the [home page](/) for the full comparison.
 
 ## License
 
-Proprietary — see the [anvil repo](https://github.com/TheBadkraft/anvil) for licensing detail.
+The ANVL Software Licence (terms still in progress, not final): free for personal and educational use; free for commercial use up to 3 developer seats; no redistribution. Every download includes the `LICENSE.txt`.

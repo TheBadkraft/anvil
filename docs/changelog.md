@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Site updated for v0.12.0-rc (technical writer).** The anvldata.com download page now highlights v0.12.0-rc and adds
+  anvil.js (reader only) as the JavaScript package, with anvil-node and anvil-wasm labelled frozen at v0.11.0-rc and
+  still downloadable. The four new tarballs, `SHA256SUMS` (cumulative, 14 lines) and `SHA256SUMS-v0.12.0-rc` were added
+  and every earlier file kept. The site copy of the language reference was brought up to date with `docs/`
+  (block form and `$ident`, attribute values as scalars, the specific error-code table), the Bindings guide gained an
+  anvil.js section, and the public changelog gained the v0.12.0-rc entry. The licence is described as in progress.
+
 ### Added
 
 - **Writer conformance corpus (FR-2610-anvl-conformance-003).** The native writer now has a native-owned corpus of

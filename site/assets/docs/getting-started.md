@@ -12,9 +12,9 @@ distributable — static and shared, Linux x86_64 — is [downloadable directly]
 it and link against it:
 
 ```sh
-tar -xzf anvil-v0.11.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.11.0-rc-linux-x86_64/include \
-    -L anvil-v0.11.0-rc-linux-x86_64/lib -lanvil -o your_program
+tar -xzf anvil-v0.12.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.12.0-rc-linux-x86_64/include \
+    -L anvil-v0.12.0-rc-linux-x86_64/lib -lanvil -o your_program
 ```
 
 The opt-in type system (§9) is in the same library. On other platforms, build the library from
