@@ -171,17 +171,15 @@ builder output **bytes**. Then the same cycle as R1: RED, then GREEN.
 
 ---
 
-## 6. Decisions for the owner
+## 6. Owner decisions (2026-10-30)
 
-- **D1, the package:** publish anvil.js *as* `anvil-node`, so consumers change nothing, or under a new
-  name with `anvil-node` deprecated. I recommend the former: FlyWire and Rivet adopt by bumping a
-  version.
-- **D2, anvil.wasm:** a pure-JS package also runs in the browser, so anvil.js could replace
-  `anvil-wasm` as well, removing `.wasm` loading and the Emscripten issues. I recommend deciding after
-  R2, on browser benchmark numbers.
-- **D3, the old `anvl-js` 0.6.2-alpha consumers** (CabNet, if any still are): migrate or freeze.
-- **D4, include I/O in the browser:** no filesystem, so the resolver callback
-  (FR-2610-anvl-include-001) is the only route. Confirm that's acceptable.
+- **D1, the package:** anvil.js is **published as `anvil-node`** (same name, same API), so consumers only bump
+  a version. The source repo stays private on the Linode box (`linode:repos/anvl-js.git`). Only the
+  published package is public.
+- **D2, anvil.wasm:** decided **after R2**, on browser benchmark numbers.
+- **D3, the old `anvl-js` 0.6.2-alpha consumers:** there are none. Nothing to migrate or freeze.
+- **D4, include I/O in the browser:** confirmed. With no filesystem, the resolver callback
+  (FR-2610-anvl-include-001) is the only route.
 
 ## 7. Risks
 
