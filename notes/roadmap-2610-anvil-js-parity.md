@@ -176,10 +176,24 @@ builder output **bytes**. Then the same cycle as R1: RED, then GREEN.
 - **D1, the package:** anvil.js is **published as `anvil-node`** (same name, same API), so consumers only bump
   a version. The source repo stays private on the Linode box (`linode:repos/anvl-js.git`). Only the
   published package is public.
-- **D2, anvil.wasm:** decided **after R2**, on browser benchmark numbers.
+- **D2, anvil.wasm (revised 2026-10-30):** ship `v0.11.0-rc` (with the browser fix and bundle), then **freeze and retire** it. `v0.11.0-rc` stays published as the record that answers "why not WASM?". anvil.js covers the browser too: it's plain JavaScript and runs in a browser as is. King & Crucible's web work is paused, so nothing depends on anvil-wasm.
 - **D3, the old `anvl-js` 0.6.2-alpha consumers:** there are none. Nothing to migrate or freeze.
 - **D4, include I/O in the browser:** confirmed. With no filesystem, the resolver callback
   (FR-2610-anvl-include-001) is the only route.
+
+## 6b. R0 result and decisions (2026-10-30)
+
+R0 (FR-2610-anvl-node-006, branch `spike/R0-representation` `2a5ff68` in anvil.js) recommends **(b) with i32 storage**:
+- **input:** UTF-8 bytes (`Uint8Array`), so offsets equal native's byte offsets and blobs are byte-exact;
+- **tree:** one `Int32Array` per parse, 8 ints per node;
+- **objects:** `AnvlNode` facades are created only on access.
+
+Against anvil-node v0.10.0-rc, parse-only came in at 0.04-0.14x and parse plus a full read at 0.13-0.47x, on every workload and size, in both orders. Retained memory is 41-46%. The owner **approved** it as the R1 design.
+
+Also decided:
+- **Cold start:** the first parse in a fresh process is about 2.5-3x slower than the native addon, until the JIT warms up (it catches up by about the 10th parse). **Accepted.**
+- **Non-allocating accessors:** **deferred**, and backlogged as an anvil.node FR.
+- **New for R1:** benchmark against `JSON.parse` too, as a reference. The owner's bar for the web is that ANVL must not lose to JSON.
 
 ## 7. Risks
 
