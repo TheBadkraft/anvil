@@ -75,7 +75,7 @@ sub-agents it starts for single tasks. See `agents/README.md` for the roles.
   `rivet resolve <ID> --resolution f.md` and a comment
   `branch …, head …, tests N/N` at the end.
 - File new work for another role in Rivet: project `anvil` for native work; `anvil.node`,
-  `anvil.wasm`, `anvil.py`, `anvil.net` or `anvil.java` for binding work. List it in your report.
+  `anvil.py`, `anvil.net` or `anvil.java` for binding work; `anvil.js` for the pure-JS implementation. (`anvil.node` and `anvil.wasm` are frozen: file nothing new there.) List it in your report.
   Don't assign it.
 - Questions belong on the ticket (`rivet block`, or a comment with an @mention), not in your
   report alone.
