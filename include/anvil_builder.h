@@ -61,6 +61,7 @@ anvil_writer_err_code anvil_builder_get_error(anvil_builder b);
 /** @brief Module attribute; `value` is raw text or NULL for a flag. Same rules as anvil_writer_attribute. */
 bool anvil_builder_attribute(anvil_builder b, const char *key, const char *value);
 bool anvil_builder_attribute_string(anvil_builder b, const char *key, const char *text, size_t length);
+/** @brief Include; emit writes every include before the module attributes, in any order they were added. */
 bool anvil_builder_include(anvil_builder b, const char *path);
 
 /* ---- values: created detached, owned by the builder ---------------------- */

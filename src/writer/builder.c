@@ -742,10 +742,17 @@ bool anvil_builder_write(anvil_builder b, anvil_writer w) {
       return outcome(b, depth);
    }
    bool ok = true;
+   // The reader requires every include before the module attributes (BR-2610-anvl-writer-003), so the
+   // includes go first whatever order they were added in; each kind keeps its own order.
+   for (size_t i = 0; ok && i < b->header_count; i++) {
+      if (b->header[i].is_include) {
+         ok = anvil_writer_include(w, b->header[i].item.key);
+      }
+   }
    for (size_t i = 0; ok && i < b->header_count; i++) {
       const header_item *h = &b->header[i];
       if (h->is_include) {
-         ok = anvil_writer_include(w, h->item.key);
+         continue;
       } else if (h->item.quoted) {
          ok = anvil_writer_attribute_string(w, h->item.key, h->item.value, h->item.value_len);
       } else {

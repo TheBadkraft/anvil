@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Writer output now always satisfies the reader's header order (BR-2610-anvl-writer-003).** The reader requires
+  every `include` before the module attributes (else 4201 `ANVL_ERR_INCLUDE_NOT_FIRST`), but the writer accepted a
+  module attribute followed by an `include` and wrote text the reader then rejected. `anvil_writer_include` now fails
+  with `ANVIL_WRITER_ERR_STATE` after a module attribute, like every other call made out of order; call it first. The
+  builder keeps its order-free model: `anvil_builder_emit` writes all includes before the module attributes, in
+  whatever order they were added, so a builder document that mixed them now loads. No signature, symbol or error code
+  changes. Writer-script corpus: `attributes/include_and_attrs` now writes the include first, and new cases cover the
+  refusal.
+
 - **AnvilScript body parser: nesting-depth limit (BR-2610-anvl-asl-001).** Deeply nested parentheses or prefix unary
   operators (`((((…x…))))`, `-----x`) recursed without bound and could overflow the C stack. The parser now counts
   nesting (each `(` group and each prefix operator is one level, sharing one budget) and, past
