@@ -1,21 +1,34 @@
 #!/usr/bin/env python3
-"""Generates conformance/cases/writer/ (FR-2610-anvl-conformance-003): writer scripts and the run each must print.
+"""Generates the SCRIPTS of conformance/cases/writer/ (FR-2610-anvl-conformance-003, SR-2610-anvl-conformance-001).
 
-Each case is a writer script (conformance/FORMAT.md, "anvil-writer-script 1") plus the expected run
-("anvil-writer-run 1"). The expectation is computed HERE, from a small model of the canonical layout and of the
-writer's documented rules (include/anvil_writer.h), not by running native: the committed .dump is then compared
-with native's real output by `make check-conformance`, so a disagreement is a finding in one or the other.
+Each case is a writer script (conformance/FORMAT.md, "anvil-writer-script 1"). The generator writes the scripts only.
+The expected runs (.wscript.dump) belong to native, like every other expected dump in the corpus: they are written by
+`make update-conformance` (anvil-dump --writer-script) and checked by `make check-conformance`.
 
-Deterministic. Usage: gen_writer.py <repo-root> [--force]   (refuses to overwrite cases/writer without --force)
+The generator also carries a small model of the canonical layout and of the writer's documented rules
+(include/anvil_writer.h), which computes the run each script is expected to produce. That model is a cross-check, not a
+source: `--check-model <anvil-dump>` runs every script through native and reports each case where native's run differs
+from the model's (exit 1 if any). A mismatch is a finding in the model or in the writer, to be decided by hand.
+
+Deterministic. Usage:
+  gen_writer.py <repo-root> [--force]                    write the scripts (refuses if cases/writer exists, unless --force)
+  gen_writer.py <repo-root> [--force] --check-model <anvil-dump>    also compare native with the model
+--force rewrites the scripts and removes scripts that are no longer generated; it never touches a .dump.
 """
-import os, re, shutil, struct, sys
+import os, re, struct, subprocess, sys
 
-root = sys.argv[1]
+args = [a for a in sys.argv[1:]]
+force = "--force" in args
+check_model = None
+if "--check-model" in args:
+    i = args.index("--check-model")
+    check_model = args[i + 1]
+    del args[i:i + 2]
+args = [a for a in args if a != "--force"]
+root = args[0]
 out_dir = os.path.join(root, "conformance", "cases", "writer")
-if os.path.exists(out_dir):
-    if "--force" not in sys.argv:
-        sys.exit("cases/writer exists; pass --force to wipe and regenerate")
-    shutil.rmtree(out_dir)
+if os.path.exists(out_dir) and not force:
+    sys.exit("cases/writer exists; pass --force to rewrite the scripts")
 
 # ---- the error table: names in enum order, messages from src/writer/writer.c --------------------------------
 ERRS = ["OK", "INVALID_ARGUMENT", "MEMORY", "STATE", "DIALECT", "INVALID_IDENTIFIER", "RESERVED_WORD",
@@ -688,7 +701,7 @@ err(K, "payload_backtick", "AMP", ['statement "payload" NULL', 'blob "table" "[(
 err(K, "bad_utid_tag", "AMP", ['statement "utid" NULL', 'blob "u-id" "x"'], E("INVALID_BLOB"))
 err(K, "dup_seq", "AMP", ['statement "seq" NULL', "int 1", 'statement "seq" NULL'], E("DUPLICATE_NAME"))
 
-# ---- write everything ----------------------------------------------------------------------------------------
+# ---- write the scripts (never a dump) ---------------------------------------------------------------------------
 seen = set()
 counts = {}
 for area, name, script, dump, out in cases:
@@ -698,7 +711,23 @@ for area, name, script, dump, out in cases:
     base = os.path.join(out_dir, area, name + ".wscript")
     os.makedirs(os.path.dirname(base), exist_ok=True)
     with open(base, "wb") as f: f.write(script.encode("latin-1"))
-    with open(base + ".dump", "wb") as f: f.write(dump.encode("latin-1"))
     counts[area] = counts.get(area, 0) + 1
+for dp, _, fns in os.walk(out_dir):          # scripts no longer generated
+    for fn in fns:
+        if fn.endswith(".wscript") and (os.path.basename(dp), fn[:-len(".wscript")]) not in seen:
+            os.remove(os.path.join(dp, fn))
 for a in sorted(counts): print("%-12s %d" % (a, counts[a]))
 print("total        %d" % sum(counts.values()))
+
+# ---- optional: the model against native -----------------------------------------------------------------------------
+if check_model:
+    mismatches = 0
+    for area, name, script, dump, out in cases:
+        path = os.path.join(out_dir, area, name + ".wscript")
+        got = subprocess.run([check_model, "--writer-script", path], capture_output=True).stdout.decode("latin-1")
+        if got != dump:
+            mismatches += 1
+            if mismatches <= 10:
+                print("MODEL MISMATCH %s/%s\n  model:  %r\n  native: %r" % (area, name, dump[:300], got[:300]))
+    print("check-model: %d cases, %d mismatches" % (len(cases), mismatches))
+    sys.exit(1 if mismatches else 0)

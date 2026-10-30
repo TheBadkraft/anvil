@@ -23,11 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   literal arguments (any byte sequence through `\xHH` escapes, null pointers, IEEE bits for doubles). `anvil-dump
   --writer-script <file>` runs a script through the native writer and prints the run (`anvil-writer-run 1`): every
   failed call with its error code and the call text, and the exact output bytes with their length; `--writer-output`
-  prints the raw output. `conformance/cases/writer/` holds 759 generated scripts (`seed/gen_writer.py`, expectations
-  computed independently of the writer) covering every call, every value kind, escapes, integer and float edges, deep
+  prints the raw output. `conformance/cases/writer/` holds 759 generated scripts (`seed/gen_writer.py` writes the scripts; the
+  expected runs are native's) covering every call, every value kind, escapes, integer and float edges, deep
   nesting, attributes, includes, AMP and every error code the flat writer can return, plus King and Crucible
   envelopes and responses. `make check-conformance` checks them, and the new `make check-writer-roundtrip` checks
   that every successful output loads through the reader. No library, header or ABI change; no writer behaviour change.
+
+- **Writer corpus: native owns the expected runs (SR-2610-anvl-conformance-001).** `seed/gen_writer.py` now writes the
+  writer scripts only; every expected run (`.wscript.dump`) is native's, written by `make update-conformance` like the
+  reader dumps (no dump changed). The generator's layout model remains as a cross-check (`--check-model`, run by the new
+  `make check-writer-gen`, part of `check-conformance`). `conformance/FORMAT.md` now specifies the writer-script
+  tool's input rules that a port would otherwise guess: the decimal and bit forms of `double` (and that an overflowing
+  decimal fails at the writer), the `int` sign and leading-zero rules, CRLF, a last line without a newline, and the
+  exact header line. Twenty new tool-test scripts pin them.
 
 ### Fixed
 
