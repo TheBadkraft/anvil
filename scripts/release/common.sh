@@ -32,3 +32,8 @@ core_lib() { # <dest dir>
   [ -f "$tgz" ] || { echo "FAIL core tarball not staged: $tgz (run package-core.sh first)" >&2; return 1; }
   tar -xzf "$tgz" -C "$1" --strip-components=1 "anvil-v$VERSION-linux-x86_64/lib/libanvil.so"
 }
+
+# The licence every package ships, byte for byte: templates/LICENSE.txt (native's own LICENSE.txt is gitignored and not in the tag).
+license_file() { # <package dir>
+  cp "$RELEASE_TOOLS/templates/LICENSE.txt" "$1/LICENSE.txt"
+}

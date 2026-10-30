@@ -26,6 +26,7 @@ for k in py net; do
   run sh "$here/../check-exports.sh" "$so" "$core/include"
   cmp -s "$so" "$core/lib/libanvil.so" && echo "note: $k libanvil.so is byte-identical to core's" || echo "note: $k libanvil.so differs from core's (built separately; version and exports checked above)"
 done
+run "$here/check-license.sh" "$dir" "$ver"
 js=$(x js anvil.js-v$ver.tar.gz)
 run "$here/check-grammar.sh" js "$js" "$ver" "$build"
 run "$here/check-readme.sh" "$js"

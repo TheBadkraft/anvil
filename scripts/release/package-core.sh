@@ -23,6 +23,7 @@ git -C "$repo" archive --format=tar "$tag" | tar -x -C "$work"
 pkg=$work/$name; mkdir -p "$pkg/lib" "$pkg/include"
 cp "$work/lib/release/libanvil.a" "$work/lib/release/libanvil.so" "$pkg/lib/"
 cp "$work"/include/anvil_*.h "$pkg/include/"
+cp "$here/templates/LICENSE.txt" "$pkg/LICENSE.txt"
 sed "s/@VERSION@/$ver/; s/@COMMIT@/${commit:0:12}/; s/@BUILD@/$build/" "$here/templates/README-core.md" > "$pkg/README.md"
 cat > "$pkg/BUILD_INFO.json" <<JSON
 {
