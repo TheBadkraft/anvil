@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (conformance format and corpus gaps, FR-2610-anvl-conformance-002)
+
+- **`conformance/FORMAT.md` now specifies every rule a port needs, with no change to any dump** (the format
+  stays version 1; the 1,165 earlier dumps are byte-identical): whether the `dialect` line appears on an error
+  dump and what `dialect ERROR` means; the exact rules for integer and float overflow, with boundary examples
+  (`-9223372036854775809`, `1.7976931348623159e308`, the rounding midpoint just above the largest double);
+  the token grammar that decides what is a number; string escape resolution; how lines and columns are counted
+  (bytes, only `\n` breaks a line); how include paths are formed and printed, that a document's identity is its
+  bytes, and the exact pre-order walk; the limits native has; and the `--batch` / `@@ <path>` protocol, moved in
+  from the fuzz README.
+- **536 new conformance cases** (`conformance/cases/coverage/`, 1,701 in all): the include graph (missing and
+  nested-missing includes, failing included documents, self and mutual includes, byte-identical copies, the
+  walk order, paths at the 1024-byte limit), nesting up to 400 levels, error columns after multibyte
+  characters, tabs, invalid UTF-8, a BOM and CR line ends, 80 string-escape cases (`\t` in every position),
+  about 140 number cases at every overflow boundary, shebang forms, and the remaining reachable error
+  codes. The corpus now reaches 41 of the 106 error codes; `notes/conformance-error-coverage.md` lists each
+  other code and why no input can produce it.
+- `check-conformance` sorts file names in the C locale, so its orphan-dump check no longer depends on the
+  locale.
+
 ### Added (parity tooling for the pure-JS reader, FR-2610-anvl-conformance-001)
 
 - **`anvil-dump`** (`make anvil-dump`, `tools/anvil-dump.c`) prints a canonical, deterministic description of
