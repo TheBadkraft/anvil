@@ -182,6 +182,7 @@ typedef enum {
    ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED = 5103,   // call depth limit exceeded
    ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP = 5104,    // break outside loop
    ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
+   ANVL_ERR_ASL_NESTING_TOO_DEEP = 5106,      // expression nesting past ASL_MAX_NESTING_DEPTH (parse time)
 
    // Memory Errors (70xx)
    ANVL_ERR_MEMORY_ALLOC_FAILED = 7001,

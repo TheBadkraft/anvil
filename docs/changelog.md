@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **AnvilScript body parser: nesting-depth limit (BR-2610-anvl-asl-001).** Deeply nested parentheses or prefix unary
+  operators (`((((…x…))))`, `-----x`) recursed without bound and could overflow the C stack. The parser now counts
+  nesting (each `(` group and each prefix operator is one level, sharing one budget) and, past
+  `ASL_MAX_NESTING_DEPTH` (256), fails the parse cleanly with the new, specific `ANVL_ERR_ASL_NESTING_TOO_DEEP`
+  (5106, "ASL expression nesting too deep"). 500000-deep input now returns the error. Only builds with `WITH_ASL=1`
+  are affected; the default build parses no AnvilScript body, and its only visible difference is the new code in
+  `errors.h`, the error name tables and the drift tables.
+
 ---
 
 ## [v0.12.0-rc] — (2026-10-30)

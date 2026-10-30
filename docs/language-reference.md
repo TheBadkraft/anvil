@@ -294,7 +294,7 @@ them, so a consumer can't see one:
   unused.
 - 3011 and 4005 (synonyms of 4009, an empty array, and 3013, a one-element tuple) and 3016 (no input fits; a missing
   `:=` is 2002).
-- The AnvilScript-only codes (4101-4105, 4305-4307, 4701-4703, 5101-5105), which need the AnvilScript build.
+- The AnvilScript-only codes (4101-4105, 4305-4307, 4701-4703, 5101-5106), which need the AnvilScript build.
 - Leftover codes that the AML reader never reaches: 4008, 4010, 4014, 4501, 5004, 5006, 5007, 5011, 5012, 9001 and
   9999. A later change may report them; until then each mistake they name is reported under another code, or accepted.
 
