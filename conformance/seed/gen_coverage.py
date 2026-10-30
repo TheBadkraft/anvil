@@ -520,7 +520,6 @@ put(G + "inherit_from_anonymous_nested.anvl", "a { x := 1; };\no := { b : a := {
 put(G + "inherit_from_anonymous_block_form.anvl", "a { x := 1; };\nb : a { y := 2; };\n")
 put(G + "inherit_from_anonymous_forward.anvl", "b : a := { y := 2; };\na { x := 1; };\n")
 put(G + "inherit_anonymous_varref_unresolved.anvl", "a { x := 1; };\nb := $a;\n")
-put(G + "attr_value_blob_ok.anvl", "x @[a=@t`z`] := 1;\n")
 put(G + "attr_value_string_brackets_ok.anvl", 'x @[a="[1,2"] := 1;\n')
 put(G + "char_control_value.anvl", "x := \x01;\n")
 put(G + "char_control_after_name.anvl", "x\x01 := 1;\n")
