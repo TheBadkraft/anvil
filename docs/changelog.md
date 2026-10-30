@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 122 new conformance cases (the new errors, their legal neighbours, and fragment `@2`, which reads as the bare
   word `2`).
 
+### Changed (documentation: grammar consistency)
+
+- **The language reference states the grammar-consistency rules** (§3, §5, §6, §7), with the specific error codes
+  now reported, the codes that stay reserved and unreported, and the writer and builder codes
+  `ANVIL_WRITER_ERR_DUPLICATE_FIELD` (17) and `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` (18) (§12, §13). Each rule was
+  checked against `anvil-dump`. The public site copies follow when v0.12.0-rc ships.
+
 ### Fixed (downloads)
 
 - **`SHA256SUMS` is cumulative.** It lists every published tarball, v0.11.0-rc first, then v0.10.0-rc, so pins on earlier releases still verify against it. `SHA256SUMS-v0.10.0-rc` stays and `SHA256SUMS-v0.11.0-rc` is added, so each version also has its own file. No tarball changed. `/download` words this.
