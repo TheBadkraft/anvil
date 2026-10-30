@@ -125,7 +125,9 @@ export PYTHONPATH="$PWD/anvil-py-v0.11.0-rc-linux-x64/src:$PYTHONPATH"</code></p
 
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
       Verify any download with <a href="/assets/downloads/SHA256SUMS">SHA256SUMS</a>
-      (<code>sha256sum -c SHA256SUMS</code> in the folder holding the files). Every file reports
+      (<code>sha256sum -c SHA256SUMS</code> in the folder holding the files). <code>SHA256SUMS</code>
+      lists every release, current first; <a href="/assets/downloads/SHA256SUMS-v0.11.0-rc">SHA256SUMS-v0.11.0-rc</a>
+      lists only this one (<code>SHA256SUMS-&lt;version&gt;</code> lists one release). Every file reports
       the version <code>0.11.0-rc+316</code>. The native downloads (C library, Node.js, .NET and
       Python) are Linux x86_64 only; the WebAssembly build runs anywhere WebAssembly does.
     </p>
