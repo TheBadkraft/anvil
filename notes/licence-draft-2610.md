@@ -1,8 +1,8 @@
-# ANVL Software Licence (DRAFT 2610, for owner approval)
+# ANVL Software Licence (2610, approved terms; lawyer review recommended)
 
 ---
 
-Copyright © 2025 Quantum Override. All rights reserved.
+Copyright © 2025–2026 Quantum Override. All rights reserved.
 
 ## 1. What this licence covers
 
@@ -34,7 +34,7 @@ Free use is perpetual, subject to section 5 (Termination).
 Free use is limited to Your own machines and servers. In addition, whether You use the Software for personal, educational or commercial purposes, You must not:
 
 1. **Redistribute.** Copy, share, publish, sublicense, sell, lend, host for others to download, or otherwise make the Software available to anyone else, in any form. This covers the Software on its own and as part of anything else.
-2. **Use it in browser apps.** Use the Software in any application that delivers the Software, or code or data derived from it, to a third party's browser or device.
+2. **Use it in browser apps.** Use the Software in any application that delivers the Software, or code derived from it, to a third party's browser or device.
 3. **Use it in shipped products.** Use the Software in anything installed on, or delivered to, customers or other third parties.
 4. **Modify it.** Modify the Software, or create derivative works from it.
 5. **Reverse engineer it.** Decompile, disassemble or otherwise try to recover source code or internal designs of the Software, except to the extent applicable law expressly permits this despite this restriction.
@@ -52,7 +52,7 @@ If Your use goes beyond section 3 or section 4, You need a paid commercial licen
 - use in browser apps; and
 - use in shipped products.
 
-Commercial licences are available. Contact the Licensor at [OWNER: contact email] for terms and pricing. Different components may be licensed on different terms.
+Commercial licences are available. Contact the Licensor through https://anvldata.com for terms and pricing. Different components may be licensed on different terms.
 
 Until You hold a commercial licence, You must stay within sections 3 and 4. An Organization that grows past 3 developer seats must obtain a commercial licence before the fourth seat starts using the Software.
 
@@ -60,34 +60,39 @@ Until You hold a commercial licence, You must stay within sections 3 and 4. An O
 
 Quantum Override, Bandit Mobile Technologies, their present and future subsidiaries and affiliates (any entity that controls, is controlled by, or is under common control with either of them), their principals, and their successors and assigns, hold a perpetual, irrevocable, royalty-free, worldwide licence to use, modify, and distribute all Anvil components, including as part of any product or service, without restriction. The limits of this licence do not apply to them.
 
-## 7. Ownership
+## 7. Your output
+
+Documents, data and other output that You create, read, write or process with the Software belong to You. This
+licence places no restriction on them, and You may share, publish and deliver them to anyone, including to a third
+party's browser or device. The limits in section 4 apply to the Software itself, not to its output.
+
+## 8. Ownership
 
 The Software is licensed, not sold. This licence gives You no ownership of the Software and no right to use the names or trademarks of the Licensor.
 
-## 8. Termination
+## 9. Termination
 
-If You breach this licence, Your rights under it end automatically. You must then stop using the Software and delete all copies. The Licensor may also give You written notice of a breach. Sections 6, 7 and 9 to 12 continue after termination. Ending this licence does not limit any other remedy available to the Licensor.
+If You breach this licence, Your rights under it end automatically. You must then stop using the Software and delete all copies. The Licensor may also give You written notice of a breach. Sections 6, 7, 8 and 10 to 13 continue after termination. Ending this licence does not limit any other remedy available to the Licensor.
 
-## 9. No warranty
+## 10. No warranty
 
 THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THIS INCLUDES ANY WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. THE LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
 
-## 10. Limitation of liability
+## 11. Limitation of liability
 
 TO THE FULLEST EXTENT PERMITTED BY LAW, THE LICENSOR WILL NOT BE LIABLE FOR ANY DAMAGES OR LOSSES ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENCE, INCLUDING DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, LOST PROFITS AND LOST DATA, WHATEVER THE LEGAL THEORY AND EVEN IF ADVISED OF THEIR POSSIBILITY. NOTHING IN THIS LICENCE LIMITS LIABILITY THAT CANNOT BE LIMITED BY LAW.
 
-## 11. Governing law
+## 12. Governing law
 
-This licence is governed by the laws of [OWNER: governing law], without regard to its conflict-of-laws rules. Courts in [OWNER: governing law / venue] have exclusive jurisdiction over disputes about it.
+This licence is governed by the laws of the jurisdiction in which the Licensor has its principal place of business, without regard to its conflict-of-laws rules. The courts of that jurisdiction have exclusive jurisdiction over disputes about it.
 
-## 12. General
+## 13. General
 
 If a part of this licence is unenforceable, the rest stays in force. This licence is the whole agreement about the Software between You and the Licensor, unless You hold a separate commercial licence, which then takes priority for the use it covers. A failure to enforce a right is not a waiver of it.
 
-## 13. Contact
+## 14. Contact
 
-Quantum Override: [OWNER: contact email]
-Address (optional): [OWNER: postal address]
+Quantum Override, through https://anvldata.com
 
 ---
 
@@ -95,12 +100,16 @@ Address (optional): [OWNER: postal address]
 
 **This is a draft, not legal advice. Have a lawyer review it before it is published, shipped in any package or relied on.**
 
-## Placeholders to fill
+## Decisions applied (2026-10-30)
 
-1. `[OWNER: contact email]` (section 5 and section 13).
-2. `[OWNER: governing law]` (section 11), the law that governs the licence.
-3. `[OWNER: governing law / venue]` (section 11), the courts. Decide the venue separately from the law.
-4. `[OWNER: postal address]` (section 13), optional.
+- The placeholders are filled without inventing facts. Governing law is "the jurisdiction of the Licensor's principal
+  place of business", and contact is through https://anvldata.com. Name a specific law, venue or email later if a
+  lawyer advises it.
+- "Or data derived from it" is removed from §4.2, and §7 "Your output" is added: output belongs to the user and is
+  unrestricted.
+- The specification stays covered as part of "the Software" (protected).
+- Non-profit and government use count as commercial use (3 free developer seats).
+- The copyright is 2025–2026.
 
 ## Judgement calls
 
