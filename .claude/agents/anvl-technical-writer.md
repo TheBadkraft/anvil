@@ -51,7 +51,7 @@ Release Engineer hands you verified tarballs.
   merged `main` (`git status site/` empty). Afterwards, `curl` the live URLs and confirm they
   match the repo. Name every URL you checked.
 - **Never remove a published download.** Downstream teams install by URL and checksum. Every release adds its
-  tarballs and a `SHA256SUMS` (the current release), plus `SHA256SUMS-<version>` for each earlier one, and
+  tarballs and a `SHA256SUMS` (the current release), listing every published release, plus `SHA256SUMS-<version>` for each release, and
   keeps every earlier file at its URL. The download page highlights the current release and links the
   previous ones. (On 2026-10-30, removing the v0.10.0-rc files 404'd FlyWire's installs.)
 - A public changelog page is curated, not mirrored: user-facing changes only, scrubbed.
