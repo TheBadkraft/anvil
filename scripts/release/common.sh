@@ -1,15 +1,15 @@
 # Sourced by the per-binding packagers. Parses the one shared flag set and defines helpers.
 #
-#   --version 0.11.0-rc   release version (core tag without the leading v)
+#   --version 0.12.0-rc   release version (core tag without the leading v)
 #   --build 276           BUILD, `git rev-list --count <core tag>`, from build-count.sh (computed once)
 #   --core-repo PATH      repo holding the core tag/commit (default: the shared anvil checkout, read-only use)
 #   --core-commit SHA     the core commit this release is built from; the binding's vendor/anvil pin must equal it
-#   --ref REF             binding ref to build (default: the release branch, release/v0.11.0-rc)
+#   --ref REF             binding ref to build (default: the release branch, release/v0.12.0-rc)
 #   --out DIR             where the tarball goes
 # RELEASE_TOOLS overrides where check-*.sh / clean-checkout.sh live (default: this directory).
 set -eu
 RELEASE_TOOLS=${RELEASE_TOOLS:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}
-REF=release/v0.11.0-rc; CORE_REPO=$HOME/Projects/repos/anvil
+REF=release/v0.12.0-rc; CORE_REPO=$HOME/Projects/repos/anvil
 while [ $# -gt 0 ]; do
   case $1 in
     --version) VERSION=$2 ;; --build) BUILD=$2 ;; --core-repo) CORE_REPO=$2 ;;
@@ -31,4 +31,9 @@ core_lib() { # <dest dir>
   local tgz=$OUT/anvil-v$VERSION-linux-x86_64.tar.gz
   [ -f "$tgz" ] || { echo "FAIL core tarball not staged: $tgz (run package-core.sh first)" >&2; return 1; }
   tar -xzf "$tgz" -C "$1" --strip-components=1 "anvil-v$VERSION-linux-x86_64/lib/libanvil.so"
+}
+
+# The licence every package ships, byte for byte: templates/LICENSE.txt (native's own LICENSE.txt is gitignored and not in the tag).
+license_file() { # <package dir>
+  cp "$RELEASE_TOOLS/templates/LICENSE.txt" "$1/LICENSE.txt"
 }

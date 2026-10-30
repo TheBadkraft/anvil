@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Grammar + version check for one release artifact (BR-2610-anvl-distribution-001).
 #
-#   check-grammar.sh <core|node|wasm|net|py> <extracted-package-dir> <release-version> [build-count]
+#   check-grammar.sh <core|node|wasm|net|py|js> <extracted-package-dir> <release-version> [build-count]
 #
 # <release-version> is MAJOR.MINOR.PATCH-TAG (e.g. 0.10.0-rc). The native library reports it as
 # semver, MAJOR.MINOR.PATCH-TAG+BUILD (BR-2610-anvl-version-001), where BUILD is the commit
@@ -33,6 +33,7 @@ case $kind in
            -Wl,-rpath,"$pkg/lib" -o "$work/probe" || { echo "FAIL build probe"; exit 2; }
         out=$("$work/probe" 2>&1) ;;
   node) out=$(node "$here/probes/probe-node.js" "$pkg" 2>&1) ;;
+  js)   out=$(node "$here/probes/probe-node.js" "$pkg" 2>&1) ;;
   wasm) out=$(node "$here/probes/probe-wasm.js" "$pkg" 2>&1; node "$here/probes/probe-bundle.js" "$pkg" 2>&1) ;;
   py)   out=$(PYTHONDONTWRITEBYTECODE=1 python3 -I "$here/probes/probe-py.py" "$pkg" 2>&1) ;;
   net)  cp -r "$here/probes/probe-net" "$work/net"
@@ -62,6 +63,10 @@ if [ "$kind" = wasm ]; then
     [ "$(field bundle_include)" = "$include" ] && echo "PASS bundle include: same error as the CommonJS entry" || { echo "FAIL bundle include: '$(field bundle_include)'"; rc=1; }
     [ "$(field bundle_name)" = David ] && echo "PASS bundle name: David" || { echo "FAIL bundle name: '$(field bundle_name)'"; rc=1; }
   fi
+fi
+if [ "$kind" = js ]; then
+  im=$(field implementation)
+  [ "$im" = anvil.js ] && echo "PASS implementation: anvil.js" || { echo "FAIL implementation: '${im:-<none>}' (want anvil.js)"; rc=1; }
 fi
 [ $rc -ne 0 ] && [ -z "$version$include$name" ] && printf '%s\n' "$out" | head -5
 exit $rc

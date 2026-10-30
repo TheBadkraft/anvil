@@ -3,7 +3,7 @@
 #   1. a shipped README must not link outside the package (`](../x)`): those paths are sibling checkouts
 #      that don't exist in an installed tarball;
 #   2. a README that names dist/anvil.browser.js must be shipped with it (the file is in the package);
-#   3. node/wasm: the README's ```js blocks that `require('anvil-node'|'anvil-wasm')` run against this
+#   3. node/wasm/js: the README's ```js blocks that `require("anvil-node"|"anvil-wasm"|"anvil.js")` run against this
 #      package (installed layout, via a scratch node_modules). The ```html blocks and the service-worker
 #      (`// sw.js`) block are browser-only illustrations and are skipped, as is any block with a
 #      `{ ... }` placeholder; a block that fails only with a ReferenceError (an undefined placeholder such as
@@ -21,7 +21,7 @@ if grep -q 'anvil\.browser\.js' "$readme"; then
 fi
 pkg=$(cd "$pkg" && pwd)
 name=$(node -p "try{require('$pkg/package.json').name}catch(e){''}" 2>/dev/null || true)
-case $name in anvil-node|anvil-wasm) ;; *) exit 0 ;; esac
+case $name in anvil-node|anvil-wasm|anvil.js) ;; *) exit 0 ;; esac
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/node_modules"; ln -s "$pkg" "$work/node_modules/$name"
 node - "$readme" "$name" "$work" <<'JS'
