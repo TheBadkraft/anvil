@@ -29,7 +29,7 @@
  * ----------------------------------------------------------------------- */
 #define ANVL_VERSION_MAJOR 0
 #define ANVL_VERSION_MINOR 12
-#define ANVL_VERSION_PATCH 0
+#define ANVL_VERSION_PATCH 1
 #define ANVL_VERSION_TAG "rc"
 // Derived from the parts above, so the two cannot drift (BR-2610-anvl-version-001). It is the
 // version WITHOUT build metadata; the library reports it with `+BUILD` appended when BUILD is known.

@@ -82,3 +82,11 @@ Principal Engineer asks for once the release is staged.
 - Browsers only through the contained harness, one run at a time.
 - Nothing in `$HOME` except `~/release-staging/v0.12.1-rc/`.
 - Rivet credentials go inline on every command.
+
+## Status (2026-10-30)
+
+| Step | State |
+|---|---|
+| 1. Cut core: `0.12.1-rc`, `[Unreleased]` -> `[v0.12.1-rc]` | done on `release/v0.12.1-rc`, waiting for the merge and tag |
+| 2. Tooling fix (package-js.sh exports) | on `release/v0.12.1-rc-tooling` |
+| 3. Pins, builds, checks, benches, staging | after the tag |

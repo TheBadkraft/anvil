@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.12.1-rc] — (2026-10-30)
+
+A patch release: every public header is now safe to include from C++ (`extern "C"` guards, with a `check-cxx` gate), the writer refuses an `include` after a module attribute and the builder emits includes first, the AnvilScript body parser has a depth limit, and the native writer corpus ships for second implementations. Every artifact is built from this tag and reports `0.12.1-rc+<BUILD>`.
+
 ### Changed
 
 - **Site updated for v0.12.0-rc (technical writer).** The anvldata.com download page now highlights v0.12.0-rc and adds
