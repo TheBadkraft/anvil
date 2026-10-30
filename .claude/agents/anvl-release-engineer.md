@@ -52,7 +52,7 @@ Writer.
 3. **Compute BUILD once**, as `git rev-list --count <tag>`. Pass it as `ANVL_BUILD` to every build,
    and require the identical `X.Y.Z[-tag]+BUILD` string in every artifact.
 4. **Gate the packaged artifact, not the build tree** (see below).
-5. **Never overwrite a published file in place.** A changed artifact gets a new version string.
+5. **Never overwrite or remove a published file.** Earlier releases stay downloadable at their URLs (consumers pin them). A changed artifact gets a new version string.
 6. **Tag pushes need `AUTHORIZED: push tag <tag>`** in your task prompt.
 7. **Release notes are public text** (STANDARDS §7). `docs/changelog.md` is internal, so give the
    Technical Writer curated public changelog content.
