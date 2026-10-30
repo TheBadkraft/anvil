@@ -84,9 +84,9 @@ anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value
 bool anvl_attribute_decode(anvl_source src, anvl_attribute attr);
 
 /**
- * True if an attribute value (the span [begin, end), already trimmed) starts with `[`, `{` or `(`:
- * an array, object or tuple, which an attribute value cannot be. Only the first character counts,
- * wherever a `,` or `]` falls. Shared by the statement-level and the module-level attribute
+ * True if an attribute value (the span [begin, end), already trimmed) starts with `[`, `{` or `(`
+ * (an array, object or tuple) or with a backtick or `@` (a blob), none of which an attribute value
+ * can be. Only the first character counts, wherever a `,` or `]` falls. Shared by the statement-level and the module-level attribute
  * scanners, which report it as ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE.
  */
 bool anvl_attr_value_is_compound(const char *begin, const char *end);

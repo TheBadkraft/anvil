@@ -352,7 +352,7 @@ static void test_p4_attribute_value_message(void) {
                    "P4.message: says attribute values must be scalars");
    TestBit.is_true(m && strstr(m, "bare or quoted") != NULL,
                    "P4.message: says bare or quoted, so quoting is not required");
-   TestBit.is_true(m && strstr(m, "blob") == NULL, "P4.message: does not mention blobs");
+   TestBit.is_true(m && strstr(m, "blob") != NULL, "P4.message: names blobs among the refused values");
 }
 
 /* ====================================================================== *

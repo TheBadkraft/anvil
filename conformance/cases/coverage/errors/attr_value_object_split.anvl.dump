@@ -3,4 +3,4 @@ mode document
 input-bytes 26
 status error
 dialect AML
-error code=2006 name=ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=7 message="Attribute values must be scalars (bare or quoted), not an array, tuple or object"
+error code=2006 name=ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=7 message="Attribute values must be scalars (bare or quoted), not an array, tuple, object or blob"
