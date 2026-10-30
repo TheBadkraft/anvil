@@ -137,6 +137,14 @@ deliberate marketing. `docs/` and `notes/` are internal and may name anything.
   browser in a systemd user scope (1.5 GB memory, 256 processes, 180 s), one run at a time, with all state in
   `/tmp/anvl-browser-test/`. **Never launch a browser directly, never use snap Firefox, never wrap one in `timeout`.**
   On 2026-10-30, leaked headless browsers filled the owner's home directory and froze the workstation.
+- **Heavy or long-running commands run under a hard memory cap.** That covers fuzzing, benchmarks, corpus
+  generation, big builds, and anything that loops over thousands of cases or runs more than about a minute.
+  Run them as
+  `systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 -p RuntimeMaxSec=<s> -- <command>`
+  (lower the cap if you can). **Agents run inside the owner's VS Code process group.** On 2026-10-30 a fuzz
+  run grew to 28 GB, and the out-of-memory killer took VS Code and every agent down with it, twice. Never
+  start background jobs (`&`, `nohup`, `setsid`) that outlive your command; run in the foreground under the
+  cap, in bounded chunks. Generators must cap the size of each case, and drivers must stream results.
 - **The owner's home directory is not scratch space.** Put temporary state in your session scratchpad or under
   `/tmp`, clean it up on exit, and leave no processes running. Before reporting, `ls -A ~` must be unchanged and
   `pgrep -fa 'firefox|chrom|playwright'` must show nothing of yours.
