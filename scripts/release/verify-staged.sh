@@ -34,7 +34,7 @@ run "$here/check-js-package.sh" "$dir/anvil.js-v$ver.tar.gz" "${JS_REPO:-$HOME/P
 run "$here/check-browser-js.sh" "$js" "${JS_REPO:-$HOME/Projects/repos/anvil.js}"
 if [ $fail -eq 0 ]; then
   ( cd "$dir"; sha256sum anvil*-v$ver*.tar.gz anvil.js-v$ver.tar.gz 2>/dev/null | sort -k2 -u > SHA256SUMS-v$ver
-    if [ -f "$pub/SHA256SUMS" ]; then ( cd "$pub" && sha256sum -c SHA256SUMS >/dev/null ) || { echo "FAIL published SHA256SUMS does not match the published files"; exit 1; }; cat "$pub/SHA256SUMS" SHA256SUMS-v$ver > SHA256SUMS; else cp SHA256SUMS-v$ver SHA256SUMS; fi
+    if [ -f "$pub/SHA256SUMS" ]; then ( cd "$pub" && sha256sum -c SHA256SUMS >/dev/null ) || { echo "FAIL published SHA256SUMS does not match the published files"; exit 1; }; cat SHA256SUMS-v$ver "$pub/SHA256SUMS" > SHA256SUMS; else cp SHA256SUMS-v$ver SHA256SUMS; fi
     sha256sum -c SHA256SUMS-v$ver ) || fail=1
 else echo "NOT writing SHA256SUMS: a check failed"; fi
 exit $fail
