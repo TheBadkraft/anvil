@@ -1051,6 +1051,62 @@ static void test_amp24_bare_literal_rejects_at_and_backtick(void) {
    }
 }
 /* ---------------------------------------------------------------------- *
+ * AMP26..AMP29 - FR-2610-anvl-parser-002: number grammar
+ * An exponent sign is optional (`1e3` is a number); a decimal point needs a digit after it
+ * (`5.` is a parse error); a malformed exponent is an error; digit-led bare words are untouched.
+ * ---------------------------------------------------------------------- */
+static void amp_num_case(const char *text, anvl_result want_res, anvl_err_code want_err,
+                         anvl_value_type want_type, const char *label) {
+   char buf[96];
+   snprintf(buf, sizeof buf, "#!amp\nn := %s;\n", text);
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc(buf, &ctx);
+   TestBit.is_not_null(doc, label);
+   if (!doc) {
+      return;
+   }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(want_res, res, label);
+   if (want_res == ANVL_RES_OK) {
+      anvl_statement stmt = NULL;
+      FArray.get(doc->body, 0, sizeof(anvl_statement), (object *)&stmt);
+      TestBit.is_true(stmt && stmt->value && stmt->value->type == want_type, label);
+      TestBit.is_true(stmt && stmt->value && slice_equals(stmt->value->text, text), label);
+   } else {
+      TestBit.is_equal_int(want_err, err_code, label);
+   }
+   mod_ctx_dispose(ctx);
+}
+
+static void test_amp26_unsigned_exponent_is_numeric(void) {
+   const char *ok[] = {"1e3", "1E3", "1e+3", "1e-3", "-1e3", "1.5e10", "0e0", "1e308", "-2.5E-4"};
+   for (usize i = 0; i < sizeof ok / sizeof *ok; i++) {
+      amp_num_case(ok[i], ANVL_RES_OK, ANVL_ERR_NONE, ANVL_VALUE_NUMERIC, ok[i]);
+   }
+}
+
+static void test_amp27_trailing_decimal_point_rejected(void) {
+   const char *bad[] = {"5.", "-5.", "5.e3", "5.E+3", "0."};
+   for (usize i = 0; i < sizeof bad / sizeof *bad; i++) {
+      amp_num_case(bad[i], ANVL_RES_ERR, ANVL_ERR_PARSER_INVALID_NUMBER, 0, bad[i]);
+   }
+}
+
+static void test_amp28_malformed_exponent_rejected(void) {
+   const char *bad[] = {"1e", "1e+", "1e-", "1E", "1.5e", "-1e+"};
+   for (usize i = 0; i < sizeof bad / sizeof *bad; i++) {
+      amp_num_case(bad[i], ANVL_RES_ERR, ANVL_ERR_PARSER_INVALID_EXPONENT, 0, bad[i]);
+   }
+}
+
+static void test_amp29_digit_led_bare_words_unaffected(void) {
+   const char *bare[] = {"007x", "1ex", "1e3x", "5.x", "1.5.5", "09-02-2026", "1e3.5"};
+   for (usize i = 0; i < sizeof bare / sizeof *bare; i++) {
+      amp_num_case(bare[i], ANVL_RES_OK, ANVL_ERR_NONE, ANVL_VALUE_BARE, bare[i]);
+   }
+}
+/* ---------------------------------------------------------------------- *
  * AMP25 — '$identifier' VarRef rejected entirely in AMP, at both the
  * top-level value position and nested as an array element — matching
  * every other AMP-forbidden construct (base/attributes/object).
@@ -1135,6 +1191,14 @@ int main(void) {
    TestBit.run_ex("AMP24_bare_literal_rejects_at_and_backtick", NULL,
                   test_amp24_bare_literal_rejects_at_and_backtick, th);
    TestBit.run_ex("AMP25_varref_rejected", NULL, test_amp25_varref_rejected, th);
+   TestBit.run_ex("AMP26_unsigned_exponent_is_numeric", NULL, test_amp26_unsigned_exponent_is_numeric,
+                  th);
+   TestBit.run_ex("AMP27_trailing_decimal_point_rejected", NULL,
+                  test_amp27_trailing_decimal_point_rejected, th);
+   TestBit.run_ex("AMP28_malformed_exponent_rejected", NULL, test_amp28_malformed_exponent_rejected,
+                  th);
+   TestBit.run_ex("AMP29_digit_led_bare_words_unaffected", NULL,
+                  test_amp29_digit_led_bare_words_unaffected, th);
 
    return TestBit.report();
 }

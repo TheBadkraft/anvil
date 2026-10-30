@@ -214,7 +214,7 @@ Slice 1 (`anvil.node`) is done; see the FR's Progress section. Still open:
 Done and resolved; see the FR's Resolution. Still open:
 
 - **A bytes-capable loader for `anvil.node`** (`parse(Buffer)` meaning something, plus `AnvlNode.asBytes()`). Today a blob written from non-UTF-8 bytes is emitted exactly but reads back lossy, because the loader takes a JS string. New surface, so its own FR, and sequenced after **BR-2610-anvl-bindings-001** (`parse()` silently returns an empty document for any non-string).
-- **`numeric()` exponent sign.** The native writer rejects `1.5e3` and requires `1.5e+3`, while the reader accepts `1e3`. Probably intended; worth confirming with the coder agent before a binding documents it as a rule.
+- ~~**`numeric()` exponent sign.**~~ **Superseded 2026-10-29 by FR-2610-anvl-parser-002: the exponent sign is optional in reader and writer.** Original: The native writer rejects `1.5e3` and requires `1.5e+3`, while the reader accepts `1e3`. Probably intended; worth confirming with the coder agent before a binding documents it as a rule.
 - **FlyWire's hand-built ANVL** (`src/am-packet.js`, `harness/server.js`) can move to `AnvilWriter` once `anvil-node` 0.9.x is published; that change is FlyWire's.
 
 ## Deferred — bindings: `anvil.wasm` types, schema, writer and builder

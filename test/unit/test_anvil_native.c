@@ -1415,6 +1415,30 @@ static void test_anv48_attribute_value_handle_scalars(void) {
    }
 }
 
+static void test_anv48b_attribute_exponent_and_trailing_dot(void) {
+   // FR-2610-anvl-parser-002: the attribute decoder reuses the scalar parser, so 1e3 is NUMERIC;
+   // a malformed number (`5.`) is not a scalar as a whole, so it stays BARE raw text.
+   anvil_document doc = ATTR_LOAD("#!aml\nx @[a=1e3, b=1E-2, c=5., d=1e] := 1;\n");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV48b: document loads without errors");
+   if (doc) {
+      anvil_value v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "a"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_double == 1000.0,
+                      "ANV48b: a=1e3 is NUMERIC 1000");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "b"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_NUMERIC &&
+                         anvil_value_get_numeric(v).as_double == 0.01,
+                      "ANV48b: b=1E-2 is NUMERIC 0.01");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "c"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "5.", 2),
+                      "ANV48b: c=5. stays BARE raw text");
+      v = anvil_attribute_get_value_handle(stmt_attr(doc, "x", "d"));
+      TestBit.is_true(v && anvil_value_get_type(v) == ANVIL_VALUE_BARE && text_is(v, "1e", 2),
+                      "ANV48b: d=1e stays BARE raw text");
+      anvil_dispose(doc);
+   }
+}
+
 static void test_anv49_flag_attribute_has_no_value_handle(void) {
    anvil_document doc = ATTR_LOAD("#!aml\n@[schema, table=assets, active]\nx @[hot, k=v] := 1;\n");
    TestBit.is_true(doc && !anvil_has_errors(doc), "ANV49: loads");
@@ -2012,6 +2036,8 @@ int main(void) {
 
    TestBit.run_ex("ANV48_ATTRIBUTE_VALUE_HANDLE_SCALARS", NULL,
                   test_anv48_attribute_value_handle_scalars, th);
+   TestBit.run_ex("ANV48b_ATTRIBUTE_EXPONENT_AND_TRAILING_DOT", NULL,
+                  test_anv48b_attribute_exponent_and_trailing_dot, th);
    TestBit.run_ex("ANV49_FLAG_ATTRIBUTE_HAS_NO_VALUE_HANDLE", NULL,
                   test_anv49_flag_attribute_has_no_value_handle, th);
    TestBit.run_ex("ANV50_RAW_VALUE_READER_IS_UNCHANGED", NULL,

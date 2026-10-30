@@ -481,6 +481,22 @@ static void test_sch15_exponent_bound(void) {
                         "SCH15: data 5e+10 is not read as 5");
 }
 
+static void test_sch15b_unsigned_exponent(void) {
+   // FR-2610-anvl-parser-002: 1e308 used to be a bare word and failed Numeric as TYPE_MISMATCH.
+   const char *any = "#!aml\n@[schema]\nscore := { type := Numeric; };\n";
+   TestBit.is_equal_int(0, numeric_case(any, "#!aml\nscore := 1e308;\n", "score"),
+                        "SCH15b: 1e308 satisfies Numeric");
+   TestBit.is_equal_int(0, numeric_case(any, "#!aml\nscore := 1E3;\n", "score"),
+                        "SCH15b: 1E3 satisfies Numeric");
+   const char *src = "#!aml\n@[schema]\nscore := { type := Numeric; max := 1e3; };\n";
+   TestBit.is_equal_int(0, numeric_case(src, "#!aml\nscore := 999;\n", "score"),
+                        "SCH15b: 999 satisfies max := 1e3");
+   TestBit.is_equal_int(RANGE, numeric_case(src, "#!aml\nscore := 1001;\n", "score"),
+                        "SCH15b: 1001 exceeds max := 1e3");
+   TestBit.is_equal_int(RANGE, numeric_case(SCHEMA_MAX3, "#!aml\nscore := 5e10;\n", "score"),
+                        "SCH15b: data 5e10 is not read as 5");
+}
+
 static void test_sch16_long_numeric_text(void) {
    // 39 characters, real value 1e7: a 31-character cut reads it as 0.
    TestBit.is_equal_int(RANGE,
@@ -2718,6 +2734,7 @@ int main(void) {
                   test_sch13_fractional_data_vs_integral_bound, th);
    TestBit.run_ex("SCH14_fractional_bound", NULL, test_sch14_fractional_bound, th);
    TestBit.run_ex("SCH15_exponent_bound", NULL, test_sch15_exponent_bound, th);
+   TestBit.run_ex("SCH15b_unsigned_exponent", NULL, test_sch15b_unsigned_exponent, th);
    TestBit.run_ex("SCH16_long_numeric_text", NULL, test_sch16_long_numeric_text, th);
    TestBit.run_ex("SCH17_overflowed_data_compares_by_sign", NULL,
                   test_sch17_overflowed_data_compares_by_sign, th);
