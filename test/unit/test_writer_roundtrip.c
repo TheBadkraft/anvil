@@ -15,6 +15,7 @@
 
 #include "anvil_flat.h"
 #include "anvil_types.h"
+#include "anvil_builder.h"
 #include "anvil_writer.h"
 #include "internal/source_registry.h"
 #include "testbit.h"
@@ -22,6 +23,7 @@
 #include "../utilities/helpers.h"
 #include <dirent.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -805,6 +807,184 @@ static void test_rt12_duplicate_names_match_reader(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * RT14 (BR-2610-anvl-parser-005) - the property that ties writer, builder and
+ * reader together: anything the writer or the builder accepts, the reader
+ * loads. A generated sweep draws names and attribute keys from a tiny
+ * alphabet so repeats are common; every repeat must be rejected by the writer
+ * or the builder, and every document they do emit must load.
+ * ---------------------------------------------------------------------- */
+static uint64_t sweep_state;
+static unsigned sweep_next(unsigned n) {
+   sweep_state ^= sweep_state << 13;
+   sweep_state ^= sweep_state >> 7;
+   sweep_state ^= sweep_state << 17;
+   return (unsigned)(sweep_state % n);
+}
+static const char *const SWEEP_NAMES[] = {"a", "b", "c", "d"};
+static const char *const SWEEP_KEYS[] = {"k", "m", "n"};
+
+// Writes one statement (and, for an object, its fields) with random content. False once the
+// writer has rejected something.
+static bool sweep_writer_value(anvil_writer w, int depth);
+static bool sweep_writer_statement(anvil_writer w, int depth) {
+   if (!anvil_writer_statement(w, SWEEP_NAMES[sweep_next(4)], NULL)) {
+      return false;
+   }
+   unsigned na = sweep_next(3);
+   for (unsigned i = 0; i < na; i++) {
+      const char *key = SWEEP_KEYS[sweep_next(3)];
+      bool ok = sweep_next(2) ? anvil_writer_attribute(w, key, NULL)
+                              : anvil_writer_attribute_string(w, key, "v", 1);
+      if (!ok) {
+         return false;
+      }
+   }
+   return sweep_writer_value(w, depth);
+}
+static bool sweep_writer_value(anvil_writer w, int depth) {
+   unsigned pick = sweep_next(depth >= 3 ? 2 : 5);
+   if (pick == 0) {
+      return anvil_writer_int(w, (int64_t)sweep_next(100));
+   }
+   if (pick == 1) {
+      return anvil_writer_bare(w, "word");
+   }
+   if (pick == 2 || pick == 3) { // object
+      if (!anvil_writer_begin_object(w)) {
+         return false;
+      }
+      unsigned n = 1 + sweep_next(4);
+      for (unsigned i = 0; i < n; i++) {
+         if (!sweep_writer_statement(w, depth + 1)) {
+            return false;
+         }
+      }
+      return anvil_writer_end_object(w);
+   }
+   if (!anvil_writer_begin_array(w)) { // array of objects and scalars
+      return false;
+   }
+   unsigned n = 1 + sweep_next(3);
+   for (unsigned i = 0; i < n; i++) {
+      if (!(sweep_next(2) ? anvil_writer_int(w, 1) : sweep_writer_value(w, depth + 1))) {
+         return false;
+      }
+   }
+   return anvil_writer_end_array(w);
+}
+static bool dup_code(anvil_writer_err_code c) {
+   return c == ANVIL_WRITER_ERR_DUPLICATE_NAME || c == ANVIL_WRITER_ERR_DUPLICATE_FIELD ||
+          c == ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY;
+}
+
+static void test_rt14_writer_sweep(void) {
+   sweep_state = UINT64_C(0x9E3779B97F4A7C15);
+   int accepted = 0, rejected = 0, not_loading = 0, wrong_reject = 0;
+   for (int doc = 0; doc < 4000; doc++) {
+      anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+      bool ok = true;
+      unsigned nm = sweep_next(3);
+      for (unsigned i = 0; ok && i < nm; i++) {
+         ok = anvil_writer_attribute(w, SWEEP_KEYS[sweep_next(3)], NULL);
+      }
+      unsigned ns = 1 + sweep_next(4);
+      for (unsigned i = 0; ok && i < ns; i++) {
+         ok = sweep_writer_statement(w, 0);
+      }
+      ok = ok && anvil_writer_finish(w);
+      if (ok) {
+         accepted++;
+         size_t len = 0;
+         const char *text = anvil_writer_data(w, &len);
+         anvil_document d = anvil_load_buffer(text, len);
+         if (!d || anvil_has_errors(d)) {
+            not_loading++;
+         }
+         anvil_dispose(d);
+      } else {
+         rejected++;
+         if (!dup_code(anvil_writer_get_error(w))) {
+            wrong_reject++;
+         }
+      }
+      anvil_writer_dispose(w);
+   }
+   TestBit.is_true(accepted > 300, "RT14: the writer sweep accepted a good share of documents");
+   TestBit.is_true(rejected > 300, "RT14: the writer sweep hit repeats");
+   TestBit.is_equal_int(0, not_loading, "RT14: every document the writer accepted loads");
+   TestBit.is_equal_int(0, wrong_reject, "RT14: the writer rejected only repeats");
+}
+
+static anvil_node sweep_builder_value(anvil_builder b, int depth);
+static void sweep_builder_fill(anvil_builder b, anvil_node object, int depth, unsigned n) {
+   for (unsigned i = 0; i < n; i++) {
+      anvil_node v = sweep_builder_value(b, depth + 1);
+      anvil_member m = anvil_builder_add(b, object, SWEEP_NAMES[sweep_next(4)], v);
+      if (!m) {
+         continue; // a repeat: rejected, the document goes on without it
+      }
+      unsigned na = sweep_next(3);
+      for (unsigned k = 0; k < na; k++) {
+         const char *key = SWEEP_KEYS[sweep_next(3)];
+         if (sweep_next(2)) {
+            (void)anvil_builder_member_attribute(b, m, key, NULL);
+         } else {
+            (void)anvil_builder_member_attribute_string(b, m, key, "v", 1);
+         }
+      }
+   }
+}
+static anvil_node sweep_builder_value(anvil_builder b, int depth) {
+   unsigned pick = sweep_next(depth >= 3 ? 2 : 5);
+   if (pick == 0) {
+      return anvil_builder_int(b, (int64_t)sweep_next(100));
+   }
+   if (pick == 1) {
+      return anvil_builder_bare(b, "word");
+   }
+   if (pick == 2 || pick == 3) {
+      anvil_node o = anvil_builder_object(b);
+      sweep_builder_fill(b, o, depth, 1 + sweep_next(4));
+      return o;
+   }
+   anvil_node a = anvil_builder_array(b);
+   unsigned n = 1 + sweep_next(3);
+   for (unsigned i = 0; i < n; i++) {
+      (void)anvil_builder_append(b, a, sweep_next(2) ? anvil_builder_int(b, 1) : sweep_builder_value(b, depth + 1));
+   }
+   return a;
+}
+
+static void test_rt14_builder_sweep(void) {
+   sweep_state = UINT64_C(0xD1B54A32D192ED03);
+   int emitted = 0, refused = 0, not_loading = 0;
+   for (int doc = 0; doc < 4000; doc++) {
+      anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+      unsigned nm = sweep_next(3);
+      for (unsigned i = 0; i < nm; i++) {
+         (void)anvil_builder_attribute(b, SWEEP_KEYS[sweep_next(3)], NULL);
+      }
+      sweep_builder_fill(b, NULL, 0, 1 + sweep_next(4));
+      size_t len = 0;
+      const char *text = anvil_builder_emit(b, &len);
+      if (text) {
+         emitted++;
+         anvil_document d = anvil_load_buffer(text, len);
+         if (!d || anvil_has_errors(d)) {
+            not_loading++;
+         }
+         anvil_dispose(d);
+      } else {
+         refused++; // an object left empty because its only field was a repeat, say
+      }
+      anvil_builder_dispose(b);
+   }
+   TestBit.is_true(emitted > 1000, "RT14: the builder sweep emitted a good share of documents");
+   TestBit.is_equal_int(0, not_loading, "RT14: every document the builder emits loads");
+   (void)refused;
+}
+
+/* ---------------------------------------------------------------------- *
  * RT13 - a blob's tag survives write -> read -> write
  * ---------------------------------------------------------------------- */
 static void test_rt13_blob_tags_round_trip(void) {
@@ -876,6 +1056,8 @@ int main(void) {
    TestBit.run_ex("RT13_blob_tags_round_trip", NULL, test_rt13_blob_tags_round_trip, th);
    TestBit.run_ex("RT12_duplicate_names_match_reader", NULL, test_rt12_duplicate_names_match_reader,
                   th);
+   TestBit.run_ex("RT14_writer_sweep", NULL, test_rt14_writer_sweep, th);
+   TestBit.run_ex("RT14_builder_sweep", NULL, test_rt14_builder_sweep, th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,
                   th);
    TestBit.run_ex("RT_LITERAL_PREFIXED_BARE_WORDS", NULL, test_rt_literal_prefixed_bare_words, th);

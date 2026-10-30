@@ -104,6 +104,10 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "top-level name declared twice";
    case ANVIL_WRITER_ERR_DEPTH_EXCEEDED:
       return "nesting is too deep";
+   case ANVIL_WRITER_ERR_DUPLICATE_FIELD:
+      return "field name declared twice in one object";
+   case ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY:
+      return "attribute key given twice";
    }
    return "unknown error";
 }
