@@ -485,6 +485,49 @@ static void test_rt09_include(void) {
    rmdir(dir);
 }
 
+static void test_rt09b_include_and_module_attribute(void) {
+   char dir[] = "/tmp/anvil_writer_rt_XXXXXX";
+   TestBit.is_not_null(mkdtemp(dir), "RT09b: temp dir created");
+   char base_path[256], main_path[256];
+   snprintf(base_path, sizeof base_path, "%s/base.anvl", dir);
+   snprintf(main_path, sizeof main_path, "%s/main.anvl", dir);
+   anvil_writer base = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(base, "shared", NULL);
+   anvil_writer_int(base, 1);
+   anvil_writer_finish(base);
+   TestBit.is_true(write_file(base_path, base), "RT09b: base written");
+   anvil_writer_dispose(base);
+
+   // a header with an include and a module attribute: the order the writer accepts loads
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_writer_include(w, "base.anvl"), "RT09b: include");
+   TestBit.is_true(anvil_writer_attribute(w, "doc", "x"), "RT09b: module attribute after the include");
+   anvil_writer_statement(w, "own", NULL);
+   anvil_writer_int(w, 2);
+   anvil_writer_finish(w);
+   TestBit.is_true(write_file(main_path, w), "RT09b: main written");
+   anvil_writer_dispose(w);
+   anvil_document doc = anvil_load(main_path);
+   TestBit.is_not_null(doc, "RT09b: main loaded");
+   if (doc) {
+      TestBit.is_false(anvil_has_errors(doc), "RT09b: the reader accepts include then module attribute");
+      anvil_dispose(doc);
+   }
+
+   // the other order is what the reader rejects (4201); the writer must not produce it
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_attribute(w, "doc", "x");
+   bool included = anvil_writer_include(w, "base.anvl");
+   anvil_writer_statement(w, "own", NULL);
+   anvil_writer_int(w, 2);
+   bool finished = anvil_writer_finish(w);
+   TestBit.is_false(included && finished, "RT09b: the writer does not emit a module attribute before an include");
+   anvil_writer_dispose(w);
+   remove(base_path);
+   remove(main_path);
+   rmdir(dir);
+}
+
 /* ---------------------------------------------------------------------- *
  * RT10 - fixed point over every real fixture
  * ---------------------------------------------------------------------- *
@@ -1157,6 +1200,7 @@ int main(void) {
    TestBit.run_ex("RT07_varref", NULL, test_rt07_varref, th);
    TestBit.run_ex("RT08_amp", NULL, test_rt08_amp, th);
    TestBit.run_ex("RT09_include", NULL, test_rt09_include, th);
+   TestBit.run_ex("RT09b_include_and_module_attribute", NULL, test_rt09b_include_and_module_attribute, th);
    TestBit.run_ex("RT10_fixture_fixed_point", NULL, test_rt10_fixture_fixed_point, th);
    TestBit.run_ex("RT13_blob_tags_round_trip", NULL, test_rt13_blob_tags_round_trip, th);
    TestBit.run_ex("RT12_duplicate_names_match_reader", NULL, test_rt12_duplicate_names_match_reader,

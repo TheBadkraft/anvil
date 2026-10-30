@@ -165,22 +165,48 @@ static void test_w03_int_and_double(void) {
  * W04 - module header: attributes then includes, blank line before body
  * ---------------------------------------------------------------------- */
 static void test_w04_header(void) {
+   // The reader requires every include before the module attributes (4201 otherwise), so the writer
+   // takes them in that order (BR-2610-anvl-writer-003).
    anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_include(w, "base.anvl");
    anvil_writer_attribute(w, "types", NULL);
    anvil_writer_attribute(w, "mixed", "true");
    anvil_writer_attribute_string(w, "note", "hello, world]", 13);
-   anvil_writer_include(w, "base.anvl");
    anvil_writer_statement(w, "x", NULL);
    anvil_writer_int(w, 1);
    expect_text(w,
                "#!aml\n\n"
+               "include \"base.anvl\";\n"
                "@[types]\n"
                "@[mixed=true]\n"
                "@[note=\"hello, world]\"]\n"
-               "include \"base.anvl\";\n"
                "\n"
                "x := 1;\n",
-               "W04: header attributes and include");
+               "W04: header include then attributes");
+}
+
+/* ---------------------------------------------------------------------- *
+ * W04b - an include after a module attribute is refused (the reader's order: includes first)
+ * ---------------------------------------------------------------------- */
+static void test_w04b_include_after_attribute(void) {
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_writer_attribute(w, "doc", NULL), "W04b: module attribute accepted");
+   TestBit.is_false(anvil_writer_include(w, "base.anvl"), "W04b: include after a module attribute fails");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_STATE, anvil_writer_get_error(w), "W04b: with STATE");
+   anvil_writer_dispose(w);
+
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_include(w, "a.anvl");
+   anvil_writer_attribute(w, "k", NULL);
+   TestBit.is_false(anvil_writer_include(w, "b.anvl"), "W04b: a second include after an attribute fails");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_STATE, anvil_writer_get_error(w), "W04b: with STATE (interleaved)");
+   anvil_writer_dispose(w);
+
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_writer_include(w, "a.anvl") && anvil_writer_include(w, "b.anvl") &&
+                      anvil_writer_attribute(w, "k", NULL),
+                   "W04b: includes together, then attributes");
+   anvil_writer_dispose(w);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -1054,6 +1080,7 @@ int main(void) {
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
    TestBit.run_ex("W03_int_and_double", NULL, test_w03_int_and_double, th);
    TestBit.run_ex("W04_header", NULL, test_w04_header, th);
+   TestBit.run_ex("W04b_include_after_attribute", NULL, test_w04b_include_after_attribute, th);
    TestBit.run_ex("W05_statement_attributes_and_base", NULL,
                   test_w05_statement_attributes_and_base, th);
    TestBit.run_ex("W06_collections", NULL, test_w06_collections, th);

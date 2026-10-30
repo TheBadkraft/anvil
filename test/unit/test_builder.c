@@ -163,7 +163,8 @@ static void test_b03_collections(void) {
 }
 
 /* ---------------------------------------------------------------------- *
- * B04 - header, attributes and base: W04/W05's text
+ * B04 - header, attributes and base: W04/W05's text. The include was added after the attributes,
+ * yet is emitted first: the reader requires includes before module attributes (BR-2610-anvl-writer-003)
  * ---------------------------------------------------------------------- */
 static void test_b04_header_attributes_base(void) {
    anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
@@ -188,10 +189,10 @@ static void test_b04_header_attributes_base(void) {
 
    expect_emit(b,
                "#!aml\n\n"
+               "include \"base.anvl\";\n"
                "@[types]\n"
                "@[mixed=true]\n"
                "@[note=\"hello, world]\"]\n"
-               "include \"base.anvl\";\n"
                "\n"
                "server @[env=production, active, label=\"a b\"] := {\n"
                "   host := localhost;\n"
