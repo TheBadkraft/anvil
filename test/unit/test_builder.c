@@ -369,7 +369,7 @@ static void test_b07_structure(void) {
  * B16 - BR-2610-anvl-parser-007: an attribute value must be a scalar
  * ---------------------------------------------------------------------- */
 static void test_b16_attribute_values_are_scalars(void) {
-   static const char *const bad[] = {"[x", "[x]", "(1)", "{a}", "{}", "()", "[]", "(1,2)"};
+   static const char *const bad[] = {"[x", "[x]", "(1)", "{a}", "{}", "()", "[]", "(1,2)", "@t`z`", "`z`", "@t``"};
    anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
    anvil_member m = ADD(b, "s", anvil_builder_int(b, 1));
    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {

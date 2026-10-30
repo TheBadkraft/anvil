@@ -699,7 +699,7 @@ static void test_rt11_accepted_candidates_read_back(void) {
    const char *bare_alpha = "ab1_-./:$e+.,;@`\"{}[]()#\\ x09";
    const char *num_alpha = "0123456789-+.eE";
    const char *string_alpha = "ab \"\\\n\t\r;:=,{}[]()@`$/*#'";
-   const char *attr_alpha = "ab1=,]\" $-.[({";
+   const char *attr_alpha = "ab1=,]\" $-.[({`@";
    int accepted_bare = 0, accepted_numeric = 0, accepted_attr = 0;
 
    for (int round = 0; round < 3000; round++) {
@@ -1056,7 +1056,7 @@ static void test_rt14_anonymous_block_base(void) {
 // RT14, attribute values: whatever the builder takes as an attribute value loads.
 static void test_rt14_builder_attribute_values(void) {
    sweep_state = UINT64_C(0xA24BAED4963EE407);
-   const char *alpha = "ab1=,]\" $-.[({)}";
+   const char *alpha = "ab1=,]\" $-.[({)}`@";
    int accepted = 0, refused = 0, not_loading = 0;
    for (int round = 0; round < 3000; round++) {
       char v[12];

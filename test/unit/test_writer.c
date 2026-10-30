@@ -420,6 +420,8 @@ static bool attr_scalars_ok(anvil_writer w) {
           anvil_writer_attribute(w, "e", "b{c}") && anvil_writer_attribute_string(w, "f", "(1)", 3) &&
           anvil_writer_attribute_string(w, "g", "{a}", 3);
 }
+static bool attr_blob(anvil_writer w) { return anvil_writer_attribute(w, "k", "@t`z`"); }
+static bool attr_blob_untagged(anvil_writer w) { return anvil_writer_attribute(w, "k", "`z`"); }
 static bool attr_comma(anvil_writer w) { return anvil_writer_attribute(w, "k", "a,b"); }
 static bool attr_bracket(anvil_writer w) { return anvil_writer_attribute(w, "k", "a]"); }
 static bool attr_varref(anvil_writer w) { return anvil_writer_attribute(w, "k", "$x"); }
@@ -480,6 +482,9 @@ static void test_w10_value_validation(void) {
       TestBit.is_true(attr_scalars_ok(w), "W10: bare scalars and quoted text with brackets are accepted");
       anvil_writer_dispose(w);
    }
+   expect_error(ANVIL_WRITER_AML, attr_blob, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr tagged blob");
+   expect_error(ANVIL_WRITER_AML, attr_blob_untagged, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE,
+                "W10: attr untagged blob");
    expect_error(ANVIL_WRITER_AML, attr_comma, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr ','");
    expect_error(ANVIL_WRITER_AML, attr_bracket, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr ']'");
    expect_error(ANVIL_WRITER_AML, attr_varref, ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, "W10: attr '$'");
