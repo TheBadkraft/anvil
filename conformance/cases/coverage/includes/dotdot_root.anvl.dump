@@ -1,0 +1,20 @@
+anvil-dump 1
+mode document
+input-bytes 63
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=63
+  include decl-span=0-28 decl="include \"sub/../leaf_c.anvl\"" path-span=8-28 path="\"sub/../leaf_c.anvl\"" resolved=1
+  include decl-span=30-53 decl="include \"sub/./s2.anvl\"" path-span=38-53 path="\"sub/./s2.anvl\"" resolved=2
+  stmt kind=ASSIGN name="x" name-span=55-56 base="" base-span=none attrs=0
+    value type=NUMERIC span=60-61 text="1" kind=integer overflow=0 i64=1
+doc 1 path="sub/../leaf_c.anvl" dialect=AML bytes=8
+  stmt kind=ASSIGN name="c" name-span=0-1 base="" base-span=none attrs=0
+    value type=NUMERIC span=5-6 text="3" kind=integer overflow=0 i64=3
+doc 2 path="sub/./s2.anvl" dialect=AML bytes=35
+  include decl-span=0-24 decl="include \"../leaf_b.anvl\"" path-span=8-24 path="\"../leaf_b.anvl\"" resolved=3
+  stmt kind=ASSIGN name="s2" name-span=26-28 base="" base-span=none attrs=0
+    value type=NUMERIC span=32-33 text="2" kind=integer overflow=0 i64=2
+doc 3 path="sub/./../leaf_b.anvl" dialect=AML bytes=8
+  stmt kind=ASSIGN name="b" name-span=0-1 base="" base-span=none attrs=0
+    value type=NUMERIC span=5-6 text="2" kind=integer overflow=0 i64=2

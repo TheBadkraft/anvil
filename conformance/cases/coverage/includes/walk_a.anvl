@@ -1,0 +1,2 @@
+include "walk_c.anvl";
+a := 1;

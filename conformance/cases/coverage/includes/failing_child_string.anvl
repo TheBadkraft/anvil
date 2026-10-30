@@ -1,0 +1,2 @@
+include "child_unterminated.anvl";
+x := 1;

@@ -10,6 +10,15 @@ The format is a **contract**. It is versioned: the first line is `anvil-dump 1`.
 contains, or to how a line is written, bumps the version, regenerates the whole corpus, and is a deliberate
 act (`make update-conformance`), never a side effect.
 
+Revision history of this document (the dump version is the number on the first line; a revision that only
+makes the text exact does not change it):
+
+- **Version 1, first text**: the Phase 0 format.
+- **Version 1, second text** (FR-2610-anvl-conformance-002): the same bytes, specified without gaps: the
+  `dialect` line on an error, the exact number rules, the document identity and the walk, the path rule, how
+  line and column are counted, the batch protocol (moved here from `fuzz/README.md`), and the limits native has.
+  No dump of the 1165 earlier cases changed. The version stays `1`.
+
 ## Why a line format, not AML
 
 The format has to be readable when the implementation under test is broken. A dump written in AML would need
@@ -38,13 +47,39 @@ anvil-dump 1
 mode document|fragment
 input-bytes N
 status ok|error
-dialect AML|AMP|ASL|ERROR         (document mode, when the root document exists)
+dialect AML|AMP|ASL|ERROR         (document mode, when the root document exists; see below)
 ```
 
 then either the error records (when `status error`) or the tree (when `status ok`).
 
 `mode fragment` is the input parsed as a standalone value expression (`anvil_parse_value_fragment`); it has no
 `dialect` line and, when `status ok`, a single `value` record (with its children) at indent 0.
+
+### The `dialect` line
+
+In `mode document` the line is written **whenever native created the root document, whatever the status**: on
+`status ok` and on `status error` alike. It is left out in `mode fragment`, and in the one document-mode case
+where native failed before it had a root document (a root file that cannot be read: its error is the `code=0`
+record described below). Its place is always right after `status`, before the first `error` or `doc` record.
+
+Its value is the dialect native had determined for the **root** document at the point it stopped (an error in an
+included document does not change it):
+
+1. start from the extension hint of the root file: `.amp` gives `AMP`, `.asl` gives `ASL`, anything else (`.anvl`,
+   `.aml`, no extension, an unknown one) and a buffer read from stdin give `AML`;
+2. a shebang overrides it. A shebang is `#!` and **exactly three bytes** (`aml`, `amp` or `asl`, lower case),
+   after optional leading space, tab, CR or LF; whatever follows those five bytes is ordinary content (`#!amlx := 1;`
+   is `AML` followed by `x := 1;`; `#!aml trailing` is `AML` followed by the content `trailing`);
+3. a shebang that is not one of those three words, or that is shorter than five bytes (`#!`, `#!am`, `#!AML`, `#! aml`,
+   `#!xyz`), makes the dialect **`ERROR`**: native's dialect-detection error state. It always comes with
+   `error code=2011` (`ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT`, line 1, column 1) and never with `status ok`. `ERROR`
+   is not a dialect a document can have, only the value of this line (and of nothing else: a `doc` record in the
+   tree never carries it).
+
+So a dump can say `status error` with `dialect AML` (the usual syntax error), with `dialect AMP`, with `dialect
+ASL` (native built without AnvilScript refuses `#!asl` with `error code=2012`, and the line still says `ASL`), or
+with `dialect ERROR`. A port must print the dialect of the shebang or the extension even when the parse fails
+later. Cases: `coverage/errors/shebang_*`.
 
 `input-bytes` is the number of bytes of input read. The tool never reports file names, so a dump does not
 depend on where the corpus is checked out.
@@ -62,15 +97,56 @@ internal `anvl_err_code` number (`include/errors.h`) and `name` is native's name
 `4` SYNTAX, `5` RESOLVE, `6` MEMORY, `7` INVALID_ARGUMENT. `line` and `column` are 1-based as native reports
 them (`0` when there is none). `message` is native's message text, exactly.
 
+**Line and column.** A line break is the byte `\n` and nothing else: `\r`, `\r\n`'s `\r`, form feed and vertical tab
+are ordinary bytes (a document with lone-`\r` line ends is one line). `line` is 1 plus the number of `\n` before the
+error position; `column` is 1 plus the number of **bytes** between the last `\n` (or the start) and the error
+position. So a tab counts as 1, a two-byte character as 2, a three-byte one as 3, a four-byte one as 4, an invalid
+UTF-8 byte as 1, a NUL as 1, and a byte-order mark is three ordinary bytes (a BOM before the first statement is
+itself a syntax error, at line 1, column 1). No UTF-8 decoding takes place anywhere. The error position is the
+start of the token native was reading when it failed (for `5.` and `1e`, the first digit of the number; for an
+unterminated string or blob, the end of the input); a port reports the same position, not the position it would find natural. In an included document the
+line and column are those inside the included document, and the dump does not say which document it was.
+
 When a load fails, **nothing but the error is defined**: no tree is dumped, because the partial tree native
 leaves behind is an implementation artifact, not behaviour a port should copy. If native failed before it
 recorded anything (an unreadable file), one line `error code=0 name=ANVL_ERR_NONE ...` with the public
-category and an empty message is written.
+category and an empty message is written (and no `dialect` line, see above). The corpus holds no such case,
+since an input is always an existing file; the line exists for completeness.
+
+Two errors depend on the resolved include path (see **Includes**): an include whose joined path is 1024 bytes
+or longer is `error code=9002 name=ANVL_ERR_INVALID_ARGUMENT category=3` (an include category, not an argument
+category), and a file that cannot be opened is `error code=4204` (`ANVL_ERR_INCLUDE_FILE_NOT_FOUND`).
+
+Most error codes in `include/errors.h` can never be produced from a document: see `notes/conformance-error-coverage.md`
+for the list of the codes the corpus reaches (41) and why the others cannot be.
 
 ### The tree (`status ok`)
 
-One `doc` record per document, the root first (`doc 0`), then each included document in the order a pre-order
-walk of the include graph first reaches it; a document included twice (a diamond) appears once.
+One `doc` record per **distinct document**, numbered from 0 in the order below; the root is `doc 0`.
+
+**The walk.** Start at the root. To visit a document: if it is already numbered, stop; otherwise give it the next
+number, then visit, in the order the `include` declarations appear in its source, the document each one resolved
+to, each visit finishing (with everything below it) before the next sibling starts. That is a depth-first,
+pre-order walk with the document numbered when it is first entered and an include's own subtree dumped
+before its next sibling. It is not breadth-first: with `root` including `a` then `b`, `a` including `c`, and `b`
+including `d` then `c`, the numbering is `root 0, a 1, c 2, (c's own includes), b, d`, and `c` is not repeated under `b`
+(`coverage/includes/walk_root.anvl`; reverse the first two includes and the numbers change,
+`walk_root_reversed.anvl`). A document that is reached again (a diamond, a shared leaf, a cycle that native
+accepts) is not dumped again; the `include` record that reached it carries `resolved=<its first number>`, which may
+be a smaller number than the current document's own. The `doc` records are then printed in number order.
+
+**What "the same document" means: identical bytes.** Native identifies a document by a hash of its source bytes
+(64-bit FNV-1a), not by its path. Two includes that name *different paths* with *byte-identical contents* (a
+copy of a file, an empty file named twice) resolve to the **same** document, which keeps the path of the first
+one reached (`coverage/includes/identical_copies.anvl`). An include of a file whose bytes equal the root's resolves to
+`doc 0` (`self_dot.anvl`). A port compares the bytes (a hash collision between different files is outside the
+contract). Which of two spellings of one path is "first" is decided by the walk above.
+
+**Cycles.** An include that names, **by exactly the same joined path string**, a document still being loaded
+(one of its ancestors in the include chain) is `error code=4206` (`ANVL_ERR_INCLUDE_CYCLIC`) and the load fails
+(`self_exact.anvl`, `mutual_a.anvl`). The comparison is textual: `"./self.anvl"` against `"self.anvl"` is not
+the same string, so the include is accepted, the bytes are the same, and it resolves to the existing document
+(`self_dot.anvl`, `mutual_dot_a.anvl`: the dump then shows an include that resolves to a document with a smaller number).
 
 ```
 doc 0 path="<root>" dialect=AML bytes=132
@@ -81,12 +157,29 @@ doc 1 path="f01_bare_literal.anvl" dialect=AML bytes=205
   ...
 ```
 
-`path` is `"<root>"` for the root and, for an included document, its path relative to the root document's
-directory. `bytes` is its source length.
+`path` is `"<root>"` for the root. For an included document it is the path native opened, with the root
+document's directory prefix removed. Native opens `<directory of the including document>/<the include string>`
+(an include string starting with `/` is opened as it is), **without normalising it**: `.` and `..` segments, repeated
+slashes and a `./` prefix stay as written. The including document's directory is its own path up to its last `/`
+(`.` when it has none), so a document in `sub/` that includes `"s2.anvl"` opens `<root dir>/sub/s2.anvl` and one
+that includes `"../x.anvl"` opens `<root dir>/sub/../x.anvl`, printed `sub/../x.anvl`. The dump is made from
+inputs run by their path relative to `conformance/cases/` (see **Corpus layout**), so the root directory prefix is
+`<group>/` or `<group>/<dir>/`; a root named with no `/` at all (a bare file name, or stdin, whose directory is `.`)
+prints its includes with a leading `./` (`./x.anvl`). Absolute include paths print as they are and are not used
+by the corpus, since they would depend on the machine. `bytes` is its source length.
 
 **include**: `include decl-span=7-38 decl="include \"x.anvl\"" path-span=15-38 path="\"x.anvl\"" resolved=1`.
 `decl` is the declaration without its `;`; `path` is the path literal with its quotes. `resolved` is the index
-of the `doc` it resolved to (`none` if it did not).
+of the `doc` it resolved to.
+
+**`resolved=none` cannot occur in a dump.** A tree is only dumped for `status ok`, and native loads every include of
+a successful load: an include that cannot be resolved (missing file, unreadable file, joined path of 1024 bytes
+or more, cycle, a failing included document) fails the whole load with an error and no tree. The value `none` is kept in
+the grammar for a port's own use and is never produced by native. The unresolved-include behaviour that *is*
+specified is the error dump (`coverage/includes/missing_*.anvl`, `failing_child_*.anvl`, `path_len_*.anvl`).
+The cases `coverage/includes/path_len_1005.anvl` and `path_len_1006.anvl` sit on the length boundary for a root run as
+`coverage/includes/<file>` (the joined path is 17 + 1 + len(name) bytes: fine up to 1005, too long from 1006);
+a name of 1024 bytes or more is too long wherever the root is.
 
 **stmt**: `stmt kind=ASSIGN name="x" name-span=6-7 base="" base-span=none attrs=0`. `kind` is `ASSIGN`,
 `OBJECT_BLOCK`, `VARS`, `IMPORT` or `FUNCTION` (the last two only with AnvilScript). `base` is the
@@ -107,7 +200,7 @@ value's span (the contents only for a string and a blob; no delimiters):
 |---|---|
 | `NULL`, `BARE` | none |
 | `BOOL` | `bool=true\|false` |
-| `NUMERIC` | `kind=integer\|float overflow=0\|1` and `i64=<n>` (integer, no overflow) or `f64=0x<16 hex digits>` (float, no overflow): the IEEE 754 bits of the double native computed. `kind` is judged from the spelling: integer when it has no `.`, `e` or `E` |
+| `NUMERIC` | `kind=integer\|float overflow=0\|1`, then `i64=<n>` (integer, no overflow) or `f64=0x<16 hex digits>` (float, no overflow); with `overflow=1` neither is written. The exact rules are in **Numbers** below |
 | `STRING` | `decoded="..."`: the string after native's escape resolution (`\n \t \r \\ \"`; any other backslash pair is kept as written) |
 | `BLOB` | `tag="..." tag-span=a-b bytes=<hex>`: the tag (`""` and `none` when untagged) and the content bytes |
 | `ARRAY`, `TUPLE`, `OBJECT` | `count=n`; the children follow, one level deeper: `value` records (array, tuple) or `stmt` records (object) |
@@ -118,6 +211,93 @@ value's span (the contents only for a string and a blob; no delimiters):
 (`public=` is the type they report; an unresolved reference reports `NULL`). An `OBJECT` that inherits from a
 base lists the inherited fields too, after the object's own, exactly as native resolved them; their spans point
 into the document where they were written.
+
+## Numbers
+
+**Which text is a `NUMERIC` value.** The word starting a value is a number when it matches, in this order,
+
+```
+number   = [ "-" ] digit+ [ "." digit+ ] [ ( "e" | "E" ) [ "+" | "-" ] digit+ ] boundary
+boundary = end of input | " " | tab | CR | LF | ";" | "," | "]" | ")" | "}"
+```
+
+Anything that is not followed by a `boundary` is not a number but a longer word, and becomes a `BARE` value
+(`1_000`, `0x10`, `12abc`, `1d`, `1-2`, `1.2.3`, `1e5.5`, `5.x`, `1/* c */`, and `.5`, which does not start with a digit);
+`NaN` and `Infinity` are bare words too. Two shapes are committed to being numbers and are **errors**: a `.` not followed by a digit
+when what follows is a boundary or an exponent (`5.`, `5.;`, `5.e3`) is `error code=5009 ANVL_ERR_PARSER_INVALID_NUMBER`, and an `e`/`E` not followed by digits
+when a sign follows it or a boundary does (`1e`, `1e+`, `1e-`, `1e;`) is `error code=5008 ANVL_ERR_PARSER_INVALID_EXPONENT`.
+A leading `+` is not part of a number (`+5` is `error 2003`); a word starting with `-` that is not a number (`-.5`, `-a`, `-1a`, a lone `-`) is `error 2003 ANVL_ERR_PARSER_EXPECTED_VALUE` too, not a bare word. Leading zeros are
+part of the number (`007`, `-0009`, `00.5e0`).
+
+**`kind`.** `integer` when the text contains none of `.`, `e`, `E`; otherwise `float`. (`12e3` is a float.)
+
+**Integer, `kind=integer`.** The text is `["-"] digit+`. The value is the decimal number it spells (leading zeros do
+not count, so `0000000000000000000000000007` is 7 and a 400-digit run of zeros followed by 5 is 5; `-0` and `-000`
+are 0). It is **`overflow=1` exactly when it is outside the signed 64-bit range**, that is when the magnitude is
+greater than 9223372036854775807 for a number without `-`, or greater than 9223372036854775808 for one with `-`:
+
+| text | result |
+|---|---|
+| `9223372036854775807` | `i64=9223372036854775807` |
+| `9223372036854775808` | `overflow=1` (no `i64=`) |
+| `-9223372036854775808` | `i64=-9223372036854775808` |
+| `-9223372036854775809` | `overflow=1` |
+| `0009223372036854775807`, `-0009223372036854775808` | `i64=` the value (padding is ignored) |
+| `0009223372036854775808`, `18446744073709551615`, `1` followed by 99 zeros | `overflow=1` |
+| `-0`, `-000` | `i64=0` (an integer has no negative zero) |
+
+**Float, `kind=float`.** The value is the double nearest to the exact decimal number the text spells, **correctly
+rounded to nearest, ties to even**, as a C library's `strtod` does in the default rounding mode, for any number of
+digits (a 100000-digit mantissa is exact, not truncated at 17 digits). The dump writes the 64 bits of that
+double: `f64=0x` and 16 lower-case hex digits, sign bit first (so `-0.0` is `0x8000000000000000`). A float is
+**`overflow=1` exactly when that rounding gives infinity**, and for no other reason. Infinity is the result when
+the magnitude is **at least 2^1024 - 2^970**, the midpoint between the largest double and 2^1024 (a midpoint rounds
+to even, which is infinity). In decimal that is the 309-digit integer
+`179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792`
+(`1.79769313486231580793...e308`). The sign does not matter (`-1e999` overflows too).
+
+| text | result |
+|---|---|
+| `1.7976931348623157e308` (the largest double) | `f64=0x7fefffffffffffff` |
+| `1.7976931348623158e308` | `f64=0x7fefffffffffffff` (still below the midpoint) |
+| `1.7976931348623159e308`, `-1.7976931348623159e308` | `overflow=1` (above the midpoint) |
+| 2^1024 - 2^970 written in full with `.0`, and that plus one | `overflow=1` |
+| the same minus one, with `.0` | `f64=0x7fefffffffffffff` |
+| `1e308` | `f64=0x7fe1ccf385ebc8a0` |
+| `2e308`, `1e309`, `1E309`, `1e+309`, `1e999`, `1e1000000`, `1e99999999999999999999` | `overflow=1` |
+| `1e+0000000000000000000000000000000000000308` | `f64=0x7fe1ccf385ebc8a0` (leading zeros of an exponent do not count) |
+| `1` followed by 309 zeros then `.0` | `overflow=1` |
+
+**Underflow is never overflow.** A magnitude too small for a double rounds to a subnormal or to zero, keeps its sign, and has `overflow=0`:
+`5e-324` is `0x0000000000000001`; `2.4703282292062327e-324` (below the midpoint to the smallest subnormal) is
+`0x0000000000000000`; `2.4703282292062328e-324` (above it) is `0x0000000000000001`; `1e-999`, `0e99999999999999999999` and `1e-99999999999999999999` are
+`0x0000000000000000`; `-1e-999` is `0x8000000000000000`; `-0.0` and `-0e5` are `0x8000000000000000`.
+An exponent with more digits than any integer type holds is read as an arbitrarily large exponent, never as an error
+and never wrapped: it overflows a non-zero mantissa and gives zero for a zero mantissa.
+
+`i64=` is written with no sign for positive and `-` for negative, in decimal, with no padding and no `+`.
+Corpus: `coverage/numbers/` (about a hundred spellings, one per file), and the earlier `grammar/` numbers.
+
+## Strings
+
+`decoded=` is the string with native's escape set resolved: `\n` (10), `\t` (9), `\r` (13), `\\` (`\`) and `\"` (`"`), and
+nothing else. Scanning is left to right and every backslash is looked at once: a backslash followed by one of those
+five bytes is replaced by the byte; **any other backslash pair stays as two bytes** (`\x41`, `\u00e9`, `\0`, `\/`,
+`\'`, `\T`, a backslash and a multibyte character). A backslash that was
+consumed as the first half of `\\` is not looked at again, so `\\t` is a backslash and the letter t, `\\\t` is a
+backslash and a tab, and five backslashes then `t` are two backslashes and a tab. A raw tab, CR, LF, NUL or any other byte
+inside the quotes is an ordinary content byte (a string may span lines). The raw text is always in `text=`.
+Corpus: `coverage/escapes/` and `grammar/`.
+
+## Limits native has
+
+- **No nesting limit is defined.** Arrays, tuples and objects nest to any depth that native's recursion can
+  hold. Native is recursive and has a C-stack limit: on the default 8 MB stack it handled 40000 levels of arrays or tuples and 25000 of objects, and crashed with a
+  stack overflow at 60000 and 30000 (`ulimit -s unlimited` removes the crash); that is a defect, not a rule, and
+  a port must not copy it. The corpus goes to 400 levels (`coverage/nesting/`), which every port must handle.
+- **Include path length**: see **Includes**: a joined path of 1024 bytes or more is `error 9002`.
+- No limit on identifier length, string or blob length, number length, statement count or element count has been found
+  (`coverage/errors/name_very_long.anvl`, `string_very_long.anvl`, `many_statements.anvl`, `numbers/digits_*`).
 
 ## Corpus layout
 
@@ -137,7 +317,15 @@ conformance/
 - Groups: `handmade` (written before the tool, TDD), `fixtures` (a verbatim copy of `test/fixtures`; the check
   fails if the two differ), `unit` (the inline inputs of the unit tests, extracted), `grammar` (generated
   from tables: numbers, strings and escapes, blobs, attributes, empty and one-element rules, statement
-  forms, includes, errors).
+  forms, includes, errors), `coverage` (FR-2610-anvl-conformance-002, generated by `seed/gen_coverage.py`:
+  `includes/` the include graph, `nesting/`, `columns/` multibyte, tab, CR and BOM error positions, `escapes/`,
+  `numbers/` every overflow boundary, `errors/` the remaining error codes and the shebang forms).
+- A case that is **not an error** is as binding as one that is: several `coverage/errors/` inputs look wrong and
+  native accepts them (a duplicate attribute key, a keyword as an attribute name, a duplicate object field, a
+  reference to a name that does not exist). The dump is the specification of what is accepted.
+- `AnvilScript` statement kinds (`VARS`, `IMPORT`, `FUNCTION`) and `#!asl` documents are **not** in the corpus: the
+  corpus is generated with a native built without AnvilScript (`WITH_ASL=0`), where `vars` and `import` are keywords and
+  `#!asl` is an error.
 - `make check-conformance` regenerates every dump and diffs it with the committed one: **any difference
   fails**, as does an input without a dump or a dump without an input. `make update-conformance` rewrites them;
   use it only alongside a deliberate native change, and commit the new dumps in the same commit.
@@ -161,6 +349,33 @@ anvil-dump --fragment <file|->  a standalone value expression
 
 Exit status `0` for any dump (including of an input that fails to parse), `2` for a usage or tool error.
 `make anvil-dump` builds `build/tools/anvil-dump`.
+
+### The batch protocol
+
+```
+anvil-dump --batch            read paths from stdin, one per line; dump each
+```
+
+This is how the fuzz harness avoids starting one process per input. A port that is to be fuzzed provides the same mode
+(any program that follows the rules below can be side `b`; the harness also has `--no-batch`, which runs
+`CMD [--fragment] <path>` once per input).
+
+- **Input**: standard input is a list of file paths, one per line, each ended by `\n` (a final line without one is also
+  read). The paths are relative to the process's working directory or absolute, and are opened exactly as the
+  single-file mode would open them (so includes resolve against the file's own directory). An empty line is skipped.
+  A path ending in `.frag` is dumped as a value fragment (`--fragment`), every other path as a document, whatever its
+  extension (the extension is still the dialect hint). Combining `--batch` with a path argument or `--fragment` is a usage error (exit 2).
+- **Output**: for each path, in input order, the line `@@ <path>` (the path exactly as read, without its newline)
+  followed by that input's complete dump, from `anvil-dump 1` to its last line, as the single-file mode would print it.
+  Nothing else is written to standard output between or after dumps: no blank lines, no trailer. The harness splits the
+  stream on lines that start with `@@ `. (A dump line can never start with `@@ `: every dump line starts with a
+  record name or two spaces of indent.)
+- **Errors**: a path that cannot be read is dumped as the unreadable-file dump (`status error`, `error code=0 ...`)
+  after its `@@` line, like the single mode, and the run goes on. The exit status is `0` unless a tool error happened
+  (`2`). Diagnostics go to standard error and are empty in a healthy run: the harness counts anything written to standard error, a crash, a timeout or a non-zero exit as a difference.
+- **State**: each input is loaded in a fresh context, as in single mode: nothing carries over from one input to the next
+  (the registry that makes identical bytes one document is per load, so a file included by two *different* inputs is
+  not the same document in both dumps).
 
 ## Differential fuzzing
 

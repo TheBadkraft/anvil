@@ -1,0 +1,2 @@
+include "amp_child.amp";
+x := 1;

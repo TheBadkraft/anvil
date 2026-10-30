@@ -1,0 +1,2 @@
+include "../leaf_b.anvl";
+s2 := 2;

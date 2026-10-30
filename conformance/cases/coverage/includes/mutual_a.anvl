@@ -1,0 +1,2 @@
+include "mutual_b.anvl";
+a := 1;

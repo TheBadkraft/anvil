@@ -1,0 +1,136 @@
+anvil-dump 1
+mode document
+input-bytes 264
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=264
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=TUPLE span=5-262 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+      value type=NUMERIC span=6-7 text="1" kind=integer overflow=0 i64=1
+      value type=TUPLE span=8-261 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+        value type=NUMERIC span=9-10 text="1" kind=integer overflow=0 i64=1
+        value type=TUPLE span=11-260 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+          value type=NUMERIC span=12-13 text="1" kind=integer overflow=0 i64=1
+          value type=TUPLE span=14-259 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+            value type=NUMERIC span=15-16 text="1" kind=integer overflow=0 i64=1
+            value type=TUPLE span=17-258 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+              value type=NUMERIC span=18-19 text="1" kind=integer overflow=0 i64=1
+              value type=TUPLE span=20-257 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                value type=NUMERIC span=21-22 text="1" kind=integer overflow=0 i64=1
+                value type=TUPLE span=23-256 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                  value type=NUMERIC span=24-25 text="1" kind=integer overflow=0 i64=1
+                  value type=TUPLE span=26-255 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                    value type=NUMERIC span=27-28 text="1" kind=integer overflow=0 i64=1
+                    value type=TUPLE span=29-254 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                      value type=NUMERIC span=30-31 text="1" kind=integer overflow=0 i64=1
+                      value type=TUPLE span=32-253 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                        value type=NUMERIC span=33-34 text="1" kind=integer overflow=0 i64=1
+                        value type=TUPLE span=35-252 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                          value type=NUMERIC span=36-37 text="1" kind=integer overflow=0 i64=1
+                          value type=TUPLE span=38-251 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                            value type=NUMERIC span=39-40 text="1" kind=integer overflow=0 i64=1
+                            value type=TUPLE span=41-250 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                              value type=NUMERIC span=42-43 text="1" kind=integer overflow=0 i64=1
+                              value type=TUPLE span=44-249 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                value type=NUMERIC span=45-46 text="1" kind=integer overflow=0 i64=1
+                                value type=TUPLE span=47-248 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                  value type=NUMERIC span=48-49 text="1" kind=integer overflow=0 i64=1
+                                  value type=TUPLE span=50-247 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                    value type=NUMERIC span=51-52 text="1" kind=integer overflow=0 i64=1
+                                    value type=TUPLE span=53-246 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                      value type=NUMERIC span=54-55 text="1" kind=integer overflow=0 i64=1
+                                      value type=TUPLE span=56-245 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                        value type=NUMERIC span=57-58 text="1" kind=integer overflow=0 i64=1
+                                        value type=TUPLE span=59-244 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                          value type=NUMERIC span=60-61 text="1" kind=integer overflow=0 i64=1
+                                          value type=TUPLE span=62-243 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                            value type=NUMERIC span=63-64 text="1" kind=integer overflow=0 i64=1
+                                            value type=TUPLE span=65-242 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))))" count=2
+                                              value type=NUMERIC span=66-67 text="1" kind=integer overflow=0 i64=1
+                                              value type=TUPLE span=68-241 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))))" count=2
+                                                value type=NUMERIC span=69-70 text="1" kind=integer overflow=0 i64=1
+                                                value type=TUPLE span=71-240 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))))" count=2
+                                                  value type=NUMERIC span=72-73 text="1" kind=integer overflow=0 i64=1
+                                                  value type=TUPLE span=74-239 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))))" count=2
+                                                    value type=NUMERIC span=75-76 text="1" kind=integer overflow=0 i64=1
+                                                    value type=TUPLE span=77-238 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))))" count=2
+                                                      value type=NUMERIC span=78-79 text="1" kind=integer overflow=0 i64=1
+                                                      value type=TUPLE span=80-237 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))))" count=2
+                                                        value type=NUMERIC span=81-82 text="1" kind=integer overflow=0 i64=1
+                                                        value type=TUPLE span=83-236 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))))" count=2
+                                                          value type=NUMERIC span=84-85 text="1" kind=integer overflow=0 i64=1
+                                                          value type=TUPLE span=86-235 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))))" count=2
+                                                            value type=NUMERIC span=87-88 text="1" kind=integer overflow=0 i64=1
+                                                            value type=TUPLE span=89-234 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))))" count=2
+                                                              value type=NUMERIC span=90-91 text="1" kind=integer overflow=0 i64=1
+                                                              value type=TUPLE span=92-233 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))))" count=2
+                                                                value type=NUMERIC span=93-94 text="1" kind=integer overflow=0 i64=1
+                                                                value type=TUPLE span=95-232 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))))" count=2
+                                                                  value type=NUMERIC span=96-97 text="1" kind=integer overflow=0 i64=1
+                                                                  value type=TUPLE span=98-231 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))))" count=2
+                                                                    value type=NUMERIC span=99-100 text="1" kind=integer overflow=0 i64=1
+                                                                    value type=TUPLE span=101-230 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))))" count=2
+                                                                      value type=NUMERIC span=102-103 text="1" kind=integer overflow=0 i64=1
+                                                                      value type=TUPLE span=104-229 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))))" count=2
+                                                                        value type=NUMERIC span=105-106 text="1" kind=integer overflow=0 i64=1
+                                                                        value type=TUPLE span=107-228 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))))" count=2
+                                                                          value type=NUMERIC span=108-109 text="1" kind=integer overflow=0 i64=1
+                                                                          value type=TUPLE span=110-227 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))))" count=2
+                                                                            value type=NUMERIC span=111-112 text="1" kind=integer overflow=0 i64=1
+                                                                            value type=TUPLE span=113-226 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))))" count=2
+                                                                              value type=NUMERIC span=114-115 text="1" kind=integer overflow=0 i64=1
+                                                                              value type=TUPLE span=116-225 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))))" count=2
+                                                                                value type=NUMERIC span=117-118 text="1" kind=integer overflow=0 i64=1
+                                                                                value type=TUPLE span=119-224 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))))" count=2
+                                                                                  value type=NUMERIC span=120-121 text="1" kind=integer overflow=0 i64=1
+                                                                                  value type=TUPLE span=122-223 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))))" count=2
+                                                                                    value type=NUMERIC span=123-124 text="1" kind=integer overflow=0 i64=1
+                                                                                    value type=TUPLE span=125-222 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))))" count=2
+                                                                                      value type=NUMERIC span=126-127 text="1" kind=integer overflow=0 i64=1
+                                                                                      value type=TUPLE span=128-221 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))))" count=2
+                                                                                        value type=NUMERIC span=129-130 text="1" kind=integer overflow=0 i64=1
+                                                                                        value type=TUPLE span=131-220 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))))" count=2
+                                                                                          value type=NUMERIC span=132-133 text="1" kind=integer overflow=0 i64=1
+                                                                                          value type=TUPLE span=134-219 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))))" count=2
+                                                                                            value type=NUMERIC span=135-136 text="1" kind=integer overflow=0 i64=1
+                                                                                            value type=TUPLE span=137-218 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))))" count=2
+                                                                                              value type=NUMERIC span=138-139 text="1" kind=integer overflow=0 i64=1
+                                                                                              value type=TUPLE span=140-217 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))))" count=2
+                                                                                                value type=NUMERIC span=141-142 text="1" kind=integer overflow=0 i64=1
+                                                                                                value type=TUPLE span=143-216 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))))" count=2
+                                                                                                  value type=NUMERIC span=144-145 text="1" kind=integer overflow=0 i64=1
+                                                                                                  value type=TUPLE span=146-215 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))))" count=2
+                                                                                                    value type=NUMERIC span=147-148 text="1" kind=integer overflow=0 i64=1
+                                                                                                    value type=TUPLE span=149-214 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))" count=2
+                                                                                                      value type=NUMERIC span=150-151 text="1" kind=integer overflow=0 i64=1
+                                                                                                      value type=TUPLE span=152-213 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))" count=2
+                                                                                                        value type=NUMERIC span=153-154 text="1" kind=integer overflow=0 i64=1
+                                                                                                        value type=TUPLE span=155-212 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))" count=2
+                                                                                                          value type=NUMERIC span=156-157 text="1" kind=integer overflow=0 i64=1
+                                                                                                          value type=TUPLE span=158-211 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))" count=2
+                                                                                                            value type=NUMERIC span=159-160 text="1" kind=integer overflow=0 i64=1
+                                                                                                            value type=TUPLE span=161-210 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))" count=2
+                                                                                                              value type=NUMERIC span=162-163 text="1" kind=integer overflow=0 i64=1
+                                                                                                              value type=TUPLE span=164-209 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))" count=2
+                                                                                                                value type=NUMERIC span=165-166 text="1" kind=integer overflow=0 i64=1
+                                                                                                                value type=TUPLE span=167-208 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))" count=2
+                                                                                                                  value type=NUMERIC span=168-169 text="1" kind=integer overflow=0 i64=1
+                                                                                                                  value type=TUPLE span=170-207 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))" count=2
+                                                                                                                    value type=NUMERIC span=171-172 text="1" kind=integer overflow=0 i64=1
+                                                                                                                    value type=TUPLE span=173-206 text="(1,(1,(1,(1,(1,(1,(1,(1,1))))))))" count=2
+                                                                                                                      value type=NUMERIC span=174-175 text="1" kind=integer overflow=0 i64=1
+                                                                                                                      value type=TUPLE span=176-205 text="(1,(1,(1,(1,(1,(1,(1,1)))))))" count=2
+                                                                                                                        value type=NUMERIC span=177-178 text="1" kind=integer overflow=0 i64=1
+                                                                                                                        value type=TUPLE span=179-204 text="(1,(1,(1,(1,(1,(1,1))))))" count=2
+                                                                                                                          value type=NUMERIC span=180-181 text="1" kind=integer overflow=0 i64=1
+                                                                                                                          value type=TUPLE span=182-203 text="(1,(1,(1,(1,(1,1)))))" count=2
+                                                                                                                            value type=NUMERIC span=183-184 text="1" kind=integer overflow=0 i64=1
+                                                                                                                            value type=TUPLE span=185-202 text="(1,(1,(1,(1,1))))" count=2
+                                                                                                                              value type=NUMERIC span=186-187 text="1" kind=integer overflow=0 i64=1
+                                                                                                                              value type=TUPLE span=188-201 text="(1,(1,(1,1)))" count=2
+                                                                                                                                value type=NUMERIC span=189-190 text="1" kind=integer overflow=0 i64=1
+                                                                                                                                value type=TUPLE span=191-200 text="(1,(1,1))" count=2
+                                                                                                                                  value type=NUMERIC span=192-193 text="1" kind=integer overflow=0 i64=1
+                                                                                                                                  value type=TUPLE span=194-199 text="(1,1)" count=2
+                                                                                                                                    value type=NUMERIC span=195-196 text="1" kind=integer overflow=0 i64=1
+                                                                                                                                    value type=NUMERIC span=197-198 text="1" kind=integer overflow=0 i64=1

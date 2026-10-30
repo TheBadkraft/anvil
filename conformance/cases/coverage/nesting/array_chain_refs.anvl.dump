@@ -1,0 +1,188 @@
+anvil-dump 1
+mode document
+input-bytes 886
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=886
+  stmt kind=ASSIGN name="a" name-span=0-1 base="" base-span=none attrs=0
+    value type=NUMERIC span=5-6 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="v0" name-span=8-10 base="" base-span=none attrs=0
+    value type=ARRAY span=14-18 text="[$a]" count=1
+      value type=VARREF span=15-17 text="$a" target="a" public=NUMERIC resolved=1 resolved-doc=0 resolved-span=5-6
+  stmt kind=ASSIGN name="v1" name-span=20-22 base="" base-span=none attrs=0
+    value type=ARRAY span=26-31 text="[$v0]" count=1
+      value type=VARREF span=27-30 text="$v0" target="v0" public=ARRAY resolved=1 resolved-doc=0 resolved-span=14-18
+  stmt kind=ASSIGN name="v2" name-span=33-35 base="" base-span=none attrs=0
+    value type=ARRAY span=39-44 text="[$v1]" count=1
+      value type=VARREF span=40-43 text="$v1" target="v1" public=ARRAY resolved=1 resolved-doc=0 resolved-span=26-31
+  stmt kind=ASSIGN name="v3" name-span=46-48 base="" base-span=none attrs=0
+    value type=ARRAY span=52-57 text="[$v2]" count=1
+      value type=VARREF span=53-56 text="$v2" target="v2" public=ARRAY resolved=1 resolved-doc=0 resolved-span=39-44
+  stmt kind=ASSIGN name="v4" name-span=59-61 base="" base-span=none attrs=0
+    value type=ARRAY span=65-70 text="[$v3]" count=1
+      value type=VARREF span=66-69 text="$v3" target="v3" public=ARRAY resolved=1 resolved-doc=0 resolved-span=52-57
+  stmt kind=ASSIGN name="v5" name-span=72-74 base="" base-span=none attrs=0
+    value type=ARRAY span=78-83 text="[$v4]" count=1
+      value type=VARREF span=79-82 text="$v4" target="v4" public=ARRAY resolved=1 resolved-doc=0 resolved-span=65-70
+  stmt kind=ASSIGN name="v6" name-span=85-87 base="" base-span=none attrs=0
+    value type=ARRAY span=91-96 text="[$v5]" count=1
+      value type=VARREF span=92-95 text="$v5" target="v5" public=ARRAY resolved=1 resolved-doc=0 resolved-span=78-83
+  stmt kind=ASSIGN name="v7" name-span=98-100 base="" base-span=none attrs=0
+    value type=ARRAY span=104-109 text="[$v6]" count=1
+      value type=VARREF span=105-108 text="$v6" target="v6" public=ARRAY resolved=1 resolved-doc=0 resolved-span=91-96
+  stmt kind=ASSIGN name="v8" name-span=111-113 base="" base-span=none attrs=0
+    value type=ARRAY span=117-122 text="[$v7]" count=1
+      value type=VARREF span=118-121 text="$v7" target="v7" public=ARRAY resolved=1 resolved-doc=0 resolved-span=104-109
+  stmt kind=ASSIGN name="v9" name-span=124-126 base="" base-span=none attrs=0
+    value type=ARRAY span=130-135 text="[$v8]" count=1
+      value type=VARREF span=131-134 text="$v8" target="v8" public=ARRAY resolved=1 resolved-doc=0 resolved-span=117-122
+  stmt kind=ASSIGN name="v10" name-span=137-140 base="" base-span=none attrs=0
+    value type=ARRAY span=144-149 text="[$v9]" count=1
+      value type=VARREF span=145-148 text="$v9" target="v9" public=ARRAY resolved=1 resolved-doc=0 resolved-span=130-135
+  stmt kind=ASSIGN name="v11" name-span=151-154 base="" base-span=none attrs=0
+    value type=ARRAY span=158-164 text="[$v10]" count=1
+      value type=VARREF span=159-163 text="$v10" target="v10" public=ARRAY resolved=1 resolved-doc=0 resolved-span=144-149
+  stmt kind=ASSIGN name="v12" name-span=166-169 base="" base-span=none attrs=0
+    value type=ARRAY span=173-179 text="[$v11]" count=1
+      value type=VARREF span=174-178 text="$v11" target="v11" public=ARRAY resolved=1 resolved-doc=0 resolved-span=158-164
+  stmt kind=ASSIGN name="v13" name-span=181-184 base="" base-span=none attrs=0
+    value type=ARRAY span=188-194 text="[$v12]" count=1
+      value type=VARREF span=189-193 text="$v12" target="v12" public=ARRAY resolved=1 resolved-doc=0 resolved-span=173-179
+  stmt kind=ASSIGN name="v14" name-span=196-199 base="" base-span=none attrs=0
+    value type=ARRAY span=203-209 text="[$v13]" count=1
+      value type=VARREF span=204-208 text="$v13" target="v13" public=ARRAY resolved=1 resolved-doc=0 resolved-span=188-194
+  stmt kind=ASSIGN name="v15" name-span=211-214 base="" base-span=none attrs=0
+    value type=ARRAY span=218-224 text="[$v14]" count=1
+      value type=VARREF span=219-223 text="$v14" target="v14" public=ARRAY resolved=1 resolved-doc=0 resolved-span=203-209
+  stmt kind=ASSIGN name="v16" name-span=226-229 base="" base-span=none attrs=0
+    value type=ARRAY span=233-239 text="[$v15]" count=1
+      value type=VARREF span=234-238 text="$v15" target="v15" public=ARRAY resolved=1 resolved-doc=0 resolved-span=218-224
+  stmt kind=ASSIGN name="v17" name-span=241-244 base="" base-span=none attrs=0
+    value type=ARRAY span=248-254 text="[$v16]" count=1
+      value type=VARREF span=249-253 text="$v16" target="v16" public=ARRAY resolved=1 resolved-doc=0 resolved-span=233-239
+  stmt kind=ASSIGN name="v18" name-span=256-259 base="" base-span=none attrs=0
+    value type=ARRAY span=263-269 text="[$v17]" count=1
+      value type=VARREF span=264-268 text="$v17" target="v17" public=ARRAY resolved=1 resolved-doc=0 resolved-span=248-254
+  stmt kind=ASSIGN name="v19" name-span=271-274 base="" base-span=none attrs=0
+    value type=ARRAY span=278-284 text="[$v18]" count=1
+      value type=VARREF span=279-283 text="$v18" target="v18" public=ARRAY resolved=1 resolved-doc=0 resolved-span=263-269
+  stmt kind=ASSIGN name="v20" name-span=286-289 base="" base-span=none attrs=0
+    value type=ARRAY span=293-299 text="[$v19]" count=1
+      value type=VARREF span=294-298 text="$v19" target="v19" public=ARRAY resolved=1 resolved-doc=0 resolved-span=278-284
+  stmt kind=ASSIGN name="v21" name-span=301-304 base="" base-span=none attrs=0
+    value type=ARRAY span=308-314 text="[$v20]" count=1
+      value type=VARREF span=309-313 text="$v20" target="v20" public=ARRAY resolved=1 resolved-doc=0 resolved-span=293-299
+  stmt kind=ASSIGN name="v22" name-span=316-319 base="" base-span=none attrs=0
+    value type=ARRAY span=323-329 text="[$v21]" count=1
+      value type=VARREF span=324-328 text="$v21" target="v21" public=ARRAY resolved=1 resolved-doc=0 resolved-span=308-314
+  stmt kind=ASSIGN name="v23" name-span=331-334 base="" base-span=none attrs=0
+    value type=ARRAY span=338-344 text="[$v22]" count=1
+      value type=VARREF span=339-343 text="$v22" target="v22" public=ARRAY resolved=1 resolved-doc=0 resolved-span=323-329
+  stmt kind=ASSIGN name="v24" name-span=346-349 base="" base-span=none attrs=0
+    value type=ARRAY span=353-359 text="[$v23]" count=1
+      value type=VARREF span=354-358 text="$v23" target="v23" public=ARRAY resolved=1 resolved-doc=0 resolved-span=338-344
+  stmt kind=ASSIGN name="v25" name-span=361-364 base="" base-span=none attrs=0
+    value type=ARRAY span=368-374 text="[$v24]" count=1
+      value type=VARREF span=369-373 text="$v24" target="v24" public=ARRAY resolved=1 resolved-doc=0 resolved-span=353-359
+  stmt kind=ASSIGN name="v26" name-span=376-379 base="" base-span=none attrs=0
+    value type=ARRAY span=383-389 text="[$v25]" count=1
+      value type=VARREF span=384-388 text="$v25" target="v25" public=ARRAY resolved=1 resolved-doc=0 resolved-span=368-374
+  stmt kind=ASSIGN name="v27" name-span=391-394 base="" base-span=none attrs=0
+    value type=ARRAY span=398-404 text="[$v26]" count=1
+      value type=VARREF span=399-403 text="$v26" target="v26" public=ARRAY resolved=1 resolved-doc=0 resolved-span=383-389
+  stmt kind=ASSIGN name="v28" name-span=406-409 base="" base-span=none attrs=0
+    value type=ARRAY span=413-419 text="[$v27]" count=1
+      value type=VARREF span=414-418 text="$v27" target="v27" public=ARRAY resolved=1 resolved-doc=0 resolved-span=398-404
+  stmt kind=ASSIGN name="v29" name-span=421-424 base="" base-span=none attrs=0
+    value type=ARRAY span=428-434 text="[$v28]" count=1
+      value type=VARREF span=429-433 text="$v28" target="v28" public=ARRAY resolved=1 resolved-doc=0 resolved-span=413-419
+  stmt kind=ASSIGN name="v30" name-span=436-439 base="" base-span=none attrs=0
+    value type=ARRAY span=443-449 text="[$v29]" count=1
+      value type=VARREF span=444-448 text="$v29" target="v29" public=ARRAY resolved=1 resolved-doc=0 resolved-span=428-434
+  stmt kind=ASSIGN name="v31" name-span=451-454 base="" base-span=none attrs=0
+    value type=ARRAY span=458-464 text="[$v30]" count=1
+      value type=VARREF span=459-463 text="$v30" target="v30" public=ARRAY resolved=1 resolved-doc=0 resolved-span=443-449
+  stmt kind=ASSIGN name="v32" name-span=466-469 base="" base-span=none attrs=0
+    value type=ARRAY span=473-479 text="[$v31]" count=1
+      value type=VARREF span=474-478 text="$v31" target="v31" public=ARRAY resolved=1 resolved-doc=0 resolved-span=458-464
+  stmt kind=ASSIGN name="v33" name-span=481-484 base="" base-span=none attrs=0
+    value type=ARRAY span=488-494 text="[$v32]" count=1
+      value type=VARREF span=489-493 text="$v32" target="v32" public=ARRAY resolved=1 resolved-doc=0 resolved-span=473-479
+  stmt kind=ASSIGN name="v34" name-span=496-499 base="" base-span=none attrs=0
+    value type=ARRAY span=503-509 text="[$v33]" count=1
+      value type=VARREF span=504-508 text="$v33" target="v33" public=ARRAY resolved=1 resolved-doc=0 resolved-span=488-494
+  stmt kind=ASSIGN name="v35" name-span=511-514 base="" base-span=none attrs=0
+    value type=ARRAY span=518-524 text="[$v34]" count=1
+      value type=VARREF span=519-523 text="$v34" target="v34" public=ARRAY resolved=1 resolved-doc=0 resolved-span=503-509
+  stmt kind=ASSIGN name="v36" name-span=526-529 base="" base-span=none attrs=0
+    value type=ARRAY span=533-539 text="[$v35]" count=1
+      value type=VARREF span=534-538 text="$v35" target="v35" public=ARRAY resolved=1 resolved-doc=0 resolved-span=518-524
+  stmt kind=ASSIGN name="v37" name-span=541-544 base="" base-span=none attrs=0
+    value type=ARRAY span=548-554 text="[$v36]" count=1
+      value type=VARREF span=549-553 text="$v36" target="v36" public=ARRAY resolved=1 resolved-doc=0 resolved-span=533-539
+  stmt kind=ASSIGN name="v38" name-span=556-559 base="" base-span=none attrs=0
+    value type=ARRAY span=563-569 text="[$v37]" count=1
+      value type=VARREF span=564-568 text="$v37" target="v37" public=ARRAY resolved=1 resolved-doc=0 resolved-span=548-554
+  stmt kind=ASSIGN name="v39" name-span=571-574 base="" base-span=none attrs=0
+    value type=ARRAY span=578-584 text="[$v38]" count=1
+      value type=VARREF span=579-583 text="$v38" target="v38" public=ARRAY resolved=1 resolved-doc=0 resolved-span=563-569
+  stmt kind=ASSIGN name="v40" name-span=586-589 base="" base-span=none attrs=0
+    value type=ARRAY span=593-599 text="[$v39]" count=1
+      value type=VARREF span=594-598 text="$v39" target="v39" public=ARRAY resolved=1 resolved-doc=0 resolved-span=578-584
+  stmt kind=ASSIGN name="v41" name-span=601-604 base="" base-span=none attrs=0
+    value type=ARRAY span=608-614 text="[$v40]" count=1
+      value type=VARREF span=609-613 text="$v40" target="v40" public=ARRAY resolved=1 resolved-doc=0 resolved-span=593-599
+  stmt kind=ASSIGN name="v42" name-span=616-619 base="" base-span=none attrs=0
+    value type=ARRAY span=623-629 text="[$v41]" count=1
+      value type=VARREF span=624-628 text="$v41" target="v41" public=ARRAY resolved=1 resolved-doc=0 resolved-span=608-614
+  stmt kind=ASSIGN name="v43" name-span=631-634 base="" base-span=none attrs=0
+    value type=ARRAY span=638-644 text="[$v42]" count=1
+      value type=VARREF span=639-643 text="$v42" target="v42" public=ARRAY resolved=1 resolved-doc=0 resolved-span=623-629
+  stmt kind=ASSIGN name="v44" name-span=646-649 base="" base-span=none attrs=0
+    value type=ARRAY span=653-659 text="[$v43]" count=1
+      value type=VARREF span=654-658 text="$v43" target="v43" public=ARRAY resolved=1 resolved-doc=0 resolved-span=638-644
+  stmt kind=ASSIGN name="v45" name-span=661-664 base="" base-span=none attrs=0
+    value type=ARRAY span=668-674 text="[$v44]" count=1
+      value type=VARREF span=669-673 text="$v44" target="v44" public=ARRAY resolved=1 resolved-doc=0 resolved-span=653-659
+  stmt kind=ASSIGN name="v46" name-span=676-679 base="" base-span=none attrs=0
+    value type=ARRAY span=683-689 text="[$v45]" count=1
+      value type=VARREF span=684-688 text="$v45" target="v45" public=ARRAY resolved=1 resolved-doc=0 resolved-span=668-674
+  stmt kind=ASSIGN name="v47" name-span=691-694 base="" base-span=none attrs=0
+    value type=ARRAY span=698-704 text="[$v46]" count=1
+      value type=VARREF span=699-703 text="$v46" target="v46" public=ARRAY resolved=1 resolved-doc=0 resolved-span=683-689
+  stmt kind=ASSIGN name="v48" name-span=706-709 base="" base-span=none attrs=0
+    value type=ARRAY span=713-719 text="[$v47]" count=1
+      value type=VARREF span=714-718 text="$v47" target="v47" public=ARRAY resolved=1 resolved-doc=0 resolved-span=698-704
+  stmt kind=ASSIGN name="v49" name-span=721-724 base="" base-span=none attrs=0
+    value type=ARRAY span=728-734 text="[$v48]" count=1
+      value type=VARREF span=729-733 text="$v48" target="v48" public=ARRAY resolved=1 resolved-doc=0 resolved-span=713-719
+  stmt kind=ASSIGN name="v50" name-span=736-739 base="" base-span=none attrs=0
+    value type=ARRAY span=743-749 text="[$v49]" count=1
+      value type=VARREF span=744-748 text="$v49" target="v49" public=ARRAY resolved=1 resolved-doc=0 resolved-span=728-734
+  stmt kind=ASSIGN name="v51" name-span=751-754 base="" base-span=none attrs=0
+    value type=ARRAY span=758-764 text="[$v50]" count=1
+      value type=VARREF span=759-763 text="$v50" target="v50" public=ARRAY resolved=1 resolved-doc=0 resolved-span=743-749
+  stmt kind=ASSIGN name="v52" name-span=766-769 base="" base-span=none attrs=0
+    value type=ARRAY span=773-779 text="[$v51]" count=1
+      value type=VARREF span=774-778 text="$v51" target="v51" public=ARRAY resolved=1 resolved-doc=0 resolved-span=758-764
+  stmt kind=ASSIGN name="v53" name-span=781-784 base="" base-span=none attrs=0
+    value type=ARRAY span=788-794 text="[$v52]" count=1
+      value type=VARREF span=789-793 text="$v52" target="v52" public=ARRAY resolved=1 resolved-doc=0 resolved-span=773-779
+  stmt kind=ASSIGN name="v54" name-span=796-799 base="" base-span=none attrs=0
+    value type=ARRAY span=803-809 text="[$v53]" count=1
+      value type=VARREF span=804-808 text="$v53" target="v53" public=ARRAY resolved=1 resolved-doc=0 resolved-span=788-794
+  stmt kind=ASSIGN name="v55" name-span=811-814 base="" base-span=none attrs=0
+    value type=ARRAY span=818-824 text="[$v54]" count=1
+      value type=VARREF span=819-823 text="$v54" target="v54" public=ARRAY resolved=1 resolved-doc=0 resolved-span=803-809
+  stmt kind=ASSIGN name="v56" name-span=826-829 base="" base-span=none attrs=0
+    value type=ARRAY span=833-839 text="[$v55]" count=1
+      value type=VARREF span=834-838 text="$v55" target="v55" public=ARRAY resolved=1 resolved-doc=0 resolved-span=818-824
+  stmt kind=ASSIGN name="v57" name-span=841-844 base="" base-span=none attrs=0
+    value type=ARRAY span=848-854 text="[$v56]" count=1
+      value type=VARREF span=849-853 text="$v56" target="v56" public=ARRAY resolved=1 resolved-doc=0 resolved-span=833-839
+  stmt kind=ASSIGN name="v58" name-span=856-859 base="" base-span=none attrs=0
+    value type=ARRAY span=863-869 text="[$v57]" count=1
+      value type=VARREF span=864-868 text="$v57" target="v57" public=ARRAY resolved=1 resolved-doc=0 resolved-span=848-854
+  stmt kind=ASSIGN name="v59" name-span=871-874 base="" base-span=none attrs=0
+    value type=ARRAY span=878-884 text="[$v58]" count=1
+      value type=VARREF span=879-883 text="$v58" target="v58" public=ARRAY resolved=1 resolved-doc=0 resolved-span=863-869

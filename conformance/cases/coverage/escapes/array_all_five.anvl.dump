@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 35
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=35
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=ARRAY span=5-33 text="[\"\\n\\t\\r\\\\\\\"\", \"\\n\\t\\r\\\\\\\"\"]" count=2
+      value type=STRING span=7-17 text="\\n\\t\\r\\\\\\\"" decoded="\n\t\r\\\""
+      value type=STRING span=21-31 text="\\n\\t\\r\\\\\\\"" decoded="\n\t\r\\\""

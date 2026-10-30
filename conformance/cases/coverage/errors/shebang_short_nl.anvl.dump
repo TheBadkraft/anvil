@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 13
+status error
+dialect ERROR
+error code=2011 name=ANVL_ERR_PARSER_INVALID_SHEBANG_DIALECT category=2 category-name=ANVIL_ERR_HEADER line=1 column=1 message="Shebang dialect not recognized (must be #!aml, #!amp, or #!asl)"

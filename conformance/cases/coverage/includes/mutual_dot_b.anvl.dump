@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 39
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=39
+  include decl-span=0-29 decl="include \"./mutual_dot_a.anvl\"" path-span=8-29 path="\"./mutual_dot_a.anvl\"" resolved=1
+  stmt kind=ASSIGN name="b" name-span=31-32 base="" base-span=none attrs=0
+    value type=NUMERIC span=36-37 text="1" kind=integer overflow=0 i64=1
+doc 1 path="./mutual_dot_a.anvl" dialect=AML bytes=39
+  include decl-span=0-29 decl="include \"./mutual_dot_b.anvl\"" path-span=8-29 path="\"./mutual_dot_b.anvl\"" resolved=0
+  stmt kind=ASSIGN name="a" name-span=31-32 base="" base-span=none attrs=0
+    value type=NUMERIC span=36-37 text="1" kind=integer overflow=0 i64=1

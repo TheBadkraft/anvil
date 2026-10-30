@@ -1,0 +1,26 @@
+anvil-dump 1
+mode document
+input-bytes 112
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=112
+  stmt kind=ASSIGN name="a" name-span=0-1 base="" base-span=none attrs=0
+    value type=BARE span=5-7 text=".5"
+  stmt kind=ASSIGN name="b" name-span=9-10 base="" base-span=none attrs=0
+    value type=BARE span=14-19 text="1e5.5"
+  stmt kind=ASSIGN name="c" name-span=21-22 base="" base-span=none attrs=0
+    value type=BARE span=26-31 text="1.2.3"
+  stmt kind=ASSIGN name="d" name-span=33-34 base="" base-span=none attrs=0
+    value type=BARE span=38-42 text="0x10"
+  stmt kind=ASSIGN name="e" name-span=44-45 base="" base-span=none attrs=0
+    value type=BARE span=49-54 text="1_000"
+  stmt kind=ASSIGN name="f" name-span=56-57 base="" base-span=none attrs=0
+    value type=BARE span=61-64 text="1-2"
+  stmt kind=ASSIGN name="g" name-span=66-67 base="" base-span=none attrs=0
+    value type=BARE span=71-73 text="1d"
+  stmt kind=ASSIGN name="h" name-span=75-76 base="" base-span=none attrs=0
+    value type=BARE span=80-83 text="NaN"
+  stmt kind=ASSIGN name="i" name-span=85-86 base="" base-span=none attrs=0
+    value type=BARE span=90-98 text="Infinity"
+  stmt kind=ASSIGN name="j" name-span=100-101 base="" base-span=none attrs=0
+    value type=BARE span=105-110 text="12abc"

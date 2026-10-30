@@ -16,8 +16,8 @@ python3 conformance/fuzz/fuzz.py --a build/tools/anvil-dump --b "node path/to/du
   mutator over the conformance corpus (flip, replace, insert grammar tokens, delete, duplicate, swap, truncate,
   splice between inputs), and the corpus itself.
 - **Running.** In batches: `CMD --batch` with one path per line on stdin, output `@@ <path>` then that input's
-  dump, per input. `--no-batch` runs `CMD [--fragment] <path>` per input for a command without batch mode. A
-  `.frag` input is a value fragment.
+  dump, per input (the protocol is specified in `conformance/FORMAT.md`, "The batch protocol"). `--no-batch` runs
+  `CMD [--fragment] <path>` per input for a command without batch mode. A `.frag` input is a value fragment.
 - **Reporting.** The first difference (or `--max-diffs N`) is minimised by delta debugging over bytes, printed
   with the input, the two dumps' unified diff, and saved under `--out` as `diff-NNNN.<ext>` with both dumps. A
   minimised difference is a candidate corpus case: put it in `conformance/cases/` and run

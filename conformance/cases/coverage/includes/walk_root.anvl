@@ -1,0 +1,3 @@
+include "walk_a.anvl";
+include "walk_b.anvl";
+root := 0;
