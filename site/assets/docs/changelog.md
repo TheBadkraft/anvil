@@ -3,6 +3,80 @@
 What changed in each release of Anvil, for people using it. Downloads are on the
 [download page](/download).
 
+## v0.11.0-rc
+
+Released 2026-10-30. This is a release candidate.
+
+v0.11.0-rc changes behaviour in two places: the number grammar, and what a schema does with a field
+whose type it cannot resolve. It also fixes `parse()` in browsers for the WebAssembly build and adds a
+prebuilt browser bundle.
+
+### Downloads
+
+| Download | What it is |
+|---|---|
+| `anvil-v0.11.0-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
+| `anvil-node-v0.11.0-rc-linux-x86_64.tar.gz` | Node.js addon (N-API) |
+| `anvil-wasm-v0.11.0-rc.tar.gz` | WebAssembly build for Node.js and the browser, with the browser bundle |
+| `anvil-py-v0.11.0-rc-linux-x64.tar.gz` | Python package (CPython 3.11+, standard library only) |
+| `anvil-net-v0.11.0-rc-linux-x64.tar.gz` | .NET 9 assembly (`Anvil.Net.dll`) with its native library |
+
+The native downloads (C library, Node.js, Python and .NET) are Linux x86_64 (glibc). The
+WebAssembly build runs on any WebAssembly host. Checksums are in
+[`SHA256SUMS`](/assets/downloads/SHA256SUMS). The library reports `0.11.0-rc+316` in every download.
+The Java binding is not distributed.
+
+### Changed: number grammar
+
+- `1e3` is now a number. The exponent sign is optional, so `1e3`, `1E3`, `1e+3`, `1e-3`, `-1e3` and
+  `1.5e10` all read as numbers with their exact text. Before, `1e3` was a bare word. If you stored the
+  bare word `1e5` as text, quote it (`"1e5"`) to keep it text.
+- `5.`, `5.e3`, `1e`, `1e+` and `1e-` are errors, at every depth: top-level values, array, tuple and
+  object members, value fragments and AnvilScript parameter defaults. A decimal point needs at least one
+  digit after it, and an exponent needs digits. Words such as `007x`, `1ex` and `09-02-2026` are
+  unaffected.
+- The writer follows: it accepts an unsigned exponent, and refuses to write `1e5` as a bare word (it
+  would read back as a number).
+
+### Changed: schema validation fails closed
+
+- A field whose `type` cannot be resolved no longer accepts anything. Loading such a schema still
+  succeeds and still reports the unknown-type diagnostic, but validating a present value for that field,
+  however deeply nested, now reports a violation with the new code `UNRESOLVED_TYPE` (10). An explicit
+  `null` fails too, and `allow_unknown` and `skip_required` do not excuse it. An absent field is not a
+  violation. A schema that used to validate a document through a misspelled type name can now reject it.
+- The Node, WebAssembly, Python and .NET bindings expose the new code.
+
+### Fixed and added: WebAssembly in browsers
+
+- **Fixed:** in v0.10.0-rc, `parse()` and `parseRawValue()` failed in real Firefox and Chrome with a
+  `TextDecoder` error, although `ready()` and `getVersion()` worked.
+- **New:** a prebuilt browser bundle, `dist/anvil.browser.js`. A plain `<script>` tag loads it, with no
+  bundler and no `require`, and it defines `window.anvl` with the same API as `require('anvil-wasm')`.
+  `anvil.wasm` stays a separate file so it can be served as `application/wasm` and precached by a
+  service worker. `ready({ wasmUrl })` or `ready({ locateFile })` says where the `.wasm` is; by default it
+  is read from next to the script. The CommonJS entry takes the same options.
+
+### Added: Node and WebAssembly numbers
+
+- Integers beyond 2^53 are read exactly, as `BigInt`, instead of rounded.
+- New `numericKind` (`'integer'`, `'float'` or `null`), `asNumber()` and `asBigInt()` on a parsed node.
+  `2020` and `2020.0` can now be told apart.
+- A trailing-dot number such as `5.` returns `null` with `lastError()` set. It never throws.
+
+### Performance
+
+Parsing and validation are at parity with v0.10.0-rc or better in every download. Measured on the
+packaged Node and WebAssembly builds against v0.10.0-rc (median of 61 interleaved runs, pinned to one
+CPU): parsing is within 1.02x on every workload, including documents of 3,000 and 10,000 floats
+(Node 1.01x, WebAssembly 1.01x to 1.02x), and schema validation is faster (Node 0.90x, WebAssembly
+0.72x of the time).
+
+### Not in this release
+
+- `isNull()` for Node and WebAssembly.
+- The blob-tag accessor for Node and WebAssembly.
+
 ## v0.10.0-rc
 
 Released 2026-10-26. This is a release candidate.

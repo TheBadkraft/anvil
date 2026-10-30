@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (site)
+
+- Site publishes v0.11.0-rc: new downloads and `SHA256SUMS`, `version.js`, the download page (browser bundle usage), the site copies of the language reference, types reference and schema docs (number grammar, fail-closed `UNRESOLVED_TYPE`), the Bindings Guide (`numericKind`, `asNumber()`, `asBigInt()`, exact BigInt reads, `5.` errors, `anvil.browser.js`, `ready({ wasmUrl | locateFile })`, service-worker precache, `UNRESOLVED_TYPE`) and the public changelog entry. Not yet deployed.
+
 ---
 
 ## [v0.11.0-rc] — (2026-10-29)
