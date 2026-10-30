@@ -1,13 +1,12 @@
 # Anvil Types — Language Reference
 
 Status: **implemented**, with the few items listed under "What's not built yet" still open. The
-grammar and semantics below are settled design (see `notes/native-schema.md` for the full design
-record); the runtime support note in each section says what `src/anvil_types.c`
-(`include/anvil_type_registry.h`) does today. AnvilSchema (`@[schema]`, validating a *data*
-document's shape against a type-annotated field list, `src/schema/schema.c`,
-`include/anvil_schema.h`) is implemented on top of it; this reference covers the type vocabulary
+grammar and semantics below are settled; the runtime support note in each section says what the
+library (`include/anvil_type_registry.h`) does today. AnvilSchema (`@[schema]`, validating a *data*
+document's shape against a type-annotated field list, `include/anvil_schema.h`) is implemented on top of it; this reference covers the type vocabulary
 and the schema behavior that depends on it (nested shapes, `nullable`, `integer`, `format`,
-diagnostics, introspection).
+diagnostics, introspection). The schema side is introduced, with a worked example, in
+[`schema/README.md`](schema/README.md).
 
 ## What this is
 
@@ -196,6 +195,12 @@ time-zone database):
 Timestamp := { type := String; format := iso8601_datetime; };
 ```
 
+`iso8601_datetime` is the strict RFC 3339 profile: an upper-case `T` between date and time, and
+either `Z` or a full `+HH:MM` / `-HH:MM` offset. These are rejected: a space separator (`2026-10-29 12:30:00Z`), a short
+`+HH` offset (`2026-10-29T12:30:00+05`), a missing offset, and lower-case `t` or `z`. PostgreSQL's
+default text output uses a space and a short offset, so **normalize a database timestamp to
+RFC 3339 before validating it**. The date part gets the same calendar check as `iso8601_date`.
+
 A mismatch is an `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field. `format` is
 inherited like the other constraints (a field's own `format` replaces the type's) and applies at
 every depth. It is checked on string, bare-word and blob values (a blob's payload is the text); a
@@ -304,6 +309,3 @@ For a complete picture, the pieces of this design that are settled but not yet i
   yet).
 - Type inference through inheritance (`base`) — architecturally free once built, since inherited
   fields already alias their ancestor's real statement object, attributes and all.
-
-See `notes/native-schema.md` for the full design record, including the reasoning behind each
-decision above.

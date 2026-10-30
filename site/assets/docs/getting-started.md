@@ -8,18 +8,17 @@ written to look right. For the grammar itself (what's legal to write in a `.anvl
 ## 1. Prerequisites
 
 Anvil Native has zero external dependencies and builds with a C23 compiler (`-std=c2x`). A real
-distributable — static and shared, Linux x86_64 — is [downloadable directly](/download); this
-walkthrough compiles the core sources directly into your own binary instead, the same way every
-test suite in the repo does, which works identically either way once you have the headers and
-either the library or the sources:
+distributable — static and shared, Linux x86_64 — is [downloadable directly](/download). Extract
+it and link against it:
 
 ```sh
-gcc -std=c2x -Iinclude your_program.c \
-  src/core/*.c src/sigma/*.c \
-  -o your_program
+tar -xzf anvil-v0.10.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.10.0-rc-linux-x86_64/include \
+    -L anvil-v0.10.0-rc-linux-x86_64/lib -lanvil -o your_program
 ```
 
-Add `src/anvil_types.c` to that list if you're using the opt-in type system (§9).
+The opt-in type system (§9) is in the same library. On other platforms, build the library from
+source (`make lib` in the [anvil repo](https://github.com/TheBadkraft/anvil)).
 
 ## 2. Your First Parse
 
@@ -282,5 +281,5 @@ directly, with no registry needed at all — pass `NULL` as the first argument f
 - [`language-reference.md`](language-reference.md) — the full grammar: dialects, statement/value
   forms, attributes, inheritance, includes, errors, and the public API/bindings surface.
 - [`types-reference.md`](types-reference.md) — the full opt-in type system.
-- [`schema/README.md`](schema/README.md) — AnvilSchema, fully implemented: loading, required-field
-  presence, type-kind validation, and full constraint checking.
+- [`schema/README.md`](schema/README.md) — AnvilSchema, fully implemented: loading, nested
+  shapes, constraints, formats, diagnostics and introspection.

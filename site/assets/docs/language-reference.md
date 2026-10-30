@@ -27,8 +27,7 @@ conditions (heap dump, memory probe, fuzzer), because it never held any.
 | **ASL** | `#!asl` | Embedded scripting *(design only — not implemented)* |
 
 The shebang on the first line selects the dialect; the parser enforces that dialect's rules
-immediately, not as a post-hoc check. See [`dialect-ownership-matrix.md`](dialect-ownership-matrix.md)
-for the full per-feature ownership table (which dialect owns which grammar construct).
+immediately, not as a post-hoc check.
 
 ## 3. Document Structure
 
@@ -92,6 +91,23 @@ Attributes are AML-only — AMP forbids them entirely (see §11). Module-level a
 document header, before any statements) use the identical `@[...]` syntax and are read the same
 way through the public API (`anvil_document_get_attribute*` vs. `anvil_statement_get_attribute*`).
 
+**Whitespace inside an attribute list is free.** Spaces, tabs and newlines are all allowed
+anywhere between the tokens of an attribute list, so a multi-line list is valid, and splitting one
+over several lines is purely a matter of style:
+
+```anvl
+ticket @[
+   type=bug,
+   status="open"
+] {
+   title := "Login fails";
+};
+```
+
+An attribute's value never includes the whitespace around it: in `@[status="open" ]` the value is
+`"open"`, and in `@[type=bug ,` it is `bug`. This is the opposite of the one place a newline *is*
+significant, a statement's `;`, which must stay on its value's line (§3).
+
 ## 6. Inheritance
 
 A statement can declare a base with `: base`, merging the base's own fields into its own:
@@ -142,11 +158,14 @@ resolution: [`types-reference.md`](types-reference.md).
 ## 10. Schema
 
 AnvilSchema validates a *data* document's shape against declared, type-annotated fields,
-building on the type system above — implemented: `@[schema]` loading, required-field presence,
-type-kind validation, and full constraint checking (`size`/`min`/`max`/`values`, inherited from
-a resolved `types.X` custom type when a field doesn't declare its own), collecting every
-violation in one pass rather than fail-fast. For why it's designed the way it is — same parser,
-zero new grammar, not a bolt-on the way XSD/XSLT or JSON Schema are — see
+building on the type system above. Implemented: `@[schema]` loading; required-field presence;
+type-kind validation; nested `Object` and `Array` shapes (`fields`, `items`, `min_items`,
+`max_items`) with full-path violations; `nullable`, `integer`, `format` and the `Blob` primitive
+with `tag`; exact `size`/`min`/`max`/`values` checking (inherited from a resolved `types.X` custom
+type when a field doesn't declare its own); validation of a bare object value; load diagnostics;
+and read-back introspection with extension keys. Every violation is collected in one pass rather
+than fail-fast. For why it's designed the way it is (same parser, zero new grammar, not a bolt-on
+the way XSD/XSLT or JSON Schema are) and a worked example, see
 [`schema/README.md`](schema/README.md).
 
 ## 11. AMP's Restrictions
@@ -200,23 +219,26 @@ those primitives idiomatically is that binding's own problem to solve, not somet
 library bends its own contracts to accommodate.
 
 The core parser/resolver is mandatory; the opt-in type system (`anvil_types.c`) ships as part of
-ANVL proper alongside it. Schema, once it exists, will be a genuinely separate, optional add-on
-module built entirely on the same public API — no core changes required to add it.
+ANVL proper alongside it. AnvilSchema (`anvil_schema.h`) is a separate, optional add-on built
+entirely on the same public API, and so are the streaming writer and document builder
+(`anvil_writer.h`, `anvil_builder.h`), which emit canonical AML and AMP.
 
 ### Real language bindings today
 
-| Binding | Runtime | Repo |
-|---|---|---|
-| `anvil.node` | Node.js (N-API) | separate repo, vendors this one as a pinned submodule |
-| `anvil.wasm` | Browser (WebAssembly/Emscripten) | separate repo, vendors this one as a pinned submodule |
+| Binding | Runtime |
+|---|---|
+| `anvil.node` | Node.js (N-API) |
+| `anvil.wasm` | Browser and Node.js (WebAssembly/Emscripten) |
+| `anvil.net` | .NET 9 (C#, or any CLR language) |
+| `anvil.py` | CPython 3.11+ (`ctypes`) |
+| `anvil.java` | Java (kept in step with the others; not distributed) |
 
-Both bindings expose the same deliberately scoped surface — `getVersion()`, `parse(source)`,
-`parseRawValue(text)`, `lastError()`, and an `AnvlNode` class wrapping an already-converted plain
-value (`has`/`get`/`hasAttribute`/`entries`/`count`/`at`/`asString`/`asBool`/`asInt`) — matching
-what real, validated consumer usage (FlyWire) actually needed rather than the C API's full range.
-Each binding has its own wiki with a quick-start and full API reference. Additional bindings can
-be added the same way, following the same "wrap the public C API idiomatically" pattern, without
-requiring any change to Anvil Native itself.
+Each binding builds on this library at a pinned version and wraps the public C API in its own
+language's idiom. All of them read documents, statements and attributes (raw and decoded
+values). Node.js, WebAssembly, .NET and Python also provide the type registry, schema validation,
+and the writer and builder, and Node.js and WebAssembly share one API. Additional bindings can be added the same
+way, without requiring any change to Anvil Native itself. Usage and downloads are in the
+Bindings guide.
 
 ## 14. Where to Go Next
 

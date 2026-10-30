@@ -7,7 +7,8 @@ record); the runtime support note in each section says what `src/anvil_types.c`
 document's shape against a type-annotated field list, `src/schema/schema.c`,
 `include/anvil_schema.h`) is implemented on top of it; this reference covers the type vocabulary
 and the schema behavior that depends on it (nested shapes, `nullable`, `integer`, `format`,
-diagnostics, introspection).
+diagnostics, introspection). The schema side is introduced, with a worked example, in
+[`schema/README.md`](schema/README.md).
 
 ## What this is
 
@@ -195,6 +196,13 @@ time-zone database):
 
 Timestamp := { type := String; format := iso8601_datetime; };
 ```
+
+`iso8601_datetime` is the strict RFC 3339 profile: an upper-case `T` between date and time, and
+either `Z` or a full `+HH:MM` / `-HH:MM` offset (`fmt_datetime` and `fmt_time_offset` in
+`src/anvil_types.c`). These are rejected: a space separator (`2026-10-29 12:30:00Z`), a short
+`+HH` offset (`2026-10-29T12:30:00+05`), a missing offset, and lower-case `t` or `z`. PostgreSQL's
+default text output uses a space and a short offset, so **normalize a database timestamp to
+RFC 3339 before validating it**. The date part gets the same calendar check as `iso8601_date`.
 
 A mismatch is an `ANVIL_SCHEMA_ERR_VALIDATION_FORMAT` violation naming the field. `format` is
 inherited like the other constraints (a field's own `format` replaces the type's) and applies at

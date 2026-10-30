@@ -7,10 +7,12 @@ written to look right. For the grammar itself (what's legal to write in a `.anvl
 
 ## 1. Prerequisites
 
-Anvil Native has zero external dependencies and builds with a C23 compiler (`-std=c2x`). There's
-no packaged library yet (see the main [`README.md`](../README.md)'s "Building and Testing") — for
-now, compile the core sources directly into your own binary, the same way every test suite in
-this repo does:
+Anvil Native has zero external dependencies and builds with a C23 compiler (`-std=c2x`). A real
+distributable (static and shared, Linux x86_64) is built by `make lib` and published with each
+release; this walkthrough compiles the core sources directly into your own binary instead (see the
+main [`README.md`](../README.md)'s "Building and Testing"), the same way every test suite in this
+repo does, which works identically either way once you have the headers and either the library or
+the sources:
 
 ```sh
 gcc -std=c2x -Iinclude your_program.c \
@@ -281,5 +283,5 @@ directly, with no registry needed at all — pass `NULL` as the first argument f
 - [`language-reference.md`](language-reference.md) — the full grammar: dialects, statement/value
   forms, attributes, inheritance, includes, errors, and the public API/bindings surface.
 - [`types-reference.md`](types-reference.md) — the full opt-in type system.
-- [`notes/native-schema.md`](../notes/native-schema.md) — schema's design record; not
-  implemented yet, but the most current source of what's coming.
+- [`schema/README.md`](schema/README.md) — AnvilSchema, fully implemented: loading, nested
+  shapes, constraints, formats, diagnostics and introspection.

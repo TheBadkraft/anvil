@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (documentation and site, v0.10.0-rc)
+- **Docs and site refreshed for `v0.10.0-rc`.** `docs/schema/README.md` now covers what AnvilSchema
+  does today (FR-2610-anvl-schema-001..005, FR-2610-anvl-types-001..005, BR-2610-anvl-nul-001,
+  BR-2610-anvl-registry-001): nested shapes, `nullable`/`integer`/`format`/`Blob` with `tag`,
+  `anvil_schema_validate_value`, diagnostics, introspection, extension keys, exact bounds, NUL and
+  thread-safety guarantees. `docs/language-reference.md` §5 states the attribute whitespace rule
+  (BR-2610-anvl-attr-001), and the schema and types docs state the strict RFC 3339
+  `iso8601_datetime` profile. Site copies updated in step with their `docs/` originals.
+- **Site downloads are the `v0.10.0-rc` artifacts**, byte for byte, with `SHA256SUMS`. The
+  `0.8.0-rc` files are removed. `download.html`, `version.js` and the page footers say
+  `0.10.0-rc`. The Bindings guide is rewritten for the release (types and schema, attributes, writer
+  and builder, WebAssembly's in-memory filesystem, layouts, the version string) and the site gains
+  a public Changelog page (`site/assets/docs/changelog.md`). The site's language reference no longer links `dialect-ownership-matrix.md`, which is internal. Not yet deployed.
+
 ### Changed (process)
 - **Tickets moved to Rivet.** As of the 2026-10-26 freeze, every anvil and anvil.java ticket lives in
   Rivet; `BR/`, `FR/` and `SR/` are frozen history (a README notice in each folder says so). The
