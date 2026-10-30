@@ -1,4 +1,4 @@
-# ANVL Software Licence (2610, approved terms; lawyer review recommended)
+# ANVL Software Licence (2610, in progress; lawyer review recommended)
 
 ---
 
