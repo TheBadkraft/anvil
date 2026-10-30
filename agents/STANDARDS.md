@@ -145,6 +145,12 @@ deliberate marketing. `docs/` and `notes/` are internal and may name anything.
   run grew to 28 GB, and the out-of-memory killer took VS Code and every agent down with it, twice. Never
   start background jobs (`&`, `nohup`, `setsid`) that outlive your command; run in the foreground under the
   cap, in bounded chunks. Generators must cap the size of each case, and drivers must stream results.
+- **Every speed figure names both sides and the direction.** Write ratios as "<subject> vs <baseline>
+  (<version or commit>)", in time taken, and say which way is better: "anvil.js vs anvil-node v0.10.0-rc:
+  0.26x time (lower is faster)", or "native acb4602 vs native v0.11.0-rc: 1.007x". Never give a bare "1.02x" or
+  "0.5x". Put the label on every table header, report, changelog entry and ticket. Native-vs-previous-native
+  (the 1.02x gate), anvil.js-vs-anvil-node (the ≤1.00x gate) and anvil.js-vs-`JSON.parse` (a target, not a
+  gate) are different comparisons and must never share a table without labels.
 - **The owner's home directory is not scratch space.** Put temporary state in your session scratchpad or under
   `/tmp`, clean it up on exit, and leave no processes running. Before reporting, `ls -A ~` must be unchanged and
   `pgrep -fa 'firefox|chrom|playwright'` must show nothing of yours.
