@@ -15,6 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (attribute values are scalars; builder checks bases, BR-2610-anvl-parser-007, BR-2610-anvl-writer-002) -- BEHAVIOUR CHANGE
+
+- **Behaviour change: an attribute value must be a scalar.** Any attribute value starting with `[`, `(` or `{`
+  is `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` (2006), reported at the value, wherever a `,` or `]` falls. Before,
+  the reader cut the value at the first `,` or `]`, so `@[k={a}]` and `@[k=(1)]` loaded as bare text while `@[k=[x]]`,
+  `@[k=[1,2]]` and `@[k={a:=1,b:=2}]` were 2006. Scalars are never required to be quoted: `@[status=done]`, `@[n=5]`
+  and `@[on=true]` are valid, as are quoted strings holding brackets. A `$` reference stays 2009. Blob attribute
+  values behave as before. The 2006 message now reads "Attribute values must be scalars (bare or quoted), not an
+  array, tuple or object" (it used to say blobs were disallowed). Applies to statement and module attributes.
+- **The writer and builder refuse the same values.** `anvil_writer_attribute`, `anvil_builder_attribute` and
+  `anvil_builder_member_attribute` return `ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE` for a value starting with `[`,
+  `(` or `{`; `..._attribute_string` is unaffected (its text is quoted). No new writer code.
+- **Behaviour change: the builder refuses a same-document non-object base at write/emit.** `anvil_builder_write` and
+  `anvil_builder_emit` look each member's base up among the top-level members and fail with
+  `ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT` when it names a scalar, string, array, tuple or other non-object
+  (the reader's 4020). `anvil_builder_set_base` is unchanged (a base can be added after the member that derives from
+  it). A base the builder does not hold, such as one from an include, is accepted and left to the reader. The builder
+  never writes the block form `ident { ... }`, an anonymous read-only block that cannot be a base (reader 4052), so it
+  cannot name one.
+- Conformance corpus: 9 dumps changed message text only, 1 changed from `ok` to 2006, 2 cases replaced, 26 added.
+  Property RT14 now covers attribute values and scalar bases.
+
 ### Changed (grammar consistency, BR-2610-anvl-parser-005) -- BEHAVIOUR CHANGE
 
 - **Behaviour change: duplicate keys are errors everywhere.** A repeated object field is now
