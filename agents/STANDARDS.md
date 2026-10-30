@@ -132,6 +132,14 @@ deliberate marketing. `docs/` and `notes/` are internal and may name anything.
   `AUTHORIZED` line. `vendor/anvil` comes from GitHub, so the pinned core commit must be pushed
   first.
 - **CI**, when it comes, is built on the Linode box, not a hosted service.
+- **Browsers: only through anvil.wasm's contained harness**, `test-browser/run-browser.sh <chromium|firefox> <glue|bundle>`
+  (install once with `test-browser/install-browsers.sh`; prove with `test-browser/prove-harness.sh`). It runs each
+  browser in a systemd user scope (1.5 GB memory, 256 processes, 180 s), one run at a time, with all state in
+  `/tmp/anvl-browser-test/`. **Never launch a browser directly, never use snap Firefox, never wrap one in `timeout`.**
+  On 2026-10-30, leaked headless browsers filled the owner's home directory and froze the workstation.
+- **The owner's home directory is not scratch space.** Put temporary state in your session scratchpad or under
+  `/tmp`, clean it up on exit, and leave no processes running. Before reporting, `ls -A ~` must be unchanged and
+  `pgrep -fa 'firefox|chrom|playwright'` must show nothing of yours.
 - **anvldata.com** deploys with `cd site && npx wrangler deploy`. The command publishes everything
   on disk under `site/` except what `.assetsignore` lists, so run `ls -la` first. Only the Technical
   Writer deploys.
