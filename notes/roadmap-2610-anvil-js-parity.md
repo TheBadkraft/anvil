@@ -227,6 +227,12 @@ King & Crucible's browser requirements, from its Principal Engineer at David's r
 
 FlyWire switches after S1-S4, since it uses Schema and AnvilBuilder.
 
+**Identifying the implementation** (FlyWire's request): `getVersion()` keeps anvil-node's meaning, the ANVL
+version it implements, in the same `X.Y.Z[-tag]+BUILD` form, so the API stays at parity. anvil.js also
+exports `implementation: 'anvil.js'`. Its `BUILD_INFO.json` carries the package name, the package
+version, the pinned native commit and the conformance format version, so a consumer's gate can tell
+anvil.js from the native addon. This lands in R2.
+
 **Resulting order** (Principal Engineer): R1 (reader) → R2 (API parity: browser ESM and global builds, plus
 `blobTag` and `isNull`) → **S3 writer first** (K&C's MUST) → S1 types → S2 schema → S4 builder.
 
