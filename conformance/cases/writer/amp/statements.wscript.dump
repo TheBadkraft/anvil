@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 16
+status ok
+output bytes=51 text="#!amp\n\na := 1;\nb := \"x\";\nc := [1, 2];\nd := (1, 2);\n"

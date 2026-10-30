@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-roundtrip check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -272,14 +272,24 @@ check-numeric-fastpath:
 DUMP_BIN = build/tools/anvil-dump
 anvil-dump: $(DUMP_BIN)
 
-$(DUMP_BIN): tools/anvil-dump.c $(DEBUG_OBJS)
+$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h $(DEBUG_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c $(DEBUG_OBJS) -o $@
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c $(DEBUG_OBJS) -o $@
 
 # Regenerates every expected dump and diffs it against the committed one; any difference fails.
 # ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).
 check-conformance: $(DUMP_BIN) check-drift-tables
+	sh scripts/check-writer-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-conformance.sh check $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-writer-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The writer-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/writer-script/).
+check-writer-script: $(DUMP_BIN)
+	sh scripts/check-writer-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# Every successful writer-corpus output must load through the native reader with status ok.
+check-writer-roundtrip: $(DUMP_BIN)
+	sh scripts/check-writer-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 
 # The drift tables (conformance/drift-tables.txt) are generated from include/*.h; stale ones fail.
 check-drift-tables:

@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 8
+status ok
+output bytes=26 text="#!aml\n\nt := (ok, 1, \"x\");\n"

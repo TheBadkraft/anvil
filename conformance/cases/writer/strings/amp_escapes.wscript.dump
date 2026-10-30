@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=26 text="#!amp\n\ns := \"a\\\"b\\\\c\\nd\";\n"

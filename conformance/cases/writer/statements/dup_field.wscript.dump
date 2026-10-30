@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=7 code=17 name=ANVIL_WRITER_ERR_DUPLICATE_FIELD call="statement \"x\" NULL" message="field name declared twice in one object"
+steps 6
+status error code=17 name=ANVIL_WRITER_ERR_DUPLICATE_FIELD
+output none

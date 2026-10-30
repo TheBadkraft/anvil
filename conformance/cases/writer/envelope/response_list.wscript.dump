@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 10
+status ok
+output bytes=47 text="#!amp\n\nresults := [\"a\", \"b\", \"c\"];\ncount := 3;\n"

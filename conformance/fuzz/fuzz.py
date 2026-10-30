@@ -297,7 +297,7 @@ def load_corpus(root):
     out = []
     for dp, _, fns in os.walk(root):
         for fn in sorted(fns):
-            if fn.endswith('.dump'): continue
+            if fn.endswith('.dump') or fn.endswith('.wscript'): continue
             ext = 'frag' if fn.endswith('.frag') else ('amp' if fn.endswith('.amp') else 'anvl')
             try: data = open(os.path.join(dp, fn), 'rb').read()
             except OSError: continue

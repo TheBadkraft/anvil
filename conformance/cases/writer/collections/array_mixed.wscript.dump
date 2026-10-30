@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 12
+status ok
+output bytes=58 text="#!aml\n\na := [1, \"two\", three, null, true, 4.5, @t`five`];\n"

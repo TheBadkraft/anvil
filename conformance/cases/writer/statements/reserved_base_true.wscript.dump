@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=3 code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD call="statement \"a\" \"true\"" message="reserved word"
+steps 2
+status error code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD
+output none

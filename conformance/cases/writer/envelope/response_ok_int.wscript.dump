@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 7
+status ok
+output bytes=27 text="#!amp\n\nresult := (ok, 42);\n"

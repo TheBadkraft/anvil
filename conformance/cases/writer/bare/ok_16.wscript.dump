@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=22 text="#!aml\n\nb := /usr/bin;\n"

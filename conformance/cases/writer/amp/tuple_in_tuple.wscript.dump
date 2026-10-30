@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=5 code=4 name=ANVIL_WRITER_ERR_DIALECT call="begin_tuple" message="construct is forbidden in this dialect"
+steps 4
+status error code=4 name=ANVIL_WRITER_ERR_DIALECT
+output none

@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 18
+status ok
+output bytes=114 text="#!aml\n\ntrueish := 1;\nnullable := 1;\nincluded := 1;\nInclude := 1;\nTRUE := 1;\nNull := 1;\nvars1 := 1;\nimporter := 1;\n"

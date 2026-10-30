@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 5
+status ok
+output bytes=35 text="#!aml\n\na @[note=\"caf\xc3\xa9 \xe2\x82\xac\"] := 1;\n"

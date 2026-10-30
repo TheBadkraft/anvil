@@ -1,0 +1,6 @@
+anvil-writer-run 1
+get_error code=0 name=ANVIL_WRITER_OK
+get_error code=0 name=ANVIL_WRITER_OK
+steps 4
+status ok
+output bytes=7 text="#!aml\n\n"

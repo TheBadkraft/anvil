@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 5
+status ok
+output bytes=33 text="#!aml\n\na @[env=production] := 1;\n"

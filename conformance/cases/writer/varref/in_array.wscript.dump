@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 10
+status ok
+output bytes=33 text="#!aml\n\na := 1;\nb := [$a, 2, $a];\n"

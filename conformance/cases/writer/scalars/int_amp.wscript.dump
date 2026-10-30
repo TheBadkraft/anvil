@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=17 text="#!amp\n\nn := -42;\n"

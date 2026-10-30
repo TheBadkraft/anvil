@@ -1,0 +1,6 @@
+anvil-writer-script 1
+# bare xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+dialect AML
+statement "b" NULL
+bare "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+finish

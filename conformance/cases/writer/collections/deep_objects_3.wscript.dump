@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 13
+status ok
+output bytes=72 text="#!aml\n\na := {\n   f := {\n      f := {\n         f := 1;\n      };\n   };\n};\n"

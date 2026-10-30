@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=6 code=12 name=ANVIL_WRITER_ERR_EMPTY_COLLECTION call="end_tuple" message="empty collection (arrays and objects need 1 element, tuples 2)"
+steps 5
+status error code=12 name=ANVIL_WRITER_ERR_EMPTY_COLLECTION
+output none

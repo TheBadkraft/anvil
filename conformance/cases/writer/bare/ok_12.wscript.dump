@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=25 text="#!aml\n\nb := a-b.c/d:e$f;\n"

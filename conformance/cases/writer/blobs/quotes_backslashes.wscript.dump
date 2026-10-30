@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=32 text="#!aml\n\nb := @t`say \"x\" \\n \\\\ `;\n"

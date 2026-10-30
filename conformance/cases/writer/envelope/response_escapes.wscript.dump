@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 8
+status ok
+output bytes=60 text="#!amp\n\nresult := (ok, \"say \\\"hi\\\"\\nline2\\ttab\\\\slash\", \"\");\n"

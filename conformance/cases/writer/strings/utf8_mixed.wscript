@@ -1,0 +1,5 @@
+anvil-writer-script 1
+dialect AML
+statement "s" NULL
+string "na\xc3\xafve \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e \xf0\x9d\x84\x9e"
+finish

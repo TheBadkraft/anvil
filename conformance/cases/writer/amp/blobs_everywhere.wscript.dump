@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 11
+status ok
+output bytes=67 text="#!amp\n\nx := @table`[(1), (2)]`;\ny := `plain`;\nz := [@a`1`, @b`2`];\n"

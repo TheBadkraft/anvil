@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=4 code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD call="varref \"null\"" message="reserved word"
+steps 3
+status error code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD
+output none

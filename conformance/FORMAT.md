@@ -326,9 +326,145 @@ conformance/
 - `AnvilScript` statement kinds (`VARS`, `IMPORT`, `FUNCTION`) and `#!asl` documents are **not** in the corpus: the
   corpus is generated with a native built without AnvilScript (`WITH_ASL=0`), where `vars` and `import` are keywords and
   `#!asl` is an error.
+- `cases/writer/` is the writer corpus (see "The writer script" below): its inputs are `.wscript` files, run with
+  `--writer-script`, and are not dialect hints.
 - `make check-conformance` regenerates every dump and diffs it with the committed one: **any difference
   fails**, as does an input without a dump or a dump without an input. `make update-conformance` rewrites them;
   use it only alongside a deliberate native change, and commit the new dumps in the same commit.
+
+## The writer script, version 1
+
+The reader half of the corpus is `anvil-dump 1`. The **writer** half is a second, separately versioned contract:
+a **writer script** (`anvil-writer-script 1`) names a sequence of writer API calls with literal arguments, and
+native's run of it (`anvil-writer-run 1`) is the exact bytes the writer produced, or the error it returned. An
+implementation of the writer (anvil.js) runs the same scripts through its own writer and must print the **same run,
+byte for byte**. Native is the spec; when a run differs, the port is wrong unless an owner decision changes native
+first. A change to the script grammar or to the run format bumps the number, regenerates the writer corpus and is a
+deliberate act. (FR-2610-anvl-conformance-003.)
+
+The writer surface is `include/anvil_writer.h`. A script drives one writer from `anvil_writer_new` to
+`anvil_writer_data`; the writer is disposed when the script ends.
+
+### The script
+
+A script is a byte file of `\n`-terminated lines. The generated corpus is ASCII, but any byte is legal inside a quoted
+string (below).
+
+1. **Line 1** is exactly `anvil-writer-script 1`.
+2. A blank line, or a line whose first non-blank byte is `#`, is ignored. A `#` is a comment only at the start of a line.
+3. Every other line is one **step**: a *call name*, then its *arguments*, separated by spaces or tabs. Leading and
+   trailing blanks are ignored. The step's number is its **1-based line number in the file** (comments and blank lines
+   count); the run reports it as `line=`.
+4. The first step other than `option` is `dialect`, and no other step is `dialect`.
+
+An **argument** is a *word* or a *quoted string*:
+
+- a **word** is a run of bytes up to the next blank; it contains no `"`. The words used are `NULL`, `true`, `false`,
+  `AML`, `AMP`, option names, and numbers.
+- a **quoted string** is `"` ... `"`. Inside, a byte `0x20`-`0xff` other than `"` and `\` stands for itself (so raw UTF-8
+  is allowed), and these escapes are recognised: `\\`, `\"`, `\n`, `\r`, `\t`, `\xHH` (two hex digits, either case).
+  A raw byte below `0x20`, an unknown escape or a missing closing quote is a script error. `\x00` is allowed: the
+  string is length-delimited. The closing quote is followed by a blank or the end of the line.
+- A string argument is the **decoded bytes**. Where the C parameter is a NUL-terminated `const char *` (a name, key,
+  path, tag, base, value, numeric text, bare text), the string must not contain `\x00`. Where the parameter is a pointer
+  plus a length (`string`, `blob` content, `attribute_string` text), the length is the decoded byte count.
+- **`NULL`** (the bare word, never the quoted string) is the null pointer, for a pointer parameter.
+- A **count or length** is a decimal integer.
+
+**Calls.** One call per API function; arguments are all required unless shown in `[ ]`.
+
+| call | arguments | native function |
+|---|---|---|
+| `dialect` | `AML` \| `AMP` \| *integer* | `anvil_writer_new` (an integer is the raw enum value, to reach an invalid dialect) |
+| `option` | `on-error stop` \| `on-error continue` | (script control, see below) |
+| `get_error` | | `anvil_writer_get_error` |
+| `error_message` | *integer* | `anvil_writer_error_message` (any integer, in or out of range) |
+| `attribute` | *key*, *value* (string or `NULL`) | `anvil_writer_attribute` |
+| `attribute_string` | *key*, *text* [, *len*] | `anvil_writer_attribute_string` |
+| `include` | *path* | `anvil_writer_include` |
+| `statement` | *name*, *base* (string or `NULL`) | `anvil_writer_statement` |
+| `null` | | `anvil_writer_null` |
+| `bool` | `true` \| `false` | `anvil_writer_bool` |
+| `numeric` | *text* | `anvil_writer_numeric` |
+| `int` | *int64* (decimal, optional `-`) | `anvil_writer_int` |
+| `double` | see below | `anvil_writer_double` |
+| `string` | *text* [, *len*] | `anvil_writer_string` |
+| `bare` | *text* | `anvil_writer_bare` |
+| `blob` | *tag*, *data* [, *len*] | `anvil_writer_blob` |
+| `varref` | *name* | `anvil_writer_varref` |
+| `begin_array`, `end_array`, `begin_tuple`, `end_tuple`, `begin_object`, `end_object` | | the function of that name |
+| `finish` | | `anvil_writer_finish` |
+| `data` | | `anvil_writer_data` |
+
+- `string`, `attribute_string` and `blob`: the optional *len* passes a length **shorter** than the string (a prefix is
+  written); it may not exceed the decoded length unless the string is `NULL`, where *len* is passed with the null pointer
+  (`string NULL 3` is `anvil_writer_string(w, NULL, 3)`). Without *len*, the length is the decoded length, or `0` for `NULL`.
+- `double` takes one of: a **decimal** (`[0-9.eE+-]+`, converted as `strtod` does, correctly rounded); **`0x` and exactly
+  16 hex digits**, the IEEE-754 bits of the double (this is how `-0` and every exact value are written:
+  `0x8000000000000000`); or the words `nan`, `inf`, `-inf`.
+- An *integer* argument of `dialect` or `error_message` is a decimal with an optional `-`, within `int32` (the C `int` of
+  the enum).
+- `option on-error continue` makes the run go on after a failed call (default `stop`); it can appear anywhere, even before
+  `dialect`, and takes effect from the next step. It counts as a step in `steps`. It is a script directive, not a writer call.
+- A writer call that returns `false` is **failed**. `dialect` fails when `anvil_writer_new` returns `NULL`; the writer
+  is then `NULL` and every later call is made with a `NULL` handle (it fails with `ANVIL_WRITER_ERR_INVALID_ARGUMENT`).
+  `get_error`, `error_message`, `data` and `option` never fail.
+
+A **script error** (an unknown call, a wrong argument count or kind, a bad string, a number out of range, a missing
+`dialect`) is not a writer outcome: the tool prints the message and the line to stderr, nothing to stdout, and exits 2.
+The corpus holds no script error.
+
+### The run
+
+`anvil-dump --writer-script <file>` prints, to stdout, ASCII with `\n` line endings, in this order. Quoted strings are
+written exactly as in the reader dump (see "Lexical rules": `\\ \" \n \r \t`, `\xHH` lowercase for every other byte
+below `0x20`, for `0x7f` and from `0x80` up).
+
+```
+anvil-writer-run 1
+<records, one per event, in execution order>
+steps N
+status ok
+output bytes=N text="..."
+```
+
+- **`get_error code=C name=NAME`** for each `get_error` step. `C` is the `anvil_writer_err_code` value (`0` is
+  `ANVIL_WRITER_OK`), `NAME` its enum name.
+- **`error_message code=C text="..."`** for each `error_message` step; `text` is `anvil_writer_error_message(C)` (a
+  value outside the enum gives `unknown error`).
+- **`data none`** or **`data bytes=N text="..."`** for each `data` step: what `anvil_writer_data` returned at that
+  point.
+- **`failed line=L code=C name=NAME call="..." message="..."`** for each failed call. `L` is the step's line number;
+  `call` is the step's line **verbatim** with leading and trailing blanks removed, quoted; `C` and `NAME` are
+  `anvil_writer_get_error` right after the call (the first error is sticky, so in continue mode every later failure
+  repeats the first code); `message` is `anvil_writer_error_message(C)`.
+- **`steps N`**: the number of steps executed (the failing one included; steps after a stop are not counted).
+- **`status ok`**, or **`status error code=C name=NAME`**: `anvil_writer_get_error` at the end.
+- **`output bytes=N text="..."`**: the bytes of `anvil_writer_data` after the last executed step, when it returned
+  non-NULL, with `N` its length (the terminating NUL is not counted); else **`output none`**. Output exists only after
+  a successful `finish` and no later error. `N` is the byte count: it is what makes a mismatch obvious, and a port
+  compares `text` as raw bytes.
+
+`anvil-dump --writer-output <file>` prints only the output bytes, raw, and exits 0; with no output it prints nothing
+and exits 1. `scripts/check-writer-roundtrip.sh` uses it.
+
+### The writer corpus
+
+`conformance/cases/writer/<area>/<name>.wscript` is a script and `<name>.wscript.dump` is native's run. The corpus
+is **generated** by `conformance/seed/gen_writer.py`, which writes each script together with the run it **expects**,
+computed independently of the native writer (a small model of the canonical layout: 3-space indentation, `name := value;`
+per line, `a, b` separators). `make check-conformance` checks, for every `.wscript`, that native's run equals the
+committed `.dump` (the same rule as the reader cases), and `make check-writer-roundtrip` checks that **every successful
+output loads through the native reader with `status ok`** (an `include` is satisfied with an empty file of that name).
+`make update-conformance` rewrites the dumps; `gen_writer.py` is what changes the scripts and, with them, the
+expectations. A port compares its own run of each `.wscript` with the `.dump`.
+
+Areas: `lifecycle` (new, finish, data, get_error, error_message, sticky errors), `scalars` (null, bool, `int`, `numeric`,
+`double`), `strings`, `bare`, `blobs`, `collections` (arrays, tuples, objects, nesting), `attributes`, `statements`,
+`include`, `varref`, `amp` (the AMP dialect and what it refuses), `envelope` (King & Crucible messages).
+Every `anvil_writer_err_code` the flat writer can return has a case; `ANVIL_WRITER_ERR_MEMORY` and
+`ANVIL_WRITER_ERR_DEPTH_EXCEEDED` cannot be reached through the flat writer (the latter belongs to `anvil_builder`), so
+they appear only through `error_message`.
 
 ## Drift tables
 

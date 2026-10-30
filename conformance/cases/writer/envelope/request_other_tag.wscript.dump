@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 8
+status ok
+output bytes=71 text="#!amp\n\nutid := @utid`id-7`;\nseq := 9;\npayload := @json`{\"a\": [1, 2]}`;\n"

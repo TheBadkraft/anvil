@@ -4,10 +4,14 @@
  * conformance/FORMAT.md (version 1).                                      *
  *                                                                         *
  *   anvil-dump [--fragment] <file | ->                                    *
+ *   anvil-dump --writer-script <script> | --writer-output <script>        *
  *                                                                         *
  * A file is loaded with anvil_load (so includes resolve, and the file     *
  * extension is a dialect hint); "-" reads stdin and loads it as a buffer. *
  * --fragment parses the input as a standalone value expression.           *
+ * --writer-script runs a writer script through the native writer and      *
+ * prints the run; --writer-output prints only the output bytes            *
+ * (tools/writer-script.c; FORMAT.md, "The writer script").                *
  * Exit status: 0 for a dump (even of an input that fails to parse), 2 for  *
  * a usage or I/O error of the tool itself.                                *
  * ********************************************************************** */
@@ -17,6 +21,7 @@
 #include "internal/flat_internal.h"
 #include "internal/module.h"
 #include "internal/source.h"
+#include "writer-script.h"
 #include <sigma/farray.h>
 #include <sigma/list.h>
 #include <sigma/query.h>
@@ -34,7 +39,7 @@
 
 // A quoted string: ASCII only; \\ \" \n \r \t, and \xHH (lowercase) for every other byte below 0x20,
 // 0x7f and everything from 0x80 up. Length-delimited, so NUL bytes are ordinary.
-static void put_quoted(const char *s, size_t n) {
+void dump_put_quoted(const char *s, size_t n) {
    static const char hex[] = "0123456789abcdef";
    putchar('"');
    for (size_t i = 0; i < n; i++) {
@@ -90,7 +95,7 @@ static void put_span(const char *key, anvl_slice s) {
 
 static void put_text(const char *key, anvl_slice s) {
    printf(" %s=", key);
-   put_quoted(s.start, slice_len(s));
+   dump_put_quoted(s.start, slice_len(s));
 }
 
 /* ---------------------------------------------------------------------- *
@@ -200,7 +205,7 @@ static void dump_string_decoded(anvl_value v) {
    }
    anvil_value_get_text((anvil_value)v, buf, need + 1);
    fputs(" decoded=", stdout);
-   put_quoted(buf, need);
+   dump_put_quoted(buf, need);
    free(buf);
 }
 
@@ -225,7 +230,7 @@ static void dump_value(anvl_value v, int depth) {
       break;
    case ANVL_VALUE_BLOB:
       fputs(" tag=", stdout);
-      put_quoted(v->blob.tag.start, slice_len(v->blob.tag));
+      dump_put_quoted(v->blob.tag.start, slice_len(v->blob.tag));
       put_span("tag-span", v->blob.tag);
       fputs(" bytes=", stdout);
       put_hex(v->text.start, slice_len(v->text));
@@ -280,7 +285,7 @@ static void dump_value(anvl_value v, int depth) {
 static void dump_attribute(anvl_attribute a, int depth) {
    put_indent(depth);
    fputs("attr key=", stdout);
-   put_quoted(a->key.start, slice_len(a->key));
+   dump_put_quoted(a->key.start, slice_len(a->key));
    put_span("key-span", a->key);
    put_text("raw", a->value);
    if (slice_len(a->value) == 0) {
@@ -372,7 +377,7 @@ static void put_doc_path(module_document d, module_document root) {
    if (dirlen && strncmp(p, rp, dirlen) == 0) {
       p += dirlen;
    }
-   put_quoted(p, strlen(p));
+   dump_put_quoted(p, strlen(p));
 }
 
 static void dump_document(const doc_set *set, size_t index) {
@@ -438,7 +443,7 @@ static void dump_errors(anvil_document doc, module_context ctx) {
              (int)e->code, anvl_error_code_name(e->code), (int)cat, category_name(cat),
              (size_t)e->line, (size_t)e->column);
       const char *m = e->message ? e->message : "";
-      put_quoted(m, strlen(m));
+      dump_put_quoted(m, strlen(m));
       putchar('\n');
    }
    if (n == 0) {
@@ -450,10 +455,10 @@ static void dump_errors(anvil_document doc, module_context ctx) {
       char *buf = malloc(need + 1);
       if (buf) {
          anvil_error_get_message(pub, buf, need + 1);
-         put_quoted(buf, need);
+         dump_put_quoted(buf, need);
          free(buf);
       } else {
-         put_quoted("", 0);
+         dump_put_quoted("", 0);
       }
       putchar('\n');
    }
@@ -556,11 +561,15 @@ static bool has_suffix(const char *s, const char *suffix) {
 }
 
 int main(int argc, char **argv) {
-   bool fragment = false, batch = false;
+   bool fragment = false, batch = false, writer_script = false, writer_output = false;
    const char *path = NULL;
    for (int i = 1; i < argc; i++) {
       if (strcmp(argv[i], "--fragment") == 0) {
          fragment = true;
+      } else if (strcmp(argv[i], "--writer-script") == 0) {
+         writer_script = true;
+      } else if (strcmp(argv[i], "--writer-output") == 0) {
+         writer_output = true;
       } else if (strcmp(argv[i], "--batch") == 0) {
          batch = true;
       } else if (!path) {
@@ -596,9 +605,13 @@ int main(int argc, char **argv) {
       free(line);
       return rc;
    }
-   if (!path) {
-      fputs("usage: anvil-dump [--fragment] <file | ->\n       anvil-dump --batch  (paths on stdin)\n", stderr);
+   if (!path || ((writer_script || writer_output) && (fragment || (writer_script && writer_output)))) {
+      fputs("usage: anvil-dump [--fragment] <file | ->\n       anvil-dump --batch  (paths on stdin)\n"
+            "       anvil-dump --writer-script <script> | --writer-output <script>\n", stderr);
       return 2;
+   }
+   if (writer_script || writer_output) {
+      return writer_script_run(path, writer_output);
    }
    return dump_one(path, fragment);
 }

@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 13
+status ok
+output bytes=54 text="#!amp\n\na := [1, 1.5, \"s\", b, null, true, @t`x`, 1e5];\n"

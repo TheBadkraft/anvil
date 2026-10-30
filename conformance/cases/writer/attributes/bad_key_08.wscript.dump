@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=4 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="attribute \"caf\\xc3\\xa9\" NULL" message="invalid identifier"
+steps 2
+status error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER
+output none
