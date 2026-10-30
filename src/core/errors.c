@@ -42,7 +42,7 @@ static const char *error_messages[] = {
    [ANVL_ERR_PARSER_MULTIPLE_SHEBANG] = "Multiple shebangs not allowed",
    [ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS] = "Shebang must be first non-whitespace line",
    [ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE] =
-      "Attribute content cannot be object, array, tuple, or blob",
+      "Attribute values must be scalars (bare or quoted), not an array, tuple or object",
    [ANVL_ERR_PARSER_INVALID_IDENTIFIER] = "Invalid identifier format",
    [ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK] = "Attribute blocks cannot be empty",
    [ANVL_ERR_PARSER_VARREF_NOT_ALLOWED_IN_ATTRIBUTE] = "'$' VarRef sigil is not allowed in an attribute value",

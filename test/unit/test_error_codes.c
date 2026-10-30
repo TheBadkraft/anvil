@@ -277,7 +277,7 @@ static void test_p4_attribute_value(void) {
       CASE_ERR("P4.105 2006 an empty tuple", "x @[k=()] := 1;", 2006, SYN, 1, 7),
       CASE_ERR("P4.106 2006 a closed object, then another attribute", "x @[k={a}, m=1] := 1;", 2006, SYN, 1, 7),
       CASE_ERR("P4.107 2006 a bracket after whitespace", "x @[k=   (1)] := 1;", 2006, SYN, 1, 10),
-      CASE_ERR("P4.108 2006 nested statement", "o := { y @[k={a}] := 1; };", 2006, SYN, 1, 15),
+      CASE_ERR("P4.108 2006 nested statement", "o := { y @[k={a}] := 1; };", 2006, SYN, 1, 14),
       CASE_ERR("P4.109 2006 module, balanced object", "@[k={a}]\nx := 1;", 2006, HDR, 1, 5),
       CASE_ERR("P4.110 2006 module, balanced tuple", "@[k=(1)]\nx := 1;", 2006, HDR, 1, 5),
       CASE_ERR("P4.111 2006 module, second attribute", "@[a=1, b={c}]\nx := 1;", 2006, HDR, 1, 10),

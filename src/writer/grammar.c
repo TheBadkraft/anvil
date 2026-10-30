@@ -61,12 +61,14 @@ anvil_writer_err_code wg_check_attribute_key(const char *s) {
 }
 
 // Attribute values are raw text ended by ',' or ']' outside double quotes (parse_attribute_list).
+// A value is a scalar: one starting with '[', '(' or '{' is an array, tuple or object, which the
+// reader refuses (2006) wherever a ',' or ']' falls.
 anvil_writer_err_code wg_check_attribute_value(const char *v) {
    if (!v) {
       return ANVIL_WRITER_ERR_INVALID_ARGUMENT;
    }
    size_t n = strlen(v);
-   if (n == 0 || v[0] == '$' || v[0] == ' ' || v[0] == '\t' || v[n - 1] == ' ' || v[n - 1] == '\t') {
+   if (n == 0 || v[0] == '$' || v[0] == '[' || v[0] == '(' || v[0] == '{' || v[0] == ' ' || v[0] == '\t' || v[n - 1] == ' ' || v[n - 1] == '\t') {
       return ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE;
    }
    bool in_string = false;
