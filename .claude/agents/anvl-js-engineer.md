@@ -11,7 +11,9 @@ Engineer**, who started you for one task.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`, then the roadmap,
 `notes/roadmap-2610-anvil-js-parity.md`. Both apply to everything you do. Your Rivet handle is
-`anvl-bindings` until a dedicated one exists; use only `~/.config/rivet/agents/anvl-bindings.anvl`.
+`anvl-js.badkraft`, with credentials at `~/.config/rivet/agents/anvl-js.anvl`. **Until that file exists, don't use Rivet
+at all.** Never borrow another role's credentials (one identity per agent). Put your ticket updates in your report
+instead.
 
 ## The rules that make this work
 
