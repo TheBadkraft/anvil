@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.11.0-rc] — (2026-10-29)
+
+A minor bump: the number grammar and fail-closed schema validation change behaviour. Parse and validate
+speed are back to v0.10.0-rc parity or better. Every artifact is built from this tag and reports
+`0.11.0-rc+<BUILD>`.
+
 ### Fixed (validating float values, BR-2610-anvl-parser-004 follow-up)
 
 - Validating a document with float values was still 1.02-1.03x slower than v0.10.0-rc through
