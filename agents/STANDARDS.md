@@ -63,11 +63,19 @@ sub-agents it starts for single tasks. See `agents/README.md` for the roles.
 - All tickets live in Rivet. `BR/`, `FR/` and `SR/` (and `anvil.java/FR/`) are frozen history:
   read them, never edit them.
 - Use **only your own role's handle**. Never read another role's credentials file.
+- **Put the credentials inline on every Rivet command, reads and writes alike.** Never use a separate
+  `export`. Each Bash call is a fresh shell, and the permission check looks at one command at a time. So a write
+  whose own command line doesn't name the credentials is denied ("Identity Not Given"), even after an earlier
+  export. This is the Rivet Project Engineer's guidance, 2026-10-30. Run `whoami` first:
   ```sh
-  export RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-<role>.anvl   # e.g. anvl-coder.anvl; your handle is anvl-<role>.badkraft
-  alias rivet='node ~/Projects/repos/rivet-live/src/cli/main.js'
-  rivet whoami
+  RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-<role>.anvl rivet whoami   # e.g. anvl-coder.anvl; handle anvl-<role>.badkraft
+  RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-<role>.anvl rivet resolve <ID> --resolution - <<'EOF'
+  ...
+  EOF
   ```
+  `rivet` is on PATH. If it isn't, use `node ~/Projects/repos/rivet-live/src/cli/main.js` in the same command;
+  don't rely on an alias. If a Rivet write is denied, fix the command and retry it yourself. Never ask another
+  agent to do it for you.
 - The guide is `~/Projects/repos/rivet-live/docs/agent-guide.md`. Read §3, "The one ANVL gotcha":
   a backtick blob ends at the first backtick inside it, so add sections containing backticks with
   `rivet section set <ID> <key> --from f.md`.

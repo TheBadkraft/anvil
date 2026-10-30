@@ -12,10 +12,10 @@ recommend; the **ANVL Principal Engineer** decides on priority, scope and owner.
 `anvl-triage.badkraft`:
 
 ```sh
-export RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-triage.anvl
-alias rivet='node ~/Projects/repos/rivet-live/src/cli/main.js'
-rivet whoami
+RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-triage.anvl rivet whoami
 ```
+Put `RIVET_CREDENTIALS_FILE=...` inline on **every** Rivet command. A separate `export` doesn't carry over to the
+next call (STANDARDS §4).
 
 **Projects:** `anvil`, `anvil.node`, `anvil.wasm`, `anvil.py`, `anvil.net`, `anvil.java`,
 `anvil.ux`. Start with `rivet inbox --unread`, or `--project <slug>` for one project.
