@@ -210,6 +210,23 @@ The current native-addon `anvil-node` (repo `anvil.node`) **freezes and retires 
 JavaScript users get one package, held to native by the corpus. Native stays the spec, and serves
 Python, .NET and Java through their bindings.
 
+## 6d. Consumer priorities (2026-10-30)
+
+King & Crucible's browser requirements, from its Principal Engineer at David's request:
+- **MUST:** loads without a bundler (a script tag global, or a vendorable ES module); the AMP reader
+  (statement by name, `asString`/`asInt`, blob text, re-parsing a blob's inner text, `at`/`count`/`type`);
+  the **AMP writer** (`statement().blob(tag,text).value(int).finish()`, byte-identical to anvil-py
+  0.11.0-rc); exact native parity on escapes, blobs, tuples and integers; errors with line and column,
+  never a thrown TypeError.
+- **SHOULD:** `blobTag`; integers past 2^53 read exactly; AML reading; under 1 ms for parse plus read of a
+  <10 KB message on a mid-range Android, precache-sized, measured against `JSON.parse`.
+- **LATER:** schema in the browser, the builder.
+
+FlyWire switches after S1-S4, since it uses Schema and AnvilBuilder.
+
+**Resulting order** (Principal Engineer): R1 (reader) → R2 (API parity: browser ESM and global builds, plus
+`blobTag` and `isNull`) → **S3 writer first** (K&C's MUST) → S1 types → S2 schema → S4 builder.
+
 ## 7. Risks
 
 - **The R0 speed target isn't met.** If no representation beats `anvil-node` everywhere, we stop at R0
