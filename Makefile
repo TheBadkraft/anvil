@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -185,6 +185,11 @@ READER_ONLY_DIR = build/reader-only
 # no internal symbol may be (scripts/check-exports.sh).
 check-exports: so-release
 	sh scripts/check-exports.sh $(SO_RELEASE) include
+
+# A C++ consumer must link: every shipped header is built, linked against libanvil.so and libanvil.a,
+# and run, with g++ (and clang++ if installed) at C++11 and C++17 (scripts/check-cxx.sh).
+check-cxx: lib-release so-release
+	sh scripts/check-cxx.sh include $(RELEASE_DIR) test/infra/cxx
 
 # Compile-only check of the code that must be correct where size_t is 32 bits (wasm32, 32-bit ARM):
 # -Werror turns any silent 64->32 constant truncation into a failure. Needs the 32-bit libc headers
