@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (site)
 
+- Deployed v0.11.0-rc to anvldata.com on 2026-10-30 from main `234fbe4` (Worker version `5cfca12f-436b-47fa-8888-e2fea6143fa8`). Live checks: pages, docs copies, `version.js` (`0.11.0-rc`), the five tarballs against the live `SHA256SUMS`; the v0.10.0-rc tarballs now return 404.
+
+### Changed (site)
+
 - Site publishes v0.11.0-rc: new downloads and `SHA256SUMS`, `version.js`, the download page (browser bundle usage), the site copies of the language reference, types reference and schema docs (number grammar, fail-closed `UNRESOLVED_TYPE`), the Bindings Guide (`numericKind`, `asNumber()`, `asBigInt()`, exact BigInt reads, `5.` errors, `anvil.browser.js`, `ready({ wasmUrl | locateFile })`, service-worker precache, `UNRESOLVED_TYPE`) and the public changelog entry. Not yet deployed.
 
 ---
