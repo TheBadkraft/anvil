@@ -34,29 +34,31 @@
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-v0.8.0-rc-linux-x86_64.tar.gz</strong> — static (<code>libanvil.a</code>)
+          <strong>anvil-v0.10.0-rc-linux-x86_64.tar.gz</strong> — static (<code>libanvil.a</code>)
           and shared (<code>libanvil.so</code>) release builds, plus the public headers. Linux
           x86_64 only today; other platforms build from source until real cross-platform CI
           exists.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-v0.10.0-rc-linux-x86_64.tar.gz">Download</a>
       </div>
-      <pre><code>tar -xzf anvil-v0.8.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I .../include -L .../lib -lanvil -o your_program</code></pre>
+      <pre><code>tar -xzf anvil-v0.10.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.10.0-rc-linux-x86_64/include \
+    -L anvil-v0.10.0-rc-linux-x86_64/lib -lanvil -o your_program</code></pre>
     </div>
 
     <h2>WebAssembly — browser, or any JS host</h2>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-wasm-v0.8.0-rc.tar.gz</strong> — the compiled module, its glue, and a
-          JS-facing wrapper. Module loading is async (WASM instantiation) — see the
-          <a href="/docs#Bindings-Guide.md">bindings guide</a> for the one-line difference from
-          the Node binding below.
+          <strong>anvil-wasm-v0.10.0-rc.tar.gz</strong> — the compiled module (<code>dist/</code>) and
+          a JS-facing wrapper (<code>lib/index.js</code>), with the same API as the Node binding
+          below, including types, schema and the writer. Runs on any WebAssembly host. Module
+          loading is async (WASM instantiation) — see the
+          <a href="/docs#Bindings-Guide.md">bindings guide</a> for the one-line difference.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-wasm-v0.8.0-rc.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-wasm-v0.10.0-rc.tar.gz">Download</a>
       </div>
-      <pre><code>const anvil = require('./index.js');
+      <pre><code>const anvil = require('anvil-wasm');
 await anvil.ready();
 const doc = anvil.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1</code></pre>
@@ -66,14 +68,14 @@ doc.get('foo').asInt(); // 1</code></pre>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-node-v0.8.0-rc-linux-x86_64.tar.gz</strong> — a prebuilt native addon
-          plus its JS wrapper. Same API shape as the WebAssembly binding above (synchronous, no
-          <code>ready()</code> needed). Linux x86_64 only today; not yet published to a package
-          registry, so other platforms build from source.
+          <strong>anvil-node-v0.10.0-rc-linux-x86_64.tar.gz</strong> — a prebuilt native addon
+          plus its JS wrapper. Same API as the WebAssembly binding above (synchronous, no
+          <code>ready()</code> needed). Linux x86_64 (glibc) only today; not published to a package
+          registry, so install it from the tarball and build other platforms from source.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-node-v0.10.0-rc-linux-x86_64.tar.gz">Download</a>
       </div>
-      <pre><code>const anvil = require('./lib/index.js');
+      <pre><code>const anvil = require('anvil-node');
 const doc = anvil.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1</code></pre>
     </div>
@@ -82,12 +84,12 @@ doc.get('foo').asInt(); // 1</code></pre>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-net-v0.8.0-rc-linux-x64.tar.gz</strong> — a prebuilt managed assembly
+          <strong>anvil-net-v0.10.0-rc-linux-x64.tar.gz</strong> — a prebuilt managed assembly
           (<code>Anvil.Net.dll</code>) built directly on Anvil Native's vtable ABI, plus the
-          native library it links against. Linux x64 only today; not yet published to NuGet, so
-          other platforms build from source.
+          native library it links against. Linux x64 (glibc) only today. There is no NuGet package, so
+          reference the assembly directly; other platforms build from source.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-net-v0.8.0-rc-linux-x64.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-net-v0.10.0-rc-linux-x64.tar.gz">Download</a>
       </div>
       <pre><code>using var doc = AnvilDocument.Load("config.anvl");
 var server = doc.FindValue("server");
@@ -98,20 +100,28 @@ server["port"].AsInt(); // 8080</code></pre>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-py-v0.8.0-rc-linux-x64.tar.gz</strong> — a pure-<code>ctypes</code>
+          <strong>anvil-py-v0.10.0-rc-linux-x64.tar.gz</strong> — a pure-<code>ctypes</code>
           binding built directly on Anvil Native's vtable ABI, plus the native library it links
-          against. No compiled extension module. Linux x64 only today; not yet published to PyPI,
-          so other platforms build from source.
+          against. No compiled extension module. Linux x64 (glibc) only today; not on PyPI,
+          so put the extracted <code>src</code> directory on <code>PYTHONPATH</code>; other platforms build from source.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-py-v0.8.0-rc-linux-x64.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-py-v0.10.0-rc-linux-x64.tar.gz">Download</a>
       </div>
+      <pre><code>tar -xzf anvil-py-v0.10.0-rc-linux-x64.tar.gz
+export PYTHONPATH="$PWD/anvil-py-v0.10.0-rc-linux-x64/src:$PYTHONPATH"</code></pre>
       <pre><code>with AnvilDocument.load("config.anvl") as doc:
     server = doc.find_value("server")
     server["port"].as_int()  # 8080</code></pre>
     </div>
 
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
-      Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>.
+      Verify any download with <a href="/assets/downloads/SHA256SUMS">SHA256SUMS</a>
+      (<code>sha256sum -c SHA256SUMS</code> in the folder holding the files). Every file reports
+      the version <code>0.10.0-rc+284</code>. The native downloads (C library, Node.js, .NET and
+      Python) are Linux x86_64 only; the WebAssembly build runs anywhere WebAssembly does.
+    </p>
+    <p class="lede" style="margin-top: 16px; font-size: 15px;">
+      Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>; what changed in this release is in the <a href="/docs#changelog.md">Changelog</a>.
       This is release-candidate software — the format and API are stable enough to build
       against, but expect the surface to keep moving before a 1.0 release.
     </p>

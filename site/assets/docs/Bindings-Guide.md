@@ -13,21 +13,66 @@ no matter which one reads it. Pick the one that matches where your code runs.
 | [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
 | [Python](Bindings-Guide.md#python) | CPython 3.11+ (ctypes) | Downloadable today |
 
+Every download on this page is from release `v0.10.0-rc`, built from one source tag. Checksums
+for all five are in [`SHA256SUMS`](/assets/downloads/SHA256SUMS); after downloading, check them
+with `sha256sum -c SHA256SUMS`.
+
+The native downloads (library, Node.js, Python and .NET) are **Linux x86_64 (glibc) only**; on any
+other platform, build from source. The WebAssembly build is not platform-specific. Java has a
+binding too, but it is not distributed.
+
+### The version string
+
+A library reports its version as the release plus a build number after a `+`, valid semver:
+a prebuilt `v0.10.0-rc` download reports `0.10.0-rc+284`, and the build number is the same in
+every download of the release. A binding **built from source** has no build number of its own, so
+it reports plain `0.10.0-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
+or install from source if you want a build number in the string. Treat the string as a
+sanity check, not a compatibility contract to branch logic on.
+
+### What each binding offers
+
+| | Node.js | WebAssembly | .NET | Python |
+|---|---|---|---|---|
+| Parse, statements, values | yes | yes | yes | yes |
+| Attributes, raw and decoded | yes | yes | yes | yes |
+| Type registry and schema | yes | yes | yes | yes |
+| Writer and builder | yes | yes | yes | yes |
+
+Node.js and WebAssembly share one API. .NET and Python share another, with lazy navigation
+instead of a one-call conversion, and each follows its own language's idiom.
+
 ## Native library
 
 The C library itself — link it directly if you're not going through a JS binding at all.
 
-**[Download anvil-v0.8.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.8.0-rc-linux-x86_64.tar.gz)**
-— static (`libanvil.a`) and shared (`libanvil.so`) builds, release (stripped, `-O2`), plus the
-public headers needed to use them. Linux x86_64 only today; other platforms build from source
+**[Download anvil-v0.10.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.10.0-rc-linux-x86_64.tar.gz)**
+— static (`libanvil.a`) and shared (`libanvil.so`) builds, release (stripped, `-O2`), plus every
+public header (`include/anvil_*.h`). Linux x86_64 only today; other platforms build from source
 (`make lib` in the [anvil repo](https://github.com/TheBadkraft/anvil)) until real cross-platform
 CI exists.
 
 ```sh
-tar -xzf anvil-v0.8.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.8.0-rc-linux-x86_64/include \
-    -L anvil-v0.8.0-rc-linux-x86_64/lib -lanvil -o your_program
+tar -xzf anvil-v0.10.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.10.0-rc-linux-x86_64/include \
+    -L anvil-v0.10.0-rc-linux-x86_64/lib -lanvil -o your_program
 ```
+
+The library reports `0.10.0-rc+284` from `anvil_get_version()`. `libanvil.so` exports exactly
+the public API and no internal symbols, so it cannot collide with other libraries loaded in the
+same process.
+
+What the headers cover:
+
+| Header | What it is |
+|---|---|
+| `anvil_flat.h` | The primary API: load, statements, values, attributes, errors |
+| `anvil_vtable.h` | The same API as a struct of function pointers |
+| `anvil_types.h` | Opaque handles and stable error categories |
+| `anvil_type_registry.h` | The opt-in type registry (`@[types]`) |
+| `anvil_schema.h` | AnvilSchema (`@[schema]`) |
+| `anvil_writer.h`, `anvil_builder.h` | The streaming writer and the document builder, which emit canonical AML and AMP |
+| `anvil_schema_vtable.h`, `anvil_type_registry_vtable.h` (and the writer and builder vtables) | Vtable forms of the schema, registry, writer and builder |
 
 ```c
 #include "anvil_flat.h"
@@ -43,19 +88,51 @@ if (anvil_has_errors(doc)) {
 anvil_dispose(doc);
 ```
 
+An attribute's value can be read raw (`anvil_attribute_get_value`, the source text) or decoded
+(`anvil_attribute_get_value_handle`, a value: `@[status="done"]` reads as the string `done`).
+Values also have exact readers: `anvil_value_get_numeric`, `anvil_value_get_bytes` and
+`anvil_value_get_blob_tag`.
+
+**Thread safety.** Independent loads are safe: any number of threads may call `anvil_load`,
+`anvil_load_buffer` and `anvil_parse_value_fragment` at once, even on identical text, because each
+load owns its state. Sharing **one** handle (a document, a schema, a registry) across threads is
+the caller's job: serialize it, and never use it during or after its disposal. The writer and
+builder are single-thread.
+
 Full C API reference: see the anvil repo's own `docs/language-reference.md` and
 `docs/getting-started.md`.
 
 ## WebAssembly
 
-**[Download anvil-wasm-v0.8.0-rc.tar.gz](/assets/downloads/anvil-wasm-v0.8.0-rc.tar.gz)** — the
-compiled module (`anvil.wasm`), its Emscripten glue (`anvil.js`), and a JS-facing wrapper
-(`index.js`) with the same shape as the Node binding below.
+**[Download anvil-wasm-v0.10.0-rc.tar.gz](/assets/downloads/anvil-wasm-v0.10.0-rc.tar.gz)** — the
+compiled module (`dist/anvil.wasm`, about 160 KB), its Emscripten glue (`dist/anvil.js`), and a
+JS-facing wrapper (`lib/index.js`) with the same API as the Node binding below. The module carries
+the core reader, the type registry, AnvilSchema and the writer and builder.
 
 ### Requirements
 
-- Any JS host that can load a WASM module (browser or Node)
+- Any JS host that can load a WASM module (browser or Node); not tied to Linux or x64
 - No other runtime dependencies
+
+### Installing and layout
+
+```sh
+npm install ./anvil-wasm-v0.10.0-rc.tar.gz
+```
+
+```js
+const anvil = require('anvil-wasm');
+```
+
+The package keeps its files in two directories: the entry point (`main`) is `lib/index.js`, and
+the compiled module is `dist/anvil.js` plus `dist/anvil.wasm`. Earlier downloads were flat (`index.js`, `anvil.js` and `anvil.wasm` at the top), so `require('anvil-wasm')`
+is unaffected, but anything that referred to those files by path must now use `lib/` and `dist/`. In a browser,
+keep `dist/anvil.wasm` beside `dist/anvil.js`: the module fetches it at startup. Without a
+bundler, load `dist/anvil.js` with a `<script>` tag; it defines the Emscripten factory
+`AnvilModule`.
+
+npm does not refresh a `file:` or tarball dependency whose version has not changed. When you
+reinstall a new build of the same version, delete `node_modules/anvil-wasm` first, then install.
 
 ### One real difference from Node: loading is async
 
@@ -63,7 +140,7 @@ Instantiating a WASM module takes a moment, so you pay that cost once, explicitl
 anything else:
 
 ```js
-const anvil = require('./index.js');
+const anvil = require('anvil-wasm');
 
 await anvil.ready(); // one-time async cost
 
@@ -78,15 +155,35 @@ if (!doc) {
 
 Every call after `ready()` resolves is a plain synchronous call — the async cost is paid once,
 not per parse. Everything else below (`parse()`'s return shape, `parseRawValue()`, `AnvlNode`,
-the error object) is identical to the Node binding's own API — see [Node.js](Bindings-Guide.md#nodejs) below for
-the full reference; only the loading step differs.
+the error object, attributes, the type registry and schema, the writer and builder) is identical
+to the Node binding's own API — see [Node.js](Bindings-Guide.md#nodejs) below for the full
+reference. The differences are these:
+
+- **`await anvil.ready()` first**, once. Everything is exported from the same package:
+  `anvil.Schema`, `anvil.TypeRegistry`, `anvil.AnvilWriter`, `anvil.AnvilBuilder` and the enums.
+- **An in-memory filesystem for includes.** A schema or type file that `include`s another file
+  reads the module's own virtual filesystem, which you fill: `anvil.writeFile(path, textOrBytes)`
+  (parent directories are created) and `anvil.removeFile(path)` (a missing file is a no-op).
+  `loadFile` and `fromIncludesFile` resolve includes beside the file; the text loaders (`load`,
+  `fromIncludes`) resolve them against the filesystem root, `/`.
+
+  ```js
+  anvil.writeFile('/schemas/types.anvl', typesText);
+  const schema = anvil.Schema.loadFile('/schemas/asset.anvl');
+  ```
+- **Bytes are a `Uint8Array`**, not a `Buffer`: `finishBytes()`, `emitBytes()` and `writer.data`
+  return one, and `blob()` accepts any typed array or a string.
+- **Handles are WebAssembly heap memory.** `dispose()` frees one. A `FinalizationRegistry` frees an
+  abandoned one when the garbage collector runs, but nothing else reclaims it, so call `dispose()`
+  in a loop that creates many.
+- **Text is passed with its byte length**, so a NUL character inside a string or blob is data and
+  nothing after it is lost. Names, paths and identifiers reject an embedded NUL with a `RangeError`.
 
 ## Node.js
 
-**[Download anvil-node-v0.8.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.8.0-rc-linux-x86_64.tar.gz)**
+**[Download anvil-node-v0.10.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.10.0-rc-linux-x86_64.tar.gz)**
 — a prebuilt N-API addon (native addon, not a from-scratch JS parser) plus its JS-facing
-wrapper. Verified standalone: extracted to a clean directory with nothing else present, parsed
-real source, correctly reported a real syntax error via `lastError()`.
+wrapper. Installing it needs no compiler and no build step.
 
 ### Requirements
 
@@ -99,8 +196,16 @@ real source, correctly reported a real syntax error via `lastError()`.
   real checkout, not `npm install anvil-node`.
 - No runtime dependencies once built.
 
+```sh
+npm install ./anvil-node-v0.10.0-rc-linux-x86_64.tar.gz
+```
+
+npm does not refresh a `file:` or tarball dependency whose version has not changed. When you
+reinstall a new build of the same version, delete `node_modules/anvil-node` first, then install;
+otherwise npm keeps the old copy.
+
 ```js
-const anvil = require('./lib/index.js'); // keep lib/index.js next to build/Release/anvil_node.node
+const anvil = require('anvil-node');
 
 const doc = anvil.parse('#!aml\nserver := { host := "localhost"; port := 8080; };');
 ```
@@ -149,11 +254,125 @@ if (!doc) {
 | `.asBool()` | `boolean \| null` | `null` unless the underlying value is a JS boolean. |
 | `.asInt()` | `number \| null` | `null` unless the underlying value is a JS number; truncates toward zero. |
 
-**Attributes**
+**Attributes and statements**
 
 | Member | Returns | Notes |
 |---|---|---|
 | `.hasAttribute(key)` | `boolean` | Root only — checks the document's own module-level `@[...]` attributes. |
+| `.attributes` / `.findAttribute(key)` | `{ key, value, decodedValue }[]` / the matching one or `null` | Module attributes, on the root only; any other node's `attributes` is `[]`. |
+| `.statement(name)` | `AnvlStatement \| null` | The first top-level statement with that name. |
+| `.statements()` | `AnvlStatement[]` | An object value's statements in order, repeats included; `[]` for anything else. |
+
+### Attributes: raw `value` and `decodedValue`
+
+An `AnvlStatement` has `name`, `value` (an `AnvlNode`), `attributes` and `findAttribute(key)`. Each
+attribute has two readings of the same text:
+
+```js
+const doc = anvil.parse('#!aml\n@[version="1.2"]\nticket @[type=bug, urgent] := { id := 7; };\n');
+
+doc.findAttribute('version').value;          // '"1.2"'  raw source text, quotes kept
+doc.findAttribute('version').decodedValue;   // '1.2'    escapes resolved, delimiters stripped, typed
+const ticket = doc.statement('ticket');
+ticket.findAttribute('type').value;          // 'bug'
+ticket.findAttribute('urgent').value;        // null: a flag has no value
+ticket.value.statements();                   // the object's statements, in order
+```
+
+`decodedValue` types the value: `n=42` is the number `42`, `b=true` is `true`, and a value the
+scalar grammar does not accept whole (`range=1..5`) is the string `'1..5'`. It is `null` for a flag
+and for an explicit `@[x=null]`; the raw `value` tells them apart (`null` for the flag, `'null'`
+for the explicit one).
+
+Whitespace inside an attribute list is free, newlines included, and a value never includes the
+whitespace around it, so a multi-line `@[ ... ]` list is valid.
+
+A repeated name inside an object is kept: for `{ a := 1; a := 2; b := 3; }`, `count` is 3,
+`get('a')` returns the first, and `entries()` and `statements()` yield all three in order.
+
+`parse()` and `parseRawValue()` throw a `TypeError` for a non-string argument.
+
+### Type registry and schema
+
+Both work over ANVL **text**, not JS objects (ANVL is not JSON; objects use `:=`):
+
+```js
+const { Schema, TypeRegistry, SchemaViolation } = require('anvil-node');
+
+const schema = Schema.load(schemaText);         // text of a document carrying @[schema]
+const result = schema.validate(dataText);       // { valid, violations: [{ category, field, message }] }
+const body   = schema.validateValue('{ asset_id := 7; name := "widget"; }',
+                                    { skipRequired: false, allowUnknown: false });
+result.violations.some((v) => v.category === SchemaViolation.REQUIRED);
+schema.diagnostics;                             // what loading reported about the schema itself
+schema.dispose();
+
+const reg = TypeRegistry.load(typesText);       // a document carrying @[types]
+reg.find('VIN');                                // TypeDef | null
+reg.resolve('String');                          // also answers for the built-in types
+reg.diagnostics; reg.loadError; reg.dispose();
+```
+
+- **`validateValue(text, opts)`** checks an object value (a request body such as `{ ... }`) as if
+  it were a document's top level. `skipRequired` skips required-presence (patch semantics) and
+  `allowUnknown` ignores undeclared fields.
+- **`validateField(docText, name, opts)`** parses the text, finds the top-level statement `name` and
+  validates its object value in one call. Same result shape and options. An absent statement is
+  one `REQUIRED` violation with an empty `field`. **`{ each: true }`** treats an array or tuple
+  value as a batch (`set := [ {...}, ... ]`): every element is validated with the same options and
+  its violations are reported at `[i]` and `[i].field`.
+- **Introspection.** `schema.fields` and `schema.findField(name)` return read-only `SchemaField`
+  snapshots with `name`, `kind`, `typeName` (as written, such as `'types.Id32'`), `required`,
+  `nullable`, `integer` and, when declared, `size`, `min`, `max`, `minItems`, `maxItems`, `values`,
+  `format` and `tag`. An undeclared constraint is `undefined`, never a default. `nested`,
+  `findNested(name)`, `items` and `extras` (extension keys, each `{ name, value }`) cover the rest.
+- **Failures return `null`** and set `lastError()`: not a `@[schema]` or `@[types]` document, or
+  text that does not parse.
+- **Includes.** `Schema.loadFile(path)` resolves a document's `include`s relative to that file; the
+  text forms resolve them against the process's working directory.
+- **Lifetime.** A schema or registry is a self-contained copy, living until `dispose()` (or garbage
+  collection). Using a disposed handle throws, and a second `dispose()` is a no-op. Violations,
+  diagnostics and fields are plain snapshots. Call `dispose()` in a tight synchronous loop.
+- **Limits.** `min` and `max` are JS numbers, so a bound past 2^53 loses precision, and one that
+  overflows a 64-bit integer or a double is `undefined`.
+
+The `iso8601_datetime` format is strict RFC 3339 (a `T` separator, and `Z` or a full `+hh:mm`
+offset); see the [types reference](types-reference.md#formats).
+
+### Writing: `AnvilWriter` and `AnvilBuilder`
+
+```js
+const { AnvilWriter, AnvilBuilder, AnvilDialect } = require('anvil-node');
+
+const w = AnvilWriter.create(AnvilDialect.AMP);   // streaming: forward-only, chainable
+const text = w.statement('status').bare('ok')
+              .statement('code').value(200)
+              .statement('tags').beginArray().bare('a').bare('b').endArray()
+              .finish();
+w.dispose();
+
+const b = AnvilBuilder.create(AnvilDialect.AML);  // builder: attach in any order, re-emit at will
+const server = b.object();
+server.add('host', b.bare('localhost'));
+b.add('server', server).attribute('env', 'production');
+const text2 = b.emit();
+b.dispose();
+```
+
+- `value(x)` takes `null`, a boolean, a number or a `bigint` (a safe integer or a `bigint` is
+  written exactly). A string is ambiguous, so `value('x')` throws a `TypeError`: use `string()`
+  (quoted) or `bare()` (unquoted). `numeric(text)` takes ANVL numeric text, and `blob(tag, data)`
+  takes bytes or a string.
+- A rejected call throws `AnvilWriterError` with a `.code`. The writer's first error is sticky; the
+  builder's are not (a failed call changes nothing).
+- `finish()` / `emit()` return a string, and `finishBytes()` / `emitBytes()` a `Buffer`.
+- The writer rejects a repeated top-level name, as the reader does.
+
+**Blobs.** The writer is byte-exact, but a backtick inside blob content is rejected, because a
+blob has no escape for its delimiter. Node cannot yet read non-UTF-8 blob bytes back: the loader
+takes a JavaScript string, so such a blob reads back lossy. Also, a parsed blob's tag is not
+exposed yet in Node.js or WebAssembly (the Python and .NET bindings have `blob_tag()` and
+`BlobTag()`).
 
 ### `parseRawValue(sourceText)` — for when you already know the shape
 
@@ -177,15 +396,26 @@ before any other call.
 
 ### `getVersion()`
 
-Returns the underlying Anvil Native version string (e.g. `"0.8.0+89-rc"`) — a toolchain sanity
-check, not a compatibility contract to branch logic on.
+Returns the underlying Anvil Native version string — `"0.10.0-rc+284"` for the prebuilt download,
+plain `"0.10.0-rc"` for a source install with no build number (see
+[the version string](Bindings-Guide.md#the-version-string)). A toolchain sanity check, not a
+compatibility contract to branch logic on.
 
 ## .NET
 
-**[Download anvil-net-v0.8.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.8.0-rc-linux-x64.tar.gz)**
-— a prebuilt managed assembly (`Anvil.Net.dll`) plus the native library it links against.
-Verified standalone: extracted to a clean directory with nothing else present, referenced
-directly by a fresh console project, parsed real source correctly.
+**[Download anvil-net-v0.10.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.10.0-rc-linux-x64.tar.gz)**
+— a prebuilt managed assembly plus the native library it links against. The tarball holds
+`lib/Anvil.Net.dll`, `lib/libanvil.so`, a README and the licence. **There is no NuGet package**:
+nothing is published to nuget.org, and the tarball contains no `.nupkg`. Reference the assembly
+directly and copy `libanvil.so` beside your own output (the native library is loaded from the
+assembly's directory):
+
+```xml
+<ItemGroup>
+  <Reference Include="Anvil.Net"><HintPath>path/to/lib/Anvil.Net.dll</HintPath></Reference>
+  <None Include="path/to/lib/libanvil.so" Link="libanvil.so" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
 
 Shaped differently from the two bindings above on purpose: Node/WASM boundary crossings are
 genuinely expensive (V8's object model, `cwrap`/`ccall` overhead), so both convert a whole parsed
@@ -200,8 +430,9 @@ a tree.
 - .NET 9 runtime or later (`net9.0` target; a newer major runtime works too via roll-forward, e.g.
   `<RollForward>LatestMajor</RollForward>`).
 - Linux x64 (glibc) only today. Other platforms build from source (`make so-release` in
-  `vendor/anvil`'s `v0.8.0-rc` tag or later, then `dotnet build`) — not yet published to NuGet, so
-  building means pointing at a real checkout, not `dotnet add package`.
+  `vendor/anvil`, then `dotnet build`) — not yet published to NuGet, so building means pointing at
+  a real checkout, not `dotnet add package`. A source build reports its version without a build
+  number unless you pass one (see [the version string](Bindings-Guide.md#the-version-string)).
 - No other runtime dependencies once built.
 
 ```csharp
@@ -265,7 +496,48 @@ non-disposable view tied to that document's lifetime — never valid after it's 
 |---|---|---|
 | `AnvlStatement.Name` / `.Value` | `string` / `AnvlValue?` | The declaration's name and the value it's assigned. |
 | `AnvlStatement.Attributes` / `.FindAttribute(key)` | `IReadOnlyList<AnvilAttribute>` / `AnvilAttribute?` | This statement's own `@[...]` attributes. |
-| `AnvilAttribute.Key` / `.Value` | `string` / `string?` | `.Value` is `null` specifically for a flag attribute (`@[active]`, no `=value`). |
+| `AnvilAttribute.Key` / `.Value` / `.DecodedValue` | `string` / `string?` / `AnvlValue?` | `.Value` is the raw source text (`status="done"` is `"done"` with its quotes) and is `null` for a flag attribute (`@[active]`). `.DecodedValue` reads the same attribute as a value: escapes resolved, delimiters stripped, typed (`status="done"` is a `String` `done`, `n=42` a `Numeric`, `type=bug` a `Bare`). It is `null` for a flag; an explicit `@[x=null]` is a `Null` value. |
+
+Whitespace inside an attribute list is free, newlines included, and a value never includes the
+whitespace around it.
+
+### Type registry and schema
+
+```csharp
+using var schemaDoc = AnvilDocument.Load("asset.schema.anvl");   // carries @[schema]; may include @[types]
+using var schema = AnvilSchema.Load(schemaDoc)!;                  // null if it has no @[schema]
+
+using var data = AnvilDocument.LoadBuffer("#!aml\nname := \"widget\";\nstatus := scrapped;\n")!;
+AnvilSchemaValidation result = schema.Validate(data);             // IsValid + Violations
+foreach (AnvilSchemaViolation v in result.Violations)             // Code, Field, Message
+    Console.WriteLine($"{v.Code} at {v.Field}: {v.Message}");
+
+// A request body's `set` object, without loading a second document:
+using var fragment = AnvilDocument.ParseValueFragment("{ name := \"widget\"; }")!;
+schema.ValidateValue(fragment.FragmentValue!, new AnvilValidationOptions(SkipRequired: true));
+
+// ...or straight from document text:
+schema.ValidateField("#!aml\nset := { name := \"widget\"; };\n", "set");
+
+using var typesDoc = AnvilDocument.Load("asset.types.anvl")!;
+using var registry = AnvilTypeRegistry.Load(typesDoc)!;           // or FromIncludes(doc)
+AnvilTypeDef year = registry.Find("AssetYear")!;
+year.TryGetMin(out long min);                                     // false when not declared, never a default
+AnvilNumeric? bound = year.Max;                                   // exact, including fractional or overflowing bounds
+```
+
+- A schema and a registry are self-contained copies: they outlive the document they were loaded
+  from, and are `IDisposable`. Their views (`AnvilTypeDef`, `AnvilSchemaField`) throw
+  `ObjectDisposedException` once the owner is disposed.
+- `ValidateField(text, name, options)` parses the text, finds the top-level statement and
+  validates its object value. An absent statement is one `Required` violation with an empty
+  `Field`; text that does not parse is a `FormatException`. To validate a batch
+  (`set := [ {...}, ... ]`), iterate the array and call `ValidateValue` on each element.
+- Introspection: `schema.Fields` / `FindField` give each rule's `Kind`, `TypeName`, `IsRequired`,
+  `IsNullable`, `IsInteger`, `Min` / `Max`, `TryGetMinItems` / `TryGetMaxItems`, `Values`, `Format`,
+  `Tag`, `Nested`, `Items` and `Extras`.
+- `registry.Diagnostics` and `schema.Diagnostics` are what loading reported; whether any is fatal
+  is your call.
 
 ### `ParseValueFragment` / `FragmentValue` — for when you already know the shape
 
@@ -308,15 +580,26 @@ string text2 = b.Emit();
 
 ### `AnvilDocument.GetVersion()`
 
-Returns the underlying Anvil Native version string (e.g. `"0.8.0+127-rc"`) — same toolchain
-sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility contract.
+Returns the underlying Anvil Native version string (`"0.10.0-rc+284"` for the prebuilt download) —
+same toolchain sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility
+contract.
 
 ## Python
 
-**[Download anvil-py-v0.8.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.8.0-rc-linux-x64.tar.gz)**
+**[Download anvil-py-v0.10.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.10.0-rc-linux-x64.tar.gz)**
 — a pure-`ctypes` binding, no compiled extension module, plus the native library it links
-against. Verified standalone: extracted to a clean directory with nothing else present (no
-`vendor/`, no dev checkout), added to `PYTHONPATH`, parsed real source correctly.
+against (`libanvil.so`, inside the package at `src/anvil/runtimes/linux-x64/native/`).
+
+Extract it and put the `src` directory on `PYTHONPATH`:
+
+```sh
+tar xzf anvil-py-v0.10.0-rc-linux-x64.tar.gz
+export PYTHONPATH="$PWD/anvil-py-v0.10.0-rc-linux-x64/src:$PYTHONPATH"
+python3 -c "from anvil import AnvilDocument; print('ok')"
+```
+
+The package lives under `src/` (earlier downloads had `anvil/` at the top), so point
+`PYTHONPATH` at `src`, not at the extracted directory itself.
 
 Same design as the .NET binding above, translated to Python's own idiom rather than copied
 verbatim: real, lazy, on-demand navigation through Anvil Native's vtable ABI (`anvil_vtable.h`),
@@ -331,8 +614,9 @@ not a synthetic namespace object or a class used purely for grouping.
 - CPython 3.11 or later. No dependency beyond the standard library — `ctypes` ships with every
   install.
 - Linux x64 (glibc) only today. Other platforms build from source (`make so-release` in
-  `vendor/anvil`'s `v0.8.0-rc` tag or later) — not yet published to PyPI, so building means
-  pointing at a real checkout, not `pip install anvil-py`.
+  `vendor/anvil`) — not yet published to PyPI, so building means pointing at a real checkout, not
+  `pip install anvil-py`. The package has no packaging metadata, so its version is only what the
+  native library reports.
 - No other runtime dependencies once built.
 
 ```python
@@ -398,7 +682,47 @@ problem that ruled out a live-handle design for the Node/WASM bindings.
 |---|---|---|
 | `AnvlStatement.name` / `.value` | `str` / `AnvlValue \| None` | The declaration's name and the value it's assigned. |
 | `AnvlStatement.attributes` / `.find_attribute(key)` | `list[AnvilAttribute]` / `AnvilAttribute \| None` | This statement's own `@[...]` attributes. |
-| `AnvilAttribute.key` / `.value` | `str` / `str \| None` | `.value` is `None` specifically for a flag attribute (`@[active]`, no `=value`). |
+| `AnvilAttribute.key` / `.value` / `.decoded_value` | `str` / `str \| None` / `AnvlValue \| None` | `.value` is the raw source text (`status="done"` is `'"done"'`, quotes kept) and is `None` for a flag attribute (`@[active]`). `.decoded_value` reads the same attribute as a value: escapes resolved, delimiters stripped, typed (`status="done"` is a `STRING` `done`, `n=42` a `NUMERIC`, `type=bug` a `BARE`). It is `None` for a flag; an explicit `@[x=null]` is a `NULL` value. |
+
+Whitespace inside an attribute list is free, newlines included, and a value never includes the
+whitespace around it.
+
+### Type registry and schema
+
+```python
+from anvil import AnvilDocument, AnvilSchema, AnvilTypeRegistry
+
+with AnvilDocument.load("asset.schema.anvl") as schema_doc:     # carries @[schema]; may include @[types]
+    schema = AnvilSchema.load(schema_doc)                         # None if it has no @[schema]
+
+with schema, AnvilDocument.load_buffer('#!aml\nname := "widget";\nstatus := scrapped;\n') as data:
+    result = schema.validate(data)                                # is_valid + violations
+    for v in result.violations:                                   # code, field, message
+        print(v.code.name, v.field, v.message)
+
+    # A request body's `set` object, without loading a second document:
+    with AnvilDocument.parse_value_fragment('{ name := "widget"; }') as fragment:
+        schema.validate_value(fragment.fragment_value, skip_required=True)
+
+    # ...or straight from document text:
+    schema.validate_field('#!aml\nset := { name := "widget"; };\n', "set")
+
+with AnvilDocument.load("asset.types.anvl") as types_doc, AnvilTypeRegistry.load(types_doc) as registry:
+    year = registry.find("AssetYear")
+    year.min, year.max                                            # int, float or None (None when not declared)
+```
+
+- Options are keyword-only (`skip_required=`, `allow_unknown=`).
+- `validate_field(document, name)` takes ANVL text, bytes or an `AnvilDocument`, and validates the
+  named top-level statement's object value. An absent statement is one `REQUIRED` violation with an
+  empty `field`; text that does not parse is a `ValueError`. Validate a batch by iterating the array
+  and calling `validate_value` on each element.
+- Absent constraints are `None`, never a default. `min_numeric` / `max_numeric` give the exact
+  `AnvilNumeric`, including an `overflowed` flag.
+- Introspection: `schema.fields` / `find_field(name)` give each rule's `kind`, `type_name`,
+  `is_required`, `is_nullable`, `is_integer`, the bounds, `values`, `nested`, `items` and `extras`.
+- `registry.diagnostics` and `schema.diagnostics` are what loading reported; whether any is fatal is
+  your call. Both registry and schema are context managers and outlive the document they came from.
 
 ### `parse_value_fragment` / `.fragment_value` — for when you already know the shape
 
@@ -439,5 +763,5 @@ with AnvilBuilder.create(AnvilDialect.AML) as b:         # builder: attach in an
 
 ### `AnvilDocument.get_version()`
 
-Returns the underlying Anvil Native version string (e.g. `"0.8.0+135-rc"`) — same toolchain
-sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.
+Returns the underlying Anvil Native version string (`"0.10.0-rc+284"` for the prebuilt download) —
+same toolchain sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.
