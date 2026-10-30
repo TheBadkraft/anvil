@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (schema validation fails closed, BR-2610-anvl-schema-002)
+- **Behaviour change: a field whose `type` can't be resolved no longer accepts anything.** Loading
+  such a schema still succeeds and still reports `ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE`, but
+  `anvil_schema_validate` and `anvil_schema_validate_value` now report a violation for every
+  *present* value of that field, however it is nested (top-level, a `fields` member, an array
+  `items` rule), with the new category `ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE` (appended to
+  `anvil_schema_err_code`; existing values unchanged). An explicit `null` fails too, even with
+  `nullable := true`, and `skip_required` / `allow_unknown` do not excuse it. An *absent* unresolved
+  field is not a violation (nothing was accepted through it), unless it is `required` and
+  `skip_required` is off, which reports REQUIRED as before. A schema that used to validate a
+  document through a misspelled type name can now reject that document. There is no strict-load
+  option. Bindings mirror the new category at their next vendor bump.
+
 ### Released (v0.10.0-rc live check)
 - **The live check of `v0.10.0-rc` passed (2026-10-29).** All five tarballs downloaded fresh from
   `https://anvldata.com/assets/downloads/` match the live `SHA256SUMS` (which equals the staged copy).

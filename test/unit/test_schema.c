@@ -2697,6 +2697,105 @@ static void test_sch91_nul_in_names_and_bare_words_is_a_load_error(void) {
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- *
+ * BR-2610-anvl-schema-002 — a rule whose `type` didn't resolve fails closed
+ * ---------------------------------------------------------------------- */
+#define UT ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE
+
+static void test_sch92_unresolved_top_level(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\np := { type := types.Ghost; };\n",
+                             "#!aml\np := \"anything\";\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH92: a present value for an unresolved type is not valid");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema), "SCH92: one violation");
+      NESTED_PATH_IS(0, "p", UT, "SCH92: UNRESOLVED_TYPE at p");
+      TestBit.is_true(anvil_schema_get_diagnostic_count(schema) == 1, "SCH92: load diagnostic still reported");
+   } else {
+      TestBit.is_not_null(schema, "SCH92: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch93_unresolved_nested_and_items(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate(
+      "#!aml\n@[schema]\n"
+      "o := { type := Object; fields := { a := { type := Nope; }; b := { type := String; }; }; };\n"
+      "l := { type := Array; items := { type := Nope; }; };\n",
+      "#!aml\no := { a := 1; b := \"x\"; };\nl := [ 1, \"two\" ];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH93: invalid");
+      TestBit.is_equal_int(3, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH93: o.a, l[0], l[1]");
+      NESTED_PATH_IS(0, "o.a", UT, "SCH93: nested");
+      NESTED_PATH_IS(1, "l[0]", UT, "SCH93: item 0");
+      NESTED_PATH_IS(2, "l[1]", UT, "SCH93: item 1");
+   } else {
+      TestBit.is_not_null(schema, "SCH93: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch94_unresolved_null_and_nullable(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   bool ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; nullable := true; };\n",
+                             "#!aml\np := null;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH94: even an explicit null is not valid");
+      NESTED_PATH_IS(0, "p", UT, "SCH94: UNRESOLVED_TYPE");
+   } else {
+      TestBit.is_not_null(schema, "SCH94: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch95_unresolved_absent_and_options(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   // Absent + optional: no value passed through, so valid.
+   bool ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; };\nq := { type := String; };\n",
+                             "#!aml\nq := \"x\";\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema && ok, "SCH95: an absent optional unresolved field is valid");
+   nested_free(schema, sdoc, ddoc);
+
+   // Absent + required: REQUIRED as ever; skip_required lets the absence pass.
+   ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; required := true; };\nq := { type := String; };\n",
+                        "#!aml\nset := { q := \"x\"; };\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH95: absent required unresolved field fails");
+      NESTED_PATH_IS(0, "p", ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED, "SCH95: REQUIRED, not UNRESOLVED");
+      anvil_schema_options o = opts_of(true, false);
+      TestBit.is_true(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &o),
+                      "SCH95: skip_required: absence passes");
+   } else {
+      TestBit.is_not_null(schema, "SCH95: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+
+   // Present: skip_required and allow_unknown don't excuse it.
+   ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; };\n",
+                        "#!aml\nset := { p := 1; extra := 2; };\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      anvil_schema_options o = opts_of(true, true);
+      TestBit.is_false(anvil_schema_validate_value(schema, value_of(ddoc, "set"), &o),
+                       "SCH95: skip_required + allow_unknown still reject a present value");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema), "SCH95: one violation");
+      NESTED_PATH_IS(0, "p", UT, "SCH95: UNRESOLVED_TYPE under options");
+   } else {
+      TestBit.is_not_null(schema, "SCH95: schema loaded 2");
+   }
+   nested_free(schema, sdoc, ddoc);
+}
+
+static void test_sch96_unresolved_value_form_and_later_resolution(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   // A repeated `type` that resolves clears the failure.
+   bool ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; type := String; };\n",
+                             "#!aml\np := \"x\";\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(schema && ok, "SCH96: a later resolving type wins");
+   nested_free(schema, sdoc, ddoc);
+}
+
 int main(void) {
    TestBit.run_ex("SCH01_valid_document", NULL, test_sch01_valid_document, th);
    TestBit.run_ex("SCH02_reject_non_schema_document", NULL,
@@ -2882,6 +2981,12 @@ int main(void) {
 
    TestBit.run_ex("SCH91_NUL_IN_NAMES_AND_BARE_WORDS_IS_A_LOAD_ERROR", NULL,
                   test_sch91_nul_in_names_and_bare_words_is_a_load_error, th);
+
+   TestBit.run_ex("SCH92_UNRESOLVED_TOP_LEVEL", NULL, test_sch92_unresolved_top_level, th);
+   TestBit.run_ex("SCH93_UNRESOLVED_NESTED_AND_ITEMS", NULL, test_sch93_unresolved_nested_and_items, th);
+   TestBit.run_ex("SCH94_UNRESOLVED_NULL", NULL, test_sch94_unresolved_null_and_nullable, th);
+   TestBit.run_ex("SCH95_UNRESOLVED_ABSENT_AND_OPTIONS", NULL, test_sch95_unresolved_absent_and_options, th);
+   TestBit.run_ex("SCH96_UNRESOLVED_LATER_RESOLUTION", NULL, test_sch96_unresolved_value_form_and_later_resolution, th);
 
    return TestBit.report();
 }

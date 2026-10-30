@@ -36,6 +36,7 @@ struct anvil_schema_field_t {
    char *name; // allocated to its full length
    bool has_kind;
    anvil_type_kind kind;
+   bool type_unresolved; // `type :=` was declared but names nothing: a present value fails closed
    bool required;
    char *type_name;       // the `type :=` text as written ("types.Id32"); NULL if none
    list extras;           // struct schema_extra* - rule keys the schema didn't consume, in order
@@ -424,6 +425,7 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
          Allocator.dispose(field->type_name);
          field->type_name = text ? anvil_text_dup(text) : NULL;
          resolved = text ? anvil_type_resolve(types, strip_types_prefix(text)) : NULL;
+         field->type_unresolved = resolved == NULL;
          if (!resolved) {
             add_diag(schema, ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE, ANVIL_TYPE_DIAG_NONE, path,
                      "field '%s': type '%s' is neither a native type nor a known types.X%s", path,
@@ -434,8 +436,9 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
             field->has_kind = true;
             field->kind = anvil_type_def_get_kind(resolved);
          }
-         // An unrecognized type name leaves the field with no kind to check against, and is
-         // reported as UNKNOWN_TYPE above; the schema still loads (the caller decides).
+         // An unrecognized type name leaves the field with no kind to check against. It is
+         // reported as UNKNOWN_TYPE above and the schema still loads, but validation fails
+         // closed: any present value is an UNRESOLVED_TYPE violation (see check_value).
       } else if (strcmp(fname, "required") == 0) {
          bool nul = false;
          char *text = anvil_ident_alloc(fval, &nul);
@@ -922,6 +925,14 @@ static void validate_members(struct anvil_schema_t *s, list rules, map rules_by_
 static void check_value(struct anvil_schema_t *s, const struct anvil_schema_field_t *rule,
                         const char *path, anvil_value data_val, const struct vopts *vo) {
    anvil_value_type actual = data_val ? anvil_value_get_type(data_val) : ANVIL_VALUE_NULL;
+
+   // A rule whose declared type never resolved can judge nothing, so it accepts nothing: one
+   // violation, whatever the value (an explicit null included), and no descent into the value.
+   if (rule->type_unresolved) {
+      add_violation(s->violations, path, ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE,
+                    "the rule's declared type is unresolved; the value cannot be validated");
+      return;
+   }
 
    // An explicit null: legal iff the rule says so, and then nothing else about the value is
    // evaluated. An untyped rule has no declared type for null to violate.
