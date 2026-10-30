@@ -3,4 +3,4 @@ mode document
 input-bytes 44
 status error
 dialect AML
-error code=2002 name=ANVL_ERR_PARSER_EXPECTED_ASSIGN category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=10 message="Expected ':=' after identifier"
+error code=5001 name=ANVL_ERR_PARSER_UNEXPECTED_CHAR category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=10 message="Unexpected character"

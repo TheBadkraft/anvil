@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 15
+status error
+dialect AML
+error code=3014 name=ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES category=2 category-name=ANVIL_ERR_HEADER line=1 column=5 message="Missing ',' in attribute block"

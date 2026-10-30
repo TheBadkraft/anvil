@@ -3,4 +3,4 @@ mode document
 input-bytes 22
 status error
 dialect AML
-error code=2007 name=ANVL_ERR_PARSER_INVALID_IDENTIFIER category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=5 message="Invalid identifier format"
+error code=4012 name=ANVL_ERR_PARSER_INVALID_ATTRIBUTE category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=5 message="The attribute identifier is invalid"

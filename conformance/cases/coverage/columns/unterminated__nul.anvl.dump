@@ -3,4 +3,4 @@ mode document
 input-bytes 12
 status error
 dialect AML
-error code=2003 name=ANVL_ERR_PARSER_EXPECTED_VALUE category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=6 message="Expected content"
+error code=5001 name=ANVL_ERR_PARSER_UNEXPECTED_CHAR category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=6 message="Unexpected character"
