@@ -258,6 +258,14 @@ Rivet projects `anvil.node` and `anvil.wasm` are **frozen**, with successor `anv
 - **Tree sizing:** tune the initial `Int32Array` capacity, and the growth and trim policy, starting in R2.
   Goal: a lower transient peak right after a parse, with no regression in retained size or speed.
 
+## 6g. Boundary-emitter proposal (owner, 2026-10-30)
+
+The owner proposed that the C parser emit anvil.js's span tree directly into WebAssembly memory. That would leave
+one parser serving JS, and the AnvilScript VM would use the same handles-and-offsets boundary. The proposal, the
+context behind it, the Principal Engineer's review and the go/no-go plan are in
+[proposal-2610-boundary-emitter.md](proposal-2610-boundary-emitter.md). It is not scheduled. The proposed
+timing is a timeboxed spike after the AnvilScript compiler and VM.
+
 ## 7. Risks
 
 - **The R0 speed target isn't met.** If no representation beats `anvil-node` everywhere, we stop at R0

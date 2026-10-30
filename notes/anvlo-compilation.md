@@ -4,6 +4,10 @@
 
 Concept / design in progress. No implementation yet.
 
+See also [proposal-2610-boundary-emitter.md](proposal-2610-boundary-emitter.md). Its "one format, three uses"
+section suggests that the `nodes` section here, anvil.js's in-memory tree and a WebAssembly boundary emitter could
+share one canonical, versioned span-tree format.
+
 ## Idea
 
 Compile `.anvl` source files into internal `.anvlo` object files, analogous to
