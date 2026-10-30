@@ -144,10 +144,10 @@ static void test_rt02_string_escapes(void) {
  * RT03 - risky-looking bare literals and numerics keep their kind
  * ---------------------------------------------------------------------- */
 static void test_rt03_edge_tokens(void) {
-   const char *bares[] = {"1e5",     "007x", "a-b",        "/usr/bin", "a:b",  "x$y",
+   const char *bares[] = {"1ex",     "1e3x", "007x", "a-b",        "/usr/bin", "a:b",  "x$y",
                           ".hidden", "_x",   "Truthy",     "1.5.2",    "09-02-2026", "//unc"};
    const size_t bare_count = sizeof bares / sizeof *bares - 1; // "//unc" is rejected by the writer
-   const char *numerics[] = {"0", "-0", "007", "3.14", "-1285", "1.7976931348623157e+308", "5e-07",
+   const char *numerics[] = {"0", "-0", "007", "3.14", "-1285", "1.7976931348623157e+308", "5e-07", "1e5", "1E5", "1e308",
                              "18446744073709551615"};
    anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
    char name[16];

@@ -100,7 +100,7 @@ anvil_writer_err_code wg_check_include_path(const char *path) {
                                                    : ANVIL_WRITER_OK;
 }
 
-// -?digits(.digits)?([eE][+-]digits)? - the whole string, nothing else.
+// -?digits(.digits)?([eE][+-]?digits)? - the whole string, nothing else.
 static bool is_numeric_text(const char *s) {
    if (*s == '-') {
       s++;
@@ -122,10 +122,9 @@ static bool is_numeric_text(const char *s) {
    }
    if (*s == 'e' || *s == 'E') {
       s++;
-      if (*s != '+' && *s != '-') {
-         return false;
+      if (*s == '+' || *s == '-') {
+         s++;
       }
-      s++;
       if (!is_digit(*s)) {
          return false;
       }
@@ -144,9 +143,9 @@ anvil_writer_err_code wg_check_numeric(const char *text) {
 }
 
 // Whether the reader would take a digit-led token as a number (or fail on it) rather than fall
-// back to a bare literal. Deliberately looser than is_numeric_text: parse_numeric_literal also
-// accepts `1.` and commits to an exponent as soon as `e`/`E` is followed by a sign, so a token
-// like `1.` or `1e+` can never be written as a bare literal and read back as one.
+// back to a bare literal. Deliberately looser than is_numeric_text: parse_numeric_literal errors
+// on a malformed number (`1.`, `1.e3`, `1e`, `1e+`), so such a token can never be written as a
+// bare literal and read back as one.
 static bool reader_takes_as_number(const char *s) {
    if (!is_digit(*s)) {
       return false;
@@ -156,6 +155,11 @@ static bool reader_takes_as_number(const char *s) {
    }
    if (*s == '.') {
       s++;
+      if (!is_digit(*s)) {
+         // `1.` and `1.e3` are reader errors; `1.x` declines to a bare literal.
+         return *s == '\0' || ((*s == 'e' || *s == 'E') &&
+                               (is_digit(s[1]) || s[1] == '+' || s[1] == '-' || s[1] == '\0'));
+      }
       while (is_digit(*s)) {
          s++;
       }
@@ -163,13 +167,21 @@ static bool reader_takes_as_number(const char *s) {
          return false; // a second decimal point makes the reader decline the number
       }
    }
-   if ((*s == 'e' || *s == 'E') && (s[1] == '+' || s[1] == '-')) {
-      if (!is_digit(s[2])) {
-         return true; // malformed exponent: the reader errors rather than declining
+   if (*s == 'e' || *s == 'E') {
+      const char *e = s + 1;
+      if (*e == '+' || *e == '-') {
+         if (!is_digit(e[1])) {
+            return true; // malformed exponent: the reader errors rather than declining
+         }
+         e++;
+      } else if (*e == '\0') {
+         return true; // a trailing `e`: the reader errors
       }
-      s += 2;
-      while (is_digit(*s)) {
-         s++;
+      if (is_digit(*e)) {
+         while (is_digit(*e)) {
+            e++;
+         }
+         s = e;
       }
    }
    return *s == '\0'; // anything left over means the reader declines and reads it as bare

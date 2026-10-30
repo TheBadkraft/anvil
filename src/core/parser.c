@@ -110,7 +110,7 @@ static bool parse_value_body(anvl_source, anvl_value *);
 // literals -- see parser_set_error's own declaration below for why.
 bool parse_scalar_value(anvl_source, anvl_value *);
 static bool parse_reserved_literal(anvl_source, anvl_value *);
-static bool parse_numeric_literal(anvl_source, anvl_value *);
+static bool parse_numeric_literal(anvl_source, anvl_value *, bool *malformed);
 static bool parse_string_literal(anvl_source, anvl_value *);
 static bool parse_blob_literal(anvl_source, anvl_value *);
 static bool parse_bare_literal(anvl_source, anvl_value *);
@@ -861,13 +861,26 @@ static bool parse_value(anvl_source src, anvl_value *out_value) {
 // completed literal, not itself part of it. See notes/document-body-parse.md "generalize the
 // decline-and-rewind boundary check" TODO: parse_numeric_literal uses this to tell a genuinely
 // finished number apart from a numeric-shaped prefix of a longer bare-literal token (`09-02-2026`).
-static bool is_value_boundary(anvl_source src) {
-   if (Source.is_eof(src)) {
+static bool is_boundary_at(anvl_source, usize);
+static bool is_value_boundary(anvl_source src) { return is_boundary_at(src, 0); }
+// True if the character `off` ahead of the cursor ends a value (see is_value_boundary).
+static bool is_boundary_at(anvl_source src, usize off) {
+   if (Source.is_eof_offset(src, off)) {
       return true;
    }
-   char c = Source.peek(src);
+   char c = Source.peek_offset(src, off);
    return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ANVL_TOK_STMT_TERMINATOR ||
           c == ',' || c == ANVL_TOK_RBRACKET || c == ANVL_TOK_RPAREN || c == ANVL_TOK_RBRACE;
+}
+// True if an exponent marker at `off` ahead is malformed-or-valid exponent shaped: `e`/`E` then a
+// digit, a sign, or the end of the value. Used to tell `5.e3` (an error) from `5.exe` (bare).
+static bool exponent_follows(anvl_source src, usize off) {
+   char c = Source.peek_offset(src, off);
+   if (c != 'e' && c != 'E') {
+      return false;
+   }
+   char n = Source.peek_offset(src, off + 1);
+   return Source.is_digit(n) || n == '+' || n == '-' || is_boundary_at(src, off + 1);
 }
 // Parse a scalar value
 bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
@@ -877,8 +890,12 @@ bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
    }
    // 2. numeric literal - integer, float, hex, exponential, etc. (`parse_numeric_literal` handles
    // all numeric formats)
-   if (parse_numeric_literal(src, out_value)) {
+   bool malformed = false;
+   if (parse_numeric_literal(src, out_value, &malformed)) {
       return true; // Successfully parsed numeric literal
+   }
+   if (malformed) {
+      return false; // error already recorded; a malformed number is never a bare literal
    }
    // 3. string literal - quoted string with optional escape sequences
    if (parse_string_literal(src, out_value)) {
@@ -925,7 +942,9 @@ static bool parse_reserved_literal(anvl_source src, anvl_value *out_value) {
    return false; // Not a reserved literal
 }
 // Parse a numeric literal
-static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
+// `*malformed` is set when the text is committed to being a number but is not a valid one (`5.`,
+// `1e`): the error is recorded and the caller must fail, never fall through to a bare literal.
+static bool parse_numeric_literal(anvl_source src, anvl_value *out_value, bool *malformed) {
    // We need to check for a leading digit to determine if it's a numeric literal
    // or a '-' sign for a negative number. If it's a digit, we can parse it as a numeric literal.
    // If it's a '-' sign, we need to check if the next character is a digit to determine if it's a
@@ -954,6 +973,19 @@ static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
       Source.consume(src, 1);
    }
    if (Source.peek(src) == ANVL_TOK_DOT) {
+      // A decimal point must be followed by at least one digit (FR-2610-anvl-parser-002).
+      if (!Source.is_digit(Source.peek_offset(src, 1))) {
+         // `5.`, `5.e3`: the number is malformed, an error. Anything else (`5.x`, `5.-`) was
+         // never a number and declines to a bare literal as before.
+         if (exponent_follows(src, 1) || is_boundary_at(src, 1)) {
+            Source.set_position(src, save_pos, save_line, save_col);
+            parser_set_error(src, ANVL_ERR_PARSER_INVALID_NUMBER);
+            *malformed = true;
+            return false;
+         }
+         Source.set_position(src, save_pos, save_line, save_col);
+         return false;
+      }
       // Consume the decimal point
       Source.consume(src, 1);
       // now consume digits after the decimal point
@@ -967,22 +999,24 @@ static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
       }
    }
 
-   // optional exponent part (e.g., `e+10`, `E-5`) — sign is mandatory
+   // optional exponent part: `e`/`E`, an optional sign, then at least one digit (`1e3`, `E-5`)
    if (Source.peek(src) == 'e' || Source.peek(src) == 'E') {
-      char sign = Source.peek_offset(src, 1);
-      if (sign == '+' || sign == '-') {
-         // committed: 'e'/'E' plus a sign is unambiguous, so a missing digit
-         // here is a real malformed exponent, not "maybe something else"
-         if (!Source.is_digit(Source.peek_offset(src, 2))) {
-            parser_set_error(src, ANVL_ERR_PARSER_INVALID_EXPONENT);
-            return false;
-         }
-         // Consume the 'e' or 'E' and the sign
-         Source.consume(src, 2);
-         // Consume the exponent digits
+      char c1 = Source.peek_offset(src, 1);
+      bool signed_exp = c1 == '+' || c1 == '-';
+      char first = signed_exp ? Source.peek_offset(src, 2) : c1;
+      if (Source.is_digit(first)) {
+         Source.consume(src, signed_exp ? 2 : 1);
          while (Source.is_digit(Source.peek(src))) {
             Source.consume(src, 1);
          }
+      } else if (signed_exp || is_boundary_at(src, 1)) {
+         // committed: `e` plus a sign, or a bare trailing `e`, is a malformed exponent. `1ex`
+         // (a letter after the e) is just a digit-led bare word and falls through to the
+         // boundary check below, which declines it.
+         Source.set_position(src, save_pos, save_line, save_col);
+         parser_set_error(src, ANVL_ERR_PARSER_INVALID_EXPONENT);
+         *malformed = true;
+         return false;
       }
    }
 

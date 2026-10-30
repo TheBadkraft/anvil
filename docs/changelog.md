@@ -40,6 +40,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deployed (site, v0.10.0-rc)
 - **anvldata.com now serves `v0.10.0-rc`.** Deployed 2026-10-29 from `main` at `0f9d333` (Worker version `a2a9de8a-1b29-4897-8f0d-71bfb2afde83`). The five `v0.10.0-rc` tarballs match the live `SHA256SUMS`; the old `v0.8.0-rc` tarball URLs now return 404.
 
+### Changed (number grammar, FR-2610-anvl-parser-002)
+
+- **A bare word such as `1e3` now reads as a number.** The exponent sign is optional: `1e3`, `1E3`,
+  `1e+3`, `1e-3`, `-1e3` and `1.5e10` are all `NUMERIC` with their exact text. Before, `1e3` was a
+  bare word (and `1e308` failed a `Numeric` type check as a type mismatch). A value that was written
+  as the bare word `1e5` now reads as a number; quote it (`"1e5"`) to keep it text.
+- **`5.` is now a parse error.** A decimal point must be followed by at least one digit. `5.`, `-5.`
+  and `5.e3` are rejected with `ANVL_ERR_PARSER_INVALID_NUMBER`; `1e`, `1e+` and `1e-` with
+  `ANVL_ERR_PARSER_INVALID_EXPONENT`. Digit-led bare words such as `007x`, `1ex`, `1.5.5` and
+  `09-02-2026` are unaffected. The error is reported at the start of the number, and it applies at every depth: top-level values, array, tuple and object members, value fragments and AnvilScript parameter defaults. (A malformed number is never read as a bare literal.)
+- The writer follows: `numeric()` (and the builder) accepts an unsigned exponent (`1e5`), still
+  emits the canonical signed form for doubles (`1e+20`), and `bare()` now rejects `1e5` (it would
+  read back as a number) and `1e`/`5.e3` (the reader errors on them). A bare `1ex` or `1e3x` is
+  still accepted. Attribute values decode through the same scanner, so `@[a=1e3]` is `NUMERIC`
+  and `@[a=5.]` stays `BARE` raw text.
+
 ### Changed (documentation and site, v0.10.0-rc)
 - **Docs and site refreshed for `v0.10.0-rc`.** `docs/schema/README.md` now covers what AnvilSchema
   does today (FR-2610-anvl-schema-001..005, FR-2610-anvl-types-001..005, BR-2610-anvl-nul-001,

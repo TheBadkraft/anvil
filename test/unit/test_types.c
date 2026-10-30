@@ -821,6 +821,7 @@ static void test_typ29_numeric_bound_getters(void) {
       "Frac := { type := Numeric; min := 0.25; max := 1e+3; };\n"
       "Whole := { type := Numeric; min := 1; max := 9; };\n"
       "None := { type := Numeric; };\n"
+      "Bare := { type := Numeric; max := 1e3; };\n"
       "Bad := { type := Numeric; min := \"x\"; max := 1e+999; };\n", &doc);
    TestBit.is_not_null(reg, "TYP29: registry loaded");
    if (reg) {
@@ -833,6 +834,10 @@ static void test_typ29_numeric_bound_getters(void) {
       TestBit.is_true(anvil_type_def_get_max_numeric(frac, &n) && n.as_double == 1000.0,
                       "TYP29: max := 1e+3 reads as 1000");
       TestBit.is_false(anvil_type_def_get_max(frac, &ll), "TYP29: exponent form is not truncated");
+
+      anvil_type_def unsigned_exp = anvil_type_registry_find(reg, "Bare");
+      TestBit.is_true(anvil_type_def_get_max_numeric(unsigned_exp, &n) && n.as_double == 1000.0,
+                      "TYP29: max := 1e3 (unsigned exponent) reads as 1000");
 
       anvil_type_def whole = anvil_type_registry_find(reg, "Whole");
       TestBit.is_true(anvil_type_def_get_min_numeric(whole, &n) && n.is_integral && n.as_int64 == 1,

@@ -387,6 +387,24 @@ static void test_asl12_non_literal_default_rejected(void) {
    mod_ctx_dispose(ctx);
 }
 
+/* ASL12b - FR-2610-anvl-parser-002: 'foo (x = 5.) => { };' keeps the number error, not EXPECTED_VALUE;
+ * 'foo (x = 1e3)' is a numeric default. */
+static void test_asl12b_malformed_number_default_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_asl_doc("asl_function_decl_default_malformed_number.anvl", &ctx);
+   TestBit.is_not_null(doc, "ASL12b: document loaded");
+   if (!doc) {
+      return;
+   }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = doc_parse_body(doc, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "ASL12b: parse body returns ERR");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_NUMBER, err_code,
+                        "ASL12b: err_code reports INVALID_NUMBER, the first error");
+   mod_ctx_dispose(ctx);
+}
+
+
 /* ---------------------------------------------------------------------- *
  * ASL13 — 'sum (args []) => { };' — a single parameter-array parameter.
  * ---------------------------------------------------------------------- */
@@ -595,6 +613,8 @@ int main(void) {
    TestBit.run_ex("ASL07_multiple_params", NULL, test_asl07_multiple_params, th);
    TestBit.run_ex("ASL08_duplicate_param_rejected", NULL, test_asl08_duplicate_param_rejected, th);
    TestBit.run_ex("ASL09_trailing_comma_rejected", NULL, test_asl09_trailing_comma_rejected, th);
+   TestBit.run_ex("ASL12b_malformed_number_default_rejected", NULL,
+                  test_asl12b_malformed_number_default_rejected, th);
    TestBit.run_ex("ASL10_string_default", NULL, test_asl10_string_default, th);
    TestBit.run_ex("ASL11_numeric_default", NULL, test_asl11_numeric_default, th);
    TestBit.run_ex("ASL12_non_literal_default_rejected", NULL,

@@ -364,6 +364,51 @@ static void test_vf12_non_fragment_document_returns_null(void) {
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
+/* VF13..VF16 - FR-2610-anvl-parser-002: a malformed number in a fragment is an error, never a
+ * bare literal; at any nesting depth; a valid unsigned-exponent number still parses. */
+static void expect_fragment_error(const char *text, const char *want_msg, const char *label) {
+   anvil_document doc = anvil_parse_value_fragment(text, strlen(text));
+   TestBit.is_not_null(doc, label);
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(anvil_has_errors(doc), label);
+   TestBit.is_equal_int(ANVIL_ERR_SYNTAX, anvil_get_error(doc), label);
+   char msg[128] = {0};
+   anvil_error err = anvil_document_get_error(doc);
+   anvil_error_get_message(err, msg, sizeof msg);
+   TestBit.is_true(strstr(msg, want_msg) != NULL, label);
+   anvil_dispose(doc);
+}
+
+static void test_vf13_malformed_number_rejected(void) {
+   expect_fragment_error("5.", "Invalid number", "VF13: '5.'");
+   expect_fragment_error("-5.", "Invalid number", "VF13: '-5.'");
+   expect_fragment_error("5.e3", "Invalid number", "VF13: '5.e3'");
+   expect_fragment_error("1e", "Invalid exponent", "VF13: '1e'");
+   expect_fragment_error("1e+", "Invalid exponent", "VF13: '1e+'");
+}
+
+static void test_vf14_malformed_number_in_collection_rejected(void) {
+   expect_fragment_error("[1e3, 5.]", "Invalid number", "VF14: '[1e3, 5.]'");
+   expect_fragment_error("(1e3, 5.)", "Invalid number", "VF14: '(1e3, 5.)'");
+   expect_fragment_error("[1e]", "Invalid exponent", "VF14: '[1e]'");
+}
+
+static void test_vf15_unsigned_exponent_fragment(void) {
+   anvil_document doc = anvil_parse_value_fragment("1e3", 3);
+   TestBit.is_not_null(doc, "VF15: document handle allocated");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "VF15: no errors");
+   anvil_value value = anvil_document_get_fragment_value(doc);
+   TestBit.is_true(value && anvil_value_get_type(value) == ANVIL_VALUE_NUMERIC &&
+                      anvil_value_get_numeric(value).as_double == 1000.0,
+                   "VF15: 1e3 is NUMERIC 1000");
+   anvil_dispose(doc);
+}
+
 int main(void) {
    TestBit.run_ex("VFP01_bare_numeric_scalar", NULL, test_vfp01_bare_numeric_scalar, th);
    TestBit.run_ex("VFP02_trailing_semicolon_tolerated", NULL,
@@ -372,6 +417,7 @@ int main(void) {
    TestBit.run_ex("VFP04_top_level_varref_rejected", NULL, test_vfp04_top_level_varref_rejected, th);
    TestBit.run_ex("VFP05_nested_varref_rejected", NULL, test_vfp05_nested_varref_rejected, th);
    TestBit.run_ex("VFP06_empty_fragment_rejected", NULL, test_vfp06_empty_fragment_rejected, th);
+
 
    TestBit.run_ex("VF01_numeric_scalar", NULL, test_vf01_numeric_scalar, th);
    TestBit.run_ex("VF02_string_scalar", NULL, test_vf02_string_scalar, th);
@@ -386,6 +432,10 @@ int main(void) {
    TestBit.run_ex("VF11_nested_varref_rejected", NULL, test_vf11_nested_varref_rejected, th);
    TestBit.run_ex("VF12_non_fragment_document_returns_null", NULL,
                   test_vf12_non_fragment_document_returns_null, th);
+   TestBit.run_ex("VF13_malformed_number_rejected", NULL, test_vf13_malformed_number_rejected, th);
+   TestBit.run_ex("VF14_malformed_number_in_collection_rejected", NULL,
+                  test_vf14_malformed_number_in_collection_rejected, th);
+   TestBit.run_ex("VF15_unsigned_exponent_fragment", NULL, test_vf15_unsigned_exponent_fragment, th);
 
    return TestBit.report();
 }

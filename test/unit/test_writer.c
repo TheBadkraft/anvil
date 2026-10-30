@@ -388,6 +388,12 @@ VALUE_STEP(num_empty, anvil_writer_numeric(w, ""))
 VALUE_STEP(num_hex, anvil_writer_numeric(w, "0x10"))
 VALUE_STEP(bare_numeric, anvil_writer_bare(w, "123"))
 VALUE_STEP(bare_trailing_dot, anvil_writer_bare(w, "1."))
+VALUE_STEP(bare_unsigned_exp, anvil_writer_bare(w, "1e5"))
+VALUE_STEP(bare_empty_exp, anvil_writer_bare(w, "1e"))
+VALUE_STEP(bare_dot_exp, anvil_writer_bare(w, "5.e3"))
+VALUE_STEP(num_unsigned_exp_upper, anvil_writer_numeric(w, "-1.5E3"))
+VALUE_STEP(num_empty_exp, anvil_writer_numeric(w, "1e"))
+VALUE_STEP(num_sign_only_exp, anvil_writer_numeric(w, "1e+"))
 VALUE_STEP(bare_signed_exp, anvil_writer_bare(w, "1.e+5"))
 VALUE_STEP(bare_neg_numeric, anvil_writer_bare(w, "-1.5"))
 VALUE_STEP(bare_true, anvil_writer_bare(w, "true"))
@@ -418,8 +424,14 @@ static bool inc_newline(anvil_writer w) { return anvil_writer_include(w, "a\nb")
 static void test_w10_value_validation(void) {
    expect_error(ANVIL_WRITER_AML, num_trailing_dot, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: '1.'");
    expect_error(ANVIL_WRITER_AML, num_plus, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: '+1'");
-   expect_error(ANVIL_WRITER_AML, num_unsigned_exp, ANVIL_WRITER_ERR_INVALID_NUMERIC,
-                "W10: unsigned exponent");
+   expect_error(ANVIL_WRITER_AML, num_empty_exp, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: '1e'");
+   expect_error(ANVIL_WRITER_AML, num_sign_only_exp, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: '1e+'");
+   expect_error(ANVIL_WRITER_AML, bare_unsigned_exp, ANVIL_WRITER_ERR_INVALID_BARE,
+                "W10: bare '1e5' (the reader reads it as numeric)");
+   expect_error(ANVIL_WRITER_AML, bare_empty_exp, ANVIL_WRITER_ERR_INVALID_BARE,
+                "W10: bare '1e' (the reader errors on it)");
+   expect_error(ANVIL_WRITER_AML, bare_dot_exp, ANVIL_WRITER_ERR_INVALID_BARE,
+                "W10: bare '5.e3' (the reader errors on it)");
    expect_error(ANVIL_WRITER_AML, num_empty, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: empty numeric");
    expect_error(ANVIL_WRITER_AML, num_hex, ANVIL_WRITER_ERR_INVALID_NUMERIC, "W10: hex");
    expect_error(ANVIL_WRITER_AML, bare_numeric, ANVIL_WRITER_ERR_INVALID_BARE, "W10: bare '123'");
@@ -463,7 +475,7 @@ static void test_w10_value_validation(void) {
  * ---------------------------------------------------------------------- */
 static void test_w11_accepted_edges(void) {
    anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
-   const char *bares[] = {"1e5", "007x", "a-b", "/usr/bin", "a:b", "x$y", ".hidden", "_x", "Truthy",
+   const char *bares[] = {"1ex", "1e3x", "007x", "a-b", "/usr/bin", "a:b", "x$y", ".hidden", "_x", "Truthy",
                           "1.5.2", "09-02-2026"};
    for (size_t i = 0; i < sizeof bares / sizeof *bares; i++) {
       char name[16];
@@ -477,6 +489,10 @@ static void test_w11_accepted_edges(void) {
    w = anvil_writer_new(ANVIL_WRITER_AML);
    anvil_writer_statement(w, "n", NULL);
    TestBit.is_true(anvil_writer_numeric(w, "007"), "W11: leading zeros are numeric");
+   anvil_writer_statement(w, "e", NULL);
+   TestBit.is_true(anvil_writer_numeric(w, "1e5"), "W11: an unsigned exponent is numeric");
+   anvil_writer_statement(w, "f", NULL);
+   TestBit.is_true(anvil_writer_numeric(w, "-1.5E3"), "W11: a signless upper-case exponent is numeric");
    anvil_writer_statement(w, "m", NULL);
    TestBit.is_true(anvil_writer_numeric(w, "18446744073709551615"), "W11: beyond int64 is numeric");
    anvil_writer_dispose(w);
