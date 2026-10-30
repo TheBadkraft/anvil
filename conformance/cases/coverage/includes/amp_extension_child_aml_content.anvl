@@ -1,0 +1,2 @@
+include "child_aml_shebang.amp";
+x := 1;

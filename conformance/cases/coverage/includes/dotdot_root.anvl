@@ -1,0 +1,3 @@
+include "sub/../leaf_c.anvl";
+include "sub/./s2.anvl";
+x := 1;

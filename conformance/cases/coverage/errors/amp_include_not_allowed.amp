@@ -1,0 +1,3 @@
+#!amp
+include "x.anvl";
+y := 1;

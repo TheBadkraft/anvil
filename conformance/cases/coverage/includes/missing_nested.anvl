@@ -1,0 +1,2 @@
+include "mid_with_missing.anvl";
+x := 1;

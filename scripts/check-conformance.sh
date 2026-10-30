@@ -23,7 +23,7 @@ if [ -d "$root/test/fixtures" ]; then
    fi
 fi
 
-find . -type f ! -name '*.dump' | sed 's|^\./||' | sort > "$tmp/inputs"
+find . -type f ! -name '*.dump' | sed 's|^\./||' | LC_ALL=C sort > "$tmp/inputs"
 while IFS= read -r input; do
    expected="$input.dump"
    opts=
@@ -43,7 +43,7 @@ while IFS= read -r input; do
    fi
 done < "$tmp/inputs"
 
-find . -type f -name '*.dump' | sed 's|^\./||; s|\.dump$||' | sort > "$tmp/dumped"
+find . -type f -name '*.dump' | sed 's|^\./||; s|\.dump$||' | LC_ALL=C sort > "$tmp/dumped"
 orphans=$(comm -13 "$tmp/inputs" "$tmp/dumped")
 if [ -n "$orphans" ]; then
    if [ "$mode" = update ]; then for o in $orphans; do rm -f "$o.dump"; done; echo "update-conformance: removed dumps with no input: $orphans"

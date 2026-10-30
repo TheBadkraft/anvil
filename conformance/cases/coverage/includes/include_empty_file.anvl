@@ -1,0 +1,2 @@
+include "empty.anvl";
+x := 1;

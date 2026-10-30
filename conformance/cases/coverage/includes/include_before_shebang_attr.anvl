@@ -1,0 +1,4 @@
+#!aml
+@[m="1"]
+include "leaf_a.anvl";
+x := 1;

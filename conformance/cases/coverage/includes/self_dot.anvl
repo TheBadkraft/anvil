@@ -1,0 +1,2 @@
+include "./self_dot.anvl";
+x := 1;
