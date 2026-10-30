@@ -1049,6 +1049,8 @@ static void test_anv38b_get_numeric_matches_strtod(void) {
       "9007199254740992.0", "9007199254740993.0", "0.1", "0.3", "1.0000000000000002", "1e22",
       "1e23", "8.5e-22", "8.5e-23", "123456.789e-15", "1.5e+300", "4.9e-324", "2.2250738585072014e-308",
       "-3.14159", "00012.50", "1e0", "100000000000000000000.0", "0.000001e22", "7.0e+10", "-1.5E+22",
+      /* x87 double-rounding counterexamples (FLT_EVAL_METHOD != 0 builds got these wrong) */
+      "927846616642e-19", "432629749728e-15", "975150067171e19", "173813510944452e21",
    };
    for (size_t i = 0; i < sizeof lits / sizeof *lits; i++) {
       anvil_numeric_t n = numeric_of(lits[i]);
@@ -1057,6 +1059,22 @@ static void test_anv38b_get_numeric_matches_strtod(void) {
       TestBit.is_false(n.is_integral, lits[i]);
       TestBit.is_true(memcmp(&n.as_double, &want, sizeof want) == 0, lits[i]);
    }
+   /* A few hundred generated literals around the fast path's limits (15 digits, |e10| <= 22),
+    * deterministic. test/infra/numeric_fastpath holds the 20M-literal fuzz and the x87 harness. */
+   uint64_t st = 88172645463325252ULL;
+   int mismatches = 0;
+   for (int i = 0; i < 600; i++) {
+      st ^= st << 13; st ^= st >> 7; st ^= st << 17;
+      char lit[48];
+      snprintf(lit, sizeof lit, "%llue%d", (unsigned long long)(st % 1000000000000000ULL),
+               (int)((st >> 50) % 45) - 22);
+      anvil_numeric_t n = numeric_of(lit);
+      double want = strtod(lit, NULL);
+      if (n.overflowed || n.is_integral || memcmp(&n.as_double, &want, sizeof want) != 0) {
+         mismatches++;
+      }
+   }
+   TestBit.is_equal_int(0, mismatches, "ANV38b: 600 generated literals match strtod bit for bit");
 }
 
 /* ---------------------------------------------------------------------- *

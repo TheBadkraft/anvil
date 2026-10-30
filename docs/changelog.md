@@ -22,8 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bare word (FR-2610-anvl-parser-002), so a `min`, `max` or `integer` rule reads its double with
   `strtod` on every validate. `anvil_value_get_numeric` now converts a decimal literal of up to 15
   significant digits and a power of ten within 22 with one exact multiply or divide (Clinger's fast
-  path) and keeps `strtod` for everything else, so the result is bit-identical. No behaviour or
-  public ABI change. `bench/parse_validate.c` gains a `validate_small` workload (a 4-field schema, a
+  path) and keeps `strtod` for everything else, so the result is bit-identical. The fast path is
+  compiled out where `FLT_EVAL_METHOD` is not 0 (x87, whose double rounding differs from `strtod` in
+  the last bit for some literals) and declines when the rounding mode is not round-to-nearest.
+  `make check-numeric-fastpath` reruns the edge cases, a 20M-literal fuzz and the x87 and
+  rounding-mode gates against `strtod`. No behaviour or public ABI change. `bench/parse_validate.c` gains a `validate_small` workload (a 4-field schema, a
   document with an exponent float, validated in a tight loop).
 
 ### Fixed (parse and validate slowdown since v0.10.0-rc, BR-2610-anvl-parser-004)

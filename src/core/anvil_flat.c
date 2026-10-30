@@ -21,6 +21,7 @@
 
 #include "anvil.h"
 #include "anvil_flat.h"
+#include "internal/fast_decimal.h"
 #include "internal/module.h"
 #include "internal/parser.h"
 #include "internal/source.h"
@@ -639,65 +640,6 @@ static bool parse_integral(const char *text, size_t len, int64_t *out) {
       magnitude = magnitude * 10u + digit;
    }
    *out = negative ? (int64_t)(0u - magnitude) : (int64_t)magnitude;
-   return true;
-}
-
-// Clinger's fast path: a decimal literal whose digits fit a double's 53-bit mantissa exactly
-// (<= 15 significant digits) and whose power of ten is exact (|e10| <= 22) converts with a single
-// correctly rounded multiply or divide, so the result is bit-identical to strtod's. Anything else
-// (more digits, a larger exponent, any other character) returns false and the caller uses strtod.
-// Schema validation reads the same number again for every min/max/integer check, so this keeps
-// that read to a handful of instructions instead of strtod's multi-precision setup.
-static bool fast_decimal(const char *text, size_t len, double *out) {
-   static const double pow10_exact[] = {1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,
-                                        1e8,  1e9,  1e10, 1e11, 1e12, 1e13, 1e14, 1e15,
-                                        1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
-   size_t i = 0;
-   bool negative = false;
-   if (i < len && (text[i] == '-' || text[i] == '+')) {
-      negative = text[i] == '-';
-      i++;
-   }
-   uint64_t mant = 0;
-   int digits = 0;   // significant digits accumulated (leading zeros do not count)
-   int e10 = 0;
-   bool any = false;
-   for (; i < len && text[i] >= '0' && text[i] <= '9'; i++) {
-      any = true;
-      if (mant != 0 || text[i] != '0') {
-         if (++digits > 15) return false;
-      }
-      mant = mant * 10u + (uint64_t)(text[i] - '0');
-   }
-   if (i < len && text[i] == '.') {
-      for (i++; i < len && text[i] >= '0' && text[i] <= '9'; i++) {
-         any = true;
-         if (mant != 0 || text[i] != '0') {
-            if (++digits > 15) return false;
-         }
-         mant = mant * 10u + (uint64_t)(text[i] - '0');
-         e10--;
-      }
-   }
-   if (!any) return false;
-   if (i < len && (text[i] == 'e' || text[i] == 'E')) {
-      i++;
-      bool eneg = false;
-      if (i < len && (text[i] == '-' || text[i] == '+')) {
-         eneg = text[i] == '-';
-         i++;
-      }
-      if (i >= len) return false;
-      int ev = 0;
-      for (; i < len && text[i] >= '0' && text[i] <= '9'; i++) {
-         if ((ev = ev * 10 + (text[i] - '0')) > 1000) return false;
-      }
-      e10 += eneg ? -ev : ev;
-   }
-   if (i != len || e10 < -22 || e10 > 22) return false;
-   double d = (double)mant;
-   d = e10 < 0 ? d / pow10_exact[-e10] : d * pow10_exact[e10];
-   *out = negative ? -d : d;
    return true;
 }
 

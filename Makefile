@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -261,3 +261,7 @@ coverage:
 		'*/test/utilities/*' -o coverage.filtered.info
 	genhtml coverage.filtered.info --output-directory $(COVERAGE_DIR)
 	@echo "Combined coverage report: $(COVERAGE_DIR)/index.html"
+
+# Fast decimal-to-double path vs strtod: edge cases, fuzz, and the x87 / rounding-mode gates.
+check-numeric-fastpath:
+	sh scripts/check-numeric-fastpath.sh
