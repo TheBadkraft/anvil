@@ -236,6 +236,18 @@ anvil.js from the native addon. This lands in R2.
 **Resulting order** (Principal Engineer): R1 (reader) → R2 (API parity: browser ESM and global builds, plus
 `blobTag` and `isNull`) → **S3 writer first** (K&C's MUST) → S1 types → S2 schema → S4 builder.
 
+## 6e. Tickets carried into anvil.js (moved 2026-10-30, old IDs remain as aliases)
+
+| anvil.js ticket | Was | What | Phase |
+|---|---|---|---|
+| FR-2610-anvl-js-002 | FR-2610-anvl-node-001 | int64 schema bounds as BigInt past 2^53; `validateValue` accepts a BigInt | S2 schema |
+| FR-2610-anvl-js-003 | FR-2610-anvl-node-002 | signal a literal that overflows a double | R2 |
+| FR-2610-anvl-js-004 | FR-2610-anvl-node-005 | `isNull()` | R2 |
+| FR-2610-anvl-js-005 | FR-2610-anvl-node-007 | non-allocating accessors | backlog (owner deferred) |
+| FR-2610-anvl-js-006 | FR-2610-anvl-wasm-001 | `blobTag` | R2 |
+
+Rivet projects `anvil.node` and `anvil.wasm` are **frozen**, with successor `anvil.js`: new filings there are refused.
+
 ## 7. Risks
 
 - **The R0 speed target isn't met.** If no representation beats `anvil-node` everywhere, we stop at R0
