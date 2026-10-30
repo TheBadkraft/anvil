@@ -24,7 +24,7 @@ for k in py net; do
 done
 node=$(x node anvil-node-v$ver-linux-x86_64.tar.gz); run "$here/check-grammar.sh" node "$node" "$ver" "$build"; run "$here/check-readme.sh" "$node"
 wasm=$(x wasm anvil-wasm-v$ver.tar.gz);              run "$here/check-grammar.sh" wasm "$wasm" "$ver" "$build"; run "$here/check-readme.sh" "$wasm"
-run "$here/check-browser.sh" "$wasm"
+run "$here/check-browser.sh" "$wasm" "${WASM_REPO:-$HOME/Projects/repos/anvil.wasm}"
 run "$here/check-install.sh" node "$dir/anvil-node-v$ver-linux-x86_64.tar.gz" "$ver"
 run "$here/check-install.sh" wasm "$dir/anvil-wasm-v$ver.tar.gz" "$ver"
 run "$here/check-downstream.sh" "$dir/anvil-node-v$ver-linux-x86_64.tar.gz" "$dir/anvil-wasm-v$ver.tar.gz"
