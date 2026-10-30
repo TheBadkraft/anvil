@@ -26,7 +26,7 @@ move to sub-agents on 2026-10-29.
 | 3. Cut core: `0.10.0-rc`, `[Unreleased]` → `[v0.10.0-rc]`, merge, tag on `main` | done. Tag `v0.10.0-rc` on `e512b92`, BUILD 284, **local only**: pushing it needs `AUTHORIZED: push tag v0.10.0-rc` |
 | 4. Each binding on `release/v0.10.0-rc`: pin, version, clean build, package, every check | done (node, wasm, py, net; java is not distributed) |
 | 5. Stage the artifacts, `SHA256SUMS`, release notes and handoff | done, in `~/release-staging/v0.10.0-rc/`, handoff at `handoff/HANDOFF-documentor.md` |
-| 6. After the Technical Writer's deploy: the live check against anvldata.com, then resolve the three tickets and update the changelogs | **open**, waiting on the deploy |
+| 6. After the Technical Writer's deploy: the live check against anvldata.com, then resolve the three tickets and update the changelogs | done 2026-10-29. Live grammar, version and install checks pass on every artifact; the three tickets are resolved |
 
 Staged SHA256s (also in `SHA256SUMS`):
 

@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Released (v0.10.0-rc live check)
+- **The live check of `v0.10.0-rc` passed (2026-10-29).** All five tarballs downloaded fresh from
+  `https://anvldata.com/assets/downloads/` match the live `SHA256SUMS` (which equals the staged copy).
+  The grammar and version checks pass on core, node, wasm, py and net (`0.10.0-rc+284`). `npm install`
+  of the live node and wasm URLs in an empty directory works, and `Schema` is a function.
+  SR-2610-anvl-distribution-001, BR-2610-anvl-distribution-001 and SR-2609-anvl-distribution-001
+  are resolved; SR-2609 closes with the owner's OK, the Linux-x64-only native scope being a
+  recorded, deliberate deferral.
+
 ### Deployed (site, v0.10.0-rc)
 - **anvldata.com now serves `v0.10.0-rc`.** Deployed 2026-10-29 from `main` at `0f9d333` (Worker version `a2a9de8a-1b29-4897-8f0d-71bfb2afde83`). The five `v0.10.0-rc` tarballs match the live `SHA256SUMS`; the old `v0.8.0-rc` tarball URLs now return 404.
 
