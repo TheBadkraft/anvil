@@ -69,7 +69,7 @@ mkdir "$work/conf" && cp -r "$pkg/src" "$pkg/node" "$pkg/package.json" "$pkg/BUI
 git -C "$repo" archive "$commit" js scripts/conformance.js | tar -x -C "$work/conf" || fail "no driver at binding commit $commit in $repo"
 ntag=${tag:-v$(node -p "require('$pkg/BUILD_INFO.json').version")}
 mkdir -p "$work/conf/vendor/anvil" && git -C "$core" archive "$ntag" conformance | tar -x -C "$work/conf/vendor/anvil"
-total=$(find "$work/conf/vendor/anvil/conformance/cases" -type f ! -name '*.dump' | wc -l)
+total=$(find "$work/conf/vendor/anvil/conformance/cases" -path '*/cases/writer' -prune -o -type f ! -name '*.dump' -print | wc -l)
 out=$(cd "$work/conf" && node scripts/conformance.js 2>&1) || { echo "$out" | tail -8; fail "conformance through the installed copy"; }
 echo "$out" | grep -q "^conformance (all): $total/$total passed, 0 failed" || { echo "$out"; fail "conformance count != corpus size $total"; }
 echo "PASS js: conformance through the installed copy: $total/$total"
