@@ -310,7 +310,7 @@ static void test_p6_keywords_as_names(void) {
       CASE_ERR("P6.22 object field, import", "x := { import := 1; };", 4003, SYN, 1, 14),
       CASE_ERR("P6.23 field of a block", "x {\n  vars := 1;\n};", 4003, SYN, 2, 7),
       CASE_ERR("P6.24 field at depth 2", "x := { y := { null := 1; }; };", 4003, SYN, 1, 19),
-      CASE_ERR("P6.25 field inside an array", "x := [ { false := 1; } ];", 4003, SYN, 1, 16),
+      CASE_ERR("P6.25 field inside an array", "x := [ { false := 1; } ];", 4003, SYN, 1, 15),
    };
    RUN(cases);
 }
