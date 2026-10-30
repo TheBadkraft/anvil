@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (docs)
+
+- **Language reference: block statements and attribute values.** The reference no longer says `ident { ... };` and `ident := { ... };` are the same statement. The block form is an anonymous, read-only block that cannot be inherited (using one as a base is 4052); the assignment form is an ordinary statement and the only one that can be a base. Attribute values are stated as `null`, bool, number, quoted string or bare word, with quoting never required.
+
 ### Changed (grammar consistency, BR-2610-anvl-parser-005) -- BEHAVIOUR CHANGE
 
 - **Behaviour change: duplicate keys are errors everywhere.** A repeated object field is now
