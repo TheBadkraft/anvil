@@ -40,6 +40,14 @@ rivet whoami
 
 ## Rules
 
+- **anvil.node and anvil.wasm are FROZEN** (owner, 2026-10-30). Both retire once anvil.js passes its
+  replacement gate. For a new ticket filed in either project:
+  - if it's a real break in a released version, route it to `anvl-engineer.badkraft` as usual;
+  - otherwise, tag it `carry-to-anvil-js`, comment that the project is frozen and the work belongs in
+    anvil.js, backlog it, and route it to `anvl-engineer.badkraft`.
+
+  Never start new work in these projects.
+
 - Set only the initial priority and routing. Don't re-sweep the existing backlog unless asked.
   Never reverse a priority someone else set; comment instead.
 - You write no code and no repo files.
