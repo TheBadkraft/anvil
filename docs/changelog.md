@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot name one.
 - Conformance corpus: 9 dumps changed message text only, 1 changed from `ok` to 2006, 2 cases replaced, 26 added.
   Property RT14 now covers attribute values and scalar bases.
+- **Behaviour change: a `$ident` reference to a block-form statement resolves** (BR-2610-anvl-resolver-001). `a { x := 1; }; b := $a;`
+  used to leave `b` unresolved, silently; it now resolves to `a`'s object value, as `a := { x := 1; };` always did, also
+  through a chain (`c := $b`) and from inside an object. A block is read-only, so using one as a base is still 4052;
+  a reference is a read. Nothing else depended on the old behaviour.
+
+### Fixed (docs)
+
+- **Language reference: block statements and attribute values.** The reference no longer says `ident { ... };` and `ident := { ... };` are the same statement. The block form is an anonymous, read-only block that cannot be inherited (using one as a base is 4052); the assignment form is an ordinary statement and the only one that can be a base. Attribute values are stated as `null`, bool, number, quoted string or bare word, with quoting never required.
 
 ### Changed (grammar consistency, BR-2610-anvl-parser-005) -- BEHAVIOUR CHANGE
 

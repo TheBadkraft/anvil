@@ -34,7 +34,7 @@ for the full per-feature ownership table (which dialect owns which grammar const
 ## 3. Document Structure
 
 A document is a flat or nested sequence of **statements**. A statement has an optional
-inheritance base, optional attributes, a name, and a value — in one of two equivalent forms:
+inheritance base, optional attributes, a name, and a value — in one of two forms (assignment or block, below):
 
 ```anvl
 #!aml
@@ -46,10 +46,19 @@ label {
 };
 ```
 
-Both `ident := value;` (assignment form) and `ident { ... };` (bare block form) produce the same
-thing: a statement whose value is an object. They're indistinguishable through the public API —
-`anvil_statement_get_value` returns the same kind of value either way. Nesting works identically
-in both forms: a statement's value can itself contain further statements, to any depth.
+There are two statement forms for an object, and they are not the same statement:
+
+- **Assignment form, `ident := { ... };`.** An ordinary statement whose value is an object. It can be
+  a base (§6) and a `$ident` reference to it resolves (§4).
+- **Block form, `ident { ... };`.** An **anonymous block**: read-only, and it cannot be inherited.
+  Using one as a base is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (4052). A `$ident` reference to
+  one resolves like any other statement, because a reference is a read. A block can still *have* a base (`d : b { ... };`), it just can't *be* one.
+  The parser records it as its own statement kind (`OBJECT_BLOCK`, against `ASSIGN`), which
+  `anvil-dump` prints.
+
+What the two share: both read as an object value (`anvil_statement_get_value` returns an
+`ANVIL_VALUE_OBJECT` for either), and a statement's value can contain further statements, to any
+depth, in both.
 
 **The `;` stays on the value's line.** A statement ends with `;`, and between a finished value and its
 `;` only spaces and tabs are allowed: `x := hello ;` is fine, but `x := hello` followed by a newline and
@@ -128,8 +137,9 @@ significant, a statement's `;`, which must stay on its value's line (§3).
 - A key must be an identifier, and not a keyword or reserved word (§3): `@[include]`, `@[true]` and `@[null=1]` are
   `ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD` (4004). A key that is not an identifier (`@[1a]`) is
   `ANVL_ERR_PARSER_INVALID_ATTRIBUTE` (4012).
-- A value is a single scalar: a number, a string, a blob or a bare word. It can't be an array, an object or a tuple,
-  and a `$` reference is refused too (2009). The attribute list ends at the first `,` or `]`, so an array, object or
+- A value is a single scalar: `null`, a bool, a number, a quoted string or a bare word. Quoting is never required:
+  `@[env=production]` and `@[env="production"]` are both valid, and the first reads as the bare word `production`.
+  It can't be an array, an object or a tuple, and a `$` reference is refused too (2009). The attribute list ends at the first `,` or `]`, so an array, object or
   tuple that is cut there (`@[k=[1,2]]`, `@[k=(1,2)]`, `@[k={a:=1,b:=2}]`, or one that never closes) is
   `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` (2006), at the value. A bracketed value that closes before the
   next `,` or `]` (`@[k={a}]`, `@[k=(1)]`) is read as a bare word, text with the brackets in it.
@@ -155,17 +165,16 @@ derived : base := {
 
 `derived` ends up with both `x` (inherited) and `y` (its own) — fields are merged by aliasing the
 ancestor's real field objects, not by copying them, and a closer override always wins over a
-farther one in a transitive chain (`c : b : a`). Inheriting from an anonymous (bare `{ }`, no
-name of its own to be a base) statement is a hard error, and an inheritance cycle is rejected —
-both checked before any merge happens.
+farther one in a transitive chain (`c : b : a`). Inheriting from an anonymous block (`name { ... };`) is a hard error, and an inheritance
+cycle is rejected — both checked before any merge happens.
 
-A base must be an **object value**, declared as `name := { ... }`. A base whose value is a scalar, array,
+A base must be an **assignment-form object statement**, `name := { ... }`. A base whose value is a scalar, array,
 tuple, string, blob or bare word is an error, and so is a `$` reference, even one that points at an object
 (`ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT`, 4020; category `ANVIL_ERR_RESOLVE`, found when the document is
 resolved, reported at the base name in the deriving statement). A base that doesn't exist is 4051, an inheritance
-cycle 4050, and a base declared in the bare block form `name { ... }` is 4052 (the resolver treats that form as
-anonymous for this purpose, although the two forms are otherwise the same statement; see §3). A
-`name { ... }` statement can still *have* a base: `d : b { ... }` is fine.
+cycle 4050, and a base declared in the block form `name { ... }` is 4052 (an anonymous block cannot be inherited; see §3).
+A `name { ... }` statement can still *have* a base: `d : b { ... }` is fine, but that `d` is itself an
+anonymous block and so can't be a base in turn.
 
 ## 7. Includes
 
