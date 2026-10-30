@@ -13,16 +13,16 @@ that owns the work. Sub-agents last for one task and report only to the Principa
 
 | Role | Sub-agent | Rivet handle | Model | Replaces |
 |---|---|---|---|---|
-| **Principal Engineer** | (the session) | `anvl-engineer` | Opus | ANVL Engineer |
-| **Core Engineer** | `anvl-core-engineer` | `anvl-coder` | Sonnet | ANVL Coder |
-| **Bindings Engineer** | `anvl-bindings-engineer` | `anvl-bindings` | Sonnet | ANVL Bindings |
-| **AnvilScript Language Engineer** | `anvl-asl-language-engineer` | `anvl-scribe` | Sonnet | Scribe |
-| **AnvilScript Runtime Engineer** | `anvl-asl-runtime-engineer` | `anvl-runner` | Sonnet | Runner |
-| **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification` | Sonnet | *new* |
-| **Release Engineer** | `anvl-release-engineer` | `anvl-release` | Sonnet | ANVL Release |
-| **Technical Writer** | `anvl-technical-writer` | `anvl-documentor` | Sonnet | ANVL Documentor |
+| **Principal Engineer** | (the session) | `anvl-engineer.badkraft` | Opus | ANVL Engineer |
+| **Core Engineer** | `anvl-core-engineer` | `anvl-coder.badkraft` | Sonnet | ANVL Coder |
+| **Bindings Engineer** | `anvl-bindings-engineer` | `anvl-bindings.badkraft` | Sonnet | ANVL Bindings |
+| **AnvilScript Language Engineer** | `anvl-asl-language-engineer` | `anvl-scribe.badkraft` | Sonnet | Scribe |
+| **AnvilScript Runtime Engineer** | `anvl-asl-runtime-engineer` | `anvl-runner.badkraft` | Sonnet | Runner |
+| **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification.badkraft` | Sonnet | *new* |
+| **Release Engineer** | `anvl-release-engineer` | `anvl-release.badkraft` | Sonnet | ANVL Release |
+| **Technical Writer** | `anvl-technical-writer` | `anvl-documentor.badkraft` | Sonnet | ANVL Documentor |
 | **JS Engineer** | `anvl-js-engineer` | `anvl-js.badkraft` | Sonnet | *new*: anvil.js, shipped as `anvil-node` |
-| **Triage Analyst** | `anvl-triage-analyst` | `anvl-triage` | Haiku | ANVL Triage |
+| **Triage Analyst** | `anvl-triage-analyst` | `anvl-triage.badkraft` | Haiku | ANVL Triage |
 
 The Rivet handles are unchanged, so ticket history carries over.
 

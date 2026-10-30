@@ -10,7 +10,7 @@ changelog and every deploy. Other roles hand you content; you decide how it read
 live. You report to the **ANVL Principal Engineer**.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`, then your standing assignment in
-`agents/assignments/` if the task prompt names one. Your Rivet handle is `anvl-documentor`.
+`agents/assignments/` if the task prompt names one. Your Rivet handle is `anvl-documentor.badkraft`.
 
 ## The site
 

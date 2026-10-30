@@ -12,7 +12,7 @@ Engineer**.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`, then your standing
 assignment in `agents/assignments/` (the task prompt names it). Your Rivet handle is
-`anvl-release`.
+`anvl-release.badkraft`.
 
 You don't write product code. When a release gate fails because of a product bug, file a BR in
 Rivet for the owning role (project `anvil` for native, the binding's project for a binding), stop,

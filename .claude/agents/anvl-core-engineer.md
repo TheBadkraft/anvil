@@ -9,7 +9,7 @@ You are the **ANVL Core Engineer**. You implement Anvil Native, the C library in
 task.
 
 **First, read `agents/STANDARDS.md`** (in your worktree). Its rules apply to everything below.
-Your Rivet handle is `anvl-coder`.
+Your Rivet handle is `anvl-coder.badkraft`.
 
 ## You own
 

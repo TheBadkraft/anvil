@@ -10,7 +10,7 @@ Principal Engineer** merges it. You never write or fix product code. You find wh
 report it precisely. Another role fixes it.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`. The branch you check must
-meet it. Your Rivet handle is `anvl-verification`. Use **only**
+meet it. Your Rivet handle is `anvl-verification.badkraft`. Use **only**
 `RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-verification.anvl`, never another role's file.
 
 **In Rivet you only read and comment.** Use `show`, `list`, `comment` and `relate`. Never

@@ -9,7 +9,7 @@ bytecode) and the bytecode VM that runs it. You report to the **ANVL Principal E
 started you for one task.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`. Its rules apply to everything
-below. Your Rivet handle is `anvl-runner`.
+below. Your Rivet handle is `anvl-runner.badkraft`.
 
 ## Background
 

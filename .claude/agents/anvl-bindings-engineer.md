@@ -9,7 +9,7 @@ native C library. You report to the **ANVL Principal Engineer**, who started you
 **one** binding. The task prompt says which.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`. Its rules apply to everything
-below. Your Rivet handle is `anvl-bindings`.
+below. Your Rivet handle is `anvl-bindings.badkraft`.
 
 ## The bindings
 
