@@ -84,13 +84,12 @@ anvl_result anvl_parse_value_fragment(module_document doc, anvl_value *out_value
 bool anvl_attribute_decode(anvl_source src, anvl_attribute attr);
 
 /**
- * True if an attribute value (the span [begin, end), already trimmed) starts with `[`, `{` or `(`
- * and is not closed within the span: the scan for an attribute's value stops at the first `,` or
- * `]`, so an array, object or tuple is cut short there. Shared by the statement-level and the
- * module-level attribute scanners, which report it as ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE.
- * A bracketed value that closes within the span (`{1}`, `(1 2)`) is a plain bare word, not this.
+ * True if an attribute value (the span [begin, end), already trimmed) starts with `[`, `{` or `(`:
+ * an array, object or tuple, which an attribute value cannot be. Only the first character counts,
+ * wherever a `,` or `]` falls. Shared by the statement-level and the module-level attribute
+ * scanners, which report it as ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE.
  */
-bool anvl_attr_value_is_split_compound(const char *begin, const char *end);
+bool anvl_attr_value_is_compound(const char *begin, const char *end);
 void anvl_cleanup(void);
 anvl_err_code anvl_get_error(void);
 
