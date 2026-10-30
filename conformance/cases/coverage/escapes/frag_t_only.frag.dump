@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 4
+status ok
+value type=STRING span=1-3 text="\\t" decoded="\t"

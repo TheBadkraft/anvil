@@ -1,0 +1,40 @@
+anvil-dump 1
+mode document
+input-bytes 168
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=168
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=OBJECT span=5-166 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }" count=1
+      stmt kind=ASSIGN name="a" name-span=7-8 base="" base-span=none attrs=0
+        value type=OBJECT span=12-163 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }" count=1
+          stmt kind=ASSIGN name="a" name-span=14-15 base="" base-span=none attrs=0
+            value type=OBJECT span=19-160 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }; }; }; }" count=1
+              stmt kind=ASSIGN name="a" name-span=21-22 base="" base-span=none attrs=0
+                value type=OBJECT span=26-157 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }; }; }" count=1
+                  stmt kind=ASSIGN name="a" name-span=28-29 base="" base-span=none attrs=0
+                    value type=OBJECT span=33-154 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }; }" count=1
+                      stmt kind=ASSIGN name="a" name-span=35-36 base="" base-span=none attrs=0
+                        value type=OBJECT span=40-151 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }; }" count=1
+                          stmt kind=ASSIGN name="a" name-span=42-43 base="" base-span=none attrs=0
+                            value type=OBJECT span=47-148 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }; }" count=1
+                              stmt kind=ASSIGN name="a" name-span=49-50 base="" base-span=none attrs=0
+                                value type=OBJECT span=54-145 text="{ a := { a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }; }" count=1
+                                  stmt kind=ASSIGN name="a" name-span=56-57 base="" base-span=none attrs=0
+                                    value type=OBJECT span=61-142 text="{ a := { a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }; }" count=1
+                                      stmt kind=ASSIGN name="a" name-span=63-64 base="" base-span=none attrs=0
+                                        value type=OBJECT span=68-139 text="{ a := { a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }; }" count=1
+                                          stmt kind=ASSIGN name="a" name-span=70-71 base="" base-span=none attrs=0
+                                            value type=OBJECT span=75-136 text="{ a := { a := { a := { a := { a := { a := 1; }; }; }; }; }; }" count=1
+                                              stmt kind=ASSIGN name="a" name-span=77-78 base="" base-span=none attrs=0
+                                                value type=OBJECT span=82-133 text="{ a := { a := { a := { a := { a := 1; }; }; }; }; }" count=1
+                                                  stmt kind=ASSIGN name="a" name-span=84-85 base="" base-span=none attrs=0
+                                                    value type=OBJECT span=89-130 text="{ a := { a := { a := { a := 1; }; }; }; }" count=1
+                                                      stmt kind=ASSIGN name="a" name-span=91-92 base="" base-span=none attrs=0
+                                                        value type=OBJECT span=96-127 text="{ a := { a := { a := 1; }; }; }" count=1
+                                                          stmt kind=ASSIGN name="a" name-span=98-99 base="" base-span=none attrs=0
+                                                            value type=OBJECT span=103-124 text="{ a := { a := 1; }; }" count=1
+                                                              stmt kind=ASSIGN name="a" name-span=105-106 base="" base-span=none attrs=0
+                                                                value type=OBJECT span=110-121 text="{ a := 1; }" count=1
+                                                                  stmt kind=ASSIGN name="a" name-span=112-113 base="" base-span=none attrs=0
+                                                                    value type=NUMERIC span=117-118 text="1" kind=integer overflow=0 i64=1

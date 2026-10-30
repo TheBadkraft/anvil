@@ -4,7 +4,7 @@
   includes/  the include graph: a missing include, a missing include in a nested child, a failing child, a
              self include (exact spelling = cycle; "./" spelling = same document), mutual includes, byte-identical
              copies, the pre-order walk with a diamond, paths with "..", paths at the 1024-byte limit
-  nesting/   arrays, tuples, objects, attributes and fragments nested 100 to 600 levels deep
+  nesting/   arrays, tuples, objects, attributes and fragments nested up to 400 levels deep
   columns/   error columns after multibyte characters (2, 3 and 4 bytes), tabs, invalid UTF-8, a BOM, CR, CRLF
   escapes/   the string escapes: \\t in every position, and every backslash pair that is not an escape
   numbers/   the integer and float overflow boundaries, rounding ties, subnormals, signed zero, long spellings
@@ -78,10 +78,10 @@ put(I + "aml_includes_amp.anvl", 'include "amp_child.amp";\nx := 1;\n')
 put(I + "child_aml_shebang.amp", "#!aml\nk := { a := 1; };\n")
 put(I + "amp_extension_child_aml_content.anvl", 'include "child_aml_shebang.amp";\nx := 1;\n')
 # the include path limit: the joined path "<directory>/<name>" must be shorter than 1024 bytes
-for n in (100, 900, 1000):
-    put(I + "path_len_%d.anvl" % n, 'include "%s.anvl";\nx := 1;\n' % ("a" * (n - 5)))
-    # the name is exactly n bytes long: not found while the joined path fits, 9002 once it does not
-for n in (1016, 1017, 1023, 1024, 1025, 2000, 5000):
+# The joined path is "coverage/includes/<name>" (the root is run as cases/coverage/includes/<file>, so the
+# directory is 17 bytes plus the "/"): it fits while len(name) <= 1005 (not found), and is too long from 1006 on.
+# A name of 1024 bytes or more is too long whatever the directory.
+for n in (100, 900, 1000, 1005, 1006, 1007, 1023, 1024, 1025, 2000, 5000):
     put(I + "path_len_%d.anvl" % n, 'include "%s";\nx := 1;\n' % ("b" * n))
 put(I + "abs_missing.anvl", 'include "/nonexistent-anvil-conformance-dir/x.anvl";\n')
 put(I + "bare_missing_suffix.anvl", 'include "leaf_a";\n')
@@ -93,7 +93,7 @@ put(I + "include_before_shebang_attr.anvl", '#!aml\n@[m="1"]\ninclude "leaf_a.an
 N = "nesting/"
 def arr(n): return "x := " + "[" * n + "1" + "]" * n + ";\n"
 def tup(n): return "x := " + "(1," * n + "1" + ")" * n + ";\n"
-def obj(n): return "x := " + "{ a := " * n + "1;" + " }" * n + ";\n"
+def obj(n): return "x := " + "{ a := " * n + "1; }" + "; }" * (n - 1) + ";\n"
 def mixed(n):
     opens = ["[", "(1,", "{ a := ", "[{ a := ", "((1,"]
     # alternates array / tuple / object, closing in reverse
@@ -102,9 +102,9 @@ def mixed(n):
         k = i % 3
         if k == 0: s += "["; c = "]" + c
         elif k == 1: s += "(1,"; c = ")" + c
-        else: s += "{ a := "; c = ";}" + c
+        else: s += "{ a := "; c = "; }" + c
     return "x := " + s + "1" + c + ";\n"
-for n in (1, 2, 16, 64, 100, 256, 600):
+for n in (1, 2, 16, 64, 100, 256, 400):
     put(N + "array_%d.anvl" % n, arr(n))
 for n in (2, 16, 64, 100, 256):
     put(N + "tuple_%d.anvl" % n, tup(n))
@@ -114,13 +114,13 @@ for n in (9, 99, 255):
 put(N + "array_wide_2000.anvl", "x := [" + ",".join(str(i) for i in range(2000)) + "];\n")
 put(N + "object_wide_500.anvl", "x := { " + " ".join("k%d := %d;" % (i, i) for i in range(500)) + " };\n")
 put(N + "array_of_arrays_100.anvl", "x := [" + ",".join("[%d,%d]" % (i, i + 1) for i in range(100)) + "];\n")
-for n in (100, 256, 600):
+for n in (100, 256):
     put(N + "fragment_array_%d.frag" % n, "[" * n + "1" + "]" * n)
-put(N + "fragment_object_100.frag", "{ a := " * 100 + "1;" + " }" * 100)
-put(N + "attr_array_nested_50.anvl", "@[k=" + "[" * 50 + "1" + "]" * 50 + "]\nx := 1;\n")
+put(N + "fragment_object_100.frag", "{ a := " * 100 + "1; }" + "; }" * 99)
+put(N + "attr_value_nested_array_error.anvl", "x @[k=" + "[" * 50 + "1" + "]" * 50 + "] := 1;\n")
 put(N + "unclosed_array_100.anvl", "x := " + "[" * 100 + "1;\n")
-put(N + "unclosed_array_600.anvl", "x := " + "[" * 600 + "1")
-put(N + "unclosed_object_100.anvl", "x := " + "{ a := " * 100 + "1;")
+put(N + "unclosed_array_400.anvl", "x := " + "[" * 400 + "1")
+put(N + "unclosed_object_100.anvl", "x := " + "{ a := " * 100 + "1; }" + "; }" * 98)
 put(N + "unclosed_tuple_100.anvl", "x := " + "(1," * 100 + "1")
 put(N + "close_without_open.anvl", "x := 1" + "]" * 100 + ";\n")
 put(N + "array_chain_refs.anvl", "a := 1;\n" + "".join("v%d := [$%s];\n" % (i, "a" if i == 0 else "v%d" % (i - 1)) for i in range(60)))
@@ -166,11 +166,11 @@ put(C + "mixed_eol_error.anvl", b"x := 1;\r\ny := 2;\rz := 3;\nw := 5.;\n")
 put(C + "formfeed_vt.anvl", b"x := 1;\x0b\x0cy := 5.;\n")
 put(C + "tab_indent_error.anvl", b"a := {\n\tb := {\n\t\tc := 5.;\n\t};\n};\n")
 put(C + "tab_after_token.anvl", b"x\t:=\t1\ty;\n")
-put(C + "tab_attr_error.anvl", b'@[\ta\t=\t"1"\t,\t]\nx := 1;\n')
-put(C + "mb_attr_error.anvl", '@[k="\u00e9\u00e9", ]\nx := 1;\n')
+put(C + "tab_attr_error.anvl", b'x @[\ta\t=\t"1"\t,\t] := 1;\n')
+put(C + "mb_attr_error.anvl", 'x @[k="\u00e9\u00e9", ] := 1;\n')
 put(C + "mb_ident_value.anvl", "x := \u00e9;\n")
 put(C + "mb_in_string_ok.anvl", 'x := "\u00e9\u65e5\U0001F600";\ny := "tab\there";\n')
-put(C + "mb_blob_ok.anvl", "x := `\u00e9\u65e5\U0001F600`;\ny := t`\t\u00e9`;\n")
+put(C + "mb_blob_ok.anvl", "x := `\u00e9\u65e5\U0001F600`;\ny := @t`\t\u00e9`;\n")
 put(C + "mb_fragment_error.frag", '["\u00e9\u00e9" "x"]')
 put(C + "tab_fragment_error.frag", '[1,\t\t2\t3]')
 put(C + "nul_in_string_error.anvl", b'x := "a\x00b" y;\n')
@@ -200,16 +200,16 @@ for name, body in esc.items():
     put(E + "str_%s.anvl" % name, 'x := "' + body + '";\n')
 for name in ("t_only", "t_double", "t_after_backslash", "escaped_backslash_then_t", "unknown_x", "all_five"):
     put(E + "frag_%s.frag" % name, '"' + esc[name] + '"')
-    put(E + "attr_%s.anvl" % name, '@[k="' + esc[name] + '"]\nx := 1;\n')
+    put(E + "attr_%s.anvl" % name, 'x @[k="' + esc[name] + '"] := 1;\n')
     put(E + "array_%s.anvl" % name, 'x := ["' + esc[name] + '", "' + esc[name] + '"];\n')
     put(E + "object_%s.anvl" % name, 'x := { f := "' + esc[name] + '"; };\n')
 put(E + "tuple_t.anvl", 'x := ("a\\tb", "\\t");\n')
-put(E + "blob_backslash_t.anvl", 'x := `a\\tb`;\ny := t`\\t\\n`;\n')
+put(E + "blob_backslash_t.anvl", 'x := `a\\tb`;\ny := @t`\\t\\n`;\n')
 put(E + "key_with_t_escape_error.anvl", 'x := { "a\\tb" := 1; };\n')
 put(E + "unterminated_after_backslash.anvl", 'x := "abc\\')
 put(E + "unterminated_after_escape.anvl", 'x := "abc\\t')
 put(E + "escaped_quote_unterminated.anvl", 'x := "abc\\"')
-put(E + "attr_flag_and_tabbed.anvl", '@[a, b="\\t", c]\nx := 1;\n')
+put(E + "attr_flag_and_tabbed.anvl", 'x @[a, b="\\t", c] := 1;\n')
 
 # ------------------------------------------------------------------------------------------------ numbers
 Nn = "numbers/"
@@ -258,7 +258,7 @@ put(Nn + "frag_f_over.frag", "1.7976931348623159e308")
 put(Nn + "frag_f_max.frag", "1.7976931348623157e308")
 put(Nn + "frag_neg_i64_over.frag", "-9223372036854775809")
 put(Nn + "array_mixed_overflow.anvl", "x := [9223372036854775807, 9223372036854775808, 1e308, 1e309, -9223372036854775808, -9223372036854775809];\n")
-put(Nn + "attr_overflow.anvl", "@[a=9223372036854775808, b=1e309, c=-0.0]\nx := 1;\n")
+put(Nn + "attr_overflow.anvl", "x @[a=9223372036854775808, b=1e309, c=-0.0] := 1;\n")
 put(Nn + "not_numbers.anvl", "a := .5;\nb := 1e5.5;\nc := 1.2.3;\nd := 0x10;\ne := 1_000;\nf := 1-2;\ng := 1d;\nh := NaN;\ni := Infinity;\nj := 12abc;\n")
 put(Nn + "plus_sign_error.anvl", "x := +5;\n")
 put(Nn + "dot_no_digits_error.anvl", "x := 5.;\n")
@@ -269,6 +269,19 @@ put(Nn + "neg_dot_error.anvl", "x := -.5;\n")
 put(Nn + "minus_alone_error.anvl", "x := -;\n")
 put(Nn + "double_minus_error.anvl", "x := --5;\n")
 
+# the token boundary after a number: ; , ] ) } space tab CR LF or the end of input end a value; anything else
+# makes the whole word a bare literal (or, after "5." or "1e", an error)
+bounds = {"slash_comment": "1/* c */", "hash": "1#x", "dot": "1.5.", "letter": "1.5x", "dot_letter": "5.x", "dot_dash": "5.-",
+          "exp_letter": "1ex", "exp_dot": "1e5.", "minus": "1-", "minus_digit": "1-2", "colon": "1:2", "slash": "1/2",
+          "dollar": "1$", "underscore": "1_", "close_paren": "(1)", "close_brace": "{ a := 1 }", "tab": "1\t",
+          "cr": "1\r", "comma": "[1,2]", "neg_letter": "-a", "neg_bare": "-1a", "dot_exp_boundary": "5.e", "dot_semicolon": "5.;"}
+for name, v in bounds.items():
+    put(Nn + "bound_%s.anvl" % name, "x := %s;\n" % v)
+put(Nn + "bound_eof.frag", "1.5e3")
+put(Nn + "bound_eof_error.frag", "1e")
+put(Nn + "bound_dot_eof.frag", "5.")
+put(Nn + "bound_tab_array.frag", "[1\t,\t2\t]")
+
 # ------------------------------------------------------------------------------------------------ errors
 R = "errors/"
 put(R + "tuple_unclosed_after_comma.anvl", "x := (1,")
@@ -277,7 +290,7 @@ put(R + "tuple_unclosed_after_two.anvl", "x := (1, 2,")
 put(R + "tuple_unclosed_nested.anvl", "x := ((1, 2),")
 put(R + "tuple_unclosed_in_array.anvl", "x := [(1, 2),")
 put(R + "tuple_unclosed_in_object.anvl", "x := { a := (1,")
-put(R + "tuple_unclosed_in_attr.anvl", "@[k=(1,")
+put(R + "tuple_unclosed_in_attr.anvl", "x @[k=(1,")
 put(R + "tuple_unclosed.frag", "(1,")
 put(R + "tuple_unclosed_two.frag", "(1, 2,")
 put(R + "tuple_comma_semicolon.anvl", "x := (1, 2,;\n")
@@ -291,13 +304,13 @@ put(R + "object_unclosed_mid.anvl", "x := { a := 1")
 put(R + "empty_object.anvl", "x := { };\n")
 put(R + "empty_array.anvl", "x := [];\n")
 put(R + "empty_tuple.anvl", "x := ();\n")
-put(R + "empty_attr_block.anvl", "@[]\nx := 1;\n")
-put(R + "attr_trailing_comma.anvl", "@[a=1,]\nx := 1;\n")
-put(R + "attr_missing_comma.anvl", "@[a=1 b=2]\nx := 1;\n")
-put(R + "attr_duplicate_key.anvl", "@[a=1, a=2]\nx := 1;\n")
-put(R + "attr_keyword_key.anvl", "@[true=1]\nx := 1;\n")
-put(R + "attr_unclosed.anvl", "@[a=1\nx := 1;\n")
-put(R + "attr_not_a_block.anvl", "@a=1\nx := 1;\n")
+put(R + "empty_attr_block.anvl", "x @[] := 1;\n")
+put(R + "attr_trailing_comma.anvl", "x @[a=1,] := 1;\n")
+put(R + "attr_missing_comma.anvl", "x @[a=1 b=2] := 1;\n")
+put(R + "attr_duplicate_key.anvl", "x @[a=1, a=2] := 1;\n")
+put(R + "attr_keyword_key.anvl", "x @[include] := 1;\n")
+put(R + "attr_unclosed.anvl", "x @[a=1\n := 1;\n")
+put(R + "attr_not_a_block.anvl", "x @a=1 := 1;\n")
 put(R + "object_duplicate_field.anvl", "x := { a := 1; a := 2; };\n")
 put(R + "document_duplicate_name.anvl", "x := 1;\nx := 2;\n")
 put(R + "object_non_identifier_key.anvl", 'x := { 1 := 2; };\n')
@@ -310,12 +323,16 @@ put(R + "double_assign.anvl", "x := := 1;\n")
 put(R + "second_shebang.anvl", "#!aml\n#!aml\nx := 1;\n")
 put(R + "shebang_after_statement.anvl", "x := 1;\n#!aml\n")
 put(R + "shebang_amp_then_asl.anvl", "#!amp\n#!asl\nx := 1;\n")
-put(R + "module_attr_after_statement.anvl", "x := 1;\n@[m=1]\n")
-put(R + "vars_block_twice.anvl", "vars := { a := 1; };\nvars := { b := 2; };\nx := $a;\n")
-put(R + "vars_not_first.anvl", "x := 1;\nvars := { a := 1; };\n")
-put(R + "vars_duplicate_key.anvl", "vars := { a := 1; a := 2; };\nx := $a;\n")
-put(R + "vars_circular.anvl", "vars := { a := $b; b := $a; };\nx := $a;\n")
-put(R + "vars_missing_key.anvl", "vars := { a := 1; };\nx := $nope;\n")
+put(R + "module_attr_after_statement.anvl", "x := 1;\n@[m=1]\ny := 2;\n")
+put(R + "module_attr_duplicate.anvl", "@[a]\n@[a]\nx := 1;\n")
+put(R + "module_attr_ok.anvl", "@[a=1]\n@[b=\"s\"]\nx := 1;\n")
+put(R + "vars_block_is_keyword.anvl", "vars { a := 1; };\nx := $a;\n")
+put(R + "vars_twice_is_keyword.anvl", "vars { a := 1; };\nvars { b := 2; };\n")
+put(R + "vars_not_first_is_keyword.anvl", "x := 1;\nvars { a := 1; };\n")
+put(R + "varref_missing_target.anvl", "x := $nope;\n")
+put(R + "varref_chain.anvl", "a := 1;\nb := $a;\nc := $b;\n")
+put(R + "varref_cycle_three.anvl", "a := $c;\nb := $a;\nc := $b;\n")
+put(R + "varref_self.anvl", "a := $a;\n")
 put(R + "interp_unterminated.anvl", 'x := $"abc{y";\n')
 put(R + "braced_ref_unterminated.anvl", "x := ${abc;\n")
 put(R + "braced_ref_unterminated_eof.anvl", "x := ${abc")
@@ -323,9 +340,9 @@ put(R + "inherit_from_scalar.anvl", "a := 1;\nb : a := { c := 1; };\n")
 put(R + "inherit_unknown_base.anvl", "b : zzz := { c := 1; };\n")
 put(R + "inherit_cycle.anvl", "a : b := { x := 1; };\nb : a := { y := 1; };\n")
 put(R + "inherit_self.anvl", "a : a := { x := 1; };\n")
-put(R + "blob_tag_invalid.anvl", "x := 1bad`abc`;\n")
+put(R + "blob_tag_invalid.anvl", "x := @1bad`abc`;\n")
 put(R + "blob_unterminated.anvl", "x := `abc;\n")
-put(R + "blob_tagged_unterminated.anvl", "x := t`abc;\n")
+put(R + "blob_tagged_unterminated.anvl", "x := @t`abc;\n")
 put(R + "block_comment_unterminated.anvl", "/* never closed\nx := 1;\n")
 put(R + "block_comment_nested_unterminated.anvl", "/* a /* b */ x := 1;\n")
 put(R + "keyword_as_name.anvl", "true := 1;\n")
@@ -345,14 +362,24 @@ put(R + "unexpected_char_hash_bang_mid.anvl", "x := 1; #!aml\n")
 put(R + "unexpected_dollar.anvl", "$\n")
 put(R + "unexpected_backslash.anvl", "x := \\;\n")
 put(R + "freeform_unterminated.anvl", "x := ```abc\n")
-put(R + "hex_invalid.anvl", "x := 0xZZ;\n")
-put(R + "hex_empty.anvl", "x := 0x;\n")
-put(R + "hex_valid_shape.anvl", "x := 0x1F;\n")
+put(R + "bare_hex_zz.anvl", "x := 0xZZ;\n")
+put(R + "bare_hex_empty.anvl", "x := 0x;\n")
+put(R + "bare_hex_1f.anvl", "x := 0x1F;\n")
 put(R + "null_bool_values.anvl", "a := null;\nb := true;\nc := false;\nd := TRUE;\ne := Null;\n")
 put(R + "empty_statement_name.anvl", ":= 1;\n")
 put(R + "name_with_digit_first.anvl", "1x := 1;\n")
 put(R + "name_with_dash.anvl", "a-b := 1;\n")
 put(R + "name_very_long.anvl", "n" * 5000 + " := 1;\n")
-put(R + "string_very_long.anvl", 'x := "' + "s" * 200000 + '";\n')
-put(R + "many_statements.anvl", "".join("s%d := %d;\n" % (i, i) for i in range(3000)))
+put(R + "string_very_long.anvl", 'x := "' + "s" * 30000 + '";\n')
+# the shebang: "#!" and exactly three letters, after optional leading white space; what follows is ordinary content
+for name, text in {"minified": "#!amlx := 1;", "leading_ws": " \n\t#!amp\nx := 1;\n", "short": "#!am", "short_nl": "#!am\nx := 1;\n",
+                   "upper": "#!AML\nx := 1;\n", "bang_only": "#!\nx := 1;\n", "bang_only_eof": "#!", "unknown": "#!xyz\nx := 1;\n",
+                   "four_letters": "#!amlx\ny := 1;\n", "crlf": "#!aml\r\nx := 1;\n", "space_after_bang": "#! aml\nx := 1;\n",
+                   "amp_in_anvl_file": "#!amp\nx := 1;\n", "after_comment": "# c\n#!amp\nx := 1;\n", "trailing_text": "#!aml trailing\nx := 1;\n",
+                   "asl_short": "#!as", "asl_then_aml": "#!asl\n#!aml\n"}.items():
+    put(R + "shebang_%s.anvl" % name, text)
+put(R + "shebang_aml_in_amp_file.amp", "#!aml\nx := { a := 1; };\n")
+put(R + "amp_no_shebang.amp", "x := 1;\ny := { a := 1; };\n")
+put(R + "amp_no_shebang_ok.amp", "x := 1;\ny := [1, 2];\n")
+put(R + "many_statements.anvl", "".join("s%d := %d;\n" % (i, i) for i in range(300)))
 print("coverage cases written under", out)

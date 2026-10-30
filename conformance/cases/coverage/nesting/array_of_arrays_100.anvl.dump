@@ -1,0 +1,308 @@
+anvil-dump 1
+mode document
+input-bytes 790
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=790
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=ARRAY span=5-788 text="[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,15],[15,16],[16,17],[17,18],[18,19],[19,20],[20,21],[21,22],[22,23],[23,24],[24,25],[25,26],[26,27],[27,28],[28,29],[29,30],[30,31],[31,32],[32,33],[33,34],[34,35],[35,36],[36,37],[37,38],[38,39],[39,40],[40,41],[41,42],[42,43],[43,44],[44,45],[45,46],[46,47],[47,48],[48,49],[49,50],[50,51],[51,52],[52,53],[53,54],[54,55],[55,56],[56,57],[57,58],[58,59],[59,60],[60,61],[61,62],[62,63],[63,64],[64,65],[65,66],[66,67],[67,68],[68,69],[69,70],[70,71],[71,72],[72,73],[73,74],[74,75],[75,76],[76,77],[77,78],[78,79],[79,80],[80,81],[81,82],[82,83],[83,84],[84,85],[85,86],[86,87],[87,88],[88,89],[89,90],[90,91],[91,92],[92,93],[93,94],[94,95],[95,96],[96,97],[97,98],[98,99],[99,100]]" count=100
+      value type=ARRAY span=6-11 text="[0,1]" count=2
+        value type=NUMERIC span=7-8 text="0" kind=integer overflow=0 i64=0
+        value type=NUMERIC span=9-10 text="1" kind=integer overflow=0 i64=1
+      value type=ARRAY span=12-17 text="[1,2]" count=2
+        value type=NUMERIC span=13-14 text="1" kind=integer overflow=0 i64=1
+        value type=NUMERIC span=15-16 text="2" kind=integer overflow=0 i64=2
+      value type=ARRAY span=18-23 text="[2,3]" count=2
+        value type=NUMERIC span=19-20 text="2" kind=integer overflow=0 i64=2
+        value type=NUMERIC span=21-22 text="3" kind=integer overflow=0 i64=3
+      value type=ARRAY span=24-29 text="[3,4]" count=2
+        value type=NUMERIC span=25-26 text="3" kind=integer overflow=0 i64=3
+        value type=NUMERIC span=27-28 text="4" kind=integer overflow=0 i64=4
+      value type=ARRAY span=30-35 text="[4,5]" count=2
+        value type=NUMERIC span=31-32 text="4" kind=integer overflow=0 i64=4
+        value type=NUMERIC span=33-34 text="5" kind=integer overflow=0 i64=5
+      value type=ARRAY span=36-41 text="[5,6]" count=2
+        value type=NUMERIC span=37-38 text="5" kind=integer overflow=0 i64=5
+        value type=NUMERIC span=39-40 text="6" kind=integer overflow=0 i64=6
+      value type=ARRAY span=42-47 text="[6,7]" count=2
+        value type=NUMERIC span=43-44 text="6" kind=integer overflow=0 i64=6
+        value type=NUMERIC span=45-46 text="7" kind=integer overflow=0 i64=7
+      value type=ARRAY span=48-53 text="[7,8]" count=2
+        value type=NUMERIC span=49-50 text="7" kind=integer overflow=0 i64=7
+        value type=NUMERIC span=51-52 text="8" kind=integer overflow=0 i64=8
+      value type=ARRAY span=54-59 text="[8,9]" count=2
+        value type=NUMERIC span=55-56 text="8" kind=integer overflow=0 i64=8
+        value type=NUMERIC span=57-58 text="9" kind=integer overflow=0 i64=9
+      value type=ARRAY span=60-66 text="[9,10]" count=2
+        value type=NUMERIC span=61-62 text="9" kind=integer overflow=0 i64=9
+        value type=NUMERIC span=63-65 text="10" kind=integer overflow=0 i64=10
+      value type=ARRAY span=67-74 text="[10,11]" count=2
+        value type=NUMERIC span=68-70 text="10" kind=integer overflow=0 i64=10
+        value type=NUMERIC span=71-73 text="11" kind=integer overflow=0 i64=11
+      value type=ARRAY span=75-82 text="[11,12]" count=2
+        value type=NUMERIC span=76-78 text="11" kind=integer overflow=0 i64=11
+        value type=NUMERIC span=79-81 text="12" kind=integer overflow=0 i64=12
+      value type=ARRAY span=83-90 text="[12,13]" count=2
+        value type=NUMERIC span=84-86 text="12" kind=integer overflow=0 i64=12
+        value type=NUMERIC span=87-89 text="13" kind=integer overflow=0 i64=13
+      value type=ARRAY span=91-98 text="[13,14]" count=2
+        value type=NUMERIC span=92-94 text="13" kind=integer overflow=0 i64=13
+        value type=NUMERIC span=95-97 text="14" kind=integer overflow=0 i64=14
+      value type=ARRAY span=99-106 text="[14,15]" count=2
+        value type=NUMERIC span=100-102 text="14" kind=integer overflow=0 i64=14
+        value type=NUMERIC span=103-105 text="15" kind=integer overflow=0 i64=15
+      value type=ARRAY span=107-114 text="[15,16]" count=2
+        value type=NUMERIC span=108-110 text="15" kind=integer overflow=0 i64=15
+        value type=NUMERIC span=111-113 text="16" kind=integer overflow=0 i64=16
+      value type=ARRAY span=115-122 text="[16,17]" count=2
+        value type=NUMERIC span=116-118 text="16" kind=integer overflow=0 i64=16
+        value type=NUMERIC span=119-121 text="17" kind=integer overflow=0 i64=17
+      value type=ARRAY span=123-130 text="[17,18]" count=2
+        value type=NUMERIC span=124-126 text="17" kind=integer overflow=0 i64=17
+        value type=NUMERIC span=127-129 text="18" kind=integer overflow=0 i64=18
+      value type=ARRAY span=131-138 text="[18,19]" count=2
+        value type=NUMERIC span=132-134 text="18" kind=integer overflow=0 i64=18
+        value type=NUMERIC span=135-137 text="19" kind=integer overflow=0 i64=19
+      value type=ARRAY span=139-146 text="[19,20]" count=2
+        value type=NUMERIC span=140-142 text="19" kind=integer overflow=0 i64=19
+        value type=NUMERIC span=143-145 text="20" kind=integer overflow=0 i64=20
+      value type=ARRAY span=147-154 text="[20,21]" count=2
+        value type=NUMERIC span=148-150 text="20" kind=integer overflow=0 i64=20
+        value type=NUMERIC span=151-153 text="21" kind=integer overflow=0 i64=21
+      value type=ARRAY span=155-162 text="[21,22]" count=2
+        value type=NUMERIC span=156-158 text="21" kind=integer overflow=0 i64=21
+        value type=NUMERIC span=159-161 text="22" kind=integer overflow=0 i64=22
+      value type=ARRAY span=163-170 text="[22,23]" count=2
+        value type=NUMERIC span=164-166 text="22" kind=integer overflow=0 i64=22
+        value type=NUMERIC span=167-169 text="23" kind=integer overflow=0 i64=23
+      value type=ARRAY span=171-178 text="[23,24]" count=2
+        value type=NUMERIC span=172-174 text="23" kind=integer overflow=0 i64=23
+        value type=NUMERIC span=175-177 text="24" kind=integer overflow=0 i64=24
+      value type=ARRAY span=179-186 text="[24,25]" count=2
+        value type=NUMERIC span=180-182 text="24" kind=integer overflow=0 i64=24
+        value type=NUMERIC span=183-185 text="25" kind=integer overflow=0 i64=25
+      value type=ARRAY span=187-194 text="[25,26]" count=2
+        value type=NUMERIC span=188-190 text="25" kind=integer overflow=0 i64=25
+        value type=NUMERIC span=191-193 text="26" kind=integer overflow=0 i64=26
+      value type=ARRAY span=195-202 text="[26,27]" count=2
+        value type=NUMERIC span=196-198 text="26" kind=integer overflow=0 i64=26
+        value type=NUMERIC span=199-201 text="27" kind=integer overflow=0 i64=27
+      value type=ARRAY span=203-210 text="[27,28]" count=2
+        value type=NUMERIC span=204-206 text="27" kind=integer overflow=0 i64=27
+        value type=NUMERIC span=207-209 text="28" kind=integer overflow=0 i64=28
+      value type=ARRAY span=211-218 text="[28,29]" count=2
+        value type=NUMERIC span=212-214 text="28" kind=integer overflow=0 i64=28
+        value type=NUMERIC span=215-217 text="29" kind=integer overflow=0 i64=29
+      value type=ARRAY span=219-226 text="[29,30]" count=2
+        value type=NUMERIC span=220-222 text="29" kind=integer overflow=0 i64=29
+        value type=NUMERIC span=223-225 text="30" kind=integer overflow=0 i64=30
+      value type=ARRAY span=227-234 text="[30,31]" count=2
+        value type=NUMERIC span=228-230 text="30" kind=integer overflow=0 i64=30
+        value type=NUMERIC span=231-233 text="31" kind=integer overflow=0 i64=31
+      value type=ARRAY span=235-242 text="[31,32]" count=2
+        value type=NUMERIC span=236-238 text="31" kind=integer overflow=0 i64=31
+        value type=NUMERIC span=239-241 text="32" kind=integer overflow=0 i64=32
+      value type=ARRAY span=243-250 text="[32,33]" count=2
+        value type=NUMERIC span=244-246 text="32" kind=integer overflow=0 i64=32
+        value type=NUMERIC span=247-249 text="33" kind=integer overflow=0 i64=33
+      value type=ARRAY span=251-258 text="[33,34]" count=2
+        value type=NUMERIC span=252-254 text="33" kind=integer overflow=0 i64=33
+        value type=NUMERIC span=255-257 text="34" kind=integer overflow=0 i64=34
+      value type=ARRAY span=259-266 text="[34,35]" count=2
+        value type=NUMERIC span=260-262 text="34" kind=integer overflow=0 i64=34
+        value type=NUMERIC span=263-265 text="35" kind=integer overflow=0 i64=35
+      value type=ARRAY span=267-274 text="[35,36]" count=2
+        value type=NUMERIC span=268-270 text="35" kind=integer overflow=0 i64=35
+        value type=NUMERIC span=271-273 text="36" kind=integer overflow=0 i64=36
+      value type=ARRAY span=275-282 text="[36,37]" count=2
+        value type=NUMERIC span=276-278 text="36" kind=integer overflow=0 i64=36
+        value type=NUMERIC span=279-281 text="37" kind=integer overflow=0 i64=37
+      value type=ARRAY span=283-290 text="[37,38]" count=2
+        value type=NUMERIC span=284-286 text="37" kind=integer overflow=0 i64=37
+        value type=NUMERIC span=287-289 text="38" kind=integer overflow=0 i64=38
+      value type=ARRAY span=291-298 text="[38,39]" count=2
+        value type=NUMERIC span=292-294 text="38" kind=integer overflow=0 i64=38
+        value type=NUMERIC span=295-297 text="39" kind=integer overflow=0 i64=39
+      value type=ARRAY span=299-306 text="[39,40]" count=2
+        value type=NUMERIC span=300-302 text="39" kind=integer overflow=0 i64=39
+        value type=NUMERIC span=303-305 text="40" kind=integer overflow=0 i64=40
+      value type=ARRAY span=307-314 text="[40,41]" count=2
+        value type=NUMERIC span=308-310 text="40" kind=integer overflow=0 i64=40
+        value type=NUMERIC span=311-313 text="41" kind=integer overflow=0 i64=41
+      value type=ARRAY span=315-322 text="[41,42]" count=2
+        value type=NUMERIC span=316-318 text="41" kind=integer overflow=0 i64=41
+        value type=NUMERIC span=319-321 text="42" kind=integer overflow=0 i64=42
+      value type=ARRAY span=323-330 text="[42,43]" count=2
+        value type=NUMERIC span=324-326 text="42" kind=integer overflow=0 i64=42
+        value type=NUMERIC span=327-329 text="43" kind=integer overflow=0 i64=43
+      value type=ARRAY span=331-338 text="[43,44]" count=2
+        value type=NUMERIC span=332-334 text="43" kind=integer overflow=0 i64=43
+        value type=NUMERIC span=335-337 text="44" kind=integer overflow=0 i64=44
+      value type=ARRAY span=339-346 text="[44,45]" count=2
+        value type=NUMERIC span=340-342 text="44" kind=integer overflow=0 i64=44
+        value type=NUMERIC span=343-345 text="45" kind=integer overflow=0 i64=45
+      value type=ARRAY span=347-354 text="[45,46]" count=2
+        value type=NUMERIC span=348-350 text="45" kind=integer overflow=0 i64=45
+        value type=NUMERIC span=351-353 text="46" kind=integer overflow=0 i64=46
+      value type=ARRAY span=355-362 text="[46,47]" count=2
+        value type=NUMERIC span=356-358 text="46" kind=integer overflow=0 i64=46
+        value type=NUMERIC span=359-361 text="47" kind=integer overflow=0 i64=47
+      value type=ARRAY span=363-370 text="[47,48]" count=2
+        value type=NUMERIC span=364-366 text="47" kind=integer overflow=0 i64=47
+        value type=NUMERIC span=367-369 text="48" kind=integer overflow=0 i64=48
+      value type=ARRAY span=371-378 text="[48,49]" count=2
+        value type=NUMERIC span=372-374 text="48" kind=integer overflow=0 i64=48
+        value type=NUMERIC span=375-377 text="49" kind=integer overflow=0 i64=49
+      value type=ARRAY span=379-386 text="[49,50]" count=2
+        value type=NUMERIC span=380-382 text="49" kind=integer overflow=0 i64=49
+        value type=NUMERIC span=383-385 text="50" kind=integer overflow=0 i64=50
+      value type=ARRAY span=387-394 text="[50,51]" count=2
+        value type=NUMERIC span=388-390 text="50" kind=integer overflow=0 i64=50
+        value type=NUMERIC span=391-393 text="51" kind=integer overflow=0 i64=51
+      value type=ARRAY span=395-402 text="[51,52]" count=2
+        value type=NUMERIC span=396-398 text="51" kind=integer overflow=0 i64=51
+        value type=NUMERIC span=399-401 text="52" kind=integer overflow=0 i64=52
+      value type=ARRAY span=403-410 text="[52,53]" count=2
+        value type=NUMERIC span=404-406 text="52" kind=integer overflow=0 i64=52
+        value type=NUMERIC span=407-409 text="53" kind=integer overflow=0 i64=53
+      value type=ARRAY span=411-418 text="[53,54]" count=2
+        value type=NUMERIC span=412-414 text="53" kind=integer overflow=0 i64=53
+        value type=NUMERIC span=415-417 text="54" kind=integer overflow=0 i64=54
+      value type=ARRAY span=419-426 text="[54,55]" count=2
+        value type=NUMERIC span=420-422 text="54" kind=integer overflow=0 i64=54
+        value type=NUMERIC span=423-425 text="55" kind=integer overflow=0 i64=55
+      value type=ARRAY span=427-434 text="[55,56]" count=2
+        value type=NUMERIC span=428-430 text="55" kind=integer overflow=0 i64=55
+        value type=NUMERIC span=431-433 text="56" kind=integer overflow=0 i64=56
+      value type=ARRAY span=435-442 text="[56,57]" count=2
+        value type=NUMERIC span=436-438 text="56" kind=integer overflow=0 i64=56
+        value type=NUMERIC span=439-441 text="57" kind=integer overflow=0 i64=57
+      value type=ARRAY span=443-450 text="[57,58]" count=2
+        value type=NUMERIC span=444-446 text="57" kind=integer overflow=0 i64=57
+        value type=NUMERIC span=447-449 text="58" kind=integer overflow=0 i64=58
+      value type=ARRAY span=451-458 text="[58,59]" count=2
+        value type=NUMERIC span=452-454 text="58" kind=integer overflow=0 i64=58
+        value type=NUMERIC span=455-457 text="59" kind=integer overflow=0 i64=59
+      value type=ARRAY span=459-466 text="[59,60]" count=2
+        value type=NUMERIC span=460-462 text="59" kind=integer overflow=0 i64=59
+        value type=NUMERIC span=463-465 text="60" kind=integer overflow=0 i64=60
+      value type=ARRAY span=467-474 text="[60,61]" count=2
+        value type=NUMERIC span=468-470 text="60" kind=integer overflow=0 i64=60
+        value type=NUMERIC span=471-473 text="61" kind=integer overflow=0 i64=61
+      value type=ARRAY span=475-482 text="[61,62]" count=2
+        value type=NUMERIC span=476-478 text="61" kind=integer overflow=0 i64=61
+        value type=NUMERIC span=479-481 text="62" kind=integer overflow=0 i64=62
+      value type=ARRAY span=483-490 text="[62,63]" count=2
+        value type=NUMERIC span=484-486 text="62" kind=integer overflow=0 i64=62
+        value type=NUMERIC span=487-489 text="63" kind=integer overflow=0 i64=63
+      value type=ARRAY span=491-498 text="[63,64]" count=2
+        value type=NUMERIC span=492-494 text="63" kind=integer overflow=0 i64=63
+        value type=NUMERIC span=495-497 text="64" kind=integer overflow=0 i64=64
+      value type=ARRAY span=499-506 text="[64,65]" count=2
+        value type=NUMERIC span=500-502 text="64" kind=integer overflow=0 i64=64
+        value type=NUMERIC span=503-505 text="65" kind=integer overflow=0 i64=65
+      value type=ARRAY span=507-514 text="[65,66]" count=2
+        value type=NUMERIC span=508-510 text="65" kind=integer overflow=0 i64=65
+        value type=NUMERIC span=511-513 text="66" kind=integer overflow=0 i64=66
+      value type=ARRAY span=515-522 text="[66,67]" count=2
+        value type=NUMERIC span=516-518 text="66" kind=integer overflow=0 i64=66
+        value type=NUMERIC span=519-521 text="67" kind=integer overflow=0 i64=67
+      value type=ARRAY span=523-530 text="[67,68]" count=2
+        value type=NUMERIC span=524-526 text="67" kind=integer overflow=0 i64=67
+        value type=NUMERIC span=527-529 text="68" kind=integer overflow=0 i64=68
+      value type=ARRAY span=531-538 text="[68,69]" count=2
+        value type=NUMERIC span=532-534 text="68" kind=integer overflow=0 i64=68
+        value type=NUMERIC span=535-537 text="69" kind=integer overflow=0 i64=69
+      value type=ARRAY span=539-546 text="[69,70]" count=2
+        value type=NUMERIC span=540-542 text="69" kind=integer overflow=0 i64=69
+        value type=NUMERIC span=543-545 text="70" kind=integer overflow=0 i64=70
+      value type=ARRAY span=547-554 text="[70,71]" count=2
+        value type=NUMERIC span=548-550 text="70" kind=integer overflow=0 i64=70
+        value type=NUMERIC span=551-553 text="71" kind=integer overflow=0 i64=71
+      value type=ARRAY span=555-562 text="[71,72]" count=2
+        value type=NUMERIC span=556-558 text="71" kind=integer overflow=0 i64=71
+        value type=NUMERIC span=559-561 text="72" kind=integer overflow=0 i64=72
+      value type=ARRAY span=563-570 text="[72,73]" count=2
+        value type=NUMERIC span=564-566 text="72" kind=integer overflow=0 i64=72
+        value type=NUMERIC span=567-569 text="73" kind=integer overflow=0 i64=73
+      value type=ARRAY span=571-578 text="[73,74]" count=2
+        value type=NUMERIC span=572-574 text="73" kind=integer overflow=0 i64=73
+        value type=NUMERIC span=575-577 text="74" kind=integer overflow=0 i64=74
+      value type=ARRAY span=579-586 text="[74,75]" count=2
+        value type=NUMERIC span=580-582 text="74" kind=integer overflow=0 i64=74
+        value type=NUMERIC span=583-585 text="75" kind=integer overflow=0 i64=75
+      value type=ARRAY span=587-594 text="[75,76]" count=2
+        value type=NUMERIC span=588-590 text="75" kind=integer overflow=0 i64=75
+        value type=NUMERIC span=591-593 text="76" kind=integer overflow=0 i64=76
+      value type=ARRAY span=595-602 text="[76,77]" count=2
+        value type=NUMERIC span=596-598 text="76" kind=integer overflow=0 i64=76
+        value type=NUMERIC span=599-601 text="77" kind=integer overflow=0 i64=77
+      value type=ARRAY span=603-610 text="[77,78]" count=2
+        value type=NUMERIC span=604-606 text="77" kind=integer overflow=0 i64=77
+        value type=NUMERIC span=607-609 text="78" kind=integer overflow=0 i64=78
+      value type=ARRAY span=611-618 text="[78,79]" count=2
+        value type=NUMERIC span=612-614 text="78" kind=integer overflow=0 i64=78
+        value type=NUMERIC span=615-617 text="79" kind=integer overflow=0 i64=79
+      value type=ARRAY span=619-626 text="[79,80]" count=2
+        value type=NUMERIC span=620-622 text="79" kind=integer overflow=0 i64=79
+        value type=NUMERIC span=623-625 text="80" kind=integer overflow=0 i64=80
+      value type=ARRAY span=627-634 text="[80,81]" count=2
+        value type=NUMERIC span=628-630 text="80" kind=integer overflow=0 i64=80
+        value type=NUMERIC span=631-633 text="81" kind=integer overflow=0 i64=81
+      value type=ARRAY span=635-642 text="[81,82]" count=2
+        value type=NUMERIC span=636-638 text="81" kind=integer overflow=0 i64=81
+        value type=NUMERIC span=639-641 text="82" kind=integer overflow=0 i64=82
+      value type=ARRAY span=643-650 text="[82,83]" count=2
+        value type=NUMERIC span=644-646 text="82" kind=integer overflow=0 i64=82
+        value type=NUMERIC span=647-649 text="83" kind=integer overflow=0 i64=83
+      value type=ARRAY span=651-658 text="[83,84]" count=2
+        value type=NUMERIC span=652-654 text="83" kind=integer overflow=0 i64=83
+        value type=NUMERIC span=655-657 text="84" kind=integer overflow=0 i64=84
+      value type=ARRAY span=659-666 text="[84,85]" count=2
+        value type=NUMERIC span=660-662 text="84" kind=integer overflow=0 i64=84
+        value type=NUMERIC span=663-665 text="85" kind=integer overflow=0 i64=85
+      value type=ARRAY span=667-674 text="[85,86]" count=2
+        value type=NUMERIC span=668-670 text="85" kind=integer overflow=0 i64=85
+        value type=NUMERIC span=671-673 text="86" kind=integer overflow=0 i64=86
+      value type=ARRAY span=675-682 text="[86,87]" count=2
+        value type=NUMERIC span=676-678 text="86" kind=integer overflow=0 i64=86
+        value type=NUMERIC span=679-681 text="87" kind=integer overflow=0 i64=87
+      value type=ARRAY span=683-690 text="[87,88]" count=2
+        value type=NUMERIC span=684-686 text="87" kind=integer overflow=0 i64=87
+        value type=NUMERIC span=687-689 text="88" kind=integer overflow=0 i64=88
+      value type=ARRAY span=691-698 text="[88,89]" count=2
+        value type=NUMERIC span=692-694 text="88" kind=integer overflow=0 i64=88
+        value type=NUMERIC span=695-697 text="89" kind=integer overflow=0 i64=89
+      value type=ARRAY span=699-706 text="[89,90]" count=2
+        value type=NUMERIC span=700-702 text="89" kind=integer overflow=0 i64=89
+        value type=NUMERIC span=703-705 text="90" kind=integer overflow=0 i64=90
+      value type=ARRAY span=707-714 text="[90,91]" count=2
+        value type=NUMERIC span=708-710 text="90" kind=integer overflow=0 i64=90
+        value type=NUMERIC span=711-713 text="91" kind=integer overflow=0 i64=91
+      value type=ARRAY span=715-722 text="[91,92]" count=2
+        value type=NUMERIC span=716-718 text="91" kind=integer overflow=0 i64=91
+        value type=NUMERIC span=719-721 text="92" kind=integer overflow=0 i64=92
+      value type=ARRAY span=723-730 text="[92,93]" count=2
+        value type=NUMERIC span=724-726 text="92" kind=integer overflow=0 i64=92
+        value type=NUMERIC span=727-729 text="93" kind=integer overflow=0 i64=93
+      value type=ARRAY span=731-738 text="[93,94]" count=2
+        value type=NUMERIC span=732-734 text="93" kind=integer overflow=0 i64=93
+        value type=NUMERIC span=735-737 text="94" kind=integer overflow=0 i64=94
+      value type=ARRAY span=739-746 text="[94,95]" count=2
+        value type=NUMERIC span=740-742 text="94" kind=integer overflow=0 i64=94
+        value type=NUMERIC span=743-745 text="95" kind=integer overflow=0 i64=95
+      value type=ARRAY span=747-754 text="[95,96]" count=2
+        value type=NUMERIC span=748-750 text="95" kind=integer overflow=0 i64=95
+        value type=NUMERIC span=751-753 text="96" kind=integer overflow=0 i64=96
+      value type=ARRAY span=755-762 text="[96,97]" count=2
+        value type=NUMERIC span=756-758 text="96" kind=integer overflow=0 i64=96
+        value type=NUMERIC span=759-761 text="97" kind=integer overflow=0 i64=97
+      value type=ARRAY span=763-770 text="[97,98]" count=2
+        value type=NUMERIC span=764-766 text="97" kind=integer overflow=0 i64=97
+        value type=NUMERIC span=767-769 text="98" kind=integer overflow=0 i64=98
+      value type=ARRAY span=771-778 text="[98,99]" count=2
+        value type=NUMERIC span=772-774 text="98" kind=integer overflow=0 i64=98
+        value type=NUMERIC span=775-777 text="99" kind=integer overflow=0 i64=99
+      value type=ARRAY span=779-787 text="[99,100]" count=2
+        value type=NUMERIC span=780-782 text="99" kind=integer overflow=0 i64=99
+        value type=NUMERIC span=783-786 text="100" kind=integer overflow=0 i64=100

@@ -1,1 +1,1 @@
-x := 1bad`abc`;
+x := @1bad`abc`;

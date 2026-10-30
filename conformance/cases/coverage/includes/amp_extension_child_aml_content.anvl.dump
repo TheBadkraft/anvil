@@ -1,0 +1,14 @@
+anvil-dump 1
+mode document
+input-bytes 41
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=41
+  include decl-span=0-31 decl="include \"child_aml_shebang.amp\"" path-span=8-31 path="\"child_aml_shebang.amp\"" resolved=1
+  stmt kind=ASSIGN name="x" name-span=33-34 base="" base-span=none attrs=0
+    value type=NUMERIC span=38-39 text="1" kind=integer overflow=0 i64=1
+doc 1 path="child_aml_shebang.amp" dialect=AML bytes=24
+  stmt kind=ASSIGN name="k" name-span=6-7 base="" base-span=none attrs=0
+    value type=OBJECT span=11-22 text="{ a := 1; }" count=1
+      stmt kind=ASSIGN name="a" name-span=13-14 base="" base-span=none attrs=0
+        value type=NUMERIC span=18-19 text="1" kind=integer overflow=0 i64=1

@@ -1,0 +1,40 @@
+anvil-dump 1
+mode document
+input-bytes 72
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=72
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=TUPLE span=5-70 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))))" count=2
+      value type=NUMERIC span=6-7 text="1" kind=integer overflow=0 i64=1
+      value type=TUPLE span=8-69 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))))" count=2
+        value type=NUMERIC span=9-10 text="1" kind=integer overflow=0 i64=1
+        value type=TUPLE span=11-68 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))))" count=2
+          value type=NUMERIC span=12-13 text="1" kind=integer overflow=0 i64=1
+          value type=TUPLE span=14-67 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))))" count=2
+            value type=NUMERIC span=15-16 text="1" kind=integer overflow=0 i64=1
+            value type=TUPLE span=17-66 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))))" count=2
+              value type=NUMERIC span=18-19 text="1" kind=integer overflow=0 i64=1
+              value type=TUPLE span=20-65 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))))" count=2
+                value type=NUMERIC span=21-22 text="1" kind=integer overflow=0 i64=1
+                value type=TUPLE span=23-64 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,(1,1))))))))))" count=2
+                  value type=NUMERIC span=24-25 text="1" kind=integer overflow=0 i64=1
+                  value type=TUPLE span=26-63 text="(1,(1,(1,(1,(1,(1,(1,(1,(1,1)))))))))" count=2
+                    value type=NUMERIC span=27-28 text="1" kind=integer overflow=0 i64=1
+                    value type=TUPLE span=29-62 text="(1,(1,(1,(1,(1,(1,(1,(1,1))))))))" count=2
+                      value type=NUMERIC span=30-31 text="1" kind=integer overflow=0 i64=1
+                      value type=TUPLE span=32-61 text="(1,(1,(1,(1,(1,(1,(1,1)))))))" count=2
+                        value type=NUMERIC span=33-34 text="1" kind=integer overflow=0 i64=1
+                        value type=TUPLE span=35-60 text="(1,(1,(1,(1,(1,(1,1))))))" count=2
+                          value type=NUMERIC span=36-37 text="1" kind=integer overflow=0 i64=1
+                          value type=TUPLE span=38-59 text="(1,(1,(1,(1,(1,1)))))" count=2
+                            value type=NUMERIC span=39-40 text="1" kind=integer overflow=0 i64=1
+                            value type=TUPLE span=41-58 text="(1,(1,(1,(1,1))))" count=2
+                              value type=NUMERIC span=42-43 text="1" kind=integer overflow=0 i64=1
+                              value type=TUPLE span=44-57 text="(1,(1,(1,1)))" count=2
+                                value type=NUMERIC span=45-46 text="1" kind=integer overflow=0 i64=1
+                                value type=TUPLE span=47-56 text="(1,(1,1))" count=2
+                                  value type=NUMERIC span=48-49 text="1" kind=integer overflow=0 i64=1
+                                  value type=TUPLE span=50-55 text="(1,1)" count=2
+                                    value type=NUMERIC span=51-52 text="1" kind=integer overflow=0 i64=1
+                                    value type=NUMERIC span=53-54 text="1" kind=integer overflow=0 i64=1

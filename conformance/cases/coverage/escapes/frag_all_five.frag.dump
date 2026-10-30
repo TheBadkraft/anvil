@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 12
+status ok
+value type=STRING span=1-11 text="\\n\\t\\r\\\\\\\"" decoded="\n\t\r\\\""

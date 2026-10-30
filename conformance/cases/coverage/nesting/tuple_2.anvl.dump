@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 16
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=16
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=TUPLE span=5-14 text="(1,(1,1))" count=2
+      value type=NUMERIC span=6-7 text="1" kind=integer overflow=0 i64=1
+      value type=TUPLE span=8-13 text="(1,1)" count=2
+        value type=NUMERIC span=9-10 text="1" kind=integer overflow=0 i64=1
+        value type=NUMERIC span=11-12 text="1" kind=integer overflow=0 i64=1

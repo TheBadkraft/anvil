@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 6
+status error
+error code=3009 name=ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=7 message="Expected ')' to close tuple content"
