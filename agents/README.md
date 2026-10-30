@@ -21,7 +21,7 @@ that owns the work. Sub-agents last for one task and report only to the Principa
 | **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification` | Sonnet | *new* |
 | **Release Engineer** | `anvl-release-engineer` | `anvl-release` | Sonnet | ANVL Release |
 | **Technical Writer** | `anvl-technical-writer` | `anvl-documentor` | Sonnet | ANVL Documentor |
-| **JS Engineer** | `anvl-js-engineer` | `anvl-js.badkraft` (pending) | Sonnet | *new*: anvil.js, shipped as `anvil-node` |
+| **JS Engineer** | `anvl-js-engineer` | `anvl-js.badkraft` | Sonnet | *new*: anvil.js, shipped as `anvil-node` |
 | **Triage Analyst** | `anvl-triage-analyst` | `anvl-triage` | Haiku | ANVL Triage |
 
 The Rivet handles are unchanged, so ticket history carries over.
