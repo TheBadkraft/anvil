@@ -1,0 +1,8 @@
+anvil-dump 1
+mode document
+input-bytes 22
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=22
+  stmt kind=ASSIGN name="b" name-span=6-7 base="" base-span=none attrs=0
+    value type=BLOB span=12-19 text="payload" tag="" tag-span=none bytes=7061796c6f6164

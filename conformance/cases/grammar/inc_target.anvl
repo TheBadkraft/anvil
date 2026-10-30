@@ -1,0 +1,3 @@
+#!aml
+shared := 1;
+group := { k := 2; };

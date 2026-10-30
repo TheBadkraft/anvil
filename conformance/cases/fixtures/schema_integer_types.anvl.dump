@@ -1,0 +1,13 @@
+anvil-dump 1
+mode document
+input-bytes 72
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=72
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Ordinal" name-span=16-23 base="" base-span=none attrs=0
+    value type=OBJECT span=27-70 text="{\n   type := Numeric;\n   integer := true;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=32-36 base="" base-span=none attrs=0
+        value type=BARE span=40-47 text="Numeric"
+      stmt kind=ASSIGN name="integer" name-span=52-59 base="" base-span=none attrs=0
+        value type=BOOL span=63-67 text="true" bool=true

@@ -1,0 +1,2 @@
+#!aml
+body := `abcdef`;

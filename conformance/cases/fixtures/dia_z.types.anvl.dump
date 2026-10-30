@@ -1,0 +1,11 @@
+anvil-dump 1
+mode document
+input-bytes 50
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=50
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Shared" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-48 text="{\n   type := String;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=31-35 base="" base-span=none attrs=0
+        value type=BARE span=39-45 text="String"

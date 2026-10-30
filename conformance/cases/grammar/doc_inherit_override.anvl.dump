@@ -1,0 +1,18 @@
+anvil-dump 1
+mode document
+input-bytes 54
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=54
+  stmt kind=ASSIGN name="b" name-span=6-7 base="" base-span=none attrs=0
+    value type=OBJECT span=11-30 text="{ k := 1; m := 2; }" count=2
+      stmt kind=ASSIGN name="k" name-span=13-14 base="" base-span=none attrs=0
+        value type=NUMERIC span=18-19 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="m" name-span=21-22 base="" base-span=none attrs=0
+        value type=NUMERIC span=26-27 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="x" name-span=32-33 base="b" base-span=36-37 attrs=0
+    value type=OBJECT span=41-52 text="{ k := 9; }" count=2
+      stmt kind=ASSIGN name="k" name-span=43-44 base="" base-span=none attrs=0
+        value type=NUMERIC span=48-49 text="9" kind=integer overflow=0 i64=9
+      stmt kind=ASSIGN name="m" name-span=21-22 base="" base-span=none attrs=0
+        value type=NUMERIC span=26-27 text="2" kind=integer overflow=0 i64=2

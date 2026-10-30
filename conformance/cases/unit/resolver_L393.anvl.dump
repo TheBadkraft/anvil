@@ -1,0 +1,24 @@
+anvil-dump 1
+mode document
+input-bytes 77
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=77
+  stmt kind=ASSIGN name="a" name-span=6-7 base="" base-span=none attrs=0
+    value type=OBJECT span=11-25 text="{\n   x := 1;\n}" count=1
+      stmt kind=ASSIGN name="x" name-span=16-17 base="" base-span=none attrs=0
+        value type=NUMERIC span=21-22 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="b" name-span=27-28 base="a" base-span=31-32 attrs=0
+    value type=OBJECT span=36-50 text="{\n   y := 2;\n}" count=2
+      stmt kind=ASSIGN name="y" name-span=41-42 base="" base-span=none attrs=0
+        value type=NUMERIC span=46-47 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="x" name-span=16-17 base="" base-span=none attrs=0
+        value type=NUMERIC span=21-22 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="c" name-span=52-53 base="b" base-span=56-57 attrs=0
+    value type=OBJECT span=61-75 text="{\n   z := 3;\n}" count=3
+      stmt kind=ASSIGN name="z" name-span=66-67 base="" base-span=none attrs=0
+        value type=NUMERIC span=71-72 text="3" kind=integer overflow=0 i64=3
+      stmt kind=ASSIGN name="y" name-span=41-42 base="" base-span=none attrs=0
+        value type=NUMERIC span=46-47 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="x" name-span=16-17 base="" base-span=none attrs=0
+        value type=NUMERIC span=21-22 text="1" kind=integer overflow=0 i64=1

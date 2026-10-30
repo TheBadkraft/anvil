@@ -1,0 +1,21 @@
+anvil-dump 1
+mode document
+input-bytes 84
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=84
+  include decl-span=6-37 decl="include \"reg_diamond_left.anvl\"" path-span=14-37 path="\"reg_diamond_left.anvl\"" resolved=1
+  include decl-span=39-71 decl="include \"reg_diamond_right.anvl\"" path-span=47-71 path="\"reg_diamond_right.anvl\"" resolved=3
+  stmt kind=ASSIGN name="root" name-span=73-77 base="" base-span=none attrs=0
+    value type=NUMERIC span=81-82 text="4" kind=integer overflow=0 i64=4
+doc 1 path="reg_diamond_left.anvl" dialect=AML bytes=52
+  include decl-span=6-39 decl="include \"reg_diamond_shared.anvl\"" path-span=14-39 path="\"reg_diamond_shared.anvl\"" resolved=2
+  stmt kind=ASSIGN name="left" name-span=41-45 base="" base-span=none attrs=0
+    value type=NUMERIC span=49-50 text="2" kind=integer overflow=0 i64=2
+doc 2 path="reg_diamond_shared.anvl" dialect=AML bytes=25
+  stmt kind=ASSIGN name="shared_value" name-span=6-18 base="" base-span=none attrs=0
+    value type=NUMERIC span=22-23 text="1" kind=integer overflow=0 i64=1
+doc 3 path="reg_diamond_right.anvl" dialect=AML bytes=53
+  include decl-span=6-39 decl="include \"reg_diamond_shared.anvl\"" path-span=14-39 path="\"reg_diamond_shared.anvl\"" resolved=2
+  stmt kind=ASSIGN name="right" name-span=41-46 base="" base-span=none attrs=0
+    value type=NUMERIC span=50-51 text="3" kind=integer overflow=0 i64=3

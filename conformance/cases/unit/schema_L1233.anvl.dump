@@ -1,0 +1,19 @@
+anvil-dump 1
+mode document
+input-bytes 110
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=110
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="assignee" name-span=16-24 base="" base-span=none attrs=0
+    value type=OBJECT span=28-108 text="{ type := Object; fields := { id := { type := Numeric; required := true; }; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=30-34 base="" base-span=none attrs=0
+        value type=BARE span=38-44 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=46-52 base="" base-span=none attrs=0
+        value type=OBJECT span=56-105 text="{ id := { type := Numeric; required := true; }; }" count=1
+          stmt kind=ASSIGN name="id" name-span=58-60 base="" base-span=none attrs=0
+            value type=OBJECT span=64-102 text="{ type := Numeric; required := true; }" count=2
+              stmt kind=ASSIGN name="type" name-span=66-70 base="" base-span=none attrs=0
+                value type=BARE span=74-81 text="Numeric"
+              stmt kind=ASSIGN name="required" name-span=83-91 base="" base-span=none attrs=0
+                value type=BOOL span=95-99 text="true" bool=true

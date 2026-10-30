@@ -1,0 +1,4 @@
+#!aml
+@[types]
+A := { type := Numeric; min := "x"; max := 1e+999; };
+B := { type := String; size := 2.5; };

@@ -85,3 +85,4 @@ diagnose_tests.c
 
 # Generated binding handoff artifact
 bindings/.handoff/binding-handoff.json
+__pycache__/

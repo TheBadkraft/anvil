@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 141
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=141
+  stmt kind=OBJECT_BLOCK name="label" name-span=94-99 base="" base-span=none attrs=0
+    value type=OBJECT span=100-139 text="{\n   field := 1;\n   other := \"value\";\n}" count=2
+      stmt kind=ASSIGN name="field" name-span=105-110 base="" base-span=none attrs=0
+        value type=NUMERIC span=114-115 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="other" name-span=120-125 base="" base-span=none attrs=0
+        value type=STRING span=130-135 text="value" decoded="value"

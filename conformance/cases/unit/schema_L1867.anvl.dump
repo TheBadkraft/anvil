@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 64
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=64
+  stmt kind=ASSIGN name="image" name-span=6-11 base="" base-span=none attrs=0
+    value type=BLOB span=20-21 text="x" tag="png" tag-span=16-19 bytes=78
+  stmt kind=ASSIGN name="bad_image" name-span=24-33 base="" base-span=none attrs=0
+    value type=BLOB span=42-43 text="x" tag="jpg" tag-span=38-41 bytes=78
+  stmt kind=ASSIGN name="other" name-span=46-51 base="" base-span=none attrs=0
+    value type=BLOB span=60-61 text="x" tag="jpg" tag-span=56-59 bytes=78

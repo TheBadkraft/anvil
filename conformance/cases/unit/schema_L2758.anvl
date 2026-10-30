@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+p := { type := Ghost; nullable := true; };

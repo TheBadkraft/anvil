@@ -1,0 +1,2 @@
+#!aml
+x @[status="done", note="a\"b", type=bug, n=42] := 1;

@@ -1,0 +1,31 @@
+anvil-dump 1
+mode document
+input-bytes 181
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=181
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Half" name-span=15-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-66 text="{ type := Numeric; min := 0.5; max := 10; }" count=3
+      stmt kind=ASSIGN name="type" name-span=25-29 base="" base-span=none attrs=0
+        value type=BARE span=33-40 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=42-45 base="" base-span=none attrs=0
+        value type=NUMERIC span=49-52 text="0.5" kind=float overflow=0 f64=0x3fe0000000000000
+      stmt kind=ASSIGN name="max" name-span=54-57 base="" base-span=none attrs=0
+        value type=NUMERIC span=61-63 text="10" kind=integer overflow=0 i64=10
+  stmt kind=ASSIGN name="Exp" name-span=68-71 base="" base-span=none attrs=0
+    value type=OBJECT span=75-108 text="{ type := Numeric; max := 1e+3; }" count=2
+      stmt kind=ASSIGN name="type" name-span=77-81 base="" base-span=none attrs=0
+        value type=BARE span=85-92 text="Numeric"
+      stmt kind=ASSIGN name="max" name-span=94-97 base="" base-span=none attrs=0
+        value type=NUMERIC span=101-105 text="1e+3" kind=float overflow=0 f64=0x408f400000000000
+  stmt kind=ASSIGN name="Bad" name-span=110-113 base="" base-span=none attrs=0
+    value type=OBJECT span=117-179 text="{ type := Numeric; min := \"abc\"; max := 1e+999; size := 2.5; }" count=4
+      stmt kind=ASSIGN name="type" name-span=119-123 base="" base-span=none attrs=0
+        value type=BARE span=127-134 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=136-139 base="" base-span=none attrs=0
+        value type=STRING span=144-147 text="abc" decoded="abc"
+      stmt kind=ASSIGN name="max" name-span=150-153 base="" base-span=none attrs=0
+        value type=NUMERIC span=157-163 text="1e+999" kind=float overflow=1
+      stmt kind=ASSIGN name="size" name-span=165-169 base="" base-span=none attrs=0
+        value type=NUMERIC span=173-176 text="2.5" kind=float overflow=0 f64=0x4004000000000000

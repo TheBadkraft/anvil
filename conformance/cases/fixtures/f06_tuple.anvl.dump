@@ -1,0 +1,22 @@
+anvil-dump 1
+mode document
+input-bytes 333
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=333
+  stmt kind=ASSIGN name="coords" name-span=260-266 base="" base-span=none attrs=0
+    value type=TUPLE span=270-278 text="(10, 20)" count=2
+      value type=NUMERIC span=271-273 text="10" kind=integer overflow=0 i64=10
+      value type=NUMERIC span=275-277 text="20" kind=integer overflow=0 i64=20
+  stmt kind=ASSIGN name="mixed" name-span=280-285 base="" base-span=none attrs=0
+    value type=TUPLE span=289-305 text="(1, \"two\", true)" count=3
+      value type=NUMERIC span=290-291 text="1" kind=integer overflow=0 i64=1
+      value type=STRING span=294-297 text="two" decoded="two"
+      value type=BOOL span=300-304 text="true" bool=true
+  stmt kind=ASSIGN name="nested" name-span=307-313 base="" base-span=none attrs=0
+    value type=TUPLE span=317-331 text="(1, (2, 3), 4)" count=3
+      value type=NUMERIC span=318-319 text="1" kind=integer overflow=0 i64=1
+      value type=TUPLE span=321-327 text="(2, 3)" count=2
+        value type=NUMERIC span=322-323 text="2" kind=integer overflow=0 i64=2
+        value type=NUMERIC span=325-326 text="3" kind=integer overflow=0 i64=3
+      value type=NUMERIC span=329-330 text="4" kind=integer overflow=0 i64=4

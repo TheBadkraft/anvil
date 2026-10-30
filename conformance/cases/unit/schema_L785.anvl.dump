@@ -1,0 +1,31 @@
+anvil-dump 1
+mode document
+input-bytes 163
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=163
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="a" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-62 text="{ type := Numeric; min := 10; max := 1; }" count=3
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-38 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=40-43 base="" base-span=none attrs=0
+        value type=NUMERIC span=47-49 text="10" kind=integer overflow=0 i64=10
+      stmt kind=ASSIGN name="max" name-span=51-54 base="" base-span=none attrs=0
+        value type=NUMERIC span=58-59 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="b" name-span=64-65 base="" base-span=none attrs=0
+    value type=OBJECT span=69-109 text="{ type := Numeric; min := 1; max := 1; }" count=3
+      stmt kind=ASSIGN name="type" name-span=71-75 base="" base-span=none attrs=0
+        value type=BARE span=79-86 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=88-91 base="" base-span=none attrs=0
+        value type=NUMERIC span=95-96 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="max" name-span=98-101 base="" base-span=none attrs=0
+        value type=NUMERIC span=105-106 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="c" name-span=111-112 base="" base-span=none attrs=0
+    value type=OBJECT span=116-161 text="{ type := Numeric; min := 0.5; max := 0.25; }" count=3
+      stmt kind=ASSIGN name="type" name-span=118-122 base="" base-span=none attrs=0
+        value type=BARE span=126-133 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=135-138 base="" base-span=none attrs=0
+        value type=NUMERIC span=142-145 text="0.5" kind=float overflow=0 f64=0x3fe0000000000000
+      stmt kind=ASSIGN name="max" name-span=147-150 base="" base-span=none attrs=0
+        value type=NUMERIC span=154-158 text="0.25" kind=float overflow=0 f64=0x3fd0000000000000

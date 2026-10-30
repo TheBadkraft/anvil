@@ -1,0 +1,2 @@
+#!amp
+mixed := [1, "two", true, null, three];

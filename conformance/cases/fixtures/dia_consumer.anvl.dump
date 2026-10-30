@@ -1,0 +1,30 @@
+anvil-dump 1
+mode document
+input-bytes 75
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=75
+  include decl-span=6-32 decl="include \"dia_x.types.anvl\"" path-span=14-32 path="\"dia_x.types.anvl\"" resolved=1
+  include decl-span=34-60 decl="include \"dia_y.types.anvl\"" path-span=42-60 path="\"dia_y.types.anvl\"" resolved=3
+  stmt kind=ASSIGN name="plain" name-span=63-68 base="" base-span=none attrs=0
+    value type=NUMERIC span=72-73 text="1" kind=integer overflow=0 i64=1
+doc 1 path="dia_x.types.anvl" dialect=AML bytes=73
+  attr key="types" key-span=36-41 raw="" raw-span=none flag=1
+  include decl-span=6-32 decl="include \"dia_z.types.anvl\"" path-span=14-32 path="\"dia_z.types.anvl\"" resolved=2
+  stmt kind=ASSIGN name="X" name-span=44-45 base="" base-span=none attrs=0
+    value type=OBJECT span=49-71 text="{\n   type := String;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=54-58 base="" base-span=none attrs=0
+        value type=BARE span=62-68 text="String"
+doc 2 path="dia_z.types.anvl" dialect=AML bytes=50
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Shared" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-48 text="{\n   type := String;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=31-35 base="" base-span=none attrs=0
+        value type=BARE span=39-45 text="String"
+doc 3 path="dia_y.types.anvl" dialect=AML bytes=73
+  attr key="types" key-span=36-41 raw="" raw-span=none flag=1
+  include decl-span=6-32 decl="include \"dia_z.types.anvl\"" path-span=14-32 path="\"dia_z.types.anvl\"" resolved=2
+  stmt kind=ASSIGN name="Y" name-span=44-45 base="" base-span=none attrs=0
+    value type=OBJECT span=49-71 text="{\n   type := String;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=54-58 base="" base-span=none attrs=0
+        value type=BARE span=62-68 text="String"

@@ -1,0 +1,17 @@
+anvil-dump 1
+mode document
+input-bytes 127
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=127
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="score" name-span=16-21 base="" base-span=none attrs=0
+    value type=OBJECT span=25-125 text="{ type := Numeric; max := 3; maxxxxxxxxxxxxxxxxxxxxxx := 1; required_by_flywire_extension := true; }" count=4
+      stmt kind=ASSIGN name="type" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-42 text="Numeric"
+      stmt kind=ASSIGN name="max" name-span=44-47 base="" base-span=none attrs=0
+        value type=NUMERIC span=51-52 text="3" kind=integer overflow=0 i64=3
+      stmt kind=ASSIGN name="maxxxxxxxxxxxxxxxxxxxxxx" name-span=54-78 base="" base-span=none attrs=0
+        value type=NUMERIC span=82-83 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="required_by_flywire_extension" name-span=85-114 base="" base-span=none attrs=0
+        value type=BOOL span=118-122 text="true" bool=true

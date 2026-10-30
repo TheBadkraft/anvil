@@ -1,0 +1,7 @@
+#!aml
+base := {
+   x := 1;
+};
+derived : base {
+   y := 2;
+};

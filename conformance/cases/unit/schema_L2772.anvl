@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+p := { type := Ghost; };
+q := { type := String; };

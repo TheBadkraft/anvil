@@ -1,0 +1,18 @@
+anvil-dump 1
+mode document
+input-bytes 434
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=434
+  stmt kind=ASSIGN name="config" name-span=302-308 base="" base-span=none attrs=0
+    value type=OBJECT span=312-356 text="{\n    host := localhost;\n    port := 8080;\n}" count=2
+      stmt kind=ASSIGN name="host" name-span=318-322 base="" base-span=none attrs=0
+        value type=BARE span=326-335 text="localhost"
+      stmt kind=ASSIGN name="port" name-span=341-345 base="" base-span=none attrs=0
+        value type=NUMERIC span=349-353 text="8080" kind=integer overflow=0 i64=8080
+  stmt kind=OBJECT_BLOCK name="document" name-span=359-367 base="" base-span=none attrs=0
+    value type=OBJECT span=368-433 text="{\n    name := \"ANVL For Dummies\";\n    author := \"The Badkraft\";\n}" count=2
+      stmt kind=ASSIGN name="name" name-span=374-378 base="" base-span=none attrs=0
+        value type=STRING span=383-399 text="ANVL For Dummies" decoded="ANVL For Dummies"
+      stmt kind=ASSIGN name="author" name-span=406-412 base="" base-span=none attrs=0
+        value type=STRING span=417-429 text="The Badkraft" decoded="The Badkraft"

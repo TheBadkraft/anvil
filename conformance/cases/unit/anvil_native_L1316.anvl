@@ -1,0 +1,3 @@
+#!aml
+anv45_marker := 7;
+name := "same";

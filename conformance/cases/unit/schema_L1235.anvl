@@ -1,0 +1,2 @@
+#!aml
+assignee := { name := bob; };

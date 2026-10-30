@@ -22,6 +22,7 @@
 #include "anvil.h"
 #include "anvil_flat.h"
 #include "internal/fast_decimal.h"
+#include "internal/flat_internal.h"
 #include "internal/module.h"
 #include "internal/parser.h"
 #include "internal/source.h"
@@ -857,4 +858,19 @@ size_t anvil_attribute_get_value(anvil_attribute attr, char *buf, size_t buflen)
       return copy_to_buffer("", 0, buf, buflen);
    }
    return copy_to_buffer(a->value.start, (size_t)Source.slice_length(a->value), buf, buflen);
+}
+
+/* ---------------------------------------------------------------------- *
+ * Internal accessors (include/internal/flat_internal.h) - not public, not exported.
+ * ---------------------------------------------------------------------- */
+module_context anvil_internal_document_context(anvil_document doc) {
+   return doc ? doc->ctx : NULL;
+}
+
+module_document anvil_internal_document_root(anvil_document doc) {
+   return doc ? doc->root : NULL;
+}
+
+anvl_value anvil_internal_document_fragment(anvil_document doc) {
+   return doc ? doc->fragment_value : NULL;
 }

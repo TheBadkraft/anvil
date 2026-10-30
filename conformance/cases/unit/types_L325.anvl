@@ -1,0 +1,5 @@
+#!aml
+@[types]
+Half := { type := Numeric; min := 0.5; max := 10; };
+Exp := { type := Numeric; max := 1e+3; };
+Bad := { type := Numeric; min := "abc"; max := 1e+999; size := 2.5; };

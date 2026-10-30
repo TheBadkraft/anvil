@@ -1,0 +1,7 @@
+#!aml
+include "schema_blob_types.anvl";
+@[schema]
+
+image := { type := types.Png; };
+bad_image := { type := types.Png; };
+other := { type := types.Png; tag := jpg; };

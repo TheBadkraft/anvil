@@ -1,0 +1,3 @@
+#!aml
+include "../fixtures/resolver_dup_include.anvl";
+shared := 2;

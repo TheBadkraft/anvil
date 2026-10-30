@@ -1,0 +1,4 @@
+#!aml
+
+// neither ':=' nor '{' follows — always a parse error
+name : base;

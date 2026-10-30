@@ -1,0 +1,38 @@
+anvil-dump 1
+mode document
+input-bytes 260
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=260
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  attr key="table" key-span=16-21 raw="assets" raw-span=22-28 flag=0
+    value type=BARE span=22-28 text="assets"
+  stmt kind=ASSIGN name="asset_id" name-span=31-39 base="" base-span=none attrs=0
+    value type=OBJECT span=43-81 text="{ type := Numeric; required := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=45-49 base="" base-span=none attrs=0
+        value type=BARE span=53-60 text="Numeric"
+      stmt kind=ASSIGN name="required" name-span=62-70 base="" base-span=none attrs=0
+        value type=BOOL span=74-78 text="true" bool=true
+  stmt kind=ASSIGN name="name" name-span=83-87 base="" base-span=none attrs=0
+    value type=OBJECT span=91-122 text="{ type := String; size := 20; }" count=2
+      stmt kind=ASSIGN name="type" name-span=93-97 base="" base-span=none attrs=0
+        value type=BARE span=101-107 text="String"
+      stmt kind=ASSIGN name="size" name-span=109-113 base="" base-span=none attrs=0
+        value type=NUMERIC span=117-119 text="20" kind=integer overflow=0 i64=20
+  stmt kind=ASSIGN name="year" name-span=124-128 base="" base-span=none attrs=0
+    value type=OBJECT span=132-178 text="{ type := Numeric; min := 1900; max := 2100; }" count=3
+      stmt kind=ASSIGN name="type" name-span=134-138 base="" base-span=none attrs=0
+        value type=BARE span=142-149 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=151-154 base="" base-span=none attrs=0
+        value type=NUMERIC span=158-162 text="1900" kind=integer overflow=0 i64=1900
+      stmt kind=ASSIGN name="max" name-span=164-167 base="" base-span=none attrs=0
+        value type=NUMERIC span=171-175 text="2100" kind=integer overflow=0 i64=2100
+  stmt kind=ASSIGN name="status" name-span=180-186 base="" base-span=none attrs=0
+    value type=OBJECT span=190-258 text="{ type := enum; values := [ active, maintenance, out_of_service ]; }" count=2
+      stmt kind=ASSIGN name="type" name-span=192-196 base="" base-span=none attrs=0
+        value type=BARE span=200-204 text="enum"
+      stmt kind=ASSIGN name="values" name-span=206-212 base="" base-span=none attrs=0
+        value type=ARRAY span=216-255 text="[ active, maintenance, out_of_service ]" count=3
+          value type=BARE span=218-224 text="active"
+          value type=BARE span=226-237 text="maintenance"
+          value type=BARE span=239-253 text="out_of_service"

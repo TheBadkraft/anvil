@@ -1,0 +1,3 @@
+#!aml
+@[a=nullable, b=true, c=null, d=falsey]
+x @[e=nulls, f=false, g=truely, h=null] := 1;

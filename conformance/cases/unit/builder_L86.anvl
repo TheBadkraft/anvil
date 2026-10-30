@@ -1,0 +1,14 @@
+#!aml
+
+name := David;
+n := -1.5e+3;
+yes := true;
+no := false;
+nothing := null;
+s := "a \"q\" \\ b\n\t\r";
+empty := "";
+tagged := @date`2026-07-07`;
+untagged := `raw`;
+alias := $name;
+i := -9223372036854775808;
+d := 1e+20;

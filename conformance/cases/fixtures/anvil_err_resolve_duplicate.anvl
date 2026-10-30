@@ -1,0 +1,5 @@
+#!aml
+
+include "resolver_dup_include.anvl";
+
+shared := 2;

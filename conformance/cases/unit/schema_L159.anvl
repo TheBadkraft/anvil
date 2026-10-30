@@ -1,0 +1,4 @@
+#!aml
+asset_id := 1;
+name := "widget";
+extra := true;

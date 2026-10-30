@@ -1,0 +1,3 @@
+#!asl
+
+greet (name, greeting = "Hello") => { };

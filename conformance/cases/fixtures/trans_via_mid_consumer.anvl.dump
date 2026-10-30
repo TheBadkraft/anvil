@@ -1,0 +1,24 @@
+anvil-dump 1
+mode document
+input-bytes 73
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=73
+  attr key="schema" key-span=34-40 raw="" raw-span=none flag=1
+  include decl-span=6-30 decl="include \"trans_mid.anvl\"" path-span=14-30 path="\"trans_mid.anvl\"" resolved=1
+  stmt kind=ASSIGN name="ref" name-span=43-46 base="" base-span=none attrs=0
+    value type=OBJECT span=50-71 text="{ type := types.Id; }" count=1
+      stmt kind=ASSIGN name="type" name-span=52-56 base="" base-span=none attrs=0
+        value type=BARE span=60-68 text="types.Id"
+doc 1 path="trans_mid.anvl" dialect=AML bytes=49
+  include decl-span=6-34 decl="include \"trans_b.types.anvl\"" path-span=14-34 path="\"trans_b.types.anvl\"" resolved=2
+  stmt kind=ASSIGN name="plain" name-span=37-42 base="" base-span=none attrs=0
+    value type=NUMERIC span=46-47 text="1" kind=integer overflow=0 i64=1
+doc 2 path="trans_b.types.anvl" dialect=AML bytes=60
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Id" name-span=16-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-58 text="{\n   type := Numeric;\n   min := 1;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=27-31 base="" base-span=none attrs=0
+        value type=BARE span=35-42 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=47-50 base="" base-span=none attrs=0
+        value type=NUMERIC span=54-55 text="1" kind=integer overflow=0 i64=1

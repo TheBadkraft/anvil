@@ -1,0 +1,9 @@
+#!aml
+
+
+/* ************************************ *
+ * Multi-line block comment:            *
+ * The basic bare literal entry         *
+ * ************************************ */
+val := null;
+name := David;

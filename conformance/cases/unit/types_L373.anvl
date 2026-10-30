@@ -1,0 +1,4 @@
+#!aml
+@[types]
+%s := { type := String; size := 3; };
+%s := { type := Numeric; };

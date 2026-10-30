@@ -1,0 +1,3 @@
+#!aml
+body := `multi-line
+text`;

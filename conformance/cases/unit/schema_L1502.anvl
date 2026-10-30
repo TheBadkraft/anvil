@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+x := { type := Numeric; };

@@ -1,0 +1,10 @@
+anvil-dump 1
+mode document
+input-bytes 38
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=38
+  stmt kind=ASSIGN name="x" name-span=6-7 base="" base-span=none attrs=0
+    value type=STRING span=12-20 text="nullable" decoded="nullable"
+  stmt kind=ASSIGN name="z" name-span=23-24 base="" base-span=none attrs=0
+    value type=BARE span=28-36 text="includes"

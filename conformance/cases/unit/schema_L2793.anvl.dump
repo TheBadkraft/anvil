@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 38
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=38
+  stmt kind=ASSIGN name="set" name-span=6-9 base="" base-span=none attrs=0
+    value type=OBJECT span=13-36 text="{ p := 1; extra := 2; }" count=2
+      stmt kind=ASSIGN name="p" name-span=15-16 base="" base-span=none attrs=0
+        value type=NUMERIC span=20-21 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="extra" name-span=23-28 base="" base-span=none attrs=0
+        value type=NUMERIC span=32-33 text="2" kind=integer overflow=0 i64=2

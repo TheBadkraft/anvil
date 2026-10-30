@@ -1,0 +1,19 @@
+anvil-dump 1
+mode document
+input-bytes 108
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=108
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="labels" name-span=16-22 base="" base-span=none attrs=0
+    value type=OBJECT span=26-106 text="{ type := Array; min_items := 2; max_items := 3; items := { type := String; }; }" count=4
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-41 text="Array"
+      stmt kind=ASSIGN name="min_items" name-span=43-52 base="" base-span=none attrs=0
+        value type=NUMERIC span=56-57 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="max_items" name-span=59-68 base="" base-span=none attrs=0
+        value type=NUMERIC span=72-73 text="3" kind=integer overflow=0 i64=3
+      stmt kind=ASSIGN name="items" name-span=75-80 base="" base-span=none attrs=0
+        value type=OBJECT span=84-103 text="{ type := String; }" count=1
+          stmt kind=ASSIGN name="type" name-span=86-90 base="" base-span=none attrs=0
+            value type=BARE span=94-100 text="String"

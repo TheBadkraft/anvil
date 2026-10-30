@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 41
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=41
+  stmt kind=OBJECT_BLOCK name="foo" name-span=6-9 base="" base-span=none attrs=0
+    value type=OBJECT span=10-24 text="{\n   x := 1;\n}" count=1
+      stmt kind=ASSIGN name="x" name-span=15-16 base="" base-span=none attrs=0
+        value type=NUMERIC span=20-21 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="alias" name-span=26-31 base="" base-span=none attrs=0
+    value type=VARREF span=35-39 text="$foo" target="foo" public=NULL resolved=0

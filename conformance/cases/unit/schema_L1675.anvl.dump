@@ -1,0 +1,17 @@
+anvil-dump 1
+mode document
+input-bytes 87
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=87
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="priority" name-span=16-24 base="" base-span=none attrs=0
+    value type=OBJECT span=28-85 text="{ type := Numeric; integer := true; min := 1; max := 4; }" count=4
+      stmt kind=ASSIGN name="type" name-span=30-34 base="" base-span=none attrs=0
+        value type=BARE span=38-45 text="Numeric"
+      stmt kind=ASSIGN name="integer" name-span=47-54 base="" base-span=none attrs=0
+        value type=BOOL span=58-62 text="true" bool=true
+      stmt kind=ASSIGN name="min" name-span=64-67 base="" base-span=none attrs=0
+        value type=NUMERIC span=71-72 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="max" name-span=74-77 base="" base-span=none attrs=0
+        value type=NUMERIC span=81-82 text="4" kind=integer overflow=0 i64=4

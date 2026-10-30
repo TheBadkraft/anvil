@@ -1,0 +1,7 @@
+#!aml
+include "dia_z.types.anvl";
+@[types]
+
+Y := {
+   type := String;
+};

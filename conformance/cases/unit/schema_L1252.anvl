@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+labels := { type := Array; items := { type := String; values := [ bug, feature ]; }; };

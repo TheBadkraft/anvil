@@ -1,0 +1,28 @@
+anvil-dump 1
+mode document
+input-bytes 271
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=271
+  attr key="schema" key-span=42-48 raw="" raw-span=none flag=1
+  include decl-span=6-38 decl="include \"schema_long_types.anvl\"" path-span=14-38 path="\"schema_long_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="ref_b" name-span=51-56 base="" base-span=none attrs=0
+    value type=OBJECT span=60-159 text="{ type := types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxBBBBBBBBBBBBBBBBB; }" count=1
+      stmt kind=ASSIGN name="type" name-span=62-66 base="" base-span=none attrs=0
+        value type=BARE span=70-156 text="types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxBBBBBBBBBBBBBBBBB"
+  stmt kind=ASSIGN name="ref_a" name-span=161-166 base="" base-span=none attrs=0
+    value type=OBJECT span=170-269 text="{ type := types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxAAAAAAAAAAAAAAAAA; }" count=1
+      stmt kind=ASSIGN name="type" name-span=172-176 base="" base-span=none attrs=0
+        value type=BARE span=180-266 text="types.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxAAAAAAAAAAAAAAAAA"
+doc 1 path="schema_long_types.anvl" dialect=AML bytes=248
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxBBBBBBBBBBBBBBBBB" name-span=16-96 base="" base-span=none attrs=0
+    value type=OBJECT span=100-136 text="{\n   type := String;\n   size := 3;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=105-109 base="" base-span=none attrs=0
+        value type=BARE span=113-119 text="String"
+      stmt kind=ASSIGN name="size" name-span=124-128 base="" base-span=none attrs=0
+        value type=NUMERIC span=132-133 text="3" kind=integer overflow=0 i64=3
+  stmt kind=ASSIGN name="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxAAAAAAAAAAAAAAAAA" name-span=139-219 base="" base-span=none attrs=0
+    value type=OBJECT span=223-246 text="{\n   type := Numeric;\n}" count=1
+      stmt kind=ASSIGN name="type" name-span=228-232 base="" base-span=none attrs=0
+        value type=BARE span=236-243 text="Numeric"

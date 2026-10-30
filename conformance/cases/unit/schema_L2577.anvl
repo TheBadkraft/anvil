@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+v := { type := String; values := [ "a" ]; };

@@ -1,0 +1,4 @@
+#!amp
+label {
+   field := 1;
+};

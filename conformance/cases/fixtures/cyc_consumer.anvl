@@ -1,0 +1,4 @@
+#!aml
+include "cyc_a.types.anvl";
+
+plain := 1;

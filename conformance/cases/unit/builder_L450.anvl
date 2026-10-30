@@ -1,0 +1,7 @@
+#!aml
+
+cfg @[late] := {
+   host := h;
+   port := 1;
+   tls := true;
+};

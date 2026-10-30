@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+n := { type := Numeric; integer := maybe; };

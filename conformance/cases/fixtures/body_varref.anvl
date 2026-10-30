@@ -1,0 +1,7 @@
+#!aml
+
+// AML has no dynamic var-refs or interpolation (reserved for AnvilScript);
+// cross-statement reference is always a static, resolve-once '$identifier'.
+name := David;
+alias := $name;
+wrapped := [$name, "static"];

@@ -1,0 +1,13 @@
+#!aml
+include "schema_introspect_types.anvl";
+@[schema]
+
+id := { type := types.Id32; required := true; pooled := true; mask := [ 1, 2, 4 ]; };
+status := { type := types.Status; nullable := true; };
+created := { type := types.Timestamp; };
+img := { type := types.Png; size := 100; };
+score := { type := Numeric; min := 0.5; max := 1e+3; };
+name := { type := String; size := 40; };
+bare := { pooled := false; };
+labels := { type := Array; min_items := 1; max_items := 5; items := { type := String; values := [ bug, feature ]; extra_note := "item"; }; };
+owner := { type := Object; fields := { uid := { type := Numeric; required := true; }; nick := { type := String; }; }; };

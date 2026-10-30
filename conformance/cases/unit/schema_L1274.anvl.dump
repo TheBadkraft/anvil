@@ -1,0 +1,21 @@
+anvil-dump 1
+mode document
+input-bytes 125
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=125
+  stmt kind=ASSIGN name="links" name-span=6-11 base="" base-span=none attrs=0
+    value type=ARRAY span=15-123 text="[ { kind := blocks; target := 1; }, { kind := bogus; target := 2; },\n                 { kind := relates; } ]" count=3
+      value type=OBJECT span=17-49 text="{ kind := blocks; target := 1; }" count=2
+        stmt kind=ASSIGN name="kind" name-span=19-23 base="" base-span=none attrs=0
+          value type=BARE span=27-33 text="blocks"
+        stmt kind=ASSIGN name="target" name-span=35-41 base="" base-span=none attrs=0
+          value type=NUMERIC span=45-46 text="1" kind=integer overflow=0 i64=1
+      value type=OBJECT span=51-82 text="{ kind := bogus; target := 2; }" count=2
+        stmt kind=ASSIGN name="kind" name-span=53-57 base="" base-span=none attrs=0
+          value type=BARE span=61-66 text="bogus"
+        stmt kind=ASSIGN name="target" name-span=68-74 base="" base-span=none attrs=0
+          value type=NUMERIC span=78-79 text="2" kind=integer overflow=0 i64=2
+      value type=OBJECT span=101-121 text="{ kind := relates; }" count=1
+        stmt kind=ASSIGN name="kind" name-span=103-107 base="" base-span=none attrs=0
+          value type=BARE span=111-118 text="relates"

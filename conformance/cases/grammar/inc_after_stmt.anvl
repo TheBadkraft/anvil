@@ -1,0 +1,3 @@
+#!aml
+x := 1;
+include "inc_target.anvl";

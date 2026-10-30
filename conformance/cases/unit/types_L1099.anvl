@@ -1,0 +1,5 @@
+#!aml
+@[types]
+VIN := { type := String; size := 17; };
+Half := { type := Numeric; min := 0.5; };
+Bad := { type := Strng; };

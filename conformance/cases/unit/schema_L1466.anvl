@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+assignee := { type := Object; required := true; fields := {
+   id := { type := Numeric; required := true; }; }; };

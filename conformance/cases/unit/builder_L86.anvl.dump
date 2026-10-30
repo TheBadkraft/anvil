@@ -1,0 +1,31 @@
+anvil-dump 1
+mode document
+input-bytes 222
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=222
+  stmt kind=ASSIGN name="name" name-span=7-11 base="" base-span=none attrs=0
+    value type=BARE span=15-20 text="David"
+  stmt kind=ASSIGN name="n" name-span=22-23 base="" base-span=none attrs=0
+    value type=NUMERIC span=27-34 text="-1.5e+3" kind=float overflow=0 f64=0xc097700000000000
+  stmt kind=ASSIGN name="yes" name-span=36-39 base="" base-span=none attrs=0
+    value type=BOOL span=43-47 text="true" bool=true
+  stmt kind=ASSIGN name="no" name-span=49-51 base="" base-span=none attrs=0
+    value type=BOOL span=55-60 text="false" bool=false
+  stmt kind=ASSIGN name="nothing" name-span=62-69 base="" base-span=none attrs=0
+    value type=NULL span=73-77 text="null"
+  stmt kind=ASSIGN name="s" name-span=79-80 base="" base-span=none attrs=0
+    value type=STRING span=85-103 text="a \\\"q\\\" \\\\ b\\n\\t\\r" decoded="a \"q\" \\ b\n\t\r"
+  stmt kind=ASSIGN name="empty" name-span=106-111 base="" base-span=none attrs=0
+    value type=STRING span=116-116 text="" decoded=""
+  stmt kind=ASSIGN name="tagged" name-span=119-125 base="" base-span=none attrs=0
+    value type=BLOB span=135-145 text="2026-07-07" tag="date" tag-span=130-134 bytes=323032362d30372d3037
+  stmt kind=ASSIGN name="untagged" name-span=148-156 base="" base-span=none attrs=0
+    value type=BLOB span=161-164 text="raw" tag="" tag-span=none bytes=726177
+  stmt kind=ASSIGN name="alias" name-span=167-172 base="" base-span=none attrs=0
+    value type=VARREF span=176-181 text="$name" target="name" public=BARE resolved=1
+      value type=BARE span=15-20 text="David"
+  stmt kind=ASSIGN name="i" name-span=183-184 base="" base-span=none attrs=0
+    value type=NUMERIC span=188-208 text="-9223372036854775808" kind=integer overflow=0 i64=-9223372036854775808
+  stmt kind=ASSIGN name="d" name-span=210-211 base="" base-span=none attrs=0
+    value type=NUMERIC span=215-220 text="1e+20" kind=float overflow=0 f64=0x4415af1d78b58c40

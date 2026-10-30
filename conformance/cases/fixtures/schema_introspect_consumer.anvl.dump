@@ -1,0 +1,121 @@
+anvil-dump 1
+mode document
+input-bytes 673
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=673
+  attr key="schema" key-span=48-54 raw="" raw-span=none flag=1
+  include decl-span=6-44 decl="include \"schema_introspect_types.anvl\"" path-span=14-44 path="\"schema_introspect_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="id" name-span=57-59 base="" base-span=none attrs=0
+    value type=OBJECT span=63-141 text="{ type := types.Id32; required := true; pooled := true; mask := [ 1, 2, 4 ]; }" count=4
+      stmt kind=ASSIGN name="type" name-span=65-69 base="" base-span=none attrs=0
+        value type=BARE span=73-83 text="types.Id32"
+      stmt kind=ASSIGN name="required" name-span=85-93 base="" base-span=none attrs=0
+        value type=BOOL span=97-101 text="true" bool=true
+      stmt kind=ASSIGN name="pooled" name-span=103-109 base="" base-span=none attrs=0
+        value type=BOOL span=113-117 text="true" bool=true
+      stmt kind=ASSIGN name="mask" name-span=119-123 base="" base-span=none attrs=0
+        value type=ARRAY span=127-138 text="[ 1, 2, 4 ]" count=3
+          value type=NUMERIC span=129-130 text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC span=132-133 text="2" kind=integer overflow=0 i64=2
+          value type=NUMERIC span=135-136 text="4" kind=integer overflow=0 i64=4
+  stmt kind=ASSIGN name="status" name-span=143-149 base="" base-span=none attrs=0
+    value type=OBJECT span=153-196 text="{ type := types.Status; nullable := true; }" count=2
+      stmt kind=ASSIGN name="type" name-span=155-159 base="" base-span=none attrs=0
+        value type=BARE span=163-175 text="types.Status"
+      stmt kind=ASSIGN name="nullable" name-span=177-185 base="" base-span=none attrs=0
+        value type=BOOL span=189-193 text="true" bool=true
+  stmt kind=ASSIGN name="created" name-span=198-205 base="" base-span=none attrs=0
+    value type=OBJECT span=209-237 text="{ type := types.Timestamp; }" count=1
+      stmt kind=ASSIGN name="type" name-span=211-215 base="" base-span=none attrs=0
+        value type=BARE span=219-234 text="types.Timestamp"
+  stmt kind=ASSIGN name="img" name-span=239-242 base="" base-span=none attrs=0
+    value type=OBJECT span=246-281 text="{ type := types.Png; size := 100; }" count=2
+      stmt kind=ASSIGN name="type" name-span=248-252 base="" base-span=none attrs=0
+        value type=BARE span=256-265 text="types.Png"
+      stmt kind=ASSIGN name="size" name-span=267-271 base="" base-span=none attrs=0
+        value type=NUMERIC span=275-278 text="100" kind=integer overflow=0 i64=100
+  stmt kind=ASSIGN name="score" name-span=283-288 base="" base-span=none attrs=0
+    value type=OBJECT span=292-337 text="{ type := Numeric; min := 0.5; max := 1e+3; }" count=3
+      stmt kind=ASSIGN name="type" name-span=294-298 base="" base-span=none attrs=0
+        value type=BARE span=302-309 text="Numeric"
+      stmt kind=ASSIGN name="min" name-span=311-314 base="" base-span=none attrs=0
+        value type=NUMERIC span=318-321 text="0.5" kind=float overflow=0 f64=0x3fe0000000000000
+      stmt kind=ASSIGN name="max" name-span=323-326 base="" base-span=none attrs=0
+        value type=NUMERIC span=330-334 text="1e+3" kind=float overflow=0 f64=0x408f400000000000
+  stmt kind=ASSIGN name="name" name-span=339-343 base="" base-span=none attrs=0
+    value type=OBJECT span=347-378 text="{ type := String; size := 40; }" count=2
+      stmt kind=ASSIGN name="type" name-span=349-353 base="" base-span=none attrs=0
+        value type=BARE span=357-363 text="String"
+      stmt kind=ASSIGN name="size" name-span=365-369 base="" base-span=none attrs=0
+        value type=NUMERIC span=373-375 text="40" kind=integer overflow=0 i64=40
+  stmt kind=ASSIGN name="bare" name-span=380-384 base="" base-span=none attrs=0
+    value type=OBJECT span=388-408 text="{ pooled := false; }" count=1
+      stmt kind=ASSIGN name="pooled" name-span=390-396 base="" base-span=none attrs=0
+        value type=BOOL span=400-405 text="false" bool=false
+  stmt kind=ASSIGN name="labels" name-span=410-416 base="" base-span=none attrs=0
+    value type=OBJECT span=420-550 text="{ type := Array; min_items := 1; max_items := 5; items := { type := String; values := [ bug, feature ]; extra_note := \"item\"; }; }" count=4
+      stmt kind=ASSIGN name="type" name-span=422-426 base="" base-span=none attrs=0
+        value type=BARE span=430-435 text="Array"
+      stmt kind=ASSIGN name="min_items" name-span=437-446 base="" base-span=none attrs=0
+        value type=NUMERIC span=450-451 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="max_items" name-span=453-462 base="" base-span=none attrs=0
+        value type=NUMERIC span=466-467 text="5" kind=integer overflow=0 i64=5
+      stmt kind=ASSIGN name="items" name-span=469-474 base="" base-span=none attrs=0
+        value type=OBJECT span=478-547 text="{ type := String; values := [ bug, feature ]; extra_note := \"item\"; }" count=3
+          stmt kind=ASSIGN name="type" name-span=480-484 base="" base-span=none attrs=0
+            value type=BARE span=488-494 text="String"
+          stmt kind=ASSIGN name="values" name-span=496-502 base="" base-span=none attrs=0
+            value type=ARRAY span=506-522 text="[ bug, feature ]" count=2
+              value type=BARE span=508-511 text="bug"
+              value type=BARE span=513-520 text="feature"
+          stmt kind=ASSIGN name="extra_note" name-span=524-534 base="" base-span=none attrs=0
+            value type=STRING span=539-543 text="item" decoded="item"
+  stmt kind=ASSIGN name="owner" name-span=552-557 base="" base-span=none attrs=0
+    value type=OBJECT span=561-671 text="{ type := Object; fields := { uid := { type := Numeric; required := true; }; nick := { type := String; }; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=563-567 base="" base-span=none attrs=0
+        value type=BARE span=571-577 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=579-585 base="" base-span=none attrs=0
+        value type=OBJECT span=589-668 text="{ uid := { type := Numeric; required := true; }; nick := { type := String; }; }" count=2
+          stmt kind=ASSIGN name="uid" name-span=591-594 base="" base-span=none attrs=0
+            value type=OBJECT span=598-636 text="{ type := Numeric; required := true; }" count=2
+              stmt kind=ASSIGN name="type" name-span=600-604 base="" base-span=none attrs=0
+                value type=BARE span=608-615 text="Numeric"
+              stmt kind=ASSIGN name="required" name-span=617-625 base="" base-span=none attrs=0
+                value type=BOOL span=629-633 text="true" bool=true
+          stmt kind=ASSIGN name="nick" name-span=638-642 base="" base-span=none attrs=0
+            value type=OBJECT span=646-665 text="{ type := String; }" count=1
+              stmt kind=ASSIGN name="type" name-span=648-652 base="" base-span=none attrs=0
+                value type=BARE span=656-662 text="String"
+doc 1 path="schema_introspect_types.anvl" dialect=AML bytes=282
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Id32" name-span=16-20 base="" base-span=none attrs=0
+    value type=OBJECT span=24-102 text="{\n   type := Numeric;\n   integer := true;\n   min := 0;\n   max := 2147483647;\n}" count=4
+      stmt kind=ASSIGN name="type" name-span=29-33 base="" base-span=none attrs=0
+        value type=BARE span=37-44 text="Numeric"
+      stmt kind=ASSIGN name="integer" name-span=49-56 base="" base-span=none attrs=0
+        value type=BOOL span=60-64 text="true" bool=true
+      stmt kind=ASSIGN name="min" name-span=69-72 base="" base-span=none attrs=0
+        value type=NUMERIC span=76-77 text="0" kind=integer overflow=0 i64=0
+      stmt kind=ASSIGN name="max" name-span=82-85 base="" base-span=none attrs=0
+        value type=NUMERIC span=89-99 text="2147483647" kind=integer overflow=0 i64=2147483647
+  stmt kind=ASSIGN name="Status" name-span=105-111 base="" base-span=none attrs=0
+    value type=OBJECT span=115-166 text="{\n   type := enum;\n   values := [ open, closed ];\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=120-124 base="" base-span=none attrs=0
+        value type=BARE span=128-132 text="enum"
+      stmt kind=ASSIGN name="values" name-span=137-143 base="" base-span=none attrs=0
+        value type=ARRAY span=147-163 text="[ open, closed ]" count=2
+          value type=BARE span=149-153 text="open"
+          value type=BARE span=155-161 text="closed"
+  stmt kind=ASSIGN name="Timestamp" name-span=169-178 base="" base-span=none attrs=0
+    value type=OBJECT span=182-235 text="{\n   type := String;\n   format := iso8601_datetime;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=187-191 base="" base-span=none attrs=0
+        value type=BARE span=195-201 text="String"
+      stmt kind=ASSIGN name="format" name-span=206-212 base="" base-span=none attrs=0
+        value type=BARE span=216-232 text="iso8601_datetime"
+  stmt kind=ASSIGN name="Png" name-span=238-241 base="" base-span=none attrs=0
+    value type=OBJECT span=245-280 text="{\n   type := Blob;\n   tag := png;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=250-254 base="" base-span=none attrs=0
+        value type=BARE span=258-262 text="Blob"
+      stmt kind=ASSIGN name="tag" name-span=267-270 base="" base-span=none attrs=0
+        value type=BARE span=274-277 text="png"

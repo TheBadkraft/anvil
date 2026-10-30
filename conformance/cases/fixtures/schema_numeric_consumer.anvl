@@ -1,0 +1,5 @@
+#!aml
+include "schema_numeric_types.anvl";
+@[schema]
+
+share := { type := types.Ratio; };

@@ -1,0 +1,15 @@
+anvil-dump 1
+mode document
+input-bytes 58
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=58
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  attr key="table" key-span=16-21 raw="assets" raw-span=22-28 flag=0
+    value type=BARE span=22-28 text="assets"
+  attr key="active" key-span=30-36 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="x" name-span=38-39 base="" base-span=none attrs=2
+    attr key="hot" key-span=42-45 raw="" raw-span=none flag=1
+    attr key="k" key-span=47-48 raw="v" raw-span=49-50 flag=0
+      value type=BARE span=49-50 text="v"
+    value type=NUMERIC span=55-56 text="1" kind=integer overflow=0 i64=1

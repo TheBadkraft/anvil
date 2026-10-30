@@ -1,0 +1,38 @@
+anvil-dump 1
+mode document
+input-bytes 250
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=250
+  attr key="schema" key-span=44-50 raw="" raw-span=none flag=1
+  include decl-span=6-40 decl="include \"schema_format_types.anvl\"" path-span=14-40 path="\"schema_format_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="created_at" name-span=53-63 base="" base-span=none attrs=0
+    value type=OBJECT span=67-95 text="{ type := types.Timestamp; }" count=1
+      stmt kind=ASSIGN name="type" name-span=69-73 base="" base-span=none attrs=0
+        value type=BARE span=77-92 text="types.Timestamp"
+  stmt kind=ASSIGN name="other" name-span=97-102 base="" base-span=none attrs=0
+    value type=OBJECT span=106-125 text="{ type := String; }" count=1
+      stmt kind=ASSIGN name="type" name-span=108-112 base="" base-span=none attrs=0
+        value type=BARE span=116-122 text="String"
+  stmt kind=ASSIGN name="body" name-span=127-131 base="" base-span=none attrs=0
+    value type=OBJECT span=135-163 text="{ type := types.Timestamp; }" count=1
+      stmt kind=ASSIGN name="type" name-span=137-141 base="" base-span=none attrs=0
+        value type=BARE span=145-160 text="types.Timestamp"
+  stmt kind=ASSIGN name="bad_body" name-span=165-173 base="" base-span=none attrs=0
+    value type=OBJECT span=177-205 text="{ type := types.Timestamp; }" count=1
+      stmt kind=ASSIGN name="type" name-span=179-183 base="" base-span=none attrs=0
+        value type=BARE span=187-202 text="types.Timestamp"
+  stmt kind=ASSIGN name="n" name-span=207-208 base="" base-span=none attrs=0
+    value type=OBJECT span=212-248 text="{ type := Numeric; format := uuid; }" count=2
+      stmt kind=ASSIGN name="type" name-span=214-218 base="" base-span=none attrs=0
+        value type=BARE span=222-229 text="Numeric"
+      stmt kind=ASSIGN name="format" name-span=231-237 base="" base-span=none attrs=0
+        value type=BARE span=241-245 text="uuid"
+doc 1 path="schema_format_types.anvl" dialect=AML bytes=84
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Timestamp" name-span=16-25 base="" base-span=none attrs=0
+    value type=OBJECT span=29-82 text="{\n   type := String;\n   format := iso8601_datetime;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=34-38 base="" base-span=none attrs=0
+        value type=BARE span=42-48 text="String"
+      stmt kind=ASSIGN name="format" name-span=53-59 base="" base-span=none attrs=0
+        value type=BARE span=63-79 text="iso8601_datetime"

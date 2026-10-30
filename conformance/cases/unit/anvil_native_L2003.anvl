@@ -1,0 +1,5 @@
+#!aml
+@[kind=bug	,
+  range=1..5
+]
+x := 1;

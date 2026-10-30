@@ -1,0 +1,7 @@
+#!aml
+include "cyc_a.types.anvl";
+@[types]
+
+Beta := {
+   type := Numeric;
+};

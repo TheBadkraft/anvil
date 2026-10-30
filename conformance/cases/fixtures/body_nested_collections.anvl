@@ -1,0 +1,7 @@
+#!aml
+
+// array-of-arrays: an array element that is itself an array
+grid := [[1, 2, 3], [4, 5, 6]];
+
+// object-as-tuple-element: a tuple element that is itself an object
+player := (Aria, { health := 100; stamina := 50; }, warrior);

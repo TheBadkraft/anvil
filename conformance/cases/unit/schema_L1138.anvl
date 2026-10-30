@@ -1,0 +1,2 @@
+#!aml
+set := { status := bogus; title := 5; extra := 1; };

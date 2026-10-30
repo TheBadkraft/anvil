@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+x := { pooled := true; };

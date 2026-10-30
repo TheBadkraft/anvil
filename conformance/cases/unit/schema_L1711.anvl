@@ -1,0 +1,4 @@
+#!aml
+inherits := 2.5;
+relaxed := 2.5;
+restated := 2.5;

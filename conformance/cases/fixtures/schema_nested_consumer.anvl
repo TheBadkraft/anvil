@@ -1,0 +1,7 @@
+#!aml
+include "schema_nested_types.anvl";
+@[schema]
+
+owner := { type := types.Person; };
+reporter := { type := types.Person; };
+override := { type := types.Person; fields := { code := { type := String; }; }; };

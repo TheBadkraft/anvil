@@ -1,0 +1,2 @@
+#!amp
+config := { host := localhost; };

@@ -1,0 +1,5 @@
+anvil-dump 1
+mode fragment
+input-bytes 1
+status ok
+value type=NUMERIC span=0-1 text="0" kind=integer overflow=0 i64=0

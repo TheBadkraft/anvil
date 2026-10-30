@@ -1,0 +1,27 @@
+anvil-dump 1
+mode document
+input-bytes 158
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=158
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Good" name-span=15-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-85 text="{ type := Object; fields := { id := { type := Numeric; }; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=25-29 base="" base-span=none attrs=0
+        value type=BARE span=33-39 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=41-47 base="" base-span=none attrs=0
+        value type=OBJECT span=51-82 text="{ id := { type := Numeric; }; }" count=1
+          stmt kind=ASSIGN name="id" name-span=53-55 base="" base-span=none attrs=0
+            value type=OBJECT span=59-79 text="{ type := Numeric; }" count=1
+              stmt kind=ASSIGN name="type" name-span=61-65 base="" base-span=none attrs=0
+                value type=BARE span=69-76 text="Numeric"
+  stmt kind=ASSIGN name="Plain" name-span=87-92 base="" base-span=none attrs=0
+    value type=OBJECT span=96-115 text="{ type := Object; }" count=1
+      stmt kind=ASSIGN name="type" name-span=98-102 base="" base-span=none attrs=0
+        value type=BARE span=106-112 text="Object"
+  stmt kind=ASSIGN name="Bad" name-span=117-120 base="" base-span=none attrs=0
+    value type=OBJECT span=124-156 text="{ type := Object; fields := 5; }" count=2
+      stmt kind=ASSIGN name="type" name-span=126-130 base="" base-span=none attrs=0
+        value type=BARE span=134-140 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=142-148 base="" base-span=none attrs=0
+        value type=NUMERIC span=152-153 text="5" kind=integer overflow=0 i64=5

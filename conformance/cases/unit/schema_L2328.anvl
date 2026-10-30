@@ -1,0 +1,3 @@
+#!aml
+name := "ok";
+extra := 1;

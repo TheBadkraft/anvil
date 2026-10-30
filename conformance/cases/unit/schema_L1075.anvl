@@ -1,0 +1,2 @@
+#!aml
+set := [ { title := "a"; }, { status := open; } ];

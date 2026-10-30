@@ -1,0 +1,30 @@
+anvil-dump 1
+mode document
+input-bytes 166
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=166
+  attr key="schema" key-span=42-48 raw="" raw-span=none flag=1
+  include decl-span=6-38 decl="include \"schema_blob_types.anvl\"" path-span=14-38 path="\"schema_blob_types.anvl\"" resolved=1
+  stmt kind=ASSIGN name="image" name-span=51-56 base="" base-span=none attrs=0
+    value type=OBJECT span=60-82 text="{ type := types.Png; }" count=1
+      stmt kind=ASSIGN name="type" name-span=62-66 base="" base-span=none attrs=0
+        value type=BARE span=70-79 text="types.Png"
+  stmt kind=ASSIGN name="bad_image" name-span=84-93 base="" base-span=none attrs=0
+    value type=OBJECT span=97-119 text="{ type := types.Png; }" count=1
+      stmt kind=ASSIGN name="type" name-span=99-103 base="" base-span=none attrs=0
+        value type=BARE span=107-116 text="types.Png"
+  stmt kind=ASSIGN name="other" name-span=121-126 base="" base-span=none attrs=0
+    value type=OBJECT span=130-164 text="{ type := types.Png; tag := jpg; }" count=2
+      stmt kind=ASSIGN name="type" name-span=132-136 base="" base-span=none attrs=0
+        value type=BARE span=140-149 text="types.Png"
+      stmt kind=ASSIGN name="tag" name-span=151-154 base="" base-span=none attrs=0
+        value type=BARE span=158-161 text="jpg"
+doc 1 path="schema_blob_types.anvl" dialect=AML bytes=60
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Png" name-span=16-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-58 text="{\n   type := Blob;\n   tag := png;\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=28-32 base="" base-span=none attrs=0
+        value type=BARE span=36-40 text="Blob"
+      stmt kind=ASSIGN name="tag" name-span=45-48 base="" base-span=none attrs=0
+        value type=BARE span=52-55 text="png"

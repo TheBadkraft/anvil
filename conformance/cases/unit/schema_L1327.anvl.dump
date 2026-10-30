@@ -1,0 +1,16 @@
+anvil-dump 1
+mode document
+input-bytes 83
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=83
+  stmt kind=ASSIGN name="owner" name-span=6-11 base="" base-span=none attrs=0
+    value type=OBJECT span=15-41 text="{ name := \"toolongname\"; }" count=1
+      stmt kind=ASSIGN name="name" name-span=17-21 base="" base-span=none attrs=0
+        value type=STRING span=26-37 text="toolongname" decoded="toolongname"
+  stmt kind=ASSIGN name="reporter" name-span=43-51 base="" base-span=none attrs=0
+    value type=OBJECT span=55-81 text="{ id := 1; name := \"ok\"; }" count=2
+      stmt kind=ASSIGN name="id" name-span=57-59 base="" base-span=none attrs=0
+        value type=NUMERIC span=63-64 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="name" name-span=66-70 base="" base-span=none attrs=0
+        value type=STRING span=75-77 text="ok" decoded="ok"

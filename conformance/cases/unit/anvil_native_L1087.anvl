@@ -1,0 +1,10 @@
+#!aml
+
+n := 5;
+alias := $n;
+s := "7";
+w := seven;
+b := true;
+z := null;
+a := [1, 2];
+o := { k := 1; };

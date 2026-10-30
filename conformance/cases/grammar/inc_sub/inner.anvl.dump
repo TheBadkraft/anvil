@@ -1,0 +1,16 @@
+anvil-dump 1
+mode document
+input-bytes 48
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=48
+  include decl-span=6-34 decl="include \"../inc_target.anvl\"" path-span=14-34 path="\"../inc_target.anvl\"" resolved=1
+  stmt kind=ASSIGN name="inner" name-span=36-41 base="" base-span=none attrs=0
+    value type=NUMERIC span=45-46 text="1" kind=integer overflow=0 i64=1
+doc 1 path="../inc_target.anvl" dialect=AML bytes=41
+  stmt kind=ASSIGN name="shared" name-span=6-12 base="" base-span=none attrs=0
+    value type=NUMERIC span=16-17 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="group" name-span=19-24 base="" base-span=none attrs=0
+    value type=OBJECT span=28-39 text="{ k := 2; }" count=1
+      stmt kind=ASSIGN name="k" name-span=30-31 base="" base-span=none attrs=0
+        value type=NUMERIC span=35-36 text="2" kind=integer overflow=0 i64=2

@@ -1,0 +1,5 @@
+#!aml
+include "schema_selfref_types.anvl";
+@[schema]
+
+root := { type := types.Node; };

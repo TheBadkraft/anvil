@@ -1,0 +1,7 @@
+#!aml
+@[schema]
+a := { type := String; size := abc; };
+b := { type := Numeric; min := "x"; };
+c := { type := Numeric; max := 1e+999; };
+d := { type := enum; values := red; };
+e := { type := String; required := maybe; };

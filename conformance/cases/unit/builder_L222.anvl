@@ -1,0 +1,6 @@
+#!amp
+
+id := 7;
+tags := [a, b];
+pos := (1, 2);
+data := @bin`xyz`;

@@ -1,0 +1,8 @@
+#!amp
+a := 1;
+b := "s";
+c := `x`;
+d := @t`y`;
+e := [1, "a", true];
+f := null;
+g := word;

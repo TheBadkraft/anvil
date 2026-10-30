@@ -1,0 +1,27 @@
+anvil-dump 1
+mode document
+input-bytes 103
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=103
+  stmt kind=ASSIGN name="n" name-span=7-8 base="" base-span=none attrs=0
+    value type=NUMERIC span=12-13 text="5" kind=integer overflow=0 i64=5
+  stmt kind=ASSIGN name="alias" name-span=15-20 base="" base-span=none attrs=0
+    value type=VARREF span=24-26 text="$n" target="n" public=NUMERIC resolved=1
+      value type=NUMERIC span=12-13 text="5" kind=integer overflow=0 i64=5
+  stmt kind=ASSIGN name="s" name-span=28-29 base="" base-span=none attrs=0
+    value type=STRING span=34-35 text="7" decoded="7"
+  stmt kind=ASSIGN name="w" name-span=38-39 base="" base-span=none attrs=0
+    value type=BARE span=43-48 text="seven"
+  stmt kind=ASSIGN name="b" name-span=50-51 base="" base-span=none attrs=0
+    value type=BOOL span=55-59 text="true" bool=true
+  stmt kind=ASSIGN name="z" name-span=61-62 base="" base-span=none attrs=0
+    value type=NULL span=66-70 text="null"
+  stmt kind=ASSIGN name="a" name-span=72-73 base="" base-span=none attrs=0
+    value type=ARRAY span=77-83 text="[1, 2]" count=2
+      value type=NUMERIC span=78-79 text="1" kind=integer overflow=0 i64=1
+      value type=NUMERIC span=81-82 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="o" name-span=85-86 base="" base-span=none attrs=0
+    value type=OBJECT span=90-101 text="{ k := 1; }" count=1
+      stmt kind=ASSIGN name="k" name-span=92-93 base="" base-span=none attrs=0
+        value type=NUMERIC span=97-98 text="1" kind=integer overflow=0 i64=1

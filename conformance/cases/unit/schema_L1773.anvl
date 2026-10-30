@@ -1,0 +1,3 @@
+#!aml
+@[schema]
+e := { type := enum; values := [ a, b ]; };

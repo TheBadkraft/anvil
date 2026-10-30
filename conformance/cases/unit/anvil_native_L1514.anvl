@@ -1,0 +1,3 @@
+#!aml
+@[schema, table=assets, active]
+x @[hot, k=v] := 1;

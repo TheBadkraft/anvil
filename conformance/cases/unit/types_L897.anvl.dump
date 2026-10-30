@@ -1,0 +1,23 @@
+anvil-dump 1
+mode document
+input-bytes 122
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=122
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Raw" name-span=15-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-39 text="{ type := Blob; }" count=1
+      stmt kind=ASSIGN name="type" name-span=24-28 base="" base-span=none attrs=0
+        value type=BARE span=32-36 text="Blob"
+  stmt kind=ASSIGN name="Png" name-span=41-44 base="" base-span=none attrs=0
+    value type=OBJECT span=48-77 text="{ type := Blob; tag := png; }" count=2
+      stmt kind=ASSIGN name="type" name-span=50-54 base="" base-span=none attrs=0
+        value type=BARE span=58-62 text="Blob"
+      stmt kind=ASSIGN name="tag" name-span=64-67 base="" base-span=none attrs=0
+        value type=BARE span=71-74 text="png"
+  stmt kind=ASSIGN name="Quoted" name-span=79-85 base="" base-span=none attrs=0
+    value type=OBJECT span=89-120 text="{ type := Blob; tag := \"jpg\"; }" count=2
+      stmt kind=ASSIGN name="type" name-span=91-95 base="" base-span=none attrs=0
+        value type=BARE span=99-103 text="Blob"
+      stmt kind=ASSIGN name="tag" name-span=105-108 base="" base-span=none attrs=0
+        value type=STRING span=113-116 text="jpg" decoded="jpg"

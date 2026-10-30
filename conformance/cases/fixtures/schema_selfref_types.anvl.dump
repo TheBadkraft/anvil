@@ -1,0 +1,21 @@
+anvil-dump 1
+mode document
+input-bytes 145
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=145
+  attr key="types" key-span=8-13 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="Node" name-span=16-20 base="" base-span=none attrs=0
+    value type=OBJECT span=24-143 text="{\n   type := Object;\n   fields := {\n      label := { type := String; };\n      child := { type := types.Node; };\n   };\n}" count=2
+      stmt kind=ASSIGN name="type" name-span=29-33 base="" base-span=none attrs=0
+        value type=BARE span=37-43 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=48-54 base="" base-span=none attrs=0
+        value type=OBJECT span=58-140 text="{\n      label := { type := String; };\n      child := { type := types.Node; };\n   }" count=2
+          stmt kind=ASSIGN name="label" name-span=66-71 base="" base-span=none attrs=0
+            value type=OBJECT span=75-94 text="{ type := String; }" count=1
+              stmt kind=ASSIGN name="type" name-span=77-81 base="" base-span=none attrs=0
+                value type=BARE span=85-91 text="String"
+          stmt kind=ASSIGN name="child" name-span=102-107 base="" base-span=none attrs=0
+            value type=OBJECT span=111-134 text="{ type := types.Node; }" count=1
+              stmt kind=ASSIGN name="type" name-span=113-117 base="" base-span=none attrs=0
+                value type=BARE span=121-131 text="types.Node"

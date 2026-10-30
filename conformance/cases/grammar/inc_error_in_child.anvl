@@ -1,0 +1,2 @@
+#!aml
+include "inc_error_in_child_target.anvl";

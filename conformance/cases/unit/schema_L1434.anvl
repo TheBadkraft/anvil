@@ -1,0 +1,4 @@
+#!aml
+@[schema]
+a := { type := Object; fields := { bad := 5; ghost := { type := types.Nope; }; }; };
+l := { type := Array; items := 5; min_items := abc; };

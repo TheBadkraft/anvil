@@ -1,0 +1,27 @@
+anvil-dump 1
+mode document
+input-bytes 156
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=156
+  attr key="schema" key-span=8-14 raw="" raw-span=none flag=1
+  stmt kind=ASSIGN name="a" name-span=16-17 base="" base-span=none attrs=0
+    value type=OBJECT span=21-99 text="{ type := Object; fields := { bad := 5; ghost := { type := types.Nope; }; }; }" count=2
+      stmt kind=ASSIGN name="type" name-span=23-27 base="" base-span=none attrs=0
+        value type=BARE span=31-37 text="Object"
+      stmt kind=ASSIGN name="fields" name-span=39-45 base="" base-span=none attrs=0
+        value type=OBJECT span=49-96 text="{ bad := 5; ghost := { type := types.Nope; }; }" count=2
+          stmt kind=ASSIGN name="bad" name-span=51-54 base="" base-span=none attrs=0
+            value type=NUMERIC span=58-59 text="5" kind=integer overflow=0 i64=5
+          stmt kind=ASSIGN name="ghost" name-span=61-66 base="" base-span=none attrs=0
+            value type=OBJECT span=70-93 text="{ type := types.Nope; }" count=1
+              stmt kind=ASSIGN name="type" name-span=72-76 base="" base-span=none attrs=0
+                value type=BARE span=80-90 text="types.Nope"
+  stmt kind=ASSIGN name="l" name-span=101-102 base="" base-span=none attrs=0
+    value type=OBJECT span=106-154 text="{ type := Array; items := 5; min_items := abc; }" count=3
+      stmt kind=ASSIGN name="type" name-span=108-112 base="" base-span=none attrs=0
+        value type=BARE span=116-121 text="Array"
+      stmt kind=ASSIGN name="items" name-span=123-128 base="" base-span=none attrs=0
+        value type=NUMERIC span=132-133 text="5" kind=integer overflow=0 i64=5
+      stmt kind=ASSIGN name="min_items" name-span=135-144 base="" base-span=none attrs=0
+        value type=BARE span=148-151 text="abc"
