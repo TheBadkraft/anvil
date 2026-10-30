@@ -60,4 +60,6 @@ typedef enum {
    ANVIL_WRITER_ERR_UNFINISHED,                  // finish called with an open statement/array/tuple/object
    ANVIL_WRITER_ERR_DUPLICATE_NAME,              // a top-level name declared twice (the reader's resolver rejects it)
    ANVIL_WRITER_ERR_DEPTH_EXCEEDED,              // nesting deeper than the builder will emit
+   ANVIL_WRITER_ERR_DUPLICATE_FIELD,             // a field name declared twice in one object (the reader rejects it)
+   ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,     // an attribute key given twice on one statement, or twice in the module header
 } anvil_writer_err_code;

@@ -3,4 +3,4 @@ mode document
 input-bytes 24
 status error
 dialect AML
-error code=2002 name=ANVL_ERR_PARSER_EXPECTED_ASSIGN category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=8 message="Expected ':=' after identifier"
+error code=4011 name=ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=8 message="Invalid attribute block; must be `@[...]`"

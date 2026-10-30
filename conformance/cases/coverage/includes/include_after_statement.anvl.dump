@@ -3,4 +3,4 @@ mode document
 input-bytes 31
 status error
 dialect AML
-error code=4003 name=ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=8 message="Identifier cannot be a keyword"
+error code=4201 name=ANVL_ERR_INCLUDE_NOT_FIRST category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=1 message="include declarations must precede statements"

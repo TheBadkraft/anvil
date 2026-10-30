@@ -139,7 +139,7 @@ endef
 .PHONY: build_test_writer build_test_writer_roundtrip build_test_builder build_test_builder_roundtrip
 .PHONY: build_test_version build_test_module build_test_registry build_test_header build_test_source
 .PHONY: build_test_body_amp build_test_body_aml build_test_body_asl build_test_asl_ast build_test_types build_test_schema
-.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_body_asl test_asl_ast test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_value_fragment test_types test_schema $(UNIT_CASES)
+.PHONY: test_version test_module test_registry test_header test_source test_body_amp test_body_aml test_body_asl test_asl_ast test_resolver test_anvil_native test_anvil_vtable test_attribute_grammar test_error_codes test_value_fragment test_types test_schema $(UNIT_CASES)
 
 all: $(BIN)/test_version \
 	$(BIN)/test_module \
@@ -155,6 +155,7 @@ all: $(BIN)/test_version \
 	$(BIN)/test_anvil_native \
 	$(BIN)/test_anvil_vtable \
 	$(BIN)/test_attribute_grammar \
+	$(BIN)/test_error_codes \
 	$(BIN)/test_value_fragment \
 	$(BIN)/test_types \
 	$(BIN)/test_schema \
@@ -401,6 +402,18 @@ build_test_attribute_grammar: $(BIN)/test_attribute_grammar
 
 test_attribute_grammar: $(BIN)/test_version $(BIN)/test_attribute_grammar
 	$(call run_test_bin,test_attribute_grammar)
+	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
+		$(BIN)/test_version; \
+	fi
+
+$(BIN)/test_error_codes: test_error_codes.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) $^ -o $@
+
+build_test_error_codes: $(BIN)/test_error_codes
+
+test_error_codes: $(BIN)/test_version $(BIN)/test_error_codes
+	$(call run_test_bin,test_error_codes)
 	@if [ -z "$(filter build val,$(MAKECMDGOALS))" ]; then \
 		$(BIN)/test_version; \
 	fi

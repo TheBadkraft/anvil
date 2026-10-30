@@ -103,8 +103,9 @@ static void test_atg_m03_leading_digit_key_rejected(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    TestBit.is_equal_int(ANVL_RES_ERR, doc_scan_header(doc, &err_code),
                         "ATG_M03: '1bad' key rejected");
-   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_IDENTIFIER, err_code,
-                        "ATG_M03: err_code is INVALID_IDENTIFIER (nothing consumed yet)");
+   // BR-2610-anvl-parser-005: an attribute key that is not an identifier is 4012 (it was 2007)
+   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_ATTRIBUTE, err_code,
+                        "ATG_M03: err_code is INVALID_ATTRIBUTE (nothing consumed yet)");
    mod_ctx_dispose(ctx);
 }
 /* ATG_M04 — hyphen mid-key rejected: key scan truncates at the hyphen, then the
@@ -297,8 +298,8 @@ static void test_atg_s03_leading_digit_key_rejected(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    TestBit.is_equal_int(ANVL_RES_ERR, doc_parse_body(doc, &err_code),
                         "ATG_S03: '1bad' key rejected");
-   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_IDENTIFIER, err_code,
-                        "ATG_S03: err_code is INVALID_IDENTIFIER (matches ATG_M03)");
+   TestBit.is_equal_int(ANVL_ERR_PARSER_INVALID_ATTRIBUTE, err_code,
+                        "ATG_S03: err_code is INVALID_ATTRIBUTE (matches ATG_M03)");
    mod_ctx_dispose(ctx);
 }
 /* ATG_S04 — hyphen mid-key rejected */

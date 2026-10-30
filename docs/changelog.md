@@ -15,6 +15,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (grammar consistency, BR-2610-anvl-parser-005) -- BEHAVIOUR CHANGE
+
+- **Behaviour change: duplicate keys are errors everywhere.** A repeated object field is now
+  `ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT` (4001) and a repeated attribute key (statement-level, or across the
+  module attribute blocks) is `ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY` (4013). Both were silently kept; both are
+  reported at the repeated name, in source order, as the document is parsed (category `ANVIL_ERR_SYNTAX`, or
+  `ANVIL_ERR_HEADER` for module attributes). A repeated top-level name stays 4053. An override of an *inherited*
+  field is still fine. This reverses the keep-repeated-names behaviour the bindings mirrored.
+- **Behaviour change: a non-object base is an error.** `derived : base` where `base` is a scalar, string, array,
+  tuple, blob, bare word, `$` reference or function used to load and merge nothing; it is now
+  `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` (4020), found when the document is resolved (category
+  `ANVIL_ERR_RESOLVE`), at the base name in the deriving statement. (`derived : base := 5;` was already 4020, at parse time.)
+- **Behaviour change: some errors report a more specific code** (same inputs rejected, same place, new code):
+  second `#!` after a leading one is 2004 (it was 2005; a `#!` that is not on the first line with none before it stays
+  2005); `@[...]` after a statement is 3015 (was 2001); `include` after the header is 4201 (was 4003 in the body,
+  3100 after module attributes), reported where the keyword starts; `@[]` is 2008 (was 2007); an invalid attribute
+  key is 4012 (was 2007, which no input produces now); two attribute keys with no comma is 3014 (was 3100); an
+  array, tuple or object cut short as an attribute value is 2006 (was 2007/2002); `@` that does not open `@[` is 4011
+  (was 2001/2002); `(1,,2)` and `(,1)` are 4007 (was 2003); in an object body, a comma before `}` is 3004 (was 4017 or
+  2001), a missing key is 3001 and a token that cannot be a key is 4002 (both were 2001); an unexpected control
+  character where a token belongs is 5001 (was 2001, 2002 or 2003). 58 conformance dumps changed for these reasons, 3 more for the keyword attribute keys.
+- **Behaviour change: a keyword or reserved word is refused as an attribute key** (`ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD`,
+  4004; owner decision), for statement and module attributes. Statement names and object fields, at every depth, were
+  already refused (4003). The writer and builder refuse the same names (`ANVIL_WRITER_ERR_RESERVED_WORD`) in all three places.
+- Not enforced, and reserved: 4015 (a block and a name repeated at top level is 4053, as the two forms are the same
+  statement), 4203 (includes have no aliases). 3011, 4005 and 3016 fit no input that gets a generic code
+  (empty array is 4009, a one-element tuple 3013, a missing `:=` 2002).
+- **The writer and the builder reject what the reader now rejects** (behaviour change): a field name repeated in one object
+  at any depth is `ANVIL_WRITER_ERR_DUPLICATE_FIELD`, and an attribute key repeated on one statement or in the module
+  header is `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` (both new, appended to `anvil_writer_err_code`, so existing values
+  keep their numbers). A repeated top-level name stays `ANVIL_WRITER_ERR_DUPLICATE_NAME`. A generated sweep of 4,000 writer
+  and 4,000 builder documents checks that everything they accept loads.
+- 122 new conformance cases (the new errors, their legal neighbours, and fragment `@2`, which reads as the bare
+  word `2`).
+
 ### Fixed (downloads)
 
 - **`SHA256SUMS` is cumulative.** It lists every published tarball, v0.11.0-rc first, then v0.10.0-rc, so pins on earlier releases still verify against it. `SHA256SUMS-v0.10.0-rc` stays and `SHA256SUMS-v0.11.0-rc` is added, so each version also has its own file. No tarball changed. `/download` words this.

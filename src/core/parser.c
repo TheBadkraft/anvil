@@ -71,8 +71,34 @@ typedef struct {
    anvl_err_code expected_close_err;
    usize min_elements;
    anvl_err_code too_few_err;
+   anvl_err_code empty_element_err; // a ',' where an element belongs; ANVL_ERR_NONE: no such code
    anvl_value_type value_type;
 } collection_spec_t;
+
+// What kind of name parse_identifier_in is reading, so a failure to find one can say what was
+// missing: a plain identifier (a base, an AnvilScript parameter), the name that starts a
+// top-level statement, or the one that starts a statement nested in an object body.
+typedef enum { ID_PLAIN = 0, ID_STMT_TOP, ID_STMT_NESTED } id_kind;
+
+// The names already declared by one object body (the statements of one `{ ... }`), so a repeated
+// field is found as the second one is read. A body of up to NAME_SET_SMALL names is checked by a
+// linear scan of a stack array (no allocation: nearly every object is this small); a bigger one
+// spills into an open-addressing hash table, built on the heap and freed with the body.
+#define NAME_SET_SMALL 16
+typedef struct {
+   const char *p;
+   usize n;
+   uint64_t w; // the first 8 bytes of the name (zero-padded): for a name of up to 8 bytes, with n,
+               // this IS the name, so an equal pair needs no byte comparison
+} name_ref;
+typedef struct {
+   name_ref small[NAME_SET_SMALL];
+   usize count;
+   uint64_t seen;   // one bit per name (6 bits of its hash): a name whose bit is clear is new, and the
+                    // scan of `small` is skipped
+   name_ref *table; // NULL until count passes NAME_SET_SMALL; capacity is a power of two
+   usize cap;
+} name_set;
 
 // Per-thread parser state: two threads loading different documents must not share (or race on)
 // each other's last-error code. anvl_get_error() reports the calling thread's last parse.
@@ -98,13 +124,15 @@ static bool parser_create_ctx(anvl_source, context *);
 static void parser_dispose_ctx(context *);
 static bool parse_source(context);
 static bool parse_statement(anvl_source, anvl_statement *);
+static bool parse_statement_in(anvl_source, anvl_statement *, name_set *);
 static bool parse_statement_list(anvl_source, list *);
+static bool parse_identifier_in(anvl_source, anvl_slice *, id_kind);
 static bool parse_attribute_list(anvl_source, list *);
 static void dispose_attribute_list(list);
 // Not static: shared with src/core/asl_parser.c (WITH_ASL only) for parameter-name parsing --
 // see parser_set_error's own declaration just below for why.
 bool parse_identifier(anvl_source, anvl_slice *);
-static bool parse_value(anvl_source, anvl_value *);
+static bool parse_value(anvl_source, anvl_value *, bool nested);
 static bool parse_value_body(anvl_source, anvl_value *);
 // Not static: shared with src/core/asl_parser.c (WITH_ASL only) for parameter default
 // literals -- see parser_set_error's own declaration below for why.
@@ -125,6 +153,198 @@ static void skip_same_line_whitespace(anvl_source);
 // in internal/parser.h so asl_parse_function_decl can record its own parse errors through the
 // exact same line/col computation, rather than duplicating it.
 void parser_set_error(anvl_source, anvl_err_code);
+static void parser_set_error_at(anvl_source, anvl_err_code, usize line, usize col);
+
+
+/* ----------------------------------------------------------------- *
+ * Grammar-consistency helpers (BR-2610-anvl-parser-005)
+ * ----------------------------------------------------------------- */
+static bool name_equals(const char *a, usize an, const char *b, usize bn) {
+   return an == bn && memcmp(a, b, an) == 0;
+}
+// The first (up to) 8 bytes of a name as one word. `limit` is the end of the buffer the name is in:
+// a name that ends within 8 bytes of it is gathered a byte at a time instead of read past the end.
+static uint64_t name_word(const char *p, usize n, const char *limit) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+   if ((usize)(limit - p) >= 8) {
+      uint64_t w;
+      memcpy(&w, p, 8);
+      return n >= 8 ? w : (w & (((uint64_t)1 << (8 * n)) - 1));
+   }
+#endif
+   uint64_t w = 0;
+   for (usize i = 0; i < n && i < 8; i++) {
+      w |= (uint64_t)(unsigned char)p[i] << (8 * i);
+   }
+   return w;
+}
+static bool name_ref_equals(const name_ref *a, const name_ref *b) {
+   return a->n == b->n && a->w == b->w && (a->n <= 8 || memcmp(a->p + 8, b->p + 8, a->n - 8) == 0);
+}
+static usize name_hash(const name_ref *r) {
+   return (usize)((r->w ^ ((uint64_t)r->n << 56)) * 0x9E3779B97F4A7C15ULL >> 24);
+}
+// Inserts into the table (which has room: load factor stays under one half). True if the name was
+// already there; the table is left unchanged in that case.
+static bool name_table_insert(name_ref *table, usize cap, name_ref ref) {
+   usize mask = cap - 1;
+   for (usize i = name_hash(&ref) & mask;; i = (i + 1) & mask) {
+      if (!table[i].p) {
+         table[i] = ref;
+         return false;
+      }
+      if (name_ref_equals(&table[i], &ref)) {
+         return true;
+      }
+   }
+}
+static void name_set_dispose(name_set *set) {
+   if (set->table) {
+      Allocator.dispose(set->table);
+      set->table = NULL;
+   }
+}
+// Records a name. *duplicate is set when the set already held it. False only when the table
+// could not be allocated (out of memory).
+static bool name_set_add(name_set *set, anvl_slice name, const char *limit, bool *duplicate) {
+   usize n = (usize)(name.end - name.start);
+   name_ref ref = {name.start, n, name_word(name.start, n, limit)};
+   *duplicate = false;
+   if (!set->table) {
+      uint64_t bit = (uint64_t)1 << (name_hash(&ref) & 63);
+      if (set->seen & bit) {
+         for (usize i = 0; i < set->count; i++) {
+            if (name_ref_equals(&set->small[i], &ref)) {
+               *duplicate = true;
+               return true;
+            }
+         }
+      }
+      if (set->count < NAME_SET_SMALL) {
+         set->seen |= bit;
+         set->small[set->count++] = ref;
+         return true;
+      }
+      // spill: everything so far plus this name goes into a table of 64 slots
+      set->cap = 64;
+      set->table = Allocator.alloc(set->cap * sizeof(name_ref));
+      if (!set->table) {
+         return false;
+      }
+      memset(set->table, 0, set->cap * sizeof(name_ref));
+      for (usize i = 0; i < set->count; i++) {
+         name_table_insert(set->table, set->cap, set->small[i]);
+      }
+      *duplicate = name_table_insert(set->table, set->cap, ref);
+      set->count++;
+      return true;
+   }
+   if ((set->count + 1) * 2 > set->cap) { // grow before inserting
+      usize new_cap = set->cap * 2;
+      name_ref *grown = Allocator.alloc(new_cap * sizeof(name_ref));
+      if (!grown) {
+         return false;
+      }
+      memset(grown, 0, new_cap * sizeof(name_ref));
+      for (usize i = 0; i < set->cap; i++) {
+         if (set->table[i].p) {
+            name_table_insert(grown, new_cap, set->table[i]);
+         }
+      }
+      Allocator.dispose(set->table);
+      set->table = grown;
+      set->cap = new_cap;
+   }
+   *duplicate = name_table_insert(set->table, set->cap, ref);
+   if (!*duplicate) {
+      set->count++;
+   }
+   return true;
+}
+// True if the text up to the first non-blank character after the cursor's `,` is `}`: the comma
+// is the last thing in its object body. Looks only past spaces, tabs and line breaks.
+static bool comma_ends_object(anvl_source src) {
+   for (usize i = 1;; i++) {
+      if (Source.is_eof_offset(src, i)) {
+         return false;
+      }
+      char c = Source.peek_offset(src, i);
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+         continue;
+      }
+      return c == ANVL_TOK_RBRACE;
+   }
+}
+// The code for a ';' that is not where the statement ends: a ',' closing out an object body is a
+// trailing comma (3004); anything else is an unterminated statement (4017).
+static anvl_err_code statement_end_error(anvl_source src, bool nested) {
+   if (nested && Source.peek(src) == ',' && comma_ends_object(src)) {
+      return ANVL_ERR_PARSER_TRAILING_COMMA_IN_OBJECT;
+   }
+   return ANVL_ERR_PARSER_UNTERMINATED_STATEMENT;
+}
+// The code for "no identifier here" where a statement's name belongs, by what is actually there.
+// Top level has no more specific code than 2001 except for an attribute block (`@[` after the
+// header is a module attribute out of place; `@` alone is an attribute block that is not `@[...]`);
+// inside an object body a missing key is 3001 and a token that cannot be a key is 4002. AMP has no
+// attributes, objects or includes, so it keeps the generic code.
+static anvl_err_code statement_start_error(anvl_source src, id_kind kind) {
+   if (kind == ID_PLAIN || Source.dialect(src) == ANVL_DIALECT_AMP) {
+      return ANVL_ERR_PARSER_EXPECTED_IDENTIFIER;
+   }
+   char c = Source.peek(src);
+   if (c == ANVL_TOK_ATTRIB) {
+      if (Source.peek_offset(src, 1) != '[') {
+         return ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK;
+      }
+      return kind == ID_STMT_TOP ? ANVL_ERR_PARSER_UNEXPECTED_MODULE_ATTRIBUTES
+                                 : ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT;
+   }
+   if (kind == ID_STMT_TOP) {
+      return ANVL_ERR_PARSER_EXPECTED_IDENTIFIER;
+   }
+   if (c == ',' && comma_ends_object(src)) {
+      return ANVL_ERR_PARSER_TRAILING_COMMA_IN_OBJECT;
+   }
+   if (c == ';' || c == ',' || c == ':' || c == '=' || c == ANVL_TOK_RPAREN ||
+       c == ANVL_TOK_RBRACKET) {
+      return ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD;
+   }
+   return ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT;
+}
+// True if an attribute value that starts a `[`, `{` or `(` was cut short by the scan for the
+// next `,` or `]`: it is the front of an array, object or tuple, which an attribute value cannot
+// be. A bracketed value that closes within the scan (`{1}`, `(1 2)`) is still a plain bare word.
+bool anvl_attr_value_is_split_compound(const char *begin, const char *end) {
+   if (begin >= end || (*begin != '[' && *begin != '{' && *begin != '(')) {
+      return false;
+   }
+   int depth = 0;
+   bool in_string = false;
+   for (const char *q = begin; q < end; q++) {
+      char c = *q;
+      if (in_string) {
+         if (c == '\\' && q + 1 < end) {
+            q++;
+         } else if (c == '"') {
+            in_string = false;
+         }
+      } else if (c == '"') {
+         in_string = true;
+      } else if (c == '[' || c == '{' || c == '(') {
+         depth++;
+      } else if (c == ']' || c == '}' || c == ')') {
+         depth--;
+      }
+   }
+   return depth > 0;
+}
+// True for an ASCII control character that cannot begin or continue anything: not space, tab or a
+// line break. (End of input is not one; callers check it first.)
+static bool is_stray_control(char c) {
+   unsigned char u = (unsigned char)c;
+   return (u < 0x20 && u != '\t' && u != '\n' && u != '\r') || u == 0x7f;
+}
 
 /* ----------------------------------------------------------------- *
  * Parser Function Implementations
@@ -406,7 +626,11 @@ static bool parse_source(context ctx) {
       // we still have to have this check here, too
       if (Source.match_length(ctx->src, ANVL_TOK_SHEBANG_PREFIX, ANVL_TOK_SHEBANG_PREFIX_LEN) ==
           ANVL_TOK_SHEBANG_PREFIX_LEN) {
-         parser_set_error(ctx->src, ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS);
+         // A second shebang (the document opened with one) is 2004; a shebang that is not the
+         // document's first line, with none before it, is 2005.
+         parser_set_error(ctx->src, Source.is_shebang(ctx->src)
+                                       ? ANVL_ERR_PARSER_MULTIPLE_SHEBANG
+                                       : ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS);
          ctx->end = Time.now(); // Record the end time even on failure, for accurate instrumentation
          // Freeze whatever was already accumulated before this failure — partial
          // results stay inspectable on doc->body, not silently dropped. A throwaway out-param
@@ -498,21 +722,50 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
       return false;
    }
 
+   bool first = true;
    while (true) {
       Source.skip_whitespace_and_comments(src);
 
       if (!Source.is_identifier_start(Source.peek(src))) {
-         parser_set_error(src, ANVL_ERR_PARSER_INVALID_IDENTIFIER);
+         // `@[]` is an empty block (2008); any other non-key is an invalid attribute identifier
+         parser_set_error(src, first && Source.peek(src) == ANVL_TOK_RBRACKET
+                                  ? ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK
+                                  : ANVL_ERR_PARSER_INVALID_ATTRIBUTE);
          dispose_attribute_list(attrs);
          return false;
       }
+      first = false;
 
+      usize key_line = src->line, key_col = src->col;
       const char *key_start = Source.at(src);
       Source.consume(src, 1);
       while (Source.is_identifier_part(Source.peek(src))) {
          Source.consume(src, 1);
       }
       const char *key_end = Source.at(src);
+
+      // a keyword or reserved word is not an attribute name (4004), reported where the key starts
+      anvl_slice key_slice = {0};
+      Source.init_slice(src, &key_slice);
+      key_slice.start = key_start;
+      key_slice.end = key_end;
+      if (Source.is_keyword(key_slice)) {
+         parser_set_error_at(src, ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD, key_line, key_col);
+         dispose_attribute_list(attrs);
+         return false;
+      }
+
+      // a key repeated within the block (4013), reported at the repeat
+      for (usize i = 0, n = List.size(attrs); i < n; i++) {
+         anvl_attribute prev = NULL;
+         List.get(attrs, i, (object *)&prev);
+         if (prev && name_equals(prev->key.start, (usize)(prev->key.end - prev->key.start), key_start,
+                                 (usize)(key_end - key_start))) {
+            parser_set_error_at(src, ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY, key_line, key_col);
+            dispose_attribute_list(attrs);
+            return false;
+         }
+      }
 
       anvl_attribute attr = Allocator.alloc(sizeof(anvl_attribute_t));
       if (!attr) {
@@ -537,6 +790,7 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
             return false;
          }
          const char *value_start = Source.at(src);
+         usize value_line = src->line, value_col = src->col;
          bool in_string = false;
          while (!Source.is_eof(src)) {
             char c = Source.peek(src);
@@ -564,6 +818,14 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
             value_end--;
          }
          attr->value.end = value_end;
+         if (anvl_attr_value_is_split_compound(value_start, value_end)) {
+            // the front of an array, object or tuple, cut at its first ',' or ']' (2006)
+            parser_set_error_at(src, ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, value_line,
+                                value_col);
+            Allocator.dispose(attr);
+            dispose_attribute_list(attrs);
+            return false;
+         }
          if (!anvl_attribute_decode(src, attr)) {
             Allocator.dispose(attr);
             dispose_attribute_list(attrs);
@@ -584,7 +846,10 @@ static bool parse_attribute_list(anvl_source src, list *out_attributes) {
          break;
       }
 
-      parser_set_error(src, ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
+      // another key where a ',' or ']' belongs is a missing comma (3014)
+      parser_set_error(src, Source.is_identifier_start(Source.peek(src))
+                               ? ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES
+                               : ANVL_ERR_PARSER_UNEXPECTED_TOKEN);
       dispose_attribute_list(attrs);
       return false;
    }
@@ -614,14 +879,23 @@ static bool parse_statement_list(anvl_source src, list *out_statements) {
       return false;
    }
 
+   // the names this body has declared so far: a repeated one is 4001, at the repeat
+   name_set names;
+   names.count = 0;
+   names.seen = 0;
+   names.table = NULL;
+   names.cap = 0;
+
    while (!Source.is_eof(src) && Source.peek(src) != ANVL_TOK_RBRACE) {
       anvl_statement stmt = NULL;
-      if (!parse_statement(src, &stmt)) {
+      if (!parse_statement_in(src, &stmt, &names)) {
+         name_set_dispose(&names);
          List.dispose(statements);
          return false;
       }
       List.append(statements, stmt);
    }
+   name_set_dispose(&names);
 
    if (Source.peek(src) != ANVL_TOK_RBRACE) {
       parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_OBJECT_CLOSE);
@@ -633,8 +907,14 @@ static bool parse_statement_list(anvl_source src, list *out_statements) {
    *out_statements = statements;
    return true;
 }
-// Parse a single statement from the source
+// Parse a single top-level statement from the source
 static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
+   return parse_statement_in(src, out_stmt, NULL);
+}
+// Parse a single statement. `names` is the set of names declared so far by the object body this
+// statement is in, or NULL for a top-level statement (a repeated top-level name is the resolver's
+// 4053, which also sees the names of included documents).
+static bool parse_statement_in(anvl_source src, anvl_statement *out_stmt, name_set *names) {
    // Parse statement
    *out_stmt = Source.new_node(src, ANVL_NODE_STATEMENT, &parser.err_code);
    if (!*out_stmt) {
@@ -643,9 +923,22 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
    }
 
    // - identifier
-   if (!parse_identifier(src, &(*out_stmt)->name)) {
+   usize name_line = src->line, name_col = src->col;
+   if (!parse_identifier_in(src, &(*out_stmt)->name, names ? ID_STMT_NESTED : ID_STMT_TOP)) {
       parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
       return false;
+   }
+   if (names) {
+      bool duplicate = false;
+      if (!name_set_add(names, (*out_stmt)->name, (const char *)src->buffer.bucket + src->length,
+                        &duplicate)) {
+         parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
+         return false;
+      }
+      if (duplicate) {
+         parser_set_error_at(src, ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT, name_line, name_col);
+         return false;
+      }
    }
    // - consume whitespace
    Source.skip_whitespace_and_comments(src);
@@ -701,7 +994,7 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
       }
 
       // - value
-      if (!parse_value(src, &(*out_stmt)->value)) {
+      if (!parse_value(src, &(*out_stmt)->value, names != NULL)) {
          parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_VALUE);
          return false;
       }
@@ -738,7 +1031,7 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
       // - end of statement terminator ';' is still required after the closing '}'
       skip_same_line_whitespace(src);
       if (Source.peek(src) != ANVL_TOK_STMT_TERMINATOR) {
-         parser_set_error(src, ANVL_ERR_PARSER_UNTERMINATED_STATEMENT);
+         parser_set_error(src, statement_end_error(src, names != NULL));
          return false;
       }
       Source.consume(src, 1);
@@ -753,7 +1046,11 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
       return asl_parse_function_decl(src, out_stmt);
 #endif
    } else {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_ASSIGN);
+      // `@` after the name that does not open `@[` is a malformed attribute block (4011)
+      parser_set_error(src, Source.peek(src) == ANVL_TOK_ATTRIB &&
+                               Source.dialect(src) != ANVL_DIALECT_AMP
+                               ? ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK
+                               : ANVL_ERR_PARSER_EXPECTED_ASSIGN);
       return false;
    }
 
@@ -761,13 +1058,18 @@ static bool parse_statement(anvl_source src, anvl_statement *out_stmt) {
 }
 // Parse an identifier
 bool parse_identifier(anvl_source src, anvl_slice *out_identifier) {
+   return parse_identifier_in(src, out_identifier, ID_PLAIN);
+}
+// Parse an identifier; `kind` says what it is the name of, which decides the error when none is
+// there (see statement_start_error) and whether `include` is an include out of place.
+static bool parse_identifier_in(anvl_source src, anvl_slice *out_identifier, id_kind kind) {
    // initialize the slice
    Source.init_slice(src, out_identifier);
    out_identifier->start = NULL;
    out_identifier->end = NULL;
 
    if (!Source.is_identifier_start(Source.peek(src))) {
-      parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
+      parser_set_error(src, statement_start_error(src, kind));
       return false;
    }
    // Consume the identifier
@@ -781,6 +1083,15 @@ bool parse_identifier(anvl_source src, anvl_slice *out_identifier) {
    out_identifier->end = Source.at(src);
 
    if (Source.is_keyword(*out_identifier)) {
+      // `include` where a top-level statement starts: the header is over, so it is out of place
+      // (4201), reported where the keyword starts
+      usize len = (usize)(out_identifier->end - out_identifier->start);
+      if (kind == ID_STMT_TOP && len == 7 && memcmp(out_identifier->start, "include", 7) == 0 &&
+          Source.dialect(src) != ANVL_DIALECT_AMP) {
+         parser_set_error_at(src, ANVL_ERR_INCLUDE_NOT_FIRST, Source.line(src),
+                             Source.column(src) - len);
+         return false;
+      }
       parser_set_error(src, ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD);
       return false;
    }
@@ -830,7 +1141,7 @@ static bool parse_value_body(anvl_source src, anvl_value *out_value) {
    return false; // Not a scalar, not a collection start — genuinely not a value
 }
 // Parse a value from the source
-static bool parse_value(anvl_source src, anvl_value *out_value) {
+static bool parse_value(anvl_source src, anvl_value *out_value, bool nested) {
    *out_value = Source.new_node(src, ANVL_NODE_VALUE, &parser.err_code);
    if (!*out_value) {
       parser_set_error(src, ANVL_ERR_MEMORY_ALLOC_FAILED);
@@ -849,7 +1160,7 @@ static bool parse_value(anvl_source src, anvl_value *out_value) {
    // bare literals (see notes/document-body-parse.md "Bare literal grammar").
    skip_same_line_whitespace(src);
    if (Source.peek(src) != ANVL_TOK_STMT_TERMINATOR) {
-      parser_set_error(src, ANVL_ERR_PARSER_UNTERMINATED_STATEMENT);
+      parser_set_error(src, statement_end_error(src, nested));
       return false;
    }
    Source.consume(src, 1);
@@ -1273,6 +1584,11 @@ static bool parse_collection(anvl_source src, anvl_value *out_value, const colle
       // AMP forbids nested collections as array/tuple elements — reject on sight of the
       // leading symbol, before wasting an attempt on parse_value_body.
       char lead = Source.peek(src);
+      if (lead == ',' && spec->empty_element_err != ANVL_ERR_NONE) {
+         parser_set_error(src, spec->empty_element_err); // `(1,,2)`, `(,1)`: no element between
+         List.dispose(items);
+         return false;
+      }
       if (Source.dialect(src) == ANVL_DIALECT_AMP &&
           (lead == ANVL_TOK_LBRACE || lead == ANVL_TOK_LBRACKET || lead == ANVL_TOK_LPAREN)) {
          parser_set_error(src, ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR);
@@ -1341,6 +1657,7 @@ static bool parse_array(anvl_source src, anvl_value *out_value) {
       .expected_close_err = ANVL_ERR_PARSER_EXPECTED_ARRAY_CLOSE,
       .min_elements = 1,
       .too_few_err = ANVL_ERR_NONE, // unused: min_elements <= 1, see parse_collection's doc comment
+      .empty_element_err = ANVL_ERR_NONE, // an array has no code for `[1,,2]`: it stays 2003
       .value_type = ANVL_VALUE_ARRAY,
    };
    return parse_collection(src, out_value, &spec);
@@ -1359,6 +1676,7 @@ static bool parse_tuple(anvl_source src, anvl_value *out_value) {
       .expected_close_err = ANVL_ERR_PARSER_EXPECTED_TUPLE_CLOSE,
       .min_elements = 2,
       .too_few_err = ANVL_ERR_PARSER_TUPLE_TOO_FEW_ELEMENTS,
+      .empty_element_err = ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT,
       .value_type = ANVL_VALUE_TUPLE,
    };
    return parse_collection(src, out_value, &spec);
@@ -1384,8 +1702,20 @@ static bool parse_object_value(anvl_source src, anvl_value *out_value) {
 
    return true; // Successfully parsed object value
 }
-// Parse an error and record it in the source's error state
+// Parse an error and record it in the source's error state, at the cursor. An "expected X" error
+// raised with a stray control character under the cursor is reported as the character itself
+// (5001): the position is the same, and the character is the reason.
 void parser_set_error(anvl_source src, anvl_err_code code) {
+   if ((code == ANVL_ERR_PARSER_EXPECTED_IDENTIFIER || code == ANVL_ERR_PARSER_EXPECTED_ASSIGN ||
+        code == ANVL_ERR_PARSER_EXPECTED_VALUE || code == ANVL_ERR_PARSER_EXPECTED_OBJECT_FIELD ||
+        code == ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT) &&
+       !Source.is_eof(src) && is_stray_control(Source.peek(src))) {
+      code = ANVL_ERR_PARSER_UNEXPECTED_CHAR;
+   }
+   parser_set_error_at(src, code, Source.line(src), Source.column(src));
+}
+// The same, at a position the caller saved earlier (the start of the token at fault).
+static void parser_set_error_at(anvl_source src, anvl_err_code code, usize line, usize col) {
    // Captured *before* Source.set_error runs — its own out-param reports whether *recording*
    // the error succeeded (ANVL_ERR_NONE on success, including a first-error-wins no-op inside
    // anvl_error_set), not the error itself, so the call below always leaves parser.err_code as
@@ -1395,8 +1725,6 @@ void parser_set_error(anvl_source src, anvl_err_code code) {
    anvl_err_code prior = parser.err_code;
    bool already_recorded = prior != ANVL_ERR_NONE;
 
-   usize line = Source.line(src);
-   usize col = Source.column(src);
    const char *err_msg = anvl_error_code_message(code);
 
    Source.set_error(src, code, line, col, err_msg, &parser.err_code);

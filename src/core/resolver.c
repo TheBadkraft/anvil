@@ -157,6 +157,17 @@ static anvl_result validate_bases(module_context ctx, anvl_err_code *out_err_cod
          *out_err_code = ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS;
          return ANVL_RES_ERR;
       }
+      // A base must itself be an object: a scalar, string, array, tuple, blob, VarRef or function
+      // has no fields to merge, so inheriting from one is the inheritance error (4020), reported
+      // at the base name in the deriving statement.
+      if (!base_stmt->value || base_stmt->value->type != ANVL_VALUE_OBJECT) {
+         usize line = 0, col = 0;
+         (void)locate_in_sources(ctx, stmt->base.start, &line, &col);
+         anvl_error_set(ctx->errors, ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT, line, col, __FILE__,
+                        NULL);
+         *out_err_code = ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT;
+         return ANVL_RES_ERR;
+      }
    }
    return ANVL_RES_OK;
 }

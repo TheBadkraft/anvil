@@ -3,4 +3,4 @@ mode document
 input-bytes 12
 status error
 dialect AML
-error code=2007 name=ANVL_ERR_PARSER_INVALID_IDENTIFIER category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=5 message="Invalid identifier format"
+error code=2008 name=ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=5 message="Attribute blocks cannot be empty"

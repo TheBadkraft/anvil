@@ -1,12 +1,6 @@
 anvil-dump 1
 mode document
 input-bytes 30
-status ok
+status error
 dialect AML
-doc 0 path="<root>" dialect=AML bytes=30
-  stmt kind=ASSIGN name="a" name-span=0-1 base="" base-span=none attrs=0
-    value type=NUMERIC span=5-6 text="1" kind=integer overflow=0 i64=1
-  stmt kind=ASSIGN name="b" name-span=8-9 base="a" base-span=12-13 attrs=0
-    value type=OBJECT span=17-28 text="{ c := 1; }" count=1
-      stmt kind=ASSIGN name="c" name-span=19-20 base="" base-span=none attrs=0
-        value type=NUMERIC span=24-25 text="1" kind=integer overflow=0 i64=1
+error code=4020 name=ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT category=5 category-name=ANVIL_ERR_RESOLVE line=2 column=5 message="Inheritance requires an object value \xe2\x80\x94 scalars, arrays, tuples, and blobs are not inheritable"

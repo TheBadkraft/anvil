@@ -3,4 +3,4 @@ mode document
 input-bytes 1
 status error
 dialect AML
-error code=2001 name=ANVL_ERR_PARSER_EXPECTED_IDENTIFIER category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=1 message="Expected identifier"
+error code=5001 name=ANVL_ERR_PARSER_UNEXPECTED_CHAR category=4 category-name=ANVIL_ERR_SYNTAX line=1 column=1 message="Unexpected character"

@@ -3,4 +3,4 @@ mode document
 input-bytes 24
 status error
 dialect AML
-error code=4017 name=ANVL_ERR_PARSER_UNTERMINATED_STATEMENT category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=14 message="Expected ';' to end the statement"
+error code=3004 name=ANVL_ERR_PARSER_TRAILING_COMMA_IN_OBJECT category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=14 message="Trailing comma in object"

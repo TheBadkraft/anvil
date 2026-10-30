@@ -3,4 +3,4 @@ mode document
 input-bytes 20
 status error
 dialect AML
-error code=2005 name=ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS category=2 category-name=ANVIL_ERR_HEADER line=2 column=1 message="Shebang must be first non-whitespace line"
+error code=2004 name=ANVL_ERR_PARSER_MULTIPLE_SHEBANG category=2 category-name=ANVIL_ERR_HEADER line=2 column=1 message="Multiple shebangs not allowed"

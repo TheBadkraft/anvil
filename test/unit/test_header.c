@@ -540,8 +540,9 @@ static void test_hdr18_repeated_shebang_rejected(void) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    anvl_result res = doc_scan_header(doc, &err_code);
    TestBit.is_equal_int(ANVL_RES_ERR, res, "HDR18: scan header returns ERR for repeated shebang");
-   TestBit.is_equal_int(ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS, err_code,
-                        "HDR18: err_code is SHEBANG_AFTER_STATEMENTS");
+   // BR-2610-anvl-parser-005: a second shebang in a document that already opened with one is 2004
+   TestBit.is_equal_int(ANVL_ERR_PARSER_MULTIPLE_SHEBANG, err_code,
+                        "HDR18: err_code is MULTIPLE_SHEBANG");
    TestBit.is_true(Source.has_errors(doc->source), "HDR18: source reports an error");
 
    mod_ctx_dispose(ctx);

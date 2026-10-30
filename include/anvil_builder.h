@@ -93,8 +93,8 @@ bool anvil_builder_append(anvil_builder b, anvil_node collection, anvil_node ele
 
 /**
  * @brief Add a statement `name := value;` to an object, or to the document when `object` is NULL.
- * `value` must be detached. A top-level name may only be added once (ANVIL_WRITER_ERR_DUPLICATE_NAME);
- * names inside objects may repeat. Statements are emitted in the order added.
+ * `value` must be detached. A top-level name may only be added once (ANVIL_WRITER_ERR_DUPLICATE_NAME),
+ * and a name may only be added once to one object (ANVIL_WRITER_ERR_DUPLICATE_FIELD). Statements are emitted in the order added.
  * @return The statement handle (for a base or attributes), or NULL on failure.
  */
 anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *name, anvil_node value);

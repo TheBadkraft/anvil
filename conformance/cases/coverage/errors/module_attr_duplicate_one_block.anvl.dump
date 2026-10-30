@@ -1,0 +1,6 @@
+anvil-dump 1
+mode document
+input-bytes 20
+status error
+dialect AML
+error code=4013 name=ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY category=2 category-name=ANVIL_ERR_HEADER line=1 column=8 message="Duplicate attribute identifier"

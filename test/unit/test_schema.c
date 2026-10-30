@@ -2805,10 +2805,11 @@ static void test_sch95_unresolved_absent_and_options(void) {
 
 static void test_sch96_unresolved_value_form_and_later_resolution(void) {
    anvil_schema schema; anvil_document sdoc, ddoc;
-   // A repeated `type` that resolves clears the failure.
-   bool ok = nested_validate("#!aml\n@[schema]\np := { type := Ghost; type := String; };\n",
-                             "#!aml\np := \"x\";\n", &schema, &sdoc, &ddoc);
-   TestBit.is_true(schema && ok, "SCH96: a later resolving type wins");
+   // A repeated `type` can no longer be written (BR-2610-anvl-parser-005: a repeated object field
+   // is a load error), so there is no "later resolving type wins": the schema document is the error.
+   (void)nested_validate("#!aml\n@[schema]\np := { type := Ghost; type := String; };\n",
+                         "#!aml\np := \"x\";\n", &schema, &sdoc, &ddoc);
+   TestBit.is_true(sdoc && anvil_has_errors(sdoc), "SCH96: a repeated type is a load error");
    nested_free(schema, sdoc, ddoc);
 }
 

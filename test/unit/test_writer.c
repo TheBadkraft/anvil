@@ -687,8 +687,9 @@ static void test_w16_vtable_matches_flat(void) {
 
 /* ---------------------------------------------------------------------- *
  * W17 - a top-level name can't be declared twice (the reader's resolver
- * rejects it); nested objects may repeat a name, and a nested name may
- * match a top-level one
+ * rejects it), and neither can a field within one object (the reader rejects
+ * that too, BR-2610-anvl-parser-005: those inputs used to be legal and are
+ * now invalid by owner decision); a nested name may match a top-level one
  * ---------------------------------------------------------------------- */
 static bool dup_top_level(anvil_writer w) {
    return anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
@@ -713,7 +714,7 @@ static void test_w17_duplicate_names(void) {
    anvil_writer_begin_object(w);
    anvil_writer_statement(w, "a", NULL);
    anvil_writer_int(w, 1);
-   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_statement(w, "c", NULL);
    anvil_writer_int(w, 2);
    anvil_writer_end_object(w);
    anvil_writer_statement(w, "b", NULL);
@@ -727,14 +728,14 @@ static void test_w17_duplicate_names(void) {
                "#!aml\n\n"
                "a := {\n"
                "   a := 1;\n"
-               "   a := 2;\n"
+               "   c := 2;\n"
                "};\n"
                "b := [\n"
                "   {\n"
                "      a := 1;\n"
                "   }\n"
                "];\n",
-               "W17: nested repeats are legal");
+               "W17: a nested name may match a top-level one");
 
    // enough distinct names to force the name set to grow, then one repeat
    w = anvil_writer_new(ANVIL_WRITER_AML);
@@ -751,6 +752,239 @@ static void test_w17_duplicate_names(void) {
    anvil_writer_dispose(w);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * W20 (BR-2610-anvl-parser-005) - a field repeated within one object, at any
+ * depth, is rejected: the reader rejects it (4001)
+ * ---------------------------------------------------------------------- */
+static bool dup_depth1(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_depth1_after_other(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "b", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_depth2(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "p", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "c", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "c", NULL);
+}
+static bool dup_in_array(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "a", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_in_tuple(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_begin_tuple(w) &&
+          anvil_writer_int(w, 1) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_in_second_array_element(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "a", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "b", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "b", NULL);
+}
+static bool dup_with_attributes_between(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "a", NULL) && anvil_writer_attribute(w, "k", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_with_base(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) &&
+          anvil_writer_statement(w, "a", "base");
+}
+
+static void test_w20_duplicate_fields(void) {
+   expect_error(ANVIL_WRITER_AML, dup_depth1, ANVIL_WRITER_ERR_DUPLICATE_FIELD, "W20: depth 1");
+   expect_error(ANVIL_WRITER_AML, dup_depth1_after_other, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: depth 1, another field between");
+   expect_error(ANVIL_WRITER_AML, dup_depth2, ANVIL_WRITER_ERR_DUPLICATE_FIELD, "W20: depth 2");
+   expect_error(ANVIL_WRITER_AML, dup_in_array, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: object inside an array");
+   expect_error(ANVIL_WRITER_AML, dup_in_tuple, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: object inside a tuple");
+   expect_error(ANVIL_WRITER_AML, dup_in_second_array_element, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: second object of an array");
+   expect_error(ANVIL_WRITER_AML, dup_with_attributes_between, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: with an attribute on the first");
+   expect_error(ANVIL_WRITER_AML, dup_with_base, ANVIL_WRITER_ERR_DUPLICATE_FIELD,
+                "W20: repeat declared with a base");
+
+   // legal neighbours
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_begin_array(w);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL); // the same name in the next element is fine
+   anvil_writer_int(w, 2);
+   anvil_writer_statement(w, "o", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL); // and at another depth
+   anvil_writer_int(w, 3);
+   anvil_writer_end_object(w);
+   anvil_writer_end_object(w);
+   anvil_writer_end_array(w);
+   TestBit.is_true(anvil_writer_finish(w), "W20: same name in sibling and nested objects is legal");
+   anvil_writer_dispose(w);
+
+   // enough fields to force the set to grow, then one repeat
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   char name[16];
+   anvil_writer_statement(w, "o", NULL);
+   anvil_writer_begin_object(w);
+   for (int i = 0; i < 3000; i++) {
+      snprintf(name, sizeof name, "f%d", i);
+      anvil_writer_statement(w, name, NULL);
+      anvil_writer_int(w, i);
+   }
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_writer_get_error(w), "W20: 3000 distinct fields");
+   TestBit.is_false(anvil_writer_statement(w, "f1234", NULL), "W20: repeat after growth rejected");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_writer_get_error(w),
+                        "W20: repeat after growth is DUPLICATE_FIELD");
+   anvil_writer_dispose(w);
+
+   TestBit.is_true(anvil_writer_error_message(ANVIL_WRITER_ERR_DUPLICATE_FIELD) != NULL &&
+                      strcmp(anvil_writer_error_message(ANVIL_WRITER_ERR_DUPLICATE_FIELD),
+                             "unknown error") != 0,
+                   "W20: DUPLICATE_FIELD has a message");
+}
+
+/* ---------------------------------------------------------------------- *
+ * W21 (BR-2610-anvl-parser-005) - an attribute key repeated on one statement,
+ * or in the module header, is rejected: the reader rejects it (4013)
+ * ---------------------------------------------------------------------- */
+static bool dup_attr_statement(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "a", "1") &&
+          anvil_writer_attribute(w, "a", "2");
+}
+static bool dup_attr_statement_flag(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "f", NULL) &&
+          anvil_writer_attribute(w, "g", NULL) && anvil_writer_attribute(w, "f", NULL);
+}
+static bool dup_attr_statement_string(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "a", "1") &&
+          anvil_writer_attribute_string(w, "a", "s", 1);
+}
+static bool dup_attr_nested(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "k", NULL) &&
+          anvil_writer_attribute(w, "k", NULL);
+}
+static bool dup_attr_in_array_object(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "x", NULL) &&
+          anvil_writer_attribute(w, "k", NULL) && anvil_writer_attribute(w, "k", NULL);
+}
+static bool dup_attr_module(anvil_writer w) {
+   return anvil_writer_attribute(w, "m", "1") && anvil_writer_attribute(w, "n", NULL) &&
+          anvil_writer_attribute(w, "m", "2");
+}
+static bool dup_attr_module_string(anvil_writer w) {
+   return anvil_writer_attribute(w, "m", NULL) && anvil_writer_attribute_string(w, "m", "s", 1);
+}
+
+static void test_w21_duplicate_attribute_keys(void) {
+   expect_error(ANVIL_WRITER_AML, dup_attr_statement, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: statement");
+   expect_error(ANVIL_WRITER_AML, dup_attr_statement_flag, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: statement, flags");
+   expect_error(ANVIL_WRITER_AML, dup_attr_statement_string, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: statement, raw then quoted");
+   expect_error(ANVIL_WRITER_AML, dup_attr_nested, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: nested statement");
+   expect_error(ANVIL_WRITER_AML, dup_attr_in_array_object, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: statement of an object in an array");
+   expect_error(ANVIL_WRITER_AML, dup_attr_module, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: module");
+   expect_error(ANVIL_WRITER_AML, dup_attr_module_string, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,
+                "W21: module, flag then quoted");
+
+   // legal neighbours: the same key on two statements, and in the module and on a statement
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_attribute(w, "k", NULL);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_attribute(w, "k", NULL);
+   anvil_writer_attribute(w, "K", NULL); // keys are case sensitive
+   anvil_writer_int(w, 1);
+   anvil_writer_statement(w, "y", NULL);
+   anvil_writer_attribute(w, "k", NULL);
+   anvil_writer_int(w, 2);
+   TestBit.is_true(anvil_writer_finish(w), "W21: same key on different statements is legal");
+   anvil_writer_dispose(w);
+}
+
+/* ---------------------------------------------------------------------- *
+ * W22 (BR-2610-anvl-parser-005) - a keyword or reserved word is refused as a
+ * name at any level: statement, field at every depth, attribute key. The
+ * reader refuses them (4003, 4004).
+ * ---------------------------------------------------------------------- */
+static bool kw_attr_statement(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "include", NULL);
+}
+static bool kw_attr_statement_string(anvil_writer w) {
+   return anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute_string(w, "true", "s", 1);
+}
+static bool kw_attr_module(anvil_writer w) { return anvil_writer_attribute(w, "vars", "1"); }
+static bool kw_attr_module_string(anvil_writer w) {
+   return anvil_writer_attribute_string(w, "null", "s", 1);
+}
+static bool kw_attr_nested(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "x", NULL) && anvil_writer_attribute(w, "import", NULL);
+}
+static bool kw_statement(anvil_writer w) { return anvil_writer_statement(w, "false", NULL); }
+static bool kw_field(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "null", NULL);
+}
+static bool kw_field_depth2(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "p", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "include", NULL);
+}
+static bool kw_field_in_array(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "vars", NULL);
+}
+static void test_w22_keyword_names(void) {
+   const anvil_writer_err_code R = ANVIL_WRITER_ERR_RESERVED_WORD;
+   expect_error(ANVIL_WRITER_AML, kw_attr_statement, R, "W22: attribute key, statement");
+   expect_error(ANVIL_WRITER_AML, kw_attr_statement_string, R, "W22: attribute key, statement, string");
+   expect_error(ANVIL_WRITER_AML, kw_attr_module, R, "W22: attribute key, module");
+   expect_error(ANVIL_WRITER_AML, kw_attr_module_string, R, "W22: attribute key, module, string");
+   expect_error(ANVIL_WRITER_AML, kw_attr_nested, R, "W22: attribute key, nested statement");
+   expect_error(ANVIL_WRITER_AML, kw_statement, R, "W22: statement name");
+   expect_error(ANVIL_WRITER_AML, kw_field, R, "W22: field, depth 1");
+   expect_error(ANVIL_WRITER_AML, kw_field_depth2, R, "W22: field, depth 2");
+   expect_error(ANVIL_WRITER_AML, kw_field_in_array, R, "W22: field of an object in an array");
+   const char *words[] = {"include", "import", "vars", "true", "false", "null"};
+   for (size_t i = 0; i < 6; i++) {
+      anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+      TestBit.is_false(anvil_writer_attribute(w, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_writer_get_error(w), words[i]);
+      anvil_writer_dispose(w);
+   }
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_attribute(w, "included", NULL);
+   anvil_writer_attribute(w, "Include", NULL);
+   anvil_writer_int(w, 1);
+   TestBit.is_true(anvil_writer_finish(w), "W22: a longer or differently cased word is a fine key");
+   anvil_writer_dispose(w);
+}
 
 /* ---------------------------------------------------------------------- *
  * W18 (BR-2610-anvl-writer-001) - the name-set hash is true 64-bit FNV-1a, whatever size_t is
@@ -805,5 +1039,8 @@ int main(void) {
    TestBit.run_ex("W17_duplicate_names", NULL, test_w17_duplicate_names, th);
    TestBit.run_ex("W18_hash_is_fnv1a_64", NULL, test_w18_hash_is_fnv1a_64, th);
    TestBit.run_ex("W19_nameset_survives_growth", NULL, test_w19_nameset_survives_growth, th);
+   TestBit.run_ex("W20_duplicate_fields", NULL, test_w20_duplicate_fields, th);
+   TestBit.run_ex("W21_duplicate_attribute_keys", NULL, test_w21_duplicate_attribute_keys, th);
+   TestBit.run_ex("W22_keyword_names", NULL, test_w22_keyword_names, th);
    return TestBit.report();
 }

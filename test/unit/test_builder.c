@@ -346,7 +346,10 @@ static void test_b07_structure(void) {
                         "B07: duplicate is DUPLICATE_NAME");
    anvil_node obj = anvil_builder_object(b);
    TestBit.is_not_null(anvil_builder_add(b, obj, "a", anvil_builder_int(b, 1)), "B07: nested 'a'");
-   TestBit.is_not_null(anvil_builder_add(b, obj, "a", anvil_builder_int(b, 2)), "B07: nested repeat is legal");
+   // BR-2610-anvl-parser-005: a repeated field in one object is invalid now (the reader rejects it)
+   TestBit.is_null(anvil_builder_add(b, obj, "a", anvil_builder_int(b, 2)), "B07: nested repeat is rejected");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(b),
+                        "B07: nested repeat is DUPLICATE_FIELD");
 
    anvil_member scalar_member = ADD(b, "s", anvil_builder_int(b, 1));
    TestBit.is_false(anvil_builder_set_base(b, scalar_member, "a"), "B07: base on a scalar statement");
@@ -548,6 +551,118 @@ static void test_b13_vtable_matches_flat(void) {
    TestBit.is_true(Builder.emit == anvil_builder_emit, "B13: emit");
 }
 
+/* ---------------------------------------------------------------------- *
+ * B14 (BR-2610-anvl-parser-005) - a field repeated within one object, at any
+ * depth, and an attribute key repeated on one statement or in the module
+ * header, are rejected: the reader rejects both
+ * ---------------------------------------------------------------------- */
+static void test_b14_duplicates(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node o1 = anvil_builder_object(b);
+   TestBit.is_not_null(anvil_builder_add(b, o1, "a", anvil_builder_int(b, 1)), "B14: depth 1 first");
+   TestBit.is_not_null(anvil_builder_add(b, o1, "b", anvil_builder_int(b, 1)), "B14: depth 1 other");
+   TestBit.is_null(anvil_builder_add(b, o1, "a", anvil_builder_int(b, 2)), "B14: depth 1 repeat");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(b),
+                        "B14: depth 1 repeat is DUPLICATE_FIELD");
+   anvil_node o2 = anvil_builder_object(b);
+   TestBit.is_not_null(anvil_builder_add(b, o1, "inner", o2), "B14: nested object");
+   TestBit.is_not_null(anvil_builder_add(b, o2, "c", anvil_builder_int(b, 1)), "B14: depth 2 first");
+   TestBit.is_null(anvil_builder_add(b, o2, "c", anvil_builder_int(b, 2)), "B14: depth 2 repeat");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(b),
+                        "B14: depth 2 repeat is DUPLICATE_FIELD");
+   TestBit.is_not_null(anvil_builder_add(b, o2, "a", anvil_builder_int(b, 3)), "B14: same name at another depth");
+
+   anvil_node arr = anvil_builder_array(b);
+   anvil_node e1 = anvil_builder_object(b), e2 = anvil_builder_object(b);
+   TestBit.is_not_null(anvil_builder_add(b, e1, "k", anvil_builder_int(b, 1)), "B14: array element 1");
+   TestBit.is_not_null(anvil_builder_add(b, e2, "k", anvil_builder_int(b, 2)), "B14: same name in element 2");
+   TestBit.is_null(anvil_builder_add(b, e2, "k", anvil_builder_int(b, 3)), "B14: repeat inside an array element");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(b),
+                        "B14: array element repeat is DUPLICATE_FIELD");
+   anvil_builder_append(b, arr, e1);
+   anvil_builder_append(b, arr, e2);
+   anvil_node tup = anvil_builder_tuple(b);
+   anvil_node t1 = anvil_builder_int(b, 1), t2 = anvil_builder_object(b);
+   TestBit.is_not_null(anvil_builder_add(b, t2, "z", anvil_builder_int(b, 1)), "B14: tuple object first");
+   TestBit.is_null(anvil_builder_add(b, t2, "z", anvil_builder_int(b, 2)), "B14: repeat inside a tuple object");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(b),
+                        "B14: tuple object repeat is DUPLICATE_FIELD");
+   anvil_builder_append(b, tup, t1);
+   anvil_builder_append(b, tup, t2);
+
+   anvil_member m1 = ADD(b, "obj", o1);
+   ADD(b, "arr", arr);
+   ADD(b, "tup", tup);
+   // statement attributes
+   TestBit.is_true(anvil_builder_member_attribute(b, m1, "k", NULL), "B14: attribute");
+   TestBit.is_true(anvil_builder_member_attribute(b, m1, "j", "1"), "B14: another attribute");
+   TestBit.is_false(anvil_builder_member_attribute(b, m1, "k", "2"), "B14: repeated attribute key");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY, anvil_builder_get_error(b),
+                        "B14: repeated attribute is DUPLICATE_ATTRIBUTE_KEY");
+   TestBit.is_false(anvil_builder_member_attribute_string(b, m1, "j", "s", 1), "B14: repeat as a string");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY, anvil_builder_get_error(b),
+                        "B14: repeat as a string is DUPLICATE_ATTRIBUTE_KEY");
+   anvil_member m2 = ADD(b, "other", anvil_builder_int(b, 1));
+   TestBit.is_true(anvil_builder_member_attribute(b, m2, "k", NULL), "B14: same key on another statement");
+   // module attributes
+   TestBit.is_true(anvil_builder_attribute(b, "k", NULL), "B14: module attribute");
+   TestBit.is_true(anvil_builder_include(b, "k"), "B14: an include path is not an attribute key");
+   TestBit.is_false(anvil_builder_attribute(b, "k", "1"), "B14: repeated module attribute");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY, anvil_builder_get_error(b),
+                        "B14: repeated module attribute is DUPLICATE_ATTRIBUTE_KEY");
+   TestBit.is_false(anvil_builder_attribute_string(b, "k", "s", 1), "B14: repeated module attribute, string");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY, anvil_builder_get_error(b),
+                        "B14: repeated module attribute (string) is DUPLICATE_ATTRIBUTE_KEY");
+   size_t len = 0;
+   TestBit.is_not_null(anvil_builder_emit(b, &len), "B14: what was accepted still emits");
+
+   // enough fields to force the set to grow, then one repeat
+   anvil_builder big = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node bo = anvil_builder_object(big);
+   char name[16];
+   bool all = true;
+   for (int i = 0; i < 3000; i++) {
+      snprintf(name, sizeof name, "f%d", i);
+      all = all && anvil_builder_add(big, bo, name, anvil_builder_int(big, i)) != NULL;
+   }
+   TestBit.is_true(all, "B14: 3000 distinct fields");
+   TestBit.is_null(anvil_builder_add(big, bo, "f1234", anvil_builder_int(big, 0)), "B14: repeat after growth");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DUPLICATE_FIELD, anvil_builder_get_error(big),
+                        "B14: repeat after growth is DUPLICATE_FIELD");
+   anvil_builder_dispose(big);
+   anvil_builder_dispose(b);
+}
+
+/* B15 (BR-2610-anvl-parser-005) - keywords and reserved words are refused as names at any level */
+static void test_b15_keyword_names(void) {
+   const anvil_writer_err_code R = ANVIL_WRITER_ERR_RESERVED_WORD;
+   const char *words[] = {"include", "import", "vars", "true", "false", "null"};
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node o = anvil_builder_object(b);
+   anvil_node deep = anvil_builder_object(b);
+   anvil_member holder = anvil_builder_add(b, o, "p", deep);
+   TestBit.is_not_null(holder, "B15: a plain field");
+   anvil_member m = ADD(b, "x", anvil_builder_int(b, 1));
+   for (size_t i = 0; i < 6; i++) {
+      TestBit.is_false(anvil_builder_attribute(b, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_attribute_string(b, words[i], "s", 1), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_member_attribute(b, m, words[i], NULL), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_false(anvil_builder_member_attribute_string(b, m, words[i], "s", 1), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(ADD(b, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(anvil_builder_add(b, o, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+      TestBit.is_null(anvil_builder_add(b, deep, words[i], anvil_builder_int(b, 1)), words[i]);
+      TestBit.is_equal_int(R, anvil_builder_get_error(b), words[i]);
+   }
+   TestBit.is_true(anvil_builder_member_attribute(b, m, "included", NULL), "B15: a longer word is fine");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -562,5 +677,7 @@ int main(void) {
    TestBit.run_ex("B11_write_into_writer", NULL, test_b11_write_into_writer, th);
    TestBit.run_ex("B12_many_statements", NULL, test_b12_many_statements, th);
    TestBit.run_ex("B13_vtable_matches_flat", NULL, test_b13_vtable_matches_flat, th);
+   TestBit.run_ex("B14_duplicates", NULL, test_b14_duplicates, th);
+   TestBit.run_ex("B15_keyword_names", NULL, test_b15_keyword_names, th);
    return TestBit.report();
 }
