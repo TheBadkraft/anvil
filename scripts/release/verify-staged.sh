@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verify-staged.sh <staging-dir> <release-version> <build>
 # Extracts every staged tarball and reruns the whole check set on the *extracted files*, then the
-# FlyWire guard and the checksum file. Writes SHA256SUMS when it passes everything else.
+# FlyWire guard, the real-browser check of the wasm package and the checksum file. Writes SHA256SUMS when it passes everything else.
 set -u
 dir=$(cd "${1:?staging dir}" && pwd); ver=${2:?version}; build=${3:?build}
 here=$(cd "$(dirname "$0")" && pwd)
@@ -24,6 +24,7 @@ for k in py net; do
 done
 node=$(x node anvil-node-v$ver-linux-x86_64.tar.gz); run "$here/check-grammar.sh" node "$node" "$ver" "$build"; run "$here/check-readme.sh" "$node"
 wasm=$(x wasm anvil-wasm-v$ver.tar.gz);              run "$here/check-grammar.sh" wasm "$wasm" "$ver" "$build"; run "$here/check-readme.sh" "$wasm"
+run "$here/check-browser.sh" "$wasm"
 run "$here/check-install.sh" node "$dir/anvil-node-v$ver-linux-x86_64.tar.gz" "$ver"
 run "$here/check-install.sh" wasm "$dir/anvil-wasm-v$ver.tar.gz" "$ver"
 run "$here/check-downstream.sh" "$dir/anvil-node-v$ver-linux-x86_64.tar.gz" "$dir/anvil-wasm-v$ver.tar.gz"

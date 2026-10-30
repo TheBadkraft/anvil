@@ -14,7 +14,10 @@
 #   2. `include "missing.anvl";` fails with an include-not-found error, never "Expected ':='"
 #      (that is the pre-rename grammar, where `include` was a plain identifier);
 #   3. `name := "David";` parses and reads back as David.
-# Exit 0 only if all three hold.
+#   4. wasm only: dist/anvil.browser.js is in the package and, loaded the way a <script> tag loads it
+#      (a sandbox with no require/module/process), exposes window.anvl with the same keys as
+#      require('anvil-wasm') and gives the same version, include error and name (probes/probe-bundle.js).
+# Exit 0 only if all hold.
 set -u
 kind=${1:?kind}; pkg=$(cd "${2:?package dir}" && pwd); want=${3:?release version}; wantbuild=${4:-}
 if [[ $want =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(.+)$ ]]; then
@@ -30,8 +33,8 @@ case $kind in
            -Wl,-rpath,"$pkg/lib" -o "$work/probe" || { echo "FAIL build probe"; exit 2; }
         out=$("$work/probe" 2>&1) ;;
   node) out=$(node "$here/probes/probe-node.js" "$pkg" 2>&1) ;;
-  wasm) out=$(node "$here/probes/probe-wasm.js" "$pkg" 2>&1) ;;
-  py)   out=$(python3 -I "$here/probes/probe-py.py" "$pkg" 2>&1) ;;
+  wasm) out=$(node "$here/probes/probe-wasm.js" "$pkg" 2>&1; node "$here/probes/probe-bundle.js" "$pkg" 2>&1) ;;
+  py)   out=$(PYTHONDONTWRITEBYTECODE=1 python3 -I "$here/probes/probe-py.py" "$pkg" 2>&1) ;;
   net)  cp -r "$here/probes/probe-net" "$work/net"
         out=$(cd "$work/net" && dotnet run -c Release -p:AnvilNetLib="$pkg/lib" 2>&1) ;;
   *) echo "unknown kind: $kind" >&2; exit 2 ;;
@@ -50,5 +53,15 @@ else echo "FAIL include: '${include:-<no output>}' (want an include-not-found er
 
 if [ "$name" = "David" ]; then echo "PASS name: David"
 else echo "FAIL name: '${name:-<none>}'"; rc=1; fi
+if [ "$kind" = wasm ]; then
+  b=$(field bundle)
+  if [ "$b" != ok ]; then echo "FAIL bundle: dist/anvil.browser.js ${b:-<no output>}"; rc=1
+  else
+    [ "$(field bundle_keys)" = same ] && echo "PASS bundle keys: same as require('anvil-wasm')" || { echo "FAIL bundle keys: $(field bundle_keys)"; rc=1; }
+    [ "$(field bundle_version)" = "$version" ] && echo "PASS bundle version: $(field bundle_version)" || { echo "FAIL bundle version: '$(field bundle_version)' != '$version'"; rc=1; }
+    [ "$(field bundle_include)" = "$include" ] && echo "PASS bundle include: same error as the CommonJS entry" || { echo "FAIL bundle include: '$(field bundle_include)'"; rc=1; }
+    [ "$(field bundle_name)" = David ] && echo "PASS bundle name: David" || { echo "FAIL bundle name: '$(field bundle_name)'"; rc=1; }
+  fi
+fi
 [ $rc -ne 0 ] && [ -z "$version$include$name" ] && printf '%s\n' "$out" | head -5
 exit $rc
