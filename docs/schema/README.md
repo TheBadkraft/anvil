@@ -169,8 +169,12 @@ of `set := [ {...}, {...} ]` read the violations between calls.
 ### Diagnostics
 
 Something wrong with the schema itself (as opposed to a violation, which is something wrong with
-data) is a diagnostic. A schema with diagnostics still loads and still validates; the weakened
-rule simply checks less. `anvil_schema_get_diagnostic_count` / `get_diagnostic` list them in the
+data) is a diagnostic. A schema with diagnostics still loads and still validates, with one
+exception that fails closed: a field whose `type` is an `UNKNOWN_TYPE` accepts no value. Every
+*present* value of that field, at any depth (top level, a `fields` member, an array `items` rule),
+is an `ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE` violation, an explicit `null` included even
+with `nullable := true`; `skip_required` and `allow_unknown` do not excuse it. An absent field is
+judged only by `required`. Other weakened rules simply check less. `anvil_schema_get_diagnostic_count` / `get_diagnostic` list them in the
 order found: the type registry's own diagnostics first (name collisions, unknown base types,
 malformed constraints, malformed enum values), then the schema's: `UNKNOWN_TYPE` (a typo such as
 `types.Prority`), `UNKNOWN_FORMAT`, `MALFORMED_CONSTRAINT`, `RULE_NOT_OBJECT`, `SELF_REFERENCE`

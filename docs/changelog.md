@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deployed (site, v0.10.0-rc)
 - **anvldata.com now serves `v0.10.0-rc`.** Deployed 2026-10-29 from `main` at `0f9d333` (Worker version `a2a9de8a-1b29-4897-8f0d-71bfb2afde83`). The five `v0.10.0-rc` tarballs match the live `SHA256SUMS`; the old `v0.8.0-rc` tarball URLs now return 404.
 
+### Changed (documentation, number grammar and fail-closed validation)
+- `docs/language-reference.md` §4 now states the number grammar (optional exponent sign, `5.` and `1e` rejected, boundary rule, quote `"1e5"` to keep it text; was "sign required"). `docs/schema/README.md` and `docs/types-reference.md` now describe `ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE` and the fail-closed handling of an unresolved `type`. Internal docs only; the site copies follow the next release.
+
 ### Changed (number grammar, FR-2610-anvl-parser-002)
 
 - **A bare word such as `1e3` now reads as a number.** The exponent sign is optional: `1e3`, `1E3`,
