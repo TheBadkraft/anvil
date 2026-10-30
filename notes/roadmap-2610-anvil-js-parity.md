@@ -248,6 +248,16 @@ anvil.js from the native addon. This lands in R2.
 
 Rivet projects `anvil.node` and `anvil.wasm` are **frozen**, with successor `anvil.js`: new filings there are refused.
 
+## 6f. JSON.parse and tree sizing (owner, 2026-10-30)
+
+- **`JSON.parse` is a target, not a hard gate.** The owner doesn't expect anvil.js to beat it outright. The
+  aim is **close enough** that ANVL's added value makes it the obvious choice: schema, types, blobs, the
+  binary-safe and exact numbers, includes and attributes. Every phase reports the JSON.parse ratios
+  (parse, and parse plus read, by document size), and works to narrow the gap, especially on small
+  documents and full reads.
+- **Tree sizing:** tune the initial `Int32Array` capacity, and the growth and trim policy, starting in R2.
+  Goal: a lower transient peak right after a parse, with no regression in retained size or speed.
+
 ## 7. Risks
 
 - **The R0 speed target isn't met.** If no representation beats `anvil-node` everywhere, we stop at R0
