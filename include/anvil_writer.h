@@ -72,6 +72,8 @@ const char *anvil_writer_error_message(anvil_writer_err_code code);
  * @param key Identifier. @param value Raw attribute text, or NULL for a flag attribute. It is
  * emitted verbatim, so it must have no `,` or `]` outside double quotes, no leading `$`, and no
  * leading/trailing whitespace; use anvil_writer_attribute_string for text that needs quoting.
+ * A key may be given once per statement, and once in the module header (a repeat fails with
+ * ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY; the reader rejects it).
  */
 bool anvil_writer_attribute(anvil_writer w, const char *key, const char *value);
 
@@ -87,8 +89,9 @@ bool anvil_writer_include(anvil_writer w, const char *path);
  * @brief Begin a statement at the top level or inside an object. Always emitted as
  * `name := value;`. Complete it with one value call.
  * A top-level name may only be declared once (the reader's resolver rejects a repeat), so a repeat
- * fails with ANVIL_WRITER_ERR_DUPLICATE_NAME; names inside objects may repeat. The writer can't see
- * names pulled in by an include.
+ * fails with ANVIL_WRITER_ERR_DUPLICATE_NAME; a name repeated inside one object fails with
+ * ANVIL_WRITER_ERR_DUPLICATE_FIELD (the reader rejects both). The writer can't see names pulled in by
+ * an include.
  * @param name Identifier, not a reserved word. @param base Optional inheritance base
  * (identifier, not reserved), or NULL. A base requires an object value; AML only.
  */

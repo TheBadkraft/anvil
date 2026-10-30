@@ -37,6 +37,7 @@ typedef struct {
    size_t count;    // elements (array/tuple) or completed statements (object)
    bool multiline;  // an object element was written, so later elements go on their own lines
    bool owns_stmt;  // this collection is a statement's value, so closing it emits ';'
+   wg_nameset names; // FRAME_OBJECT: the field names so far (the reader rejects a repeat)
 } frame;
 
 typedef enum { PHASE_HEADER, PHASE_BODY, PHASE_FINISHED } phase;
@@ -56,6 +57,8 @@ struct anvil_writer_t {
    bool stmt_base;    // that statement declared an inheritance base
    bool attrs_open;   // that statement's `@[` group is written but not yet closed
    wg_nameset names;  // top-level statement names so far
+   wg_nameset stmt_keys;   // attribute keys of the open statement so far
+   wg_nameset module_keys; // module attribute keys so far
 };
 
 /* ----------------------------------------------------------------------- *
@@ -192,8 +195,13 @@ void anvil_writer_dispose(anvil_writer w) {
       return;
    }
    free(w->buf);
+   for (size_t i = 0; i < w->depth; i++) {
+      wg_nameset_free(&w->stack[i].names);
+   }
    free(w->stack);
    wg_nameset_free(&w->names);
+   wg_nameset_free(&w->stmt_keys);
+   wg_nameset_free(&w->module_keys);
    free(w);
 }
 
@@ -226,6 +234,16 @@ static bool attribute_emit(anvil_writer w, const char *key, const char *value, b
    return true;
 }
 
+// Records an attribute key against the open statement or the module header; a repeat is
+// ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY (the reader rejects it).
+static bool attribute_key_unique(anvil_writer w, const char *key) {
+   int added = wg_nameset_add(w->stmt_open ? &w->stmt_keys : &w->module_keys, key);
+   if (added < 0) {
+      return fail(w, ANVIL_WRITER_ERR_MEMORY);
+   }
+   return added == 0 ? fail(w, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY) : true;
+}
+
 // Decides which kind of attribute this call is, or fails with the right error.
 static bool attribute_context(anvil_writer w) {
    if (!ready(w)) {
@@ -243,7 +261,8 @@ bool anvil_writer_attribute(anvil_writer w, const char *key, const char *value) 
    if (!attribute_context(w)) {
       return false;
    }
-   if (!check(w, wg_check_attribute_key(key)) || (value && !check(w, wg_check_attribute_value(value)))) {
+   if (!check(w, wg_check_attribute_key(key)) || (value && !check(w, wg_check_attribute_value(value))) ||
+       !attribute_key_unique(w, key)) {
       return false;
    }
    return attribute_emit(w, key, value, false, value ? strlen(value) : 0);
@@ -254,7 +273,8 @@ bool anvil_writer_attribute_string(anvil_writer w, const char *key, const char *
    if (!attribute_context(w)) {
       return false;
    }
-   if (!check(w, wg_check_attribute_key(key)) || !check(w, wg_check_attribute_text(text, length))) {
+   if (!check(w, wg_check_attribute_key(key)) || !check(w, wg_check_attribute_text(text, length)) ||
+       !attribute_key_unique(w, key)) {
       return false;
    }
    return attribute_emit(w, key, text ? text : "", true, length);
@@ -302,7 +322,17 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
       if (added == 0) {
          return fail(w, ANVIL_WRITER_ERR_DUPLICATE_NAME);
       }
+   } else {
+      // a field repeated within one object (the reader rejects it, at any depth)
+      int added = wg_nameset_add(&w->stack[w->depth - 1].names, name);
+      if (added < 0) {
+         return fail(w, ANVIL_WRITER_ERR_MEMORY);
+      }
+      if (added == 0) {
+         return fail(w, ANVIL_WRITER_ERR_DUPLICATE_FIELD);
+      }
    }
+   wg_nameset_free(&w->stmt_keys); // a new statement starts with no attribute keys
    if (w->phase == PHASE_HEADER) {
       if (w->header_dirty && !put_char(w, '\n')) {
          return false;
@@ -558,6 +588,7 @@ static bool end_collection(anvil_writer w, frame_kind kind) {
    if (done.count < (kind == FRAME_TUPLE ? 2u : 1u)) {
       return fail(w, ANVIL_WRITER_ERR_EMPTY_COLLECTION);
    }
+   wg_nameset_free(&done.names);
    w->depth--;
    if (kind == FRAME_OBJECT) {
       if (!put_indent(w, w->depth) || !put_char(w, ANVL_TOK_RBRACE)) {

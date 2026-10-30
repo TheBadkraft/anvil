@@ -64,6 +64,7 @@ struct anvil_node_t {
    struct anvil_member_t **members; // NODE_OBJECT
    size_t count;
    size_t cap;
+   wg_nameset names;                // NODE_OBJECT: the field names so far (the reader rejects a repeat)
 };
 
 struct anvil_member_t {
@@ -140,6 +141,15 @@ static void free_attr(attr *a) {
    free(a->value);
 }
 
+static bool attr_list_has(const attr_list *list, const char *key) {
+   for (size_t i = 0; i < list->count; i++) {
+      if (strcmp(list->items[i].key, key) == 0) {
+         return true;
+      }
+   }
+   return false;
+}
+
 static bool add_attr(attr_list *list, const char *key, const char *value, size_t value_len,
                      bool quoted) {
    if (!reserve((void **)&list->items, list->count, &list->cap, sizeof *list->items)) {
@@ -181,6 +191,7 @@ void anvil_builder_dispose(anvil_builder b) {
       free(n->tag);
       free(n->elements);
       free(n->members);
+      wg_nameset_free(&n->names);
       free(n);
    }
    for (size_t i = 0; i < b->all_member_count; i++) {
@@ -214,6 +225,13 @@ anvil_writer_err_code anvil_builder_get_error(anvil_builder b) {
  * ----------------------------------------------------------------------- */
 static bool add_header(anvil_builder b, bool is_include, const char *key, const char *value,
                        size_t value_len, bool quoted) {
+   if (!is_include) { // a module attribute key given twice (the reader rejects it)
+      for (size_t i = 0; i < b->header_count; i++) {
+         if (!b->header[i].is_include && strcmp(b->header[i].item.key, key) == 0) {
+            return outcome(b, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY);
+         }
+      }
+   }
    if (!reserve((void **)&b->header, b->header_count, &b->header_cap, sizeof *b->header)) {
       return outcome(b, ANVIL_WRITER_ERR_MEMORY);
    }
@@ -487,13 +505,16 @@ anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *n
       outcome(b, ANVIL_WRITER_ERR_MEMORY);
       return NULL;
    }
-   // Top-level names are unique (the reader's resolver requires it); nested names may repeat.
-   if (!object) {
-      int added = wg_nameset_add(&b->names, name);
+   // Names are unique per object (the reader rejects a repeat at any depth; at the top level its
+   // resolver does): a repeat is DUPLICATE_NAME at the top level and DUPLICATE_FIELD inside an object.
+   {
+      int added = wg_nameset_add(object ? &object->names : &b->names, name);
       if (added <= 0) {
          free(m->name);
          free(m);
-         outcome(b, added < 0 ? ANVIL_WRITER_ERR_MEMORY : ANVIL_WRITER_ERR_DUPLICATE_NAME);
+         outcome(b, added < 0 ? ANVIL_WRITER_ERR_MEMORY
+                              : object ? ANVIL_WRITER_ERR_DUPLICATE_FIELD
+                                       : ANVIL_WRITER_ERR_DUPLICATE_NAME);
          return NULL;
       }
    }
@@ -550,6 +571,9 @@ bool anvil_builder_member_attribute(anvil_builder b, anvil_member m, const char 
    if (code != ANVIL_WRITER_OK) {
       return outcome(b, code);
    }
+   if (attr_list_has(&m->attrs, key)) {
+      return outcome(b, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY);
+   }
    return outcome(b, add_attr(&m->attrs, key, value, value ? strlen(value) : 0, false)
                          ? ANVIL_WRITER_OK
                          : ANVIL_WRITER_ERR_MEMORY);
@@ -566,6 +590,9 @@ bool anvil_builder_member_attribute_string(anvil_builder b, anvil_member m, cons
    }
    if (code != ANVIL_WRITER_OK) {
       return outcome(b, code);
+   }
+   if (attr_list_has(&m->attrs, key)) {
+      return outcome(b, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY);
    }
    return outcome(b, add_attr(&m->attrs, key, text ? text : "", length, true) ? ANVIL_WRITER_OK
                                                                               : ANVIL_WRITER_ERR_MEMORY);

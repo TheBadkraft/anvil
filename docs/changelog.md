@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attribute name is legal), 4015 (a block and a name repeated at top level is 4053, as the two forms are the same
   statement), 4203 (includes have no aliases). 3011, 4005 and 3016 fit no input that gets a generic code
   (empty array is 4009, a one-element tuple 3013, a missing `:=` 2002).
+- **The writer and the builder reject what the reader now rejects** (behaviour change): a field name repeated in one object
+  at any depth is `ANVIL_WRITER_ERR_DUPLICATE_FIELD`, and an attribute key repeated on one statement or in the module
+  header is `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` (both new, appended to `anvil_writer_err_code`, so existing values
+  keep their numbers). A repeated top-level name stays `ANVIL_WRITER_ERR_DUPLICATE_NAME`. A generated sweep of 4,000 writer
+  and 4,000 builder documents checks that everything they accept loads.
 - 102 new conformance cases (the new errors, their legal neighbours, and fragment `@2`, which reads as the bare
   word `2`).
 
