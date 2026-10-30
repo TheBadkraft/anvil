@@ -83,6 +83,10 @@ the contained harness. Nothing in `$HOME` except `~/release-staging/v0.12.0-rc/`
 
 | Step | State |
 |---|---|
-| 1. Cut core: `0.12.0-rc`, `[Unreleased]` -> `[v0.12.0-rc]` | done on `release/v0.12.0-rc`, waiting for the merge and tag |
-| 2. Bindings (py, net) and anvil.js on `release/v0.12.0-rc` | after the tag |
-| 3. Build, checks, bench, stage | after the tag |
+| 1. Cut core: `0.12.0-rc`, `[Unreleased]` -> `[v0.12.0-rc]` | done; tag `v0.12.0-rc` on `822f092`, BUILD 389, pushed |
+| 2. py, net, anvil.js on `release/v0.12.0-rc`, pinned to `822f092` | done, waiting for the merge: py `2cab130`, net `dfa8e2e`, anvil.js `1ae2d77` (conformance 1867/1867). Release tooling: native `release/v0.12.0-rc-tooling` |
+| 3. Build from the tag, twice | done; core, py, net, anvil.js byte-identical across builds |
+| 4. Checks on the extracted tarballs | pass: grammar and version `0.12.0-rc+389`, exports (165 symbols), README, anvil.js install, require and import, corpus through the installed copy, real browsers (chromium and firefox, esm and global, 10 checks each) |
+| 5. Benchmarks | HOLD: shipped `libanvil.so` loads small documents 1.027x vs native v0.11.0-rc (gate 1.02x); see BR-2610-anvl-parser-008 |
+| 6. Stage | done in `~/release-staging/v0.12.0-rc/` |
+| 7. Deploy and live check | after the Technical Writer's deploy |
