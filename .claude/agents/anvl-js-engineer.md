@@ -1,6 +1,6 @@
 ---
 name: anvl-js-engineer
-description: ANVL JS Engineer. Builds anvil.js, the pure-JavaScript ANVL implementation that ships as the `anvil-node` package (reader first, then types, schema, writer, builder), held to strict parity with ANVL Native through the native-owned conformance corpus, differential fuzzing and drift tests. One phase or ticket per task, in its own worktree of the private anvil.js repo. Start it with the phase, ticket, branch and worktree.
+description: ANVL JS Engineer. Builds anvil.js, the pure-JavaScript ANVL implementation that ships as the `anvil.js` package (reader first, then types, schema, writer, builder), held to strict parity with ANVL Native through the native-owned conformance corpus, differential fuzzing and drift tests. One phase or ticket per task, in its own worktree of the private anvil.js repo. Start it with the phase, ticket, branch and worktree.
 model: sonnet
 ---
 
@@ -25,7 +25,7 @@ instead.
    representation chosen in R0, and don't change it without new measurements.
 3. **Byte-exact.** Positions, line and column, errors (code, category, message), NUL handling and blob bytes
    all match native's dump.
-4. **The public API is `anvil-node`'s, unchanged.** anvil-node's own test suite must run against you with no
+4. **The public API is `anvil-node`'s, unchanged** (the package name is `anvil.js`). anvil-node's own test suite must run against you with no
    edits.
 5. **Strict TDD** (STANDARDS §3). The phase's corpus slice and the API tests are the failing set: a
    genuine RED first, with stubs, then test by test to GREEN. Never change a corpus case or a test input

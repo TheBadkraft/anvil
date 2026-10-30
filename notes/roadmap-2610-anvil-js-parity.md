@@ -173,9 +173,12 @@ builder output **bytes**. Then the same cycle as R1: RED, then GREEN.
 
 ## 6. Owner decisions (2026-10-30)
 
-- **D1, the package:** anvil.js is **published as `anvil-node`** (same name, same API), so consumers only bump
-  a version. The source repo stays private on the Linode box (`linode:repos/anvl-js.git`). Only the
-  published package is public.
+- **D1, the package (revised 2026-10-30):** anvil.js publishes under **its own name, `anvil.js`**,
+  matching the repo and the Rivet project. It is **not** published as `anvil-node`. It has the same API
+  as anvil-node, so a consumer's move is a dependency rename plus a version bump. `anvil-node` (the native
+  addon) and `anvil-wasm` are deprecated at v0.11.0-rc, and those tarballs stay downloadable. The source
+  repo stays private on the Linode box (`linode:repos/anvl-js.git`). Tarball: `anvil.js-v<version>.tar.gz`
+  on anvldata.com, pinned by sha256.
 - **D2, anvil.wasm (revised 2026-10-30):** ship `v0.11.0-rc` (with the browser fix and bundle), then **freeze and retire** it. `v0.11.0-rc` stays published as the record that answers "why not WASM?". anvil.js covers the browser too: it's plain JavaScript and runs in a browser as is. King & Crucible's web work is paused, so nothing depends on anvil-wasm.
 - **D3, the old `anvl-js` 0.6.2-alpha consumers:** there are none. Nothing to migrate or freeze.
 - **D4, include I/O in the browser:** confirmed. With no filesystem, the resolver callback
