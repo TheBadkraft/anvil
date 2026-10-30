@@ -1,0 +1,1 @@
+anvil-dump: e28_double_plus_inf.wscript:3: expected a decimal, 0x + 16 hex digits, nan, inf or -inf
