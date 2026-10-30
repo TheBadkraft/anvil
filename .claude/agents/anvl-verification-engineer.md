@@ -37,7 +37,12 @@ allows them. Rivet has no token scopes yet, so this rule is enforced only by you
 5. **Downstream** (anvil.node/anvil.wasm changes): run FlyWire's guard,
    `~/Projects/repos/flywire/tests/test-anvl-binding-grammar.js`. Run it read-only, from a
    scratch copy whose binding dependency points at the branch build.
-6. **Finish rules.** There's a changelog entry naming the ticket, and the ticket is resolved in
+6. **Performance.** For any change on a parse, write or validate path, native or binding, run the
+   repo's benchmark, or the measurement table in the ticket, old build against new on the same
+   documents (median of 15 runs). Report every ratio. **Any slowdown above 1.02x is a FAIL**
+   unless the ticket records that the owner accepted it. The Principal Engineer can't accept a
+   slowdown on the owner's behalf.
+7. **Finish rules.** There's a changelog entry naming the ticket, and the ticket is resolved in
    Rivet with a resolution.
 
 ## What you don't do
