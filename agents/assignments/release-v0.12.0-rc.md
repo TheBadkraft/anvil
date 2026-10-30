@@ -78,3 +78,11 @@ This is also the **first release of anvil.js**.
 
 Resource rules: CPUs 2-5, foreground, every heavy command under the systemd memory cap. Browsers only through
 the contained harness. Nothing in `$HOME` except `~/release-staging/v0.12.0-rc/`.
+
+## Status (2026-10-30)
+
+| Step | State |
+|---|---|
+| 1. Cut core: `0.12.0-rc`, `[Unreleased]` -> `[v0.12.0-rc]` | done on `release/v0.12.0-rc`, waiting for the merge and tag |
+| 2. Bindings (py, net) and anvil.js on `release/v0.12.0-rc` | after the tag |
+| 3. Build, checks, bench, stage | after the tag |

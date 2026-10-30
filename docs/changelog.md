@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.12.0-rc] — (2026-10-30)
+
+A minor bump: the grammar is now consistent (duplicate keys are errors everywhere, a base must be an object,
+keywords are refused as names, specific error codes), attribute values are scalars, the builder refuses a
+non-object base, and `$ident` resolves to a block-form statement. Every artifact is built from this tag and
+reports `0.12.0-rc+<BUILD>`. This is also the first release of anvil.js.
+
 ### Changed (attribute values are scalars; builder checks bases, BR-2610-anvl-parser-007, BR-2610-anvl-writer-002) -- BEHAVIOUR CHANGE
 
 - **Behaviour change: an attribute value must be a scalar.** Any attribute value starting with `[`, `(` or `{`
