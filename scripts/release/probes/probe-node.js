@@ -10,3 +10,4 @@ const doc = anvil.parse('#!aml\nname := "David";\n');
 let name = '<none>';
 if (doc) { const v = doc.name !== undefined ? doc.name : (doc.get && doc.get('name')); name = String(v && v.asString ? v.asString() : v); }
 console.log(`name=${name}`);
+if (anvil.implementation !== undefined) console.log(`implementation=${anvil.implementation}`);
