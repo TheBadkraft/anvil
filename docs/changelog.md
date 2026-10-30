@@ -34,9 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the reader's 4020). `anvil_builder_set_base` is unchanged (a base can be added after the member that derives from
   it). A base the builder does not hold, such as one from an include, is accepted and left to the reader. The builder
   never writes the block form `ident { ... }`, an anonymous read-only block that cannot be a base (reader 4052), so it
-  cannot name one.
-- Conformance corpus: 9 dumps changed message text only, 4 changed from `ok` to 2006 (a bracketed object value and
-  three blob values), 1 resolver dump changed `resolved=0` to `resolved=1`, 3 cases replaced or dropped, many added.
+  cannot name one. The check covers every member the builder created, including members never attached to the tree.
+- Conformance corpus: 9 dumps changed message text only, 6 changed from `ok` to 2006 (3 in place: an object value and two
+  blob values; 3 renamed to drop `_ok`: a tagged blob, a balanced object, a balanced tuple), 1 resolver dump changed
+  `resolved=0` to `resolved=1`, 44 cases added (1,823 to 1,867 in all).
   Property RT14 now covers attribute values and scalar bases.
 - **Behaviour change: a `$ident` reference to a block-form statement resolves** (BR-2610-anvl-resolver-001). `a { x := 1; }; b := $a;`
   used to leave `b` unresolved, silently; it now resolves to `a`'s object value, as `a := { x := 1; };` always did, also

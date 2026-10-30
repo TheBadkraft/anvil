@@ -514,6 +514,7 @@ put(G + "varref_inside_block_form.anvl", "a { x := 1; };\no { r := $a; };\n")
 put(G + "varref_to_nested_block_form.anvl", "o := { a { x := 1; }; };\nr := $a;\n")
 # BR-2610-anvl-writer-002 / the owner's 2026-10-30 ruling: any non-object base is 4020; the bare block
 # form `ident { }` is an anonymous, read-only block and cannot be a base (4052)
+put(G + "inherit_from_nested_sibling.anvl", "o := { a2 := { x := 1; }; b : a2 := { y := 2; }; };\n")  # 4051: bases resolve against top-level names only
 put(G + "inherit_from_object_ok.anvl", "a := { x := 1; };\nb : a := { y := 2; };\n")
 put(G + "inherit_from_object_forward_ok.anvl", "b : a := { y := 2; };\na := { x := 1; };\n")
 put(G + "inherit_from_anonymous_nested.anvl", "a { x := 1; };\no := { b : a := { y := 2; }; };\n")

@@ -229,8 +229,8 @@ void anvil_document_iterator_dispose(anvil_document_iterator it);
  * so this accessor cannot tell the two forms apart. They are not the same
  * statement elsewhere: the block form is an anonymous, read-only block. It
  * cannot be a base (inheriting from it is ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS,
- * 4052), and a '$ident' reference to it stays unresolved. See the language
- * reference, section 3.
+ * 4052). A '$ident' reference to it resolves like any other statement,
+ * because a reference is a read. See the language reference, section 3.
  */
 anvil_value anvil_statement_get_value(anvil_statement stmt);
 
