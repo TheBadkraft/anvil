@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deployed (site, v0.10.0-rc)
+- **anvldata.com now serves `v0.10.0-rc`.** Deployed 2026-10-29 from `main` at `0f9d333` (Worker version `a2a9de8a-1b29-4897-8f0d-71bfb2afde83`). The five `v0.10.0-rc` tarballs match the live `SHA256SUMS`; the old `v0.8.0-rc` tarball URLs now return 404.
+
 ### Changed (documentation and site, v0.10.0-rc)
 - **Docs and site refreshed for `v0.10.0-rc`.** `docs/schema/README.md` now covers what AnvilSchema
   does today (FR-2610-anvl-schema-001..005, FR-2610-anvl-types-001..005, BR-2610-anvl-nul-001,
