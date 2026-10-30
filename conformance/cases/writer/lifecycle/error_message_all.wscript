@@ -1,5 +1,5 @@
 anvil-writer-script 1
-# every code, and values outside the enum
+# every code, and values outside the enum (no finish: no output)
 dialect AML
 error_message 0
 error_message 1

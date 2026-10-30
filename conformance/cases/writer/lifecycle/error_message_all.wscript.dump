@@ -26,4 +26,4 @@ error_message code=-2147483648 text="unknown error"
 error_message code=2147483647 text="unknown error"
 steps 26
 status ok
-output bytes=7 text="#!aml\n\n"
+output none

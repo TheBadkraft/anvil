@@ -211,7 +211,7 @@ raw(L, "get_error_ok", "AML", ["get_error", "finish", "get_error"], lambda n: (
 steps = ["error_message %d" % c for c in list(range(0, 19)) + [19, 20, 100, -1, -2147483648, 2147483647]]
 raw(L, "error_message_all", "AML", steps, lambda n: (
     ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 19)) + [19, 20, 100, -1, -2147483648, 2147483647]],
-    len(steps) + 1, 0, HDR["AML"]), desc="every code, and values outside the enum")
+    len(steps) + 1, 0, None), desc="every code, and values outside the enum (no finish: no output)")
 # invalid dialect: the writer is NULL
 for dv in (2, 7, -1, 255):
     steps = ["get_error", "statement \"a\" NULL"]
@@ -236,7 +236,7 @@ raw(L, "sticky_error_stop", "AML", steps, lambda n: ([failed(n, 1, steps, E("STA
 steps = ["statement \"a\" NULL", "int 1", "finish", "int 2", "data"]
 raw(L, "call_after_finish", "AML", steps, lambda n: ([failed(n, 3, steps, E("STATE"))], 5, E("STATE"), None), desc="any call after finish is STATE (and the output is gone with the sticky error)")
 steps = ["option on-error continue", "statement \"a\" NULL", "int 1", "finish", "int 2", "data", "get_error"]
-raw(L, "call_after_finish_continue", "AML", steps, lambda n: ([failed(n, 3, steps, E("STATE")), "data none", "get_error code=3 name=ANVIL_WRITER_ERR_STATE"], 8, E("STATE"), None))
+raw(L, "call_after_finish_continue", "AML", steps, lambda n: ([failed(n, 4, steps, E("STATE")), "data none", "get_error code=3 name=ANVIL_WRITER_ERR_STATE"], 8, E("STATE"), None))
 err(L, "unfinished_statement", "AML", ["statement \"a\" NULL", "finish"], E("UNFINISHED"))
 err(L, "unfinished_array", "AML", ["statement \"a\" NULL", "begin_array", "int 1", "finish"], E("UNFINISHED"))
 err(L, "unfinished_tuple", "AML", ["statement \"a\" NULL", "begin_tuple", "int 1", "int 2", "finish"], E("UNFINISHED"))

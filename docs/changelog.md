@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Writer conformance corpus (FR-2610-anvl-conformance-003).** The native writer now has a native-owned corpus of
+  output bytes that a second implementation (anvil.js) must reproduce exactly. A small versioned line format, the
+  writer script (`anvil-writer-script 1`, specified in `conformance/FORMAT.md`), names one writer call per line with
+  literal arguments (any byte sequence through `\xHH` escapes, null pointers, IEEE bits for doubles). `anvil-dump
+  --writer-script <file>` runs a script through the native writer and prints the run (`anvil-writer-run 1`): every
+  failed call with its error code and the call text, and the exact output bytes with their length; `--writer-output`
+  prints the raw output. `conformance/cases/writer/` holds 759 generated scripts (`seed/gen_writer.py`, expectations
+  computed independently of the writer) covering every call, every value kind, escapes, integer and float edges, deep
+  nesting, attributes, includes, AMP and every error code the flat writer can return, plus King and Crucible
+  envelopes and responses. `make check-conformance` checks them, and the new `make check-writer-roundtrip` checks
+  that every successful output loads through the reader. No library, header or ABI change; no writer behaviour change.
+
 ### Fixed
 
 - **AnvilScript body parser: nesting-depth limit (BR-2610-anvl-asl-001).** Deeply nested parentheses or prefix unary

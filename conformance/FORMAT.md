@@ -456,7 +456,8 @@ computed independently of the native writer (a small model of the canonical layo
 per line, `a, b` separators). `make check-conformance` checks, for every `.wscript`, that native's run equals the
 committed `.dump` (the same rule as the reader cases), and `make check-writer-roundtrip` checks that **every successful
 output loads through the native reader with `status ok`** (an `include` is satisfied with an empty file of that name).
-`make update-conformance` rewrites the dumps; `gen_writer.py` is what changes the scripts and, with them, the
+A case whose output the reader rejects is a writer/reader inconsistency, not a corpus fault; it is listed with its
+ticket in `conformance/writer-roundtrip-known.txt` (one today). `make update-conformance` rewrites the dumps; `gen_writer.py` is what changes the scripts and, with them, the
 expectations. A port compares its own run of each `.wscript` with the `.dump`.
 
 Areas: `lifecycle` (new, finish, data, get_error, error_message, sticky errors), `scalars` (null, bool, `int`, `numeric`,
@@ -481,6 +482,8 @@ so on) and in `include/internal/module.h`, `keywords` (`word reserved|value`), `
 anvil-dump <file>             a file: includes resolve, the extension is the dialect hint
 anvil-dump -                  stdin, loaded as a buffer
 anvil-dump --fragment <file|->  a standalone value expression
+anvil-dump --writer-script <script>   run a writer script ("The writer script", above)
+anvil-dump --writer-output <script>   the same, printing only the output bytes
 ```
 
 Exit status `0` for any dump (including of an input that fails to parse), `2` for a usage or tool error.
