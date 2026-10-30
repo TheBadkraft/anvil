@@ -48,8 +48,21 @@ Not authorized in this task: pushing tags, deploying, merging.
 
 | Step | State |
 |---|---|
-| 1. Cut core: `0.11.0-rc`, `[Unreleased]` -> `[v0.11.0-rc]` | done, on `release/v0.11.0-rc` |
-| 2. Merge and tag on `main` | waiting for the Principal Engineer |
-| 3. Bindings on `release/v0.11.0-rc` | see the release report |
-| 4. Packaging, checks, bench, staging | see the release report |
-| 5. Deploy and live check | after the Technical Writer's deploy |
+| 1. Cut core: `0.11.0-rc`, `[Unreleased]` -> `[v0.11.0-rc]` | done; tag `v0.11.0-rc` on `8025289`, BUILD 316, pushed |
+| 2. Bindings on `release/v0.11.0-rc`, pinned to `8025289` | done, waiting for the merge: node `c50854d`, wasm `e7531ee`, py `0e5acb3`, net `4566150` (java: no pin, not distributed) |
+| 3. Build from the tag, reproducibly | done; two independent builds are byte-identical |
+| 4. Non-browser checks on the packaged files | pass: grammar and version `0.11.0-rc+316`, exports, README, install, surface, bundle sandbox, FlyWire guard 3/3 |
+| 5. Real-browser check of the packaged wasm tarball | **pending**: runs later through the contained harness. Earlier uncontained run passed in Firefox 158 and Chrome for Testing 156 (glue and bundle) |
+| 6. Bench node and wasm vs `v0.10.0-rc` | **FAILED the 1.02x gate** on float-valued parse: node 1.14x, wasm 1.08x to 1.17x. Other workloads within 1.02x; validate faster. Needs the owner |
+| 7. Stage | done in `~/release-staging/v0.11.0-rc/` (hold: items 5 and 6) |
+| 8. Deploy and live check | after the Technical Writer's deploy |
+
+Staged SHA256s (also in `SHA256SUMS`):
+
+```
+1d8ae18e21f150b979e751a0d43cfe4d88931c5a5a79fe0c8e1de0ec35874794  anvil-v0.11.0-rc-linux-x86_64.tar.gz
+e51d0432d211160107e2e1a262dd72eff89a5c9cb4dfb4e2099c39e30f8160ff  anvil-node-v0.11.0-rc-linux-x86_64.tar.gz
+5e0433848ab3d27238f4e7dc70987639119c97d66b94f6027f0f774cb951d97a  anvil-wasm-v0.11.0-rc.tar.gz
+0c5a14bcd117d15fef9bd0a5dd00467fac9786e69d7c0999edcf5d0eec89a952  anvil-py-v0.11.0-rc-linux-x64.tar.gz
+fee2cc4abb5fb72e162735ba72edeef450610b650dec0b02c11d3548c27c07f6  anvil-net-v0.11.0-rc-linux-x64.tar.gz
+```
