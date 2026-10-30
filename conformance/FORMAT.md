@@ -399,9 +399,9 @@ An **argument** is a *word* or a *quoted string*:
 - `string`, `attribute_string` and `blob`: the optional *len* passes a length **shorter** than the string (a prefix is
   written); it may not exceed the decoded length unless the string is `NULL`, where *len* is passed with the null pointer
   (`string NULL 3` is `anvil_writer_string(w, NULL, 3)`). Without *len*, the length is the decoded length, or `0` for `NULL`.
-- `double` takes one of: a **decimal** (`[0-9.eE+-]+`, converted as `strtod` does, correctly rounded); **`0x` and exactly
-  16 hex digits**, the IEEE-754 bits of the double (this is how `-0` and every exact value are written:
-  `0x8000000000000000`); or the words `nan`, `inf`, `-inf`.
+- `double` takes one of: a **decimal**; **`0x` and exactly 16 hex digits**, the IEEE-754 bits of the double (this is how
+  `-0` and every exact value are written: `0x8000000000000000`); or the words `nan`, `inf`, `-inf`. The exact rules
+  are under "Input rules" below.
 - An *integer* argument of `dialect` or `error_message` is a decimal with an optional `-`, within `int32` (the C `int` of
   the enum).
 - `option on-error continue` makes the run go on after a failed call (default `stop`); it can appear anywhere, even before
@@ -409,6 +409,28 @@ An **argument** is a *word* or a *quoted string*:
 - A writer call that returns `false` is **failed**. `dialect` fails when `anvil_writer_new` returns `NULL`; the writer
   is then `NULL` and every later call is made with a `NULL` handle (it fails with `ANVIL_WRITER_ERR_INVALID_ARGUMENT`).
   `get_error`, `error_message`, `data` and `option` never fail.
+
+**Input rules.** What the tool accepts and rejects, so a port need not guess:
+
+- **Blanks** are the space and the tab, nothing else. In a step line, leading and trailing blanks are ignored. The
+  **header line** is compared exactly: `anvil-writer-script 1` and nothing before or after it (a leading or trailing
+  blank, space or tab, is a script error at line 1).
+- **Line endings** are `\n` only. `\r` is not a blank and not a terminator: a CRLF script fails at line 1 (the header
+  line then ends in `\r`); in a later step line a `\r` stays part of the last word (`finish\r` is an unknown call,
+  `dialect AML\r` an invalid dialect word); a raw `\r` inside a quoted string is a script error (write `\r` or `\x0d`);
+  a comment line may contain one. The **last line need not end in `\n`**: it is a step like any other.
+- **`int`** (and the integer of `dialect` and `error_message`): an optional `-`, then one or more decimal digits, nothing
+  else, within `int64` (`int32` for the two enum-valued calls). Leading zeros are allowed and mean nothing (`007` is 7,
+  `-007` is -7) and `-0` is 0. A leading `+`, a hex form (`0x10`), an empty or a fractional number is a script error;
+  so is a value out of range.
+- **`double`, decimal form**: a non-empty word made only of the characters `0-9 . e E + -` that C's `strtod` (the `C`
+  locale) converts **entirely**, correctly rounded. So `+1.5`, `.5`, `5.`, `1e5`, `1E+5`, `-0` (negative zero),
+  `1e-999` (underflows to `0`) are accepted; `-`, `.`, `e5`, `1e`, `1e+`, `1-2` are script errors. A decimal that
+  overflows (`1e999`, `-1e999`) is **not** a script error: it converts to infinity, reaches the writer, and the call fails
+  with `ANVIL_WRITER_ERR_INVALID_NUMERIC` like `inf`. The bit form is `0x` in lower case and exactly 16 hex digits (digits
+  of either case): `0X3ff0000000000000` and `0x1` are script errors. The words are exactly `nan`, `inf` and `-inf`, in
+  lower case: `-nan`, `+inf`, `NaN`, `Infinity` are script errors. Every non-finite value (the three words, the
+  non-finite bit patterns, an overflowing decimal) fails at the writer, never at the tool.
 
 A **script error** (an unknown call, a wrong argument count or kind, a bad string, a number out of range, a missing
 `dialect`) is not a writer outcome: the tool prints the message and the line to stderr, nothing to stdout, and exits 2.
@@ -450,15 +472,18 @@ and exits 1. `scripts/check-writer-roundtrip.sh` uses it.
 
 ### The writer corpus
 
-`conformance/cases/writer/<area>/<name>.wscript` is a script and `<name>.wscript.dump` is native's run. The corpus
-is **generated** by `conformance/seed/gen_writer.py`, which writes each script together with the run it **expects**,
-computed independently of the native writer (a small model of the canonical layout: 3-space indentation, `name := value;`
-per line, `a, b` separators). `make check-conformance` checks, for every `.wscript`, that native's run equals the
+`conformance/cases/writer/<area>/<name>.wscript` is a script and `<name>.wscript.dump` is native's run. The scripts
+are **generated** by `conformance/seed/gen_writer.py`, which writes scripts only. The runs are **native's**: `.dump`
+files are written by `make update-conformance` and by nothing else, as for every other expected dump in the corpus. The
+generator also holds a small model of the canonical layout (3-space indentation, `name := value;` per line, `a, b`
+separators) that computes the run each script should give; it is a **cross-check, not a source**
+(`gen_writer.py <root> --force --check-model <anvil-dump>` lists every case where native differs from it, and
+`make check-writer-gen` requires none). `make check-conformance` checks, for every `.wscript`, that native's run equals the
 committed `.dump` (the same rule as the reader cases), and `make check-writer-roundtrip` checks that **every successful
 output loads through the native reader with `status ok`** (an `include` is satisfied with an empty file of that name).
 A case whose output the reader rejects is a writer/reader inconsistency, not a corpus fault; it is listed with its
-ticket in `conformance/writer-roundtrip-known.txt` (one today). `make update-conformance` rewrites the dumps; `gen_writer.py` is what changes the scripts and, with them, the
-expectations. A port compares its own run of each `.wscript` with the `.dump`.
+ticket in `conformance/writer-roundtrip-known.txt` (empty today). `gen_writer.py` changes the scripts and
+`make update-conformance` then rewrites the dumps. A port compares its own run of each `.wscript` with the `.dump`.
 
 Areas: `lifecycle` (new, finish, data, get_error, error_message, sticky errors), `scalars` (null, bool, `int`, `numeric`,
 `double`), `strings`, `bare`, `blobs`, `collections` (arrays, tuples, objects, nesting), `attributes`, `statements`,
