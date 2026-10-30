@@ -366,6 +366,85 @@ static void test_b07_structure(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * B16 - BR-2610-anvl-parser-007: an attribute value must be a scalar
+ * ---------------------------------------------------------------------- */
+static void test_b16_attribute_values_are_scalars(void) {
+   static const char *const bad[] = {"[x", "[x]", "(1)", "{a}", "{}", "()", "[]", "(1,2)"};
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member m = ADD(b, "s", anvil_builder_int(b, 1));
+   for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+      TestBit.is_false(anvil_builder_attribute(b, "k", bad[i]), bad[i]);
+      TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, anvil_builder_get_error(b),
+                           "B16: module attribute code");
+      TestBit.is_false(anvil_builder_member_attribute(b, m, "k", bad[i]), bad[i]);
+      TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE, anvil_builder_get_error(b),
+                           "B16: member attribute code");
+   }
+   TestBit.is_true(anvil_builder_attribute(b, "a", "done"), "B16: bare word module attribute");
+   TestBit.is_true(anvil_builder_attribute(b, "b", "5"), "B16: number module attribute");
+   TestBit.is_true(anvil_builder_member_attribute(b, m, "c", "true"), "B16: bool member attribute");
+   TestBit.is_true(anvil_builder_member_attribute(b, m, "d", "\"{a}\""), "B16: quoted brackets");
+   TestBit.is_true(anvil_builder_member_attribute_string(b, m, "e", "(1)", 3), "B16: string text with brackets");
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_not_null(text, "B16: emits");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B17 - BR-2610-anvl-writer-002: a same-document non-object base fails at write/emit
+ * ---------------------------------------------------------------------- */
+static void test_b17_base_must_be_object_at_emit(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "n", anvil_builder_int(b, 1));
+   anvil_node arr = anvil_builder_array(b);
+   anvil_builder_append(b, arr, anvil_builder_int(b, 1));
+   ADD(b, "arr", arr);
+   ADD(b, "bare", anvil_builder_bare(b, "word"));
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+   ADD(b, "obj", o);
+   const char *bases[] = {"n", "arr", "bare"};
+   for (size_t i = 0; i < 3; i++) {
+      anvil_node d = anvil_builder_object(b);
+      anvil_builder_add(b, d, "g", anvil_builder_int(b, 2));
+      anvil_member dm = ADD(b, i == 0 ? "d0" : i == 1 ? "d1" : "d2", d);
+      TestBit.is_true(anvil_builder_set_base(b, dm, bases[i]), "B17: set_base itself accepts it");
+      TestBit.is_null(anvil_builder_emit(b, NULL), bases[i]);
+      TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, anvil_builder_get_error(b),
+                           "B17: emit reports INHERITANCE_REQUIRES_OBJECT");
+      TestBit.is_true(anvil_builder_set_base(b, dm, "obj"), "B17: repointing the base to an object");
+   }
+   const char *text = anvil_builder_emit(b, NULL);
+   TestBit.is_not_null(text, "B17: an object base emits");
+
+   // a base added after the member that derives from it, and a nested derived member
+   anvil_builder c = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node outer = anvil_builder_object(c);
+   anvil_node inner = anvil_builder_object(c);
+   anvil_builder_add(c, inner, "g", anvil_builder_int(c, 1));
+   anvil_member nested = anvil_builder_add(c, outer, "inner", inner);
+   anvil_builder_set_base(c, nested, "later");
+   ADD(c, "outer", outer);
+   ADD(c, "later", anvil_builder_int(c, 3));
+   TestBit.is_null(anvil_builder_emit(c, NULL), "B17: a nested member's scalar base, declared later");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, anvil_builder_get_error(c),
+                        "B17: nested, late-declared base is refused too");
+   anvil_builder_dispose(c);
+
+   // a base the builder does not hold (from an include) is accepted
+   anvil_builder e = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder_include(e, "base.anvl");
+   anvil_node eo = anvil_builder_object(e);
+   anvil_builder_add(e, eo, "g", anvil_builder_int(e, 1));
+   anvil_member em = ADD(e, "d", eo);
+   anvil_builder_set_base(e, em, "from_include");
+   TestBit.is_not_null(anvil_builder_emit(e, NULL), "B17: a base outside the builder is accepted");
+   anvil_builder_dispose(e);
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
  * B08 - what's only knowable at emit, and recovery by completing the tree
  * ---------------------------------------------------------------------- */
 static void test_b08_emit_time_errors(void) {
@@ -679,5 +758,7 @@ int main(void) {
    TestBit.run_ex("B13_vtable_matches_flat", NULL, test_b13_vtable_matches_flat, th);
    TestBit.run_ex("B14_duplicates", NULL, test_b14_duplicates, th);
    TestBit.run_ex("B15_keyword_names", NULL, test_b15_keyword_names, th);
+   TestBit.run_ex("B16_attribute_values_are_scalars", NULL, test_b16_attribute_values_are_scalars, th);
+   TestBit.run_ex("B17_base_must_be_object_at_emit", NULL, test_b17_base_must_be_object_at_emit, th);
    return TestBit.report();
 }

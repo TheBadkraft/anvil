@@ -267,8 +267,27 @@ static void test_p4_attribute_value(void) {
       CASE_ERR("P4.63 2006 object with a comma", "x @[a={p := 1;, q}] := 1;", 2006, SYN, 1, 7),
       CASE_ERR("P4.64 2006 module", "@[a=[1,2]]\nx := 1;", 2006, HDR, 1, 5),
       CASE_ERR("P4.65 2006 after other attributes, multi-line", "x @[\n  k,\n  a = [1, 2]\n] := 1;", 2006, SYN, 3, 7),
-      CASE_OK("P4.66 a balanced object is legal today", "x @[a={1}] := 1;"),
-      CASE_OK("P4.67 a balanced tuple is legal today", "x @[a=(1 2)] := 1;"),
+      CASE_ERR("P4.66 2006 a balanced object (BR-2610-anvl-parser-007)", "x @[a={1}] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.67 2006 a balanced tuple", "x @[a=(1 2)] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.100 2006 a one-name object", "x @[k={a}] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.101 2006 a one-element tuple", "x @[k=(1)] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.102 2006 a one-element array", "x @[k=[x]] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.103 2006 an empty array", "x @[k=[]] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.104 2006 an empty object", "x @[k={}] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.105 2006 an empty tuple", "x @[k=()] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.106 2006 a closed object, then another attribute", "x @[k={a}, m=1] := 1;", 2006, SYN, 1, 7),
+      CASE_ERR("P4.107 2006 a bracket after whitespace", "x @[k=   (1)] := 1;", 2006, SYN, 1, 10),
+      CASE_ERR("P4.108 2006 nested statement", "o := { y @[k={a}] := 1; };", 2006, SYN, 1, 15),
+      CASE_ERR("P4.109 2006 module, balanced object", "@[k={a}]\nx := 1;", 2006, HDR, 1, 5),
+      CASE_ERR("P4.110 2006 module, balanced tuple", "@[k=(1)]\nx := 1;", 2006, HDR, 1, 5),
+      CASE_ERR("P4.111 2006 module, second attribute", "@[a=1, b={c}]\nx := 1;", 2006, HDR, 1, 10),
+      CASE_ERR("P4.112 a '$' reference stays 2009", "x @[k=$v] := 1;", 2009, SYN, 1, 7),
+      CASE_OK("P4.113 a bare word needs no quotes", "x @[status=done] := 1;"),
+      CASE_OK("P4.114 a bare number", "x @[n=5, f=-1.5e3] := 1;"),
+      CASE_OK("P4.115 a bare bool and null", "x @[on=true, off=false, z=null] := 1;"),
+      CASE_OK("P4.116 a quoted string holding brackets", "x @[a=\"{a}\", b=\"(1)\", c=\"[x]\"] := 1;"),
+      CASE_OK("P4.117 a bare word with a bracket inside", "x @[a=b{c}, d=e(f)] := 1;"),
+      CASE_OK("P4.118 module scalars", "@[a=done, b=5, c=true]\nx := 1;"),
       CASE_OK("P4.68 a blob is legal today", "x @[a=@t`z`] := 1;"),
       CASE_OK("P4.69 a string with brackets is legal", "x @[a=\"[1,2\"] := 1;"),
    };
@@ -315,6 +334,16 @@ static void test_p6_keywords_as_names(void) {
    RUN(cases);
 }
 
+static void test_p4_attribute_value_message(void) {
+   const char *m = anvl_error_code_message(ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE);
+   TestBit.is_not_null(m, "P4.message: 2006 has a message");
+   TestBit.is_true(m && strstr(m, "must be scalar") != NULL,
+                   "P4.message: says attribute values must be scalars");
+   TestBit.is_true(m && strstr(m, "bare or quoted") != NULL,
+                   "P4.message: says bare or quoted, so quoting is not required");
+   TestBit.is_true(m && strstr(m, "blob") == NULL, "P4.message: does not mention blobs");
+}
+
 /* ====================================================================== *
  * Part 5: what stays as it was
  * ====================================================================== */
@@ -334,6 +363,7 @@ static void test_p5_unchanged(void) {
 }
 
 int main(void) {
+   TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
    TestBit.run_ex("P1_duplicate_object_fields_large", NULL, test_p1_duplicate_object_fields_large, th);
    TestBit.run_ex("P1_duplicate_attribute_keys", NULL, test_p1_duplicate_attribute_keys, th);
