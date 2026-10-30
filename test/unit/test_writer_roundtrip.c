@@ -785,7 +785,7 @@ static void test_rt11_accepted_candidates_read_back(void) {
 
 /* ---------------------------------------------------------------------- *
  * RT12 - the reader really does reject a duplicate top-level name (the
- * reason the writer refuses to emit one), and accepts nested repeats
+ * reason the writer refuses to emit one), and nested repeats too
  * ---------------------------------------------------------------------- */
 static void test_rt12_duplicate_names_match_reader(void) {
    const char top_dup[] = "#!aml\n\na := 1;\na := 2;\n";
@@ -797,7 +797,8 @@ static void test_rt12_duplicate_names_match_reader(void) {
 
    const char nested_dup[] = "#!aml\n\no := {\n   a := 1;\n   a := 2;\n};\n";
    doc = anvil_load_buffer(nested_dup, sizeof nested_dup - 1);
-   TestBit.is_true(doc && !anvil_has_errors(doc), "RT12: reader accepts nested repeated names");
+   // BR-2610-anvl-parser-005: a repeated object field is an error everywhere now
+   TestBit.is_true(doc && anvil_has_errors(doc), "RT12: reader rejects nested repeated names");
    if (doc) {
       anvil_dispose(doc);
    }

@@ -151,6 +151,14 @@ static void header_scan_set_error(module_document doc, anvl_err_code code) {
    Source.set_error(doc->source, code, Source.line(doc->source), Source.column(doc->source),
                     doc->filepath, NULL);
 }
+// Records a header error at a position the scanner saved earlier (the start of the token at fault)
+// and sets *err_code. doc_scan_header's own error path records the same code at the cursor, which
+// the first-error-wins recording ignores.
+static void header_fail_at(module_document doc, anvl_err_code *err_code, anvl_err_code code,
+                           usize line, usize col) {
+   Source.set_error(doc->source, code, line, col, doc->filepath, NULL);
+   *err_code = code;
+}
 static bool header_skip_ws_comments(module_document doc, anvl_err_code *err_code) {
    anvl_source src = doc->source;
    const char *data = Source.data(src);
@@ -284,22 +292,40 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
 
       Source.consume(src, 2); // "@["
 
+      bool first = true;
       while (true) {
          if (!header_skip_ws_comments(doc, err_code)) {
             return false;
          }
 
          if (!Source.is_identifier_start(Source.peek(src))) {
-            *err_code = ANVL_ERR_PARSER_INVALID_IDENTIFIER;
+            // `@[]` is an empty block (2008); any other non-key is an invalid attribute identifier
+            *err_code = first && Source.peek(src) == ']' ? ANVL_ERR_PARSER_EMPTY_ATTRIBUTE_BLOCK
+                                                         : ANVL_ERR_PARSER_INVALID_ATTRIBUTE;
             return false;
          }
+         first = false;
 
+         usize key_line = src->line, key_col = src->col;
          usize key_start = Source.position(src);
          Source.consume(src, 1);
          while (Source.is_identifier_part(Source.peek(src))) {
             Source.consume(src, 1);
          }
          usize key_end = Source.position(src);
+
+         // a key repeated anywhere in the module's attributes (4013), reported at the repeat
+         for (usize i = 0, n = List.size(doc->header->attributes); i < n; i++) {
+            anvl_attribute prev = NULL;
+            List.get(doc->header->attributes, i, (object *)&prev);
+            if (prev && (usize)(prev->key.end - prev->key.start) == key_end - key_start &&
+                memcmp(prev->key.start, (const char *)src->buffer.bucket + key_start,
+                       key_end - key_start) == 0) {
+               header_fail_at(doc, err_code, ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY, key_line,
+                              key_col);
+               return false;
+            }
+         }
 
          anvl_attribute attr = Allocator.alloc(attribute_size);
          if (!attr) {
@@ -327,6 +353,7 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
                return false;
             }
             usize value_start = Source.position(src);
+            usize value_line = src->line, value_col = src->col;
             bool in_string = false;
             while (!Source.is_eof(src)) {
                char c = Source.peek(src);
@@ -356,6 +383,13 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
             attr->value.data = src->buffer.bucket;
             attr->value.start = src->buffer.bucket + value_start;
             attr->value.end = src->buffer.bucket + value_end;
+            if (anvl_attr_value_is_split_compound(attr->value.start, attr->value.end)) {
+               // the front of an array, object or tuple, cut at its first ',' or ']' (2006)
+               header_fail_at(doc, err_code, ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE, value_line,
+                              value_col);
+               Allocator.dispose(attr);
+               return false;
+            }
          }
 
          if (!header_skip_ws_comments(doc, err_code)) {
@@ -373,7 +407,10 @@ static bool header_scan_attributes(module_document doc, anvl_err_code *err_code)
             Source.consume(src, 1);
             break;
          }
-         *err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+         // another key where a ',' or ']' belongs is a missing comma (3014)
+         *err_code = Source.is_identifier_start(Source.peek(src))
+                        ? ANVL_ERR_PARSER_MISSING_COMMA_IN_ATTRIBUTES
+                        : ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
          return false;
       }
    }
@@ -440,14 +477,17 @@ anvl_result doc_scan_header(module_document doc, anvl_err_code *out_err_code) {
    // Enforce header ordering: no includes may follow attributes.
    if (Source.match_length(doc->source, "include", 7) == 7 &&
        !Source.is_identifier_part(Source.peek_offset(doc->source, 7))) {
-      err_code = ANVL_ERR_PARSER_UNEXPECTED_TOKEN;
+      err_code = ANVL_ERR_INCLUDE_NOT_FIRST;
       goto error;
    }
 
    // The one legitimate shebang was already reconciled at source-load time
-   // (before the header scanner ever runs); any repeated '#!' here is invalid.
+   // (before the header scanner ever runs); any repeated '#!' here is invalid. A document that
+   // opened with a shebang has a second one (2004); a '#!' with none before it is not on the
+   // first line (2005).
    if (Source.match_length(doc->source, "#!", 2) == 2) {
-      err_code = ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS;
+      err_code = Source.is_shebang(doc->source) ? ANVL_ERR_PARSER_MULTIPLE_SHEBANG
+                                                : ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS;
       goto error;
    }
 
