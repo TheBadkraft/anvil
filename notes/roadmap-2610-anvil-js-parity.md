@@ -195,6 +195,21 @@ Also decided:
 - **Non-allocating accessors:** **deferred**, and backlogged as an anvil.node FR.
 - **New for R1:** benchmark against `JSON.parse` too, as a reference. The owner's bar for the web is that ANVL must not lose to JSON.
 
+## 6c. The native add-on retires too (owner, 2026-10-30)
+
+The current native-addon `anvil-node` (repo `anvil.node`) **freezes and retires alongside anvil-wasm**:
+1. It stays the published `anvil-node` until anvil.js passes the R3 replacement gate. That means 100%
+   of the corpus, fuzz parity, and no slower on any workload, measured with the full grammar.
+2. At R3, `anvil-node` becomes anvil.js. The last native-addon release stays published as the record
+   that answers "why not a native addon?".
+3. After that the `anvil.node` repo is frozen, with fixes only for anything that breaks users before R3.
+   It is revived as a separately named package (for example `anvil-native`) only if one of these
+   appears: (a) running AnvilScript's C VM from Node, or (b) a real short-lived-process use case where
+   the native addon's cold start matters.
+
+JavaScript users get one package, held to native by the corpus. Native stays the spec, and serves
+Python, .NET and Java through their bindings.
+
 ## 7. Risks
 
 - **The R0 speed target isn't met.** If no representation beats `anvil-node` everywhere, we stop at R0
