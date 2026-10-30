@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=4 code=11 name=ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH call="include \"\\n\"" message="invalid include path"
+steps 2
+status error code=11 name=ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH
+output none

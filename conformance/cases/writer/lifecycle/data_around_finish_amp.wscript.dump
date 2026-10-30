@@ -1,0 +1,7 @@
+anvil-writer-run 1
+data none
+data none
+data bytes=15 text="#!amp\n\na := 1;\n"
+steps 7
+status ok
+output bytes=15 text="#!amp\n\na := 1;\n"

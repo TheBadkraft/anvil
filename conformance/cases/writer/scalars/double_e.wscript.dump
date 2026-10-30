@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=31 text="#!aml\n\nd := 2.718281828459045;\n"

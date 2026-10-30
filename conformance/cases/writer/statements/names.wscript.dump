@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 22
+status ok
+output bytes=309 text="#!aml\n\na := 1;\nA := 1;\n_ := 1;\n_a := 1;\na1 := 1;\na_b := 1;\nZ9_ := 1;\ncamelCase := 1;\nsnake_case := 1;\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx := 1;\n"

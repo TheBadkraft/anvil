@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=6 code=14 name=ANVIL_WRITER_ERR_UNFINISHED call="finish" message="document has an open statement, array, tuple or object"
+steps 5
+status error code=14 name=ANVIL_WRITER_ERR_UNFINISHED
+output none

@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 5
+status ok
+output bytes=38 text="#!aml\n\ninclude \"caf\xc3\xa9.anvl\";\n\na := 1;\n"

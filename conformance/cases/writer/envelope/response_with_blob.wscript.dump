@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 7
+status ok
+output bytes=38 text="#!amp\n\nresult := (ok, @table`[(1)]`);\n"

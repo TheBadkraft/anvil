@@ -1,0 +1,3 @@
+# Writer corpus cases whose output the native reader rejects: a known writer/reader inconsistency, not a corpus
+# fault. One per line: <case path under cases/writer> <ticket>. Blank lines and # lines are ignored.
+# check-writer-roundtrip skips these, and FAILS if one of them starts to load (remove the line then).

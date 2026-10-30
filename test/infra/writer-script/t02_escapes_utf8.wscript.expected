@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 4
+status ok
+output bytes=29 text="#!aml\n\ns := \"\xc3\xa9\\\"\\\\\\n\x01\x7f\xff\\t\";\n"

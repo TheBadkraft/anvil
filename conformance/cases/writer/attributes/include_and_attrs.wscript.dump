@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 6
+status ok
+output bytes=43 text="#!aml\n\ninclude \"inc.anvl\";\n@[x=1]\n\na := 1;\n"

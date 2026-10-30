@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 8
+status ok
+output bytes=42 text="#!amp\n\nutid := 1;\nseq := 1;\npayload := 1;\n"

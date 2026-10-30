@@ -1,0 +1,10 @@
+anvil-writer-run 1
+failed line=6 code=3 name=ANVIL_WRITER_ERR_STATE call="statement \"b\" NULL" message="call is not legal at this point in the document"
+failed line=7 code=3 name=ANVIL_WRITER_ERR_STATE call="int 1" message="call is not legal at this point in the document"
+failed line=8 code=3 name=ANVIL_WRITER_ERR_STATE call="bool true" message="call is not legal at this point in the document"
+get_error code=3 name=ANVIL_WRITER_ERR_STATE
+failed line=10 code=3 name=ANVIL_WRITER_ERR_STATE call="finish" message="call is not legal at this point in the document"
+data none
+steps 9
+status error code=3 name=ANVIL_WRITER_ERR_STATE
+output none

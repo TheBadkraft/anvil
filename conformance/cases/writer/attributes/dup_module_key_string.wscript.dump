@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=4 code=18 name=ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY call="attribute_string \"k\" \"x\"" message="attribute key given twice"
+steps 3
+status error code=18 name=ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY
+output none

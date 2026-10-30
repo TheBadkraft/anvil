@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=5 code=8 name=ANVIL_WRITER_ERR_INVALID_BARE call="bare \"1\"" message="text cannot be written as a bare literal"
+steps 3
+status error code=8 name=ANVIL_WRITER_ERR_INVALID_BARE
+output none

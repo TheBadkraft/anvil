@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=4 code=10 name=ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE call="attribute \"k\" \"\\ta\"" message="invalid attribute value"
+steps 2
+status error code=10 name=ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE
+output none

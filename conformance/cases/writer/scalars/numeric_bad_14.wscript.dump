@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=5 code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC call="numeric \" 1\"" message="invalid numeric"
+steps 3
+status error code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC
+output none

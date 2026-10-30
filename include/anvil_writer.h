@@ -20,8 +20,8 @@
  *                                                                        *
  * Call shape (AML):                                                      *
  *    w = anvil_writer_new(ANVIL_WRITER_AML);                             *
+ *    anvil_writer_include(w, "base.anvl");         // includes first     *
  *    anvil_writer_attribute(w, "doc", NULL);       // module attribute   *
- *    anvil_writer_include(w, "base.anvl");                               *
  *    anvil_writer_statement(w, "server", NULL);    // name [, base]      *
  *    anvil_writer_attribute(w, "env", "production");// statement attr    *
  *    anvil_writer_begin_object(w);                                       *
@@ -80,7 +80,11 @@ bool anvil_writer_attribute(anvil_writer w, const char *key, const char *value);
 /** @brief As anvil_writer_attribute, but the value is emitted as a double-quoted string. `"` in text is rejected. */
 bool anvil_writer_attribute_string(anvil_writer w, const char *key, const char *text, size_t length);
 
-/** @brief Add `include "path";` (module header, AML only). */
+/**
+ * @brief Add `include "path";` (module header, AML only). Every include comes before the first module
+ * attribute, because the reader rejects the other order (4201); an include after a module attribute
+ * fails with ANVIL_WRITER_ERR_STATE.
+ */
 bool anvil_writer_include(anvil_writer w, const char *path);
 
 /* ---- statements -------------------------------------------------------- */

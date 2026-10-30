@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 8
+status ok
+output bytes=32 text="#!aml\n\na := [\"a\\\"b\", \"\", \"\\n\"];\n"

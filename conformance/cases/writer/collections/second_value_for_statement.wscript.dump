@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=7 code=3 name=ANVIL_WRITER_ERR_STATE call="int 2" message="call is not legal at this point in the document"
+steps 6
+status error code=3 name=ANVIL_WRITER_ERR_STATE
+output none

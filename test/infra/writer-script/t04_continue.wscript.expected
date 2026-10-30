@@ -1,0 +1,8 @@
+anvil-writer-run 1
+failed line=6 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="statement \"1\" NULL" message="invalid identifier"
+failed line=7 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="int 1" message="invalid identifier"
+get_error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER
+data none
+steps 6
+status error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER
+output none

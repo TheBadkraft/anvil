@@ -53,6 +53,7 @@ struct anvil_writer_t {
    size_t depth;
    size_t stack_cap;
    bool header_dirty; // a module attribute or include has been written
+   bool header_attrs; // a module attribute has been written (an include must come before it)
    bool stmt_open;    // a statement name is written and its value is pending
    bool stmt_base;    // that statement declared an inheritance base
    bool attrs_open;   // that statement's `@[` group is written but not yet closed
@@ -229,6 +230,7 @@ static bool attribute_emit(anvil_writer w, const char *key, const char *value, b
    }
    if (!w->stmt_open) {
       w->header_dirty = true;
+      w->header_attrs = true;
       return puts_(w, "]\n");
    }
    return true;
@@ -287,7 +289,8 @@ bool anvil_writer_include(anvil_writer w, const char *path) {
    if (w->dialect == ANVIL_WRITER_AMP) {
       return fail(w, ANVIL_WRITER_ERR_DIALECT);
    }
-   if (w->phase != PHASE_HEADER || w->depth != 0 || w->stmt_open) {
+   // The reader rejects an include after a module attribute (4201), so the writer refuses it too.
+   if (w->phase != PHASE_HEADER || w->depth != 0 || w->stmt_open || w->header_attrs) {
       return fail(w, ANVIL_WRITER_ERR_STATE);
    }
    if (!check(w, wg_check_include_path(path))) {
