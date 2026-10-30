@@ -138,9 +138,9 @@ typedef struct anvl_value_t {
       struct {
          anvl_slice target;  // identifier following '$', sigil excluded
          struct anvl_value_t *resolved; // set by Resolution; NULL until resolved, and stays NULL for a
-                              // missing target, a reference cycle, or a target that names an
-                              // anonymous (OBJECT_BLOCK) statement — none of those are parse-
-                              // or resolve-time errors for a VarRef. Aliases the target's
+                              // missing target or a reference cycle — neither is a parse-
+                              // or resolve-time error for a VarRef. A block-form (OBJECT_BLOCK)
+                              // target resolves to its object value like any other. Aliases the target's
                               // existing value node directly (safe: every anvl_value in a
                               // module_context shares one arena, disposed as a single block —
                               // see notes/resolution-phase.md "VarRef resolution").
@@ -347,8 +347,8 @@ usize mod_ctx_arena_size_hint(usize summed_source_length);
  * (`ANVL_STMT_OBJECT_BLOCK`) statement is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (anonymous
  * objects are immutable and cannot be inherited from). Finally, for every `ANVL_VALUE_VARREF`
  * in the context (any nesting depth), chases its target to a final concrete value, setting
- * `.varref.resolved` — a missing target, a reference cycle, or a target naming an anonymous
- * statement are not errors, just leave `.resolved` `NULL`. See notes/resolution-phase.md for
+ * `.varref.resolved` — a missing target or a reference cycle is not an error, it just leaves
+ * `.resolved` `NULL`; a target naming a block-form statement resolves to its object value. See notes/resolution-phase.md for
  * the full design.
  */
 anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code);
