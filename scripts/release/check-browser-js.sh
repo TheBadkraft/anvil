@@ -26,7 +26,15 @@ if [ ! -d /tmp/anvl-browser-test/browsers ]; then
 fi
 rc=0
 for b in chromium firefox; do for mode in esm global; do
+  # The harness self-check (exit 99, or 75 for the lock) can trip while the previous scope is still being torn down. A run
+  # that exits 99/75 is retried ONCE, only after no Playwright browser process is left; the retry is printed, never silent.
   out=$(ANVIL_WASM_ROOT="$wasm" test-browser/run-browser.sh $b $mode 2>&1); code=$?
+  if [ $code -eq 99 ] || [ $code -eq 75 ]; then
+    for _ in $(seq 1 30); do pgrep -f /tmp/anvl-browser-test/browsers >/dev/null || break; sleep 1; done
+    if pgrep -f /tmp/anvl-browser-test/browsers >/dev/null; then echo "FAIL browser: $b $mode: a browser process is still alive after 30 s"; rc=1; continue; fi
+    echo "note browser: $b $mode: harness exit $code (self-check/lock race); no browser left; running it once more"
+    out=$(ANVIL_WASM_ROOT="$wasm" test-browser/run-browser.sh $b $mode 2>&1); code=$?
+  fi
   agent=$(printf '%s\n' "$out" | sed -n 's/^agent: //p' | grep -oE '(Firefox|HeadlessChrome)/[0-9.]+' | head -1)
   if [ $code -eq 0 ] && [ -n "$agent" ]; then
     echo "PASS browser: $b $mode ($agent, $(printf '%s\n' "$out" | grep -c '^PASS') checks)"
