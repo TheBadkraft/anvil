@@ -110,7 +110,7 @@ static bool parse_value_body(anvl_source, anvl_value *);
 // literals -- see parser_set_error's own declaration below for why.
 bool parse_scalar_value(anvl_source, anvl_value *);
 static bool parse_reserved_literal(anvl_source, anvl_value *);
-static bool parse_numeric_literal(anvl_source, anvl_value *);
+static bool parse_numeric_literal(anvl_source, anvl_value *, bool *malformed);
 static bool parse_string_literal(anvl_source, anvl_value *);
 static bool parse_blob_literal(anvl_source, anvl_value *);
 static bool parse_bare_literal(anvl_source, anvl_value *);
@@ -890,8 +890,12 @@ bool parse_scalar_value(anvl_source src, anvl_value *out_value) {
    }
    // 2. numeric literal - integer, float, hex, exponential, etc. (`parse_numeric_literal` handles
    // all numeric formats)
-   if (parse_numeric_literal(src, out_value)) {
+   bool malformed = false;
+   if (parse_numeric_literal(src, out_value, &malformed)) {
       return true; // Successfully parsed numeric literal
+   }
+   if (malformed) {
+      return false; // error already recorded; a malformed number is never a bare literal
    }
    // 3. string literal - quoted string with optional escape sequences
    if (parse_string_literal(src, out_value)) {
@@ -938,7 +942,9 @@ static bool parse_reserved_literal(anvl_source src, anvl_value *out_value) {
    return false; // Not a reserved literal
 }
 // Parse a numeric literal
-static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
+// `*malformed` is set when the text is committed to being a number but is not a valid one (`5.`,
+// `1e`): the error is recorded and the caller must fail, never fall through to a bare literal.
+static bool parse_numeric_literal(anvl_source src, anvl_value *out_value, bool *malformed) {
    // We need to check for a leading digit to determine if it's a numeric literal
    // or a '-' sign for a negative number. If it's a digit, we can parse it as a numeric literal.
    // If it's a '-' sign, we need to check if the next character is a digit to determine if it's a
@@ -974,6 +980,7 @@ static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
          if (exponent_follows(src, 1) || is_boundary_at(src, 1)) {
             Source.set_position(src, save_pos, save_line, save_col);
             parser_set_error(src, ANVL_ERR_PARSER_INVALID_NUMBER);
+            *malformed = true;
             return false;
          }
          Source.set_position(src, save_pos, save_line, save_col);
@@ -1008,6 +1015,7 @@ static bool parse_numeric_literal(anvl_source src, anvl_value *out_value) {
          // boundary check below, which declines it.
          Source.set_position(src, save_pos, save_line, save_col);
          parser_set_error(src, ANVL_ERR_PARSER_INVALID_EXPONENT);
+         *malformed = true;
          return false;
       }
    }

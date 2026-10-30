@@ -1439,6 +1439,39 @@ static void test_anv48b_attribute_exponent_and_trailing_dot(void) {
    }
 }
 
+static void aml_number_error(const char *src, const char *want_msg, size_t line, size_t col,
+                             const char *label) {
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_not_null(doc, label);
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(anvil_has_errors(doc), label);
+   TestBit.is_equal_int(ANVIL_ERR_SYNTAX, anvil_get_error(doc), label);
+   anvil_error err = anvil_document_get_error(doc);
+   char msg[128] = {0};
+   anvil_error_get_message(err, msg, sizeof msg);
+   TestBit.is_true(strstr(msg, want_msg) != NULL, label);
+   TestBit.is_true(err && anvil_error_get_line(err) == line && anvil_error_get_column(err) == col,
+                   label);
+   anvil_dispose(doc);
+}
+
+static void test_anv48c_malformed_number_errors_with_position(void) {
+   // FR-2610-anvl-parser-002 case 2: a clear message and the position of the number's start.
+   aml_number_error("#!aml\nn := 5.;\n", "Invalid number", 2, 6, "ANV48c: AML 5.");
+   aml_number_error("#!aml\nn := -5.;\n", "Invalid number", 2, 6, "ANV48c: AML -5.");
+   aml_number_error("#!aml\nn := 5.e3;\n", "Invalid number", 2, 6, "ANV48c: AML 5.e3");
+   aml_number_error("#!aml\nn := 1e;\n", "Invalid exponent", 2, 6, "ANV48c: AML 1e");
+   aml_number_error("#!aml\nn := 1e+;\n", "Invalid exponent", 2, 6, "ANV48c: AML 1e+");
+   aml_number_error("#!aml\nn := [1e3, 5.];\n", "Invalid number", 2, 12,
+                    "ANV48c: array [1e3, 5.]");
+   aml_number_error("#!aml\nn := (1e3, 5.);\n", "Invalid number", 2, 12,
+                    "ANV48c: tuple (1e3, 5.)");
+   aml_number_error("#!aml\nn := { a := 1e3; b := 5.; };\n", "Invalid number", 2, 23,
+                    "ANV48c: object member 5.");
+}
+
 static void test_anv49_flag_attribute_has_no_value_handle(void) {
    anvil_document doc = ATTR_LOAD("#!aml\n@[schema, table=assets, active]\nx @[hot, k=v] := 1;\n");
    TestBit.is_true(doc && !anvil_has_errors(doc), "ANV49: loads");
@@ -2038,6 +2071,8 @@ int main(void) {
                   test_anv48_attribute_value_handle_scalars, th);
    TestBit.run_ex("ANV48b_ATTRIBUTE_EXPONENT_AND_TRAILING_DOT", NULL,
                   test_anv48b_attribute_exponent_and_trailing_dot, th);
+   TestBit.run_ex("ANV48c_MALFORMED_NUMBER_ERRORS_WITH_POSITION", NULL,
+                  test_anv48c_malformed_number_errors_with_position, th);
    TestBit.run_ex("ANV49_FLAG_ATTRIBUTE_HAS_NO_VALUE_HANDLE", NULL,
                   test_anv49_flag_attribute_has_no_value_handle, th);
    TestBit.run_ex("ANV50_RAW_VALUE_READER_IS_UNCHANGED", NULL,

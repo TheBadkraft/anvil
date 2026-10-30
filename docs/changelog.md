@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`5.` is now a parse error.** A decimal point must be followed by at least one digit. `5.`, `-5.`
   and `5.e3` are rejected with `ANVL_ERR_PARSER_INVALID_NUMBER`; `1e`, `1e+` and `1e-` with
   `ANVL_ERR_PARSER_INVALID_EXPONENT`. Digit-led bare words such as `007x`, `1ex`, `1.5.5` and
-  `09-02-2026` are unaffected. The error is reported at the start of the number.
+  `09-02-2026` are unaffected. The error is reported at the start of the number, and it applies at every depth: top-level values, array, tuple and object members, value fragments and AnvilScript parameter defaults. (A malformed number is never read as a bare literal.)
 - The writer follows: `numeric()` (and the builder) accepts an unsigned exponent (`1e5`), still
   emits the canonical signed form for doubles (`1e+20`), and `bare()` now rejects `1e5` (it would
   read back as a number) and `1e`/`5.e3` (the reader errors on them). A bare `1ex` or `1e3x` is
