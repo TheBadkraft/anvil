@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
@@ -1039,6 +1040,25 @@ static void test_anv38_value_get_numeric(void) {
    expect_overflow("1.7976931348623159e+308", false); // rounds past DBL_MAX
 }
 
+/* ANV38b - the double of a float literal is exactly strtod's (the correctly rounded value), across
+ * the spellings a fast decimal path would take (<= 15 digits, small exponent) and the ones it must
+ * leave to strtod (17+ digits, large exponent, subnormal). BR-2610-anvl-parser-004. */
+static void test_anv38b_get_numeric_matches_strtod(void) {
+   const char *lits[] = {
+      "0.0", "-0.0", "0.5", "2000.5e0", "2000.5e+0", "4.25e-0", "1e3", "5E-1", "123456789012345.5",
+      "9007199254740992.0", "9007199254740993.0", "0.1", "0.3", "1.0000000000000002", "1e22",
+      "1e23", "8.5e-22", "8.5e-23", "123456.789e-15", "1.5e+300", "4.9e-324", "2.2250738585072014e-308",
+      "-3.14159", "00012.50", "1e0", "100000000000000000000.0", "0.000001e22", "7.0e+10", "-1.5E+22",
+   };
+   for (size_t i = 0; i < sizeof lits / sizeof *lits; i++) {
+      anvil_numeric_t n = numeric_of(lits[i]);
+      double want = strtod(lits[i], NULL);
+      TestBit.is_false(n.overflowed, lits[i]);
+      TestBit.is_false(n.is_integral, lits[i]);
+      TestBit.is_true(memcmp(&n.as_double, &want, sizeof want) == 0, lits[i]);
+   }
+}
+
 /* ---------------------------------------------------------------------- *
  * ANV39 — anvil_value_get_numeric on anything that isn't NUMERIC reports
  * "nothing valid to read" (is_integral=false, overflowed=true); NULL-safe;
@@ -2055,6 +2075,7 @@ int main(void) {
    TestBit.run_ex("ANV36_string_truncated_buffer", NULL, test_anv36_string_truncated_buffer, th);
    TestBit.run_ex("ANV37_value_find_statement", NULL, test_anv37_value_find_statement, th);
    TestBit.run_ex("ANV38_value_get_numeric", NULL, test_anv38_value_get_numeric, th);
+   TestBit.run_ex("ANV38b_get_numeric_matches_strtod", NULL, test_anv38b_get_numeric_matches_strtod, th);
    TestBit.run_ex("ANV39_value_get_numeric_non_numeric", NULL,
                   test_anv39_value_get_numeric_non_numeric, th);
    TestBit.run_ex("ANV40_value_get_bytes_scalars", NULL, test_anv40_value_get_bytes_scalars, th);

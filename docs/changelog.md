@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (validating float values, BR-2610-anvl-parser-004 follow-up)
+
+- Validating a document with float values was still 1.02-1.03x slower than v0.10.0-rc through
+  anvil.wasm. A number written with an unsigned exponent (`2000.5e0`) is now a number rather than a
+  bare word (FR-2610-anvl-parser-002), so a `min`, `max` or `integer` rule reads its double with
+  `strtod` on every validate. `anvil_value_get_numeric` now converts a decimal literal of up to 15
+  significant digits and a power of ten within 22 with one exact multiply or divide (Clinger's fast
+  path) and keeps `strtod` for everything else, so the result is bit-identical. No behaviour or
+  public ABI change. `bench/parse_validate.c` gains a `validate_small` workload (a 4-field schema, a
+  document with an exponent float, validated in a tight loop).
+
 ### Fixed (parse and validate slowdown since v0.10.0-rc, BR-2610-anvl-parser-004)
 
 - Parsing was 1.05-1.14x and validation about 1.03-1.06x slower than v0.10.0-rc. The cause was the

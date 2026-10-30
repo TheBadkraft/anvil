@@ -108,6 +108,40 @@ static void bench_load(const char *name, const char *src, size_t len) {
    report(name, s);
 }
 
+/* validate_small: a 4-field schema and one small document with an exponent float
+ * (`year := 2000.5e+0`; the signed exponent is a number in every build since v0.10.0-rc), validated in a tight loop -- the shape of the wasm Schema.validate bench.
+ * A fresh load is not part of the timing; only anvil_schema_validate is. */
+#define SMALL_SCHEMA \
+   "#!aml\n@[schema]\n" \
+   "title := { type := String; required := true; };\n" \
+   "year := { type := Numeric; required := true; min := 0; max := 3000; };\n" \
+   "rating := { type := Numeric; required := true; };\n" \
+   "ok := { type := Bool; required := true; };\n"
+#define SMALL_DOC "#!aml\ntitle := \"Dune\";\nyear := 2000.5e+0;\nrating := 4.25e+0;\nok := true;\n"
+
+static void bench_validate_small(void) {
+   anvil_document sdoc = anvil_load_buffer(SMALL_SCHEMA, sizeof SMALL_SCHEMA - 1);
+   anvil_schema schema = anvil_schema_load(sdoc);
+   anvil_document data = anvil_load_buffer(SMALL_DOC, sizeof SMALL_DOC - 1);
+   if (!schema || !anvil_schema_validate(schema, data)) {
+      fprintf(stderr, "validate_small: schema did not accept the document\n");
+      exit(1);
+   }
+   enum { PER_SAMPLE = 3000 };
+   double s[64];
+   for (int i = 0; i < SAMPLES; i++) {
+      double t0 = now_ms();
+      for (int r = 0; r < PER_SAMPLE * REPS; r++) {
+         anvil_schema_validate(schema, data);
+      }
+      s[i] = (now_ms() - t0) / REPS;
+   }
+   report("validate_small", s);
+   anvil_dispose(data);
+   anvil_schema_dispose(schema);
+   anvil_dispose(sdoc);
+}
+
 int main(void) {
    if (getenv("BENCH_ROWS")) ROWS = atoi(getenv("BENCH_ROWS"));
    if (getenv("BENCH_SAMPLES")) { SAMPLES = atoi(getenv("BENCH_SAMPLES")); if (SAMPLES > 63) SAMPLES = 63; }
@@ -139,6 +173,7 @@ int main(void) {
    anvil_dispose(data);
    anvil_schema_dispose(schema);
    anvil_dispose(sdoc);
+   bench_validate_small();
    free(floats);
    free(ints);
    free(mixed);
