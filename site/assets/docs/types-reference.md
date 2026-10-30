@@ -297,8 +297,10 @@ diagnostics into the schema's own list (`anvil_schema_get_diagnostic`, category
 `anvil_schema_diagnostic_get_type_category`), followed by the schema's own: `UNKNOWN_TYPE` (a typo
 such as `types.Prority`), `MALFORMED_CONSTRAINT`, `RULE_NOT_OBJECT`, and `CONFLICTING_CONSTRAINTS`
 (`min` greater than `max`). Unknown rule keys such as FlyWire's `pooled` or `mask` are never
-diagnostics. A schema with diagnostics still loads and validates; a CI gate is simply
-"`anvil_schema_get_diagnostic_count` is 0".
+diagnostics. A schema with diagnostics still loads and validates, but a field whose `type` is an
+`UNKNOWN_TYPE` fails closed: every present value of it (an explicit `null` too, even with
+`nullable`) is an `ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE` violation, and an absent field is
+judged only by `required`. A CI gate is simply "`anvil_schema_get_diagnostic_count` is 0".
 
 ## What's not built yet
 

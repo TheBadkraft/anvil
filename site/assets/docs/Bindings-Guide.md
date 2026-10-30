@@ -13,7 +13,7 @@ no matter which one reads it. Pick the one that matches where your code runs.
 | [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
 | [Python](Bindings-Guide.md#python) | CPython 3.11+ (ctypes) | Downloadable today |
 
-Every download on this page is from release `v0.10.0-rc`, built from one source tag. Checksums
+Every download on this page is from release `v0.11.0-rc`, built from one source tag. Checksums
 for all five are in [`SHA256SUMS`](/assets/downloads/SHA256SUMS); after downloading, check them
 with `sha256sum -c SHA256SUMS`.
 
@@ -24,9 +24,9 @@ binding too, but it is not distributed.
 ### The version string
 
 A library reports its version as the release plus a build number after a `+`, valid semver:
-a prebuilt `v0.10.0-rc` download reports `0.10.0-rc+284`, and the build number is the same in
+a prebuilt `v0.11.0-rc` download reports `0.11.0-rc+316`, and the build number is the same in
 every download of the release. A binding **built from source** has no build number of its own, so
-it reports plain `0.10.0-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
+it reports plain `0.11.0-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
 or install from source if you want a build number in the string. Treat the string as a
 sanity check, not a compatibility contract to branch logic on.
 
@@ -46,19 +46,19 @@ instead of a one-call conversion, and each follows its own language's idiom.
 
 The C library itself — link it directly if you're not going through a JS binding at all.
 
-**[Download anvil-v0.10.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.10.0-rc-linux-x86_64.tar.gz)**
+**[Download anvil-v0.11.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.11.0-rc-linux-x86_64.tar.gz)**
 — static (`libanvil.a`) and shared (`libanvil.so`) builds, release (stripped, `-O2`), plus every
 public header (`include/anvil_*.h`). Linux x86_64 only today; other platforms build from source
 (`make lib` in the [anvil repo](https://github.com/TheBadkraft/anvil)) until real cross-platform
 CI exists.
 
 ```sh
-tar -xzf anvil-v0.10.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.10.0-rc-linux-x86_64/include \
-    -L anvil-v0.10.0-rc-linux-x86_64/lib -lanvil -o your_program
+tar -xzf anvil-v0.11.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.11.0-rc-linux-x86_64/include \
+    -L anvil-v0.11.0-rc-linux-x86_64/lib -lanvil -o your_program
 ```
 
-The library reports `0.10.0-rc+284` from `anvil_get_version()`. `libanvil.so` exports exactly
+The library reports `0.11.0-rc+316` from `anvil_get_version()`. `libanvil.so` exports exactly
 the public API and no internal symbols, so it cannot collide with other libraries loaded in the
 same process.
 
@@ -104,9 +104,10 @@ Full C API reference: see the anvil repo's own `docs/language-reference.md` and
 
 ## WebAssembly
 
-**[Download anvil-wasm-v0.10.0-rc.tar.gz](/assets/downloads/anvil-wasm-v0.10.0-rc.tar.gz)** — the
-compiled module (`dist/anvil.wasm`, about 160 KB), its Emscripten glue (`dist/anvil.js`), and a
-JS-facing wrapper (`lib/index.js`) with the same API as the Node binding below. The module carries
+**[Download anvil-wasm-v0.11.0-rc.tar.gz](/assets/downloads/anvil-wasm-v0.11.0-rc.tar.gz)** — the
+compiled module (`dist/anvil.wasm`, about 160 KB), its Emscripten glue (`dist/anvil.js`), a
+JS-facing wrapper (`lib/index.js`) with the same API as the Node binding below, and a prebuilt
+script-tag bundle for browsers (`dist/anvil.browser.js`). The module carries
 the core reader, the type registry, AnvilSchema and the writer and builder.
 
 ### Requirements
@@ -117,7 +118,7 @@ the core reader, the type registry, AnvilSchema and the writer and builder.
 ### Installing and layout
 
 ```sh
-npm install ./anvil-wasm-v0.10.0-rc.tar.gz
+npm install ./anvil-wasm-v0.11.0-rc.tar.gz
 ```
 
 ```js
@@ -125,11 +126,57 @@ const anvil = require('anvil-wasm');
 ```
 
 The package keeps its files in two directories: the entry point (`main`) is `lib/index.js`, and
-the compiled module is `dist/anvil.js` plus `dist/anvil.wasm`. Earlier downloads were flat (`index.js`, `anvil.js` and `anvil.wasm` at the top), so `require('anvil-wasm')`
-is unaffected, but anything that referred to those files by path must now use `lib/` and `dist/`. In a browser,
-keep `dist/anvil.wasm` beside `dist/anvil.js`: the module fetches it at startup. Without a
-bundler, load `dist/anvil.js` with a `<script>` tag; it defines the Emscripten factory
-`AnvilModule`.
+the compiled module is `dist/anvil.js` plus `dist/anvil.wasm`, and the script-tag bundle is `dist/anvil.browser.js`. Earlier downloads were flat (`index.js`, `anvil.js` and `anvil.wasm` at the top), so `require('anvil-wasm')`
+is unaffected, but anything that referred to those files by path must now use `lib/` and `dist/`. In a browser
+with a bundler, import `anvil-wasm` as above and keep `dist/anvil.wasm` beside `dist/anvil.js`: the
+module fetches it at startup.
+
+### In a browser without a bundler: `anvil.browser.js`
+
+Load the prebuilt bundle with a `<script>` tag. It needs no bundler and no `require`, and it defines
+`window.anvl`, which is exactly the `require('anvil-wasm')` API (`ready`, `parse`, `parseRawValue`,
+`lastError`, `getVersion`, `AnvlNode`, `AnvilWriter`, `AnvilBuilder`, `AnvilDialect`, `Schema`,
+`TypeRegistry` and the error classes):
+
+```html
+<script src="/vendor/anvil/anvil.browser.js"></script>
+<script>
+  anvl.ready().then(() => {
+    const doc = anvl.parse('#!aml\nanswer := 42;\n');
+    console.log(doc.get('answer').asInt());   // 42
+  });
+</script>
+```
+
+`anvil.wasm` stays a separate file, so your server can send it as `application/wasm` and a service
+worker can cache it. By default `ready()` fetches it from **next to the script**: serve both files
+from one directory, or say where the `.wasm` is:
+
+```js
+await anvl.ready({ wasmUrl: '/assets/anvil.wasm' });
+// or Emscripten's own hook, called with 'anvil.wasm' and the script's directory:
+await anvl.ready({ locateFile: (file, scriptDirectory) => `/assets/${file}` });
+```
+
+`ready(options)` takes `{ wasmUrl }` or `{ locateFile }`, not both (a `TypeError`). The options apply
+to the first call; later calls return the same load, and a load that fails (offline, a 404) can be
+retried by calling `ready()` again. The CommonJS entry accepts the same options (`wasmUrl` is then a
+file path or URL).
+
+**Serving.** Send the `.wasm` as `Content-Type: application/wasm`; the browser's streaming compile
+needs it, and without it Emscripten falls back to a slower path.
+
+**Service worker.** To start offline, precache both files from the same URLs the page uses:
+
+```js
+// sw.js
+const ASSETS = ['/vendor/anvil/anvil.browser.js', '/vendor/anvil/anvil.wasm'];
+self.addEventListener('install', (e) => e.waitUntil(caches.open('anvil-v1').then((c) => c.addAll(ASSETS))));
+self.addEventListener('fetch', (e) => e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request))));
+```
+
+Bump the cache name when you update the package, so the script and the `.wasm` always come from the
+same build.
 
 npm does not refresh a `file:` or tarball dependency whose version has not changed. When you
 reinstall a new build of the same version, delete `node_modules/anvil-wasm` first, then install.
@@ -181,7 +228,7 @@ reference. The differences are these:
 
 ## Node.js
 
-**[Download anvil-node-v0.10.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.10.0-rc-linux-x86_64.tar.gz)**
+**[Download anvil-node-v0.11.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.11.0-rc-linux-x86_64.tar.gz)**
 — a prebuilt N-API addon (native addon, not a from-scratch JS parser) plus its JS-facing
 wrapper. Installing it needs no compiler and no build step.
 
@@ -197,7 +244,7 @@ wrapper. Installing it needs no compiler and no build step.
 - No runtime dependencies once built.
 
 ```sh
-npm install ./anvil-node-v0.10.0-rc-linux-x86_64.tar.gz
+npm install ./anvil-node-v0.11.0-rc-linux-x86_64.tar.gz
 ```
 
 npm does not refresh a `file:` or tarball dependency whose version has not changed. When you
@@ -252,7 +299,27 @@ if (!doc) {
 |---|---|---|
 | `.asString()` | `string \| null` | `null` unless the underlying value is a JS string. |
 | `.asBool()` | `boolean \| null` | `null` unless the underlying value is a JS boolean. |
-| `.asInt()` | `number \| null` | `null` unless the underlying value is a JS number; truncates toward zero. |
+| `.asInt()` | `number \| bigint \| null` | `null` unless the value is a number. A safe integer is a `number`; an integer past 2^53 is the exact `bigint`; a float literal is the truncated value. |
+| `.numericKind` | `'integer' \| 'float' \| null` | The literal's spelling: no `.` and no exponent is `'integer'`, anything else is `'float'`, even when its value is integral. `null` for a non-number. |
+| `.asNumber()` | `number \| null` | The double a float literal denotes (`Infinity` if it overflows); the value of a safe integer; `null` for an integer past 2^53 (it has no exact `number`) and for a non-number. |
+| `.asBigInt()` | `bigint \| null` | The exact value of an integer literal of any size; `null` for a float literal and for a non-number. |
+
+`2020` and `2020.0` are the same number but different literals, and `numericKind` tells them apart:
+`2020` is `'integer'` (`asNumber()` `2020`, `asBigInt()` `2020n`), `2020.0` is `'float'`
+(`asNumber()` `2020`, `asBigInt()` `null`), and `9007199254740993` is `'integer'` with `asNumber()`
+`null` and `asBigInt()` `9007199254740993n`. An integer field can reject `2020.7` with
+`Number.isInteger(node.asNumber())` and `2020.0` with `node.numericKind === 'float'`.
+
+**Integers beyond 2^53.** An integer literal inside the safe range is a `number`. One outside it is
+an exact `BigInt`, never a rounded `number`: `parseRawValue('9223372036854775807')` is
+`9223372036854775807n`, and `AnvilWriter.value()` writes any `bigint` as exact text, so what you write
+reads back. Mixing a `BigInt` with a `number` in arithmetic throws a `TypeError`, so a value that used
+to be silently rounded now fails loudly. An attribute's `decodedValue` follows the same rule.
+`parseRawValue()` returns plain values, which carry no kind: `2020.0` is the number `2020` there.
+
+**Number errors.** The exponent sign is optional (`1e3` is the float `1000`). A malformed number is an
+error at every depth, fragments included: for `5.`, `-5.`, `5.e3`, `1e`, `1e+` and `1e-`, `parse()` and
+`parseRawValue()` return `null` and `lastError()` says why. Neither throws.
 
 **Attributes and statements**
 
@@ -326,6 +393,11 @@ reg.diagnostics; reg.loadError; reg.dispose();
   `nullable`, `integer` and, when declared, `size`, `min`, `max`, `minItems`, `maxItems`, `values`,
   `format` and `tag`. An undeclared constraint is `undefined`, never a default. `nested`,
   `findNested(name)`, `items` and `extras` (extension keys, each `{ name, value }`) cover the rest.
+- **Fails closed on an unresolved type.** A field whose `type` cannot be resolved (a misspelled
+  `types.Name`) is reported in `schema.diagnostics`, and every *present* value of it, at any depth, is a
+  violation with category `SchemaViolation.UNRESOLVED_TYPE` (`10`). An explicit `null` fails too, and
+  `skipRequired` and `allowUnknown` do not excuse it. An absent field is judged only by `required`.
+  The same code is `UnresolvedType` in .NET and `UNRESOLVED_TYPE` in Python.
 - **Failures return `null`** and set `lastError()`: not a `@[schema]` or `@[types]` document, or
   text that does not parse.
 - **Includes.** `Schema.loadFile(path)` resolves a document's `include`s relative to that file; the
@@ -396,14 +468,14 @@ before any other call.
 
 ### `getVersion()`
 
-Returns the underlying Anvil Native version string — `"0.10.0-rc+284"` for the prebuilt download,
-plain `"0.10.0-rc"` for a source install with no build number (see
+Returns the underlying Anvil Native version string — `"0.11.0-rc+316"` for the prebuilt download,
+plain `"0.11.0-rc"` for a source install with no build number (see
 [the version string](Bindings-Guide.md#the-version-string)). A toolchain sanity check, not a
 compatibility contract to branch logic on.
 
 ## .NET
 
-**[Download anvil-net-v0.10.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.10.0-rc-linux-x64.tar.gz)**
+**[Download anvil-net-v0.11.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.11.0-rc-linux-x64.tar.gz)**
 — a prebuilt managed assembly plus the native library it links against. The tarball holds
 `lib/Anvil.Net.dll`, `lib/libanvil.so`, a README and the licence. **There is no NuGet package**:
 nothing is published to nuget.org, and the tarball contains no `.nupkg`. Reference the assembly
@@ -580,21 +652,21 @@ string text2 = b.Emit();
 
 ### `AnvilDocument.GetVersion()`
 
-Returns the underlying Anvil Native version string (`"0.10.0-rc+284"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.11.0-rc+316"` for the prebuilt download) —
 same toolchain sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility
 contract.
 
 ## Python
 
-**[Download anvil-py-v0.10.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.10.0-rc-linux-x64.tar.gz)**
+**[Download anvil-py-v0.11.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.11.0-rc-linux-x64.tar.gz)**
 — a pure-`ctypes` binding, no compiled extension module, plus the native library it links
 against (`libanvil.so`, inside the package at `src/anvil/runtimes/linux-x64/native/`).
 
 Extract it and put the `src` directory on `PYTHONPATH`:
 
 ```sh
-tar xzf anvil-py-v0.10.0-rc-linux-x64.tar.gz
-export PYTHONPATH="$PWD/anvil-py-v0.10.0-rc-linux-x64/src:$PYTHONPATH"
+tar xzf anvil-py-v0.11.0-rc-linux-x64.tar.gz
+export PYTHONPATH="$PWD/anvil-py-v0.11.0-rc-linux-x64/src:$PYTHONPATH"
 python3 -c "from anvil import AnvilDocument; print('ok')"
 ```
 
@@ -763,5 +835,5 @@ with AnvilBuilder.create(AnvilDialect.AML) as b:         # builder: attach in an
 
 ### `AnvilDocument.get_version()`
 
-Returns the underlying Anvil Native version string (`"0.10.0-rc+284"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.11.0-rc+316"` for the prebuilt download) —
 same toolchain sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.
