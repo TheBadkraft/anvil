@@ -20,6 +20,10 @@
 
 #include "anvil_writer_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Opaque handle to a document under construction. Owns every node and member made
  * through it; dispose with anvil_builder_dispose. Not thread-safe.
@@ -39,3 +43,7 @@ typedef struct anvil_node_t *anvil_node;
  * base, attributes, and its value. Owned by its builder, like anvil_node.
  */
 typedef struct anvil_member_t *anvil_member;
+
+#ifdef __cplusplus
+}
+#endif

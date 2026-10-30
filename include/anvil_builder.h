@@ -41,6 +41,10 @@
 #include "anvil_builder_types.h"
 #include "anvil_writer_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // See anvil_flat.h's own comment: the library compiles with -fvisibility=hidden, so this
 // pragma keeps every declaration below exported exactly as before.
 #if defined(__GNUC__) || defined(__clang__)
@@ -131,4 +135,8 @@ const char *anvil_builder_emit(anvil_builder b, size_t *length);
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility pop
+#endif
+
+#ifdef __cplusplus
+}
 #endif

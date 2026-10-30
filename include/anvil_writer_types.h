@@ -24,6 +24,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Opaque handle to a streaming document writer.
  *
@@ -63,3 +67,7 @@ typedef enum {
    ANVIL_WRITER_ERR_DUPLICATE_FIELD,             // a field name declared twice in one object (the reader rejects it)
    ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,     // an attribute key given twice on one statement, or twice in the module header
 } anvil_writer_err_code;
+
+#ifdef __cplusplus
+}
+#endif

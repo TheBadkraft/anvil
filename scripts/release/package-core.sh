@@ -4,7 +4,7 @@
 # Builds the core tarball anvil-v<version>-linux-x86_64.tar.gz from a clean export of <tag> (git
 # archive: no working tree, no .git), with BUILD passed explicitly (BR-2610-anvl-version-001), then
 # gates the *extracted tarball*: grammar + version (check-grammar.sh), exports (check-exports.sh),
-# and that every shipped header compiles standalone. Same inputs produce the same tarball bytes.
+# that every shipped header compiles standalone, and that C++ links and runs against them (check-cxx.sh). Same inputs produce the same tarball bytes.
 set -eu
 repo=$(cd "${1:?core repo}" && pwd); tag=${2:?tag e.g. v0.10.0-rc}; out=${3:?out dir}
 here=$(cd "$(dirname "$0")" && pwd); ver=${tag#v}
@@ -43,6 +43,8 @@ done
 "$here/check-grammar.sh" core "$pkg" "$ver" "$build"
 "$here/check-readme.sh" "$pkg"
 sh "$here/../check-exports.sh" "$pkg/lib/libanvil.so" "$pkg/include"
+# C++ consumers must link the shipped headers (extern "C"): probes come from the tag's export.
+sh "$work/scripts/check-cxx.sh" "$pkg/include" "$pkg/lib" "$work/test/infra/cxx"
 
 # Deterministic tarball: sorted names, commit time as mtime, no owner, no gzip timestamp.
 mtime=$(git -C "$repo" log -1 --format=%cI "$tag")
