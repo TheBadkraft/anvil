@@ -1,0 +1,4 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+add o-1 "a" NULL

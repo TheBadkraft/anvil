@@ -1,0 +1,13 @@
+anvil-builder-script 1
+dialect AMP
+let u = blob "utid" "id-1"
+add NULL "utid" u
+let s = int 7
+add NULL "seq" s
+let r = tuple
+let r0 = string "ok"
+append r r0
+let r1 = int 1
+append r r1
+add NULL "result" r
+emit

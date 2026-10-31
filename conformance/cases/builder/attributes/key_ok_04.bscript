@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# module key "a_b"
+dialect AML
+attribute "a_b" "v"
+emit

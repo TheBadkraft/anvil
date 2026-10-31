@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# raw value "caf\xc3\xa9"
+dialect AML
+attribute "k" "caf\xc3\xa9"
+emit

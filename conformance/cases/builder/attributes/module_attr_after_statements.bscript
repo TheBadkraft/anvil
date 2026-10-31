@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# module attributes are written before statements whenever they were added
+dialect AML
+let a = int 1
+add NULL "a" a
+attribute "late" "1"
+emit

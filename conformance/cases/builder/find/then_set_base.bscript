@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# find returns the member add returned
+dialect AML
+let o = object
+let x = int 1
+add o "k" x
+add NULL "o" o
+let m = find NULL "o"
+set_base m "base"
+emit

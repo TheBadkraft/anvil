@@ -1,0 +1,7 @@
+anvil-builder-script 1
+dialect AML
+let a = array
+let r = varref "x"
+append a r
+add NULL "a" a
+emit

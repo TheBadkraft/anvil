@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# 1 nested arrays
+dialect AML
+let c1 = array
+let leaf = int 1
+append c1 leaf
+add NULL "d" c1
+emit

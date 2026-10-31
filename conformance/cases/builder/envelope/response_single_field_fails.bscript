@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# a 1-tuple fails at emit
+dialect AMP
+let u = blob "utid" "id-1"
+add NULL "utid" u
+let s = int 7
+add NULL "seq" s
+let r = tuple
+let r0 = bare ok
+append r r0
+add NULL "result" r
+emit

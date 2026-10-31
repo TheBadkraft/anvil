@@ -1,0 +1,7 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let v = int 1
+add NULL "1" v
+add NULL "ok" v
+emit

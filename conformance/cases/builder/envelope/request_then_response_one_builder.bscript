@@ -1,0 +1,10 @@
+anvil-builder-script 1
+dialect AMP
+builder2 AMP
+let u = blob "utid" "id-1"
+add NULL "utid" u
+let s = int 1
+add NULL "seq" s
+let p = blob "table" "[(1)]"
+add NULL "payload" p
+emit

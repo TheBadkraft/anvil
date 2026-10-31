@@ -1,0 +1,11 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+builder2 AMP
+let o = other object
+other get_error
+let v = other varref "x"
+other get_error
+let a = other int 1
+other add NULL "a" a
+other emit

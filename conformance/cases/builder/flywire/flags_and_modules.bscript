@@ -1,0 +1,11 @@
+anvil-builder-script 1
+dialect AML
+attribute "module" "flywire.core"
+attribute "strict" NULL
+attribute_string "description" "FlyWire core module"
+include "types.anvl"
+let v = string "1.2.3"
+let m = add NULL "version" v
+member_attribute m "frozen" NULL
+member_attribute m "since" "1.0"
+emit

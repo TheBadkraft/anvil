@@ -1,0 +1,14 @@
+anvil-builder-script 1
+# BR-2610-anvl-writer-002: the base names a top-level member that is not an object
+option on-error continue
+dialect AML
+let t = blob "t" "d"
+add NULL "target" t
+let d = object
+let x = int 2
+add d "j" x
+let dm = add NULL "derived" d
+set_base dm "target"
+emit
+write
+get_error

@@ -1,0 +1,6 @@
+anvil-builder-script 1
+dialect AML
+let a = array
+let t = tuple
+let o = object
+emit

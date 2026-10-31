@@ -1,0 +1,4 @@
+anvil-builder-script 1
+dialect AML
+let n = numeric "x"
+get_error

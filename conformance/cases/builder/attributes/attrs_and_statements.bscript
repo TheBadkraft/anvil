@@ -1,0 +1,10 @@
+anvil-builder-script 1
+dialect AML
+attribute "version" "1"
+attribute_string "title" "T"
+let a = int 1
+let m = add NULL "a" a
+member_attribute m "doc" "x"
+let b = string "s"
+add NULL "b" b
+emit

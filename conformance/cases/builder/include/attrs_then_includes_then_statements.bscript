@@ -1,0 +1,10 @@
+anvil-builder-script 1
+dialect AML
+attribute "a" "1"
+attribute "b" NULL
+include "x.anvl"
+include "y.anvl"
+let v = int 1
+add NULL "n" v
+let m = add NULL "m" v
+emit

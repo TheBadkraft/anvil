@@ -1,0 +1,9 @@
+anvil-builder-script 1
+dialect AMP
+let a = tuple
+let x = int 1
+let y = bool true
+append a x
+append a y
+add NULL "t" a
+emit

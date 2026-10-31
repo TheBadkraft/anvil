@@ -1,0 +1,9 @@
+anvil-builder-script 1
+# a comment
+
+	 dialect	AML 	
+  let   x	=	null	
+# another
+add NULL "x" x
+
+emit  

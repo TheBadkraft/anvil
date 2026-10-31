@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+include "a.anvl"
+include "a.anvl"
+emit

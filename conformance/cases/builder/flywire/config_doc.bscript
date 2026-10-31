@@ -1,0 +1,44 @@
+anvil-builder-script 1
+dialect AML
+attribute "profile" "prod"
+include "base.anvl"
+include "secrets.anvl"
+let db = object
+let h = string "db.internal"
+add db "host" h
+let p = int 5432
+add db "port" p
+let pw = varref "db_password"
+add db "password" pw
+let tls = bool true
+add db "tls" tls
+let dbm = add NULL "database" db
+member_attribute dbm "secret" NULL
+let hosts = array
+let hs0 = string "node0.example"
+append hosts hs0
+let hs1 = string "node1.example"
+append hosts hs1
+let hs2 = string "node2.example"
+append hosts hs2
+let hs3 = string "node3.example"
+append hosts hs3
+let hs4 = string "node4.example"
+append hosts hs4
+add NULL "hosts" hosts
+let lim = tuple
+let l0 = int 10
+let l1 = int 100
+append lim l0
+append lim l1
+add NULL "limits" lim
+let tp = double 0.75
+add NULL "timeout_ratio" tp
+let none = null
+add NULL "fallback" none
+let rep = object
+let rr = int 3
+add rep "replicas" rr
+let repm = add NULL "replica" rep
+set_base repm "database"
+emit

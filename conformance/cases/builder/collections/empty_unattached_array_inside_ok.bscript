@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# unattached collections are never emitted
+dialect AML
+let a = array
+let b = array
+append a b
+emit

@@ -1,0 +1,17 @@
+anvil-builder-script 1
+dialect AML
+let o_v = int 1
+let o = object
+add o "k" o_v
+let m = add NULL "a" o
+let b = object
+let x = int 2
+add b "j" x
+let bm = add NULL "b" b
+set_base bm "a"
+let c = object
+let y = int 3
+add c "l" y
+let cm = add NULL "c" c
+set_base cm "b"
+emit

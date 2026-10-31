@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = blob NULL "hello"
+add NULL "v" v
+emit

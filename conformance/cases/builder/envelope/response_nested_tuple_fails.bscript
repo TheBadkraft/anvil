@@ -1,0 +1,18 @@
+anvil-builder-script 1
+# a nested tuple is refused in AMP
+dialect AMP
+let u = blob "utid" "id-1"
+add NULL "utid" u
+let s = int 7
+add NULL "seq" s
+let r = tuple
+let r0 = bare ok
+append r r0
+let i = tuple
+let i0 = int 1
+let i1 = int 2
+append i i0
+append i i1
+append r i
+add NULL "result" r
+emit

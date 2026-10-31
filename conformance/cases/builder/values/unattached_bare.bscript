@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# a value never attached is not in the document
+dialect AML
+let v = bare ok
+emit

@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# path "a\x7fb"
+option on-error continue
+dialect AML
+include "a\x7fb"
+get_error

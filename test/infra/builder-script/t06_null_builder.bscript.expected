@@ -1,0 +1,7 @@
+anvil-builder-run 1
+failed line=3 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="dialect 7" message="invalid argument"
+failed line=4 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="let x = null" message="invalid argument"
+failed line=5 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="emit" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+steps 5
+status error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT

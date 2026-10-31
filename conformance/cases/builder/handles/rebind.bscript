@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# a name may be bound again
+dialect AML
+let v = int 1
+add NULL "a" v
+let v = int 2
+add NULL "b" v
+emit

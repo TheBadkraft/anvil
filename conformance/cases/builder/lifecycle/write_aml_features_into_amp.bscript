@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# AML-only constructs into an AMP writer fail with DIALECT
+option on-error continue
+dialect AML
+let o = object
+let i = int 1
+add o "k" i
+add NULL "o" o
+write AMP
+get_error

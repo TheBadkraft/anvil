@@ -1,0 +1,7 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let v = int 1
+add o "k" v
+find o "k"
+find o "z"

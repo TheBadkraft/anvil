@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-builder-script check-builder-gen check-builder-roundtrip check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -277,9 +277,9 @@ check-numeric-fastpath:
 DUMP_BIN = build/tools/anvil-dump
 anvil-dump: $(DUMP_BIN)
 
-$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tools/script-common.c tools/script-common.h $(DEBUG_OBJS)
+$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tools/builder-script.c tools/builder-script.h tools/script-common.c tools/script-common.h $(DEBUG_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/builder-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
 
 # Regenerates every expected dump and diffs it against the committed one; any difference fails.
 # ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).
@@ -288,10 +288,25 @@ check-conformance: $(DUMP_BIN) check-drift-tables
 	sh scripts/check-writer-gen.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-conformance.sh check $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-writer-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-builder-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-builder-gen.sh
+	sh scripts/check-builder-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 
 # The writer-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/writer-script/).
 check-writer-script: $(DUMP_BIN)
 	sh scripts/check-writer-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The builder-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/builder-script/).
+check-builder-script: $(DUMP_BIN)
+	sh scripts/check-builder-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The builder corpus generator writes scripts only (native owns the dumps).
+check-builder-gen:
+	sh scripts/check-builder-gen.sh
+
+# Every successful emit and write of the builder corpus must load through the native reader with status ok.
+check-builder-roundtrip: $(DUMP_BIN)
+	sh scripts/check-builder-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 
 # The writer corpus generator writes scripts only (native owns the dumps); its model cross-checks native.
 check-writer-gen: $(DUMP_BIN)

@@ -4,7 +4,7 @@
 #
 # Every file under conformance/cases that is not a ".dump" is an input and has its dump beside it
 # ("<input>.dump"). A ".frag" input is dumped in value-fragment mode, a ".wscript" (cases/writer/) is run with
-# --writer-script. Run from the repo root.
+# --writer-script, a ".bscript" (cases/builder/) with --builder-script. Run from the repo root.
 # check fails on: a dump that differs, an input without a dump, a dump without an input, a corpus copy of
 # a test/fixtures file that differs from it. update writes every dump (new ones included) and removes
 # none. Inputs are run from conformance/cases, with relative paths, so includes resolve there.
@@ -28,7 +28,7 @@ find . -type f ! -name '*.dump' | sed 's|^\./||' | LC_ALL=C sort > "$tmp/inputs"
 while IFS= read -r input; do
    expected="$input.dump"
    opts=
-   case $input in *.frag) opts=--fragment;; *.wscript) opts=--writer-script;; esac
+   case $input in *.frag) opts=--fragment;; *.wscript) opts=--writer-script;; *.bscript) opts=--builder-script;; esac
    total=$((total + 1))
    "$dump" $opts "$input" > "$tmp/out" 2> "$tmp/err"
    rc=$?

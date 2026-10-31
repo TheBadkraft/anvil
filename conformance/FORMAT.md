@@ -327,7 +327,8 @@ conformance/
   corpus is generated with a native built without AnvilScript (`WITH_ASL=0`), where `vars` and `import` are keywords and
   `#!asl` is an error.
 - `cases/writer/` is the writer corpus (see "The writer script" below): its inputs are `.wscript` files, run with
-  `--writer-script`, and are not dialect hints.
+  `--writer-script`, and are not dialect hints. `cases/builder/` is the builder corpus ("The builder script"): `.bscript`
+  files, run with `--builder-script`.
 - `make check-conformance` regenerates every dump and diffs it with the committed one: **any difference
   fails**, as does an input without a dump or a dump without an input. `make update-conformance` rewrites them;
   use it only alongside a deliberate native change, and commit the new dumps in the same commit.
@@ -492,6 +493,144 @@ Every `anvil_writer_err_code` the flat writer can return has a case; `ANVIL_WRIT
 `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` cannot be reached through the flat writer (the latter belongs to `anvil_builder`), so
 they appear only through `error_message`.
 
+## The builder script, version 1
+
+The builder is the third contract of the corpus. A **builder script** (`anvil-builder-script 1`) names a sequence of
+`anvil_builder_*` calls (`include/anvil_builder.h`) with literal arguments, and native's run of it
+(`anvil-builder-run 1`) is every failed call, every `find` result, the exact bytes of every `emit` and `write`, and the
+final status. An implementation of the builder (anvil.js' `AnvilBuilder`) runs the same scripts through its own builder
+and must print the **same run, byte for byte**. Native is the spec. A change to the grammar or the run format bumps the
+number and regenerates the corpus. (FR-2610-anvl-conformance-004.)
+
+The builder differs from the writer in three ways the format has to carry: values are **handles** (a node or a member
+is created by one call and used by later ones), errors are **not sticky** (a failed call changes nothing and the next
+call works), and the output comes from an explicit `emit` or `write` step, as many times as the script likes.
+
+### The script
+
+The lexical rules are **the writer script's**, unchanged: the same bytes, lines, comments, blanks, quoted strings and
+escapes, `NULL`, step numbers (the 1-based line number), the same `int` and `double` forms, `option on-error`, and the
+same script-error conditions. The **header line** is exactly `anvil-builder-script 1`. The first step other than
+`option` is `dialect`, and `dialect` appears once.
+
+A **step** is
+
+```
+[let NAME =] [other] CALL ARGS...
+```
+
+- **`let NAME =`** binds the call's result to the handle `NAME`. `let`, `NAME` and `=` are separate words (`let x=null`
+  is a script error). Only the calls marked *node* or *member* below return something to bind. `NAME` is
+  `[A-Za-z_][A-Za-z0-9_]*`, and is not `NULL`, `true`, `false`, `let` or `other`. A name may be bound again; the latest
+  binding wins. A call that returns a handle without `let` is legal (the handle is dropped).
+- **`other`** makes the call on the **second builder** instead of the first. It is how a script reaches the
+  foreign-handle error (a node from one builder given to another).
+- A **handle argument** is a bound name, or the word `NULL` (the null handle). A quoted string in a handle position is a
+  script error. A name used before it is bound is a script error, and so is a handle of the wrong kind (a member where a
+  node is expected, or the reverse). The kind of a name is the kind of its latest `let`, known without running the script.
+- If a call that has a `let` **fails**, the name is bound to the null handle. (Later calls that use it get a null
+  handle, and fail the way the C function does.)
+- Handles and their builder: a node or member belongs to the builder that made it. Handles of builder 1 and of builder 2
+  live in one namespace.
+
+**Calls.** `P` text pointer (a quoted string without `\x00`, or `NULL`); `S` bytes (a quoted string or `NULL`) with an
+optional length; `N` a node handle, `M` a member handle (a bound name or `NULL`); `I` an integer.
+
+| call | arguments | result | native function |
+|---|---|---|---|
+| `dialect` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 1; an integer is the raw enum value, to reach an invalid dialect) |
+| `builder2` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 2, for `other`; once, after `dialect`) |
+| `option` | `on-error stop` \| `on-error continue` | | script control, as in the writer script |
+| `get_error` | | | `anvil_builder_get_error` |
+| `error_message` | *integer* | | `anvil_writer_error_message` (the builder reports the writer's codes) |
+| `attribute` | *key* `P`, *value* `P` | | `anvil_builder_attribute` |
+| `attribute_string` | *key* `P`, *text* `S` [, *len*] | | `anvil_builder_attribute_string` |
+| `include` | *path* `P` | | `anvil_builder_include` |
+| `null` | | node | `anvil_builder_null` |
+| `bool` | `true` \| `false` | node | `anvil_builder_bool` |
+| `numeric` | *text* `P` | node | `anvil_builder_numeric` |
+| `int` | *int64* | node | `anvil_builder_int` |
+| `double` | as the writer script | node | `anvil_builder_double` |
+| `string` | *text* `S` [, *len*] | node | `anvil_builder_string` |
+| `bare` | *text* `P` | node | `anvil_builder_bare` |
+| `blob` | *tag* `P`, *data* `S` [, *len*] | node | `anvil_builder_blob` |
+| `varref` | *name* `P` | node | `anvil_builder_varref` |
+| `array`, `tuple`, `object` | | node | `anvil_builder_array`, `_tuple`, `_object` |
+| `append` | *collection* `N`, *element* `N` | | `anvil_builder_append` |
+| `add` | *object* `N` (`NULL` is the document), *name* `P`, *value* `N` | member | `anvil_builder_add` |
+| `set_base` | *member* `M`, *base* `P` | | `anvil_builder_set_base` |
+| `member_attribute` | *member* `M`, *key* `P`, *value* `P` | | `anvil_builder_member_attribute` |
+| `member_attribute_string` | *member* `M`, *key* `P`, *text* `S` [, *len*] | | `anvil_builder_member_attribute_string` |
+| `find` | *object* `N` (`NULL` is the document), *name* `P` | member | `anvil_builder_find` |
+| `emit` | | | `anvil_builder_emit` |
+| `write` | [`AML` \| `AMP` \| `NULL`] | | `anvil_builder_write` into a fresh writer, then `anvil_writer_finish` (below) |
+
+Every `S` and *len* rule, and the `int` and `double` forms, are the writer script's (`string NULL 3` passes the null
+pointer with the length 3; a *len* longer than a quoted string is a script error). The builder has **no removal or
+replacement call**: a node is attached once and a statement is added once.
+
+- **`write [W]`** makes a fresh writer of dialect `W` (default: the dialect of the builder the call is made on; `AML`
+  when that builder is the null builder), calls `anvil_builder_write(builder, writer)`, and if it succeeds calls
+  `anvil_writer_finish` and reads `anvil_writer_data`. `write NULL` passes the null writer. A `W` that differs from the
+  builder's dialect is legal; native's result is the spec. The writer is disposed at the end of the step.
+- A call is **failed** when it returns `false`, when a constructor, `add` or `emit` returns `NULL`, when `dialect` or
+  `builder2` yields no builder, or when `write` succeeds but its `finish` fails. **`find` never fails**: it returns a
+  member or `NULL`, and it does not change the builder's error. `get_error`, `error_message` and `option` never fail.
+- After a failed `dialect` the builder is the null builder, and every later call on it is made with a null handle (it
+  fails with `ANVIL_WRITER_ERR_INVALID_ARGUMENT`, and `get_error` on it is that code).
+- `option on-error continue` behaves as in the writer script. Because builder errors are not sticky, a later call
+  works normally. **`get_error` reports the outcome of the most recent call** on that builder (`find` excepted).
+- The builder's output is **borrowed**: an `emit` record is printed when the step runs, so a later call cannot change it.
+
+The depth limit is `ANVIL_BUILDER_MAX_DEPTH` (256) containers; exceeding it fails the `emit` or `write` with
+`ANVIL_WRITER_ERR_DEPTH_EXCEEDED`. A **script error** is as in the writer script (stderr, exit 2, nothing on stdout),
+with these additions: an unbound or wrong-kind handle, a bad `let`, `other` before `builder2`, `builder2` before
+`dialect` or twice. The corpus holds no script error.
+
+### The run
+
+`anvil-dump --builder-script <file>` prints, to stdout, ASCII with `\n` line endings and quoted strings written as in the
+reader dump:
+
+```
+anvil-builder-run 1
+<records, one per event, in execution order>
+steps N
+status ok
+```
+
+- **`get_error code=C name=NAME`**, **`error_message code=C text="..."`**: as in the writer run. `get_error` is on the
+  builder the step names (`other get_error` is builder 2's).
+- **`find line=L result=found`** or **`find line=L result=none`** for each `find` step.
+- **`emit bytes=N text="..."`** for each `emit` that succeeded: the document text (the terminating NUL is not counted).
+- **`write bytes=N text="..."`** for each `write` that succeeded: the finished writer's data.
+- **`failed line=L code=C name=NAME call="..." message="..."`** for each failed call: `call` is the step's line verbatim
+  (the `let` and `other` included) with leading and trailing blanks removed; `C` is `anvil_builder_get_error` of the
+  builder the call was made on right after the call (for a failed `finish` in `write`, the writer's error);
+  `message` is `anvil_writer_error_message(C)`.
+- **`steps N`**: the steps executed, the failing one included. A step after a stop is not counted.
+- **`status ok`** or **`status error code=C name=NAME`**: `anvil_builder_get_error` of builder 1 at the end.
+
+`anvil-dump --builder-script <file> --emit-dir <dir>` also writes the bytes of the k-th successful `emit` or `write`
+step (counting from 1, either builder) to `<dir>/emit-<k>.anvl`; `scripts/check-builder-roundtrip.sh` uses it.
+
+### The builder corpus
+
+`conformance/cases/builder/<area>/<name>.bscript` is a script and `<name>.bscript.dump` is native's run. The scripts are
+**generated** by `conformance/seed/gen_builder.py`, which writes scripts only; the runs are native's, written by
+`make update-conformance` and by nothing else. `make check-conformance` checks, for every `.bscript`, that native's run
+equals the committed `.dump`, and `make check-builder-roundtrip` checks that **every successful `emit` and `write` loads
+through the native reader with `status ok`** (an `include` is satisfied by an empty file of that name; known
+inconsistencies are listed with their ticket in `conformance/builder-roundtrip-known.txt`). `make check-builder-gen`
+checks that the generator reproduces the committed scripts and writes no dump.
+
+Areas: `lifecycle` (new, get_error, error_message, non-sticky errors, emit twice, write), `values` (every value kind and
+its errors), `names` (statement names, duplicates), `collections` (arrays, tuples, objects, attaching rules, nesting),
+`attributes` (module and member attributes), `include` (include ordering), `bases` (`set_base`, the
+INHERITANCE_REQUIRES_OBJECT check across all members), `find`, `depth` (nesting up to and beyond the limit), `amp` (the
+AMP dialect and what it refuses), `handles` (null, foreign and misused handles), `envelope` (King & Crucible shaped
+documents) and `flywire` (FlyWire shaped documents).
+
 ## Drift tables
 
 `conformance/drift-tables.txt` is generated by `scripts/gen-drift-tables.sh` from `include/*.h`, and
@@ -509,6 +648,7 @@ anvil-dump -                  stdin, loaded as a buffer
 anvil-dump --fragment <file|->  a standalone value expression
 anvil-dump --writer-script <script>   run a writer script ("The writer script", above)
 anvil-dump --writer-output <script>   the same, printing only the output bytes
+anvil-dump --builder-script <script> [--emit-dir <dir>]   run a builder script ("The builder script", above)
 ```
 
 Exit status `0` for any dump (including of an input that fails to parse), `2` for a usage or tool error.

@@ -1,0 +1,11 @@
+anvil-builder-script 1
+dialect AML
+let a = object
+let b = object
+let c = object
+let x = int 1
+add c "leaf" x
+add b "c" c
+add a "b" b
+add NULL "a" a
+emit

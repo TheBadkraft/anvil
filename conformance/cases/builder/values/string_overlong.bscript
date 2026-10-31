@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = string "\xc0\xaf"
+add NULL "v" v
+emit

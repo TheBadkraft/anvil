@@ -1,0 +1,11 @@
+anvil-builder-script 1
+dialect AML
+builder2 AML
+let a = int 1
+add NULL "x" a
+let b = other int 2
+other add NULL "y" b
+emit
+other emit
+get_error
+other get_error

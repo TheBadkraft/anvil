@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# re-emit after changing the builder
+dialect AML
+let a = int 1
+add NULL "a" a
+emit
+let b = bool true
+add NULL "b" b
+emit
+let c = null
+add NULL "c" c
+emit

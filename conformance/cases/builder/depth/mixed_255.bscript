@@ -1,0 +1,686 @@
+anvil-builder-script 1
+# array, tuple and object alternating, 255 deep
+dialect AML
+let c1 = tuple
+let c2 = object
+let c3 = array
+let c4 = tuple
+let c5 = object
+let c6 = array
+let c7 = tuple
+let c8 = object
+let c9 = array
+let c10 = tuple
+let c11 = object
+let c12 = array
+let c13 = tuple
+let c14 = object
+let c15 = array
+let c16 = tuple
+let c17 = object
+let c18 = array
+let c19 = tuple
+let c20 = object
+let c21 = array
+let c22 = tuple
+let c23 = object
+let c24 = array
+let c25 = tuple
+let c26 = object
+let c27 = array
+let c28 = tuple
+let c29 = object
+let c30 = array
+let c31 = tuple
+let c32 = object
+let c33 = array
+let c34 = tuple
+let c35 = object
+let c36 = array
+let c37 = tuple
+let c38 = object
+let c39 = array
+let c40 = tuple
+let c41 = object
+let c42 = array
+let c43 = tuple
+let c44 = object
+let c45 = array
+let c46 = tuple
+let c47 = object
+let c48 = array
+let c49 = tuple
+let c50 = object
+let c51 = array
+let c52 = tuple
+let c53 = object
+let c54 = array
+let c55 = tuple
+let c56 = object
+let c57 = array
+let c58 = tuple
+let c59 = object
+let c60 = array
+let c61 = tuple
+let c62 = object
+let c63 = array
+let c64 = tuple
+let c65 = object
+let c66 = array
+let c67 = tuple
+let c68 = object
+let c69 = array
+let c70 = tuple
+let c71 = object
+let c72 = array
+let c73 = tuple
+let c74 = object
+let c75 = array
+let c76 = tuple
+let c77 = object
+let c78 = array
+let c79 = tuple
+let c80 = object
+let c81 = array
+let c82 = tuple
+let c83 = object
+let c84 = array
+let c85 = tuple
+let c86 = object
+let c87 = array
+let c88 = tuple
+let c89 = object
+let c90 = array
+let c91 = tuple
+let c92 = object
+let c93 = array
+let c94 = tuple
+let c95 = object
+let c96 = array
+let c97 = tuple
+let c98 = object
+let c99 = array
+let c100 = tuple
+let c101 = object
+let c102 = array
+let c103 = tuple
+let c104 = object
+let c105 = array
+let c106 = tuple
+let c107 = object
+let c108 = array
+let c109 = tuple
+let c110 = object
+let c111 = array
+let c112 = tuple
+let c113 = object
+let c114 = array
+let c115 = tuple
+let c116 = object
+let c117 = array
+let c118 = tuple
+let c119 = object
+let c120 = array
+let c121 = tuple
+let c122 = object
+let c123 = array
+let c124 = tuple
+let c125 = object
+let c126 = array
+let c127 = tuple
+let c128 = object
+let c129 = array
+let c130 = tuple
+let c131 = object
+let c132 = array
+let c133 = tuple
+let c134 = object
+let c135 = array
+let c136 = tuple
+let c137 = object
+let c138 = array
+let c139 = tuple
+let c140 = object
+let c141 = array
+let c142 = tuple
+let c143 = object
+let c144 = array
+let c145 = tuple
+let c146 = object
+let c147 = array
+let c148 = tuple
+let c149 = object
+let c150 = array
+let c151 = tuple
+let c152 = object
+let c153 = array
+let c154 = tuple
+let c155 = object
+let c156 = array
+let c157 = tuple
+let c158 = object
+let c159 = array
+let c160 = tuple
+let c161 = object
+let c162 = array
+let c163 = tuple
+let c164 = object
+let c165 = array
+let c166 = tuple
+let c167 = object
+let c168 = array
+let c169 = tuple
+let c170 = object
+let c171 = array
+let c172 = tuple
+let c173 = object
+let c174 = array
+let c175 = tuple
+let c176 = object
+let c177 = array
+let c178 = tuple
+let c179 = object
+let c180 = array
+let c181 = tuple
+let c182 = object
+let c183 = array
+let c184 = tuple
+let c185 = object
+let c186 = array
+let c187 = tuple
+let c188 = object
+let c189 = array
+let c190 = tuple
+let c191 = object
+let c192 = array
+let c193 = tuple
+let c194 = object
+let c195 = array
+let c196 = tuple
+let c197 = object
+let c198 = array
+let c199 = tuple
+let c200 = object
+let c201 = array
+let c202 = tuple
+let c203 = object
+let c204 = array
+let c205 = tuple
+let c206 = object
+let c207 = array
+let c208 = tuple
+let c209 = object
+let c210 = array
+let c211 = tuple
+let c212 = object
+let c213 = array
+let c214 = tuple
+let c215 = object
+let c216 = array
+let c217 = tuple
+let c218 = object
+let c219 = array
+let c220 = tuple
+let c221 = object
+let c222 = array
+let c223 = tuple
+let c224 = object
+let c225 = array
+let c226 = tuple
+let c227 = object
+let c228 = array
+let c229 = tuple
+let c230 = object
+let c231 = array
+let c232 = tuple
+let c233 = object
+let c234 = array
+let c235 = tuple
+let c236 = object
+let c237 = array
+let c238 = tuple
+let c239 = object
+let c240 = array
+let c241 = tuple
+let c242 = object
+let c243 = array
+let c244 = tuple
+let c245 = object
+let c246 = array
+let c247 = tuple
+let c248 = object
+let c249 = array
+let c250 = tuple
+let c251 = object
+let c252 = array
+let c253 = tuple
+let c254 = object
+let c255 = array
+append c1 c2
+add c2 "k" c3
+append c3 c4
+append c4 c5
+add c5 "k" c6
+append c6 c7
+append c7 c8
+add c8 "k" c9
+append c9 c10
+append c10 c11
+add c11 "k" c12
+append c12 c13
+append c13 c14
+add c14 "k" c15
+append c15 c16
+append c16 c17
+add c17 "k" c18
+append c18 c19
+append c19 c20
+add c20 "k" c21
+append c21 c22
+append c22 c23
+add c23 "k" c24
+append c24 c25
+append c25 c26
+add c26 "k" c27
+append c27 c28
+append c28 c29
+add c29 "k" c30
+append c30 c31
+append c31 c32
+add c32 "k" c33
+append c33 c34
+append c34 c35
+add c35 "k" c36
+append c36 c37
+append c37 c38
+add c38 "k" c39
+append c39 c40
+append c40 c41
+add c41 "k" c42
+append c42 c43
+append c43 c44
+add c44 "k" c45
+append c45 c46
+append c46 c47
+add c47 "k" c48
+append c48 c49
+append c49 c50
+add c50 "k" c51
+append c51 c52
+append c52 c53
+add c53 "k" c54
+append c54 c55
+append c55 c56
+add c56 "k" c57
+append c57 c58
+append c58 c59
+add c59 "k" c60
+append c60 c61
+append c61 c62
+add c62 "k" c63
+append c63 c64
+append c64 c65
+add c65 "k" c66
+append c66 c67
+append c67 c68
+add c68 "k" c69
+append c69 c70
+append c70 c71
+add c71 "k" c72
+append c72 c73
+append c73 c74
+add c74 "k" c75
+append c75 c76
+append c76 c77
+add c77 "k" c78
+append c78 c79
+append c79 c80
+add c80 "k" c81
+append c81 c82
+append c82 c83
+add c83 "k" c84
+append c84 c85
+append c85 c86
+add c86 "k" c87
+append c87 c88
+append c88 c89
+add c89 "k" c90
+append c90 c91
+append c91 c92
+add c92 "k" c93
+append c93 c94
+append c94 c95
+add c95 "k" c96
+append c96 c97
+append c97 c98
+add c98 "k" c99
+append c99 c100
+append c100 c101
+add c101 "k" c102
+append c102 c103
+append c103 c104
+add c104 "k" c105
+append c105 c106
+append c106 c107
+add c107 "k" c108
+append c108 c109
+append c109 c110
+add c110 "k" c111
+append c111 c112
+append c112 c113
+add c113 "k" c114
+append c114 c115
+append c115 c116
+add c116 "k" c117
+append c117 c118
+append c118 c119
+add c119 "k" c120
+append c120 c121
+append c121 c122
+add c122 "k" c123
+append c123 c124
+append c124 c125
+add c125 "k" c126
+append c126 c127
+append c127 c128
+add c128 "k" c129
+append c129 c130
+append c130 c131
+add c131 "k" c132
+append c132 c133
+append c133 c134
+add c134 "k" c135
+append c135 c136
+append c136 c137
+add c137 "k" c138
+append c138 c139
+append c139 c140
+add c140 "k" c141
+append c141 c142
+append c142 c143
+add c143 "k" c144
+append c144 c145
+append c145 c146
+add c146 "k" c147
+append c147 c148
+append c148 c149
+add c149 "k" c150
+append c150 c151
+append c151 c152
+add c152 "k" c153
+append c153 c154
+append c154 c155
+add c155 "k" c156
+append c156 c157
+append c157 c158
+add c158 "k" c159
+append c159 c160
+append c160 c161
+add c161 "k" c162
+append c162 c163
+append c163 c164
+add c164 "k" c165
+append c165 c166
+append c166 c167
+add c167 "k" c168
+append c168 c169
+append c169 c170
+add c170 "k" c171
+append c171 c172
+append c172 c173
+add c173 "k" c174
+append c174 c175
+append c175 c176
+add c176 "k" c177
+append c177 c178
+append c178 c179
+add c179 "k" c180
+append c180 c181
+append c181 c182
+add c182 "k" c183
+append c183 c184
+append c184 c185
+add c185 "k" c186
+append c186 c187
+append c187 c188
+add c188 "k" c189
+append c189 c190
+append c190 c191
+add c191 "k" c192
+append c192 c193
+append c193 c194
+add c194 "k" c195
+append c195 c196
+append c196 c197
+add c197 "k" c198
+append c198 c199
+append c199 c200
+add c200 "k" c201
+append c201 c202
+append c202 c203
+add c203 "k" c204
+append c204 c205
+append c205 c206
+add c206 "k" c207
+append c207 c208
+append c208 c209
+add c209 "k" c210
+append c210 c211
+append c211 c212
+add c212 "k" c213
+append c213 c214
+append c214 c215
+add c215 "k" c216
+append c216 c217
+append c217 c218
+add c218 "k" c219
+append c219 c220
+append c220 c221
+add c221 "k" c222
+append c222 c223
+append c223 c224
+add c224 "k" c225
+append c225 c226
+append c226 c227
+add c227 "k" c228
+append c228 c229
+append c229 c230
+add c230 "k" c231
+append c231 c232
+append c232 c233
+add c233 "k" c234
+append c234 c235
+append c235 c236
+add c236 "k" c237
+append c237 c238
+append c238 c239
+add c239 "k" c240
+append c240 c241
+append c241 c242
+add c242 "k" c243
+append c243 c244
+append c244 c245
+add c245 "k" c246
+append c246 c247
+append c247 c248
+add c248 "k" c249
+append c249 c250
+append c250 c251
+add c251 "k" c252
+append c252 c253
+append c253 c254
+add c254 "k" c255
+let t1 = int 1
+append c1 t1
+let t4 = int 1
+append c4 t4
+let t7 = int 1
+append c7 t7
+let t10 = int 1
+append c10 t10
+let t13 = int 1
+append c13 t13
+let t16 = int 1
+append c16 t16
+let t19 = int 1
+append c19 t19
+let t22 = int 1
+append c22 t22
+let t25 = int 1
+append c25 t25
+let t28 = int 1
+append c28 t28
+let t31 = int 1
+append c31 t31
+let t34 = int 1
+append c34 t34
+let t37 = int 1
+append c37 t37
+let t40 = int 1
+append c40 t40
+let t43 = int 1
+append c43 t43
+let t46 = int 1
+append c46 t46
+let t49 = int 1
+append c49 t49
+let t52 = int 1
+append c52 t52
+let t55 = int 1
+append c55 t55
+let t58 = int 1
+append c58 t58
+let t61 = int 1
+append c61 t61
+let t64 = int 1
+append c64 t64
+let t67 = int 1
+append c67 t67
+let t70 = int 1
+append c70 t70
+let t73 = int 1
+append c73 t73
+let t76 = int 1
+append c76 t76
+let t79 = int 1
+append c79 t79
+let t82 = int 1
+append c82 t82
+let t85 = int 1
+append c85 t85
+let t88 = int 1
+append c88 t88
+let t91 = int 1
+append c91 t91
+let t94 = int 1
+append c94 t94
+let t97 = int 1
+append c97 t97
+let t100 = int 1
+append c100 t100
+let t103 = int 1
+append c103 t103
+let t106 = int 1
+append c106 t106
+let t109 = int 1
+append c109 t109
+let t112 = int 1
+append c112 t112
+let t115 = int 1
+append c115 t115
+let t118 = int 1
+append c118 t118
+let t121 = int 1
+append c121 t121
+let t124 = int 1
+append c124 t124
+let t127 = int 1
+append c127 t127
+let t130 = int 1
+append c130 t130
+let t133 = int 1
+append c133 t133
+let t136 = int 1
+append c136 t136
+let t139 = int 1
+append c139 t139
+let t142 = int 1
+append c142 t142
+let t145 = int 1
+append c145 t145
+let t148 = int 1
+append c148 t148
+let t151 = int 1
+append c151 t151
+let t154 = int 1
+append c154 t154
+let t157 = int 1
+append c157 t157
+let t160 = int 1
+append c160 t160
+let t163 = int 1
+append c163 t163
+let t166 = int 1
+append c166 t166
+let t169 = int 1
+append c169 t169
+let t172 = int 1
+append c172 t172
+let t175 = int 1
+append c175 t175
+let t178 = int 1
+append c178 t178
+let t181 = int 1
+append c181 t181
+let t184 = int 1
+append c184 t184
+let t187 = int 1
+append c187 t187
+let t190 = int 1
+append c190 t190
+let t193 = int 1
+append c193 t193
+let t196 = int 1
+append c196 t196
+let t199 = int 1
+append c199 t199
+let t202 = int 1
+append c202 t202
+let t205 = int 1
+append c205 t205
+let t208 = int 1
+append c208 t208
+let t211 = int 1
+append c211 t211
+let t214 = int 1
+append c214 t214
+let t217 = int 1
+append c217 t217
+let t220 = int 1
+append c220 t220
+let t223 = int 1
+append c223 t223
+let t226 = int 1
+append c226 t226
+let t229 = int 1
+append c229 t229
+let t232 = int 1
+append c232 t232
+let t235 = int 1
+append c235 t235
+let t238 = int 1
+append c238 t238
+let t241 = int 1
+append c241 t241
+let t244 = int 1
+append c244 t244
+let t247 = int 1
+append c247 t247
+let t250 = int 1
+append c250 t250
+let t253 = int 1
+append c253 t253
+let leaf = int 9
+append c255 leaf
+add NULL "d" c1
+emit

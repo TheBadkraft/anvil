@@ -1,0 +1,9 @@
+anvil-builder-script 1
+dialect AML
+let sql = blob "sql" "SELECT a, b FROM t WHERE c = \"x\";"
+add NULL "query" sql
+let md = blob "md" "# Notes\n- one\n- two\n"
+add NULL "notes" md
+let raw = blob NULL "opaque"
+add NULL "raw" raw
+emit

@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = double 0x3fd5555555555555
+add NULL "v" v
+emit

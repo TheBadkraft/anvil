@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# BR-2610-anvl-writer-003: includes are written first, then attributes
+dialect AML
+attribute "k" "v"
+include "a.anvl"
+emit

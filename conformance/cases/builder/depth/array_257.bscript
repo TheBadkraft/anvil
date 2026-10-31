@@ -1,0 +1,520 @@
+anvil-builder-script 1
+# 257 nested arrays
+dialect AML
+let c1 = array
+let c2 = array
+let c3 = array
+let c4 = array
+let c5 = array
+let c6 = array
+let c7 = array
+let c8 = array
+let c9 = array
+let c10 = array
+let c11 = array
+let c12 = array
+let c13 = array
+let c14 = array
+let c15 = array
+let c16 = array
+let c17 = array
+let c18 = array
+let c19 = array
+let c20 = array
+let c21 = array
+let c22 = array
+let c23 = array
+let c24 = array
+let c25 = array
+let c26 = array
+let c27 = array
+let c28 = array
+let c29 = array
+let c30 = array
+let c31 = array
+let c32 = array
+let c33 = array
+let c34 = array
+let c35 = array
+let c36 = array
+let c37 = array
+let c38 = array
+let c39 = array
+let c40 = array
+let c41 = array
+let c42 = array
+let c43 = array
+let c44 = array
+let c45 = array
+let c46 = array
+let c47 = array
+let c48 = array
+let c49 = array
+let c50 = array
+let c51 = array
+let c52 = array
+let c53 = array
+let c54 = array
+let c55 = array
+let c56 = array
+let c57 = array
+let c58 = array
+let c59 = array
+let c60 = array
+let c61 = array
+let c62 = array
+let c63 = array
+let c64 = array
+let c65 = array
+let c66 = array
+let c67 = array
+let c68 = array
+let c69 = array
+let c70 = array
+let c71 = array
+let c72 = array
+let c73 = array
+let c74 = array
+let c75 = array
+let c76 = array
+let c77 = array
+let c78 = array
+let c79 = array
+let c80 = array
+let c81 = array
+let c82 = array
+let c83 = array
+let c84 = array
+let c85 = array
+let c86 = array
+let c87 = array
+let c88 = array
+let c89 = array
+let c90 = array
+let c91 = array
+let c92 = array
+let c93 = array
+let c94 = array
+let c95 = array
+let c96 = array
+let c97 = array
+let c98 = array
+let c99 = array
+let c100 = array
+let c101 = array
+let c102 = array
+let c103 = array
+let c104 = array
+let c105 = array
+let c106 = array
+let c107 = array
+let c108 = array
+let c109 = array
+let c110 = array
+let c111 = array
+let c112 = array
+let c113 = array
+let c114 = array
+let c115 = array
+let c116 = array
+let c117 = array
+let c118 = array
+let c119 = array
+let c120 = array
+let c121 = array
+let c122 = array
+let c123 = array
+let c124 = array
+let c125 = array
+let c126 = array
+let c127 = array
+let c128 = array
+let c129 = array
+let c130 = array
+let c131 = array
+let c132 = array
+let c133 = array
+let c134 = array
+let c135 = array
+let c136 = array
+let c137 = array
+let c138 = array
+let c139 = array
+let c140 = array
+let c141 = array
+let c142 = array
+let c143 = array
+let c144 = array
+let c145 = array
+let c146 = array
+let c147 = array
+let c148 = array
+let c149 = array
+let c150 = array
+let c151 = array
+let c152 = array
+let c153 = array
+let c154 = array
+let c155 = array
+let c156 = array
+let c157 = array
+let c158 = array
+let c159 = array
+let c160 = array
+let c161 = array
+let c162 = array
+let c163 = array
+let c164 = array
+let c165 = array
+let c166 = array
+let c167 = array
+let c168 = array
+let c169 = array
+let c170 = array
+let c171 = array
+let c172 = array
+let c173 = array
+let c174 = array
+let c175 = array
+let c176 = array
+let c177 = array
+let c178 = array
+let c179 = array
+let c180 = array
+let c181 = array
+let c182 = array
+let c183 = array
+let c184 = array
+let c185 = array
+let c186 = array
+let c187 = array
+let c188 = array
+let c189 = array
+let c190 = array
+let c191 = array
+let c192 = array
+let c193 = array
+let c194 = array
+let c195 = array
+let c196 = array
+let c197 = array
+let c198 = array
+let c199 = array
+let c200 = array
+let c201 = array
+let c202 = array
+let c203 = array
+let c204 = array
+let c205 = array
+let c206 = array
+let c207 = array
+let c208 = array
+let c209 = array
+let c210 = array
+let c211 = array
+let c212 = array
+let c213 = array
+let c214 = array
+let c215 = array
+let c216 = array
+let c217 = array
+let c218 = array
+let c219 = array
+let c220 = array
+let c221 = array
+let c222 = array
+let c223 = array
+let c224 = array
+let c225 = array
+let c226 = array
+let c227 = array
+let c228 = array
+let c229 = array
+let c230 = array
+let c231 = array
+let c232 = array
+let c233 = array
+let c234 = array
+let c235 = array
+let c236 = array
+let c237 = array
+let c238 = array
+let c239 = array
+let c240 = array
+let c241 = array
+let c242 = array
+let c243 = array
+let c244 = array
+let c245 = array
+let c246 = array
+let c247 = array
+let c248 = array
+let c249 = array
+let c250 = array
+let c251 = array
+let c252 = array
+let c253 = array
+let c254 = array
+let c255 = array
+let c256 = array
+let c257 = array
+append c1 c2
+append c2 c3
+append c3 c4
+append c4 c5
+append c5 c6
+append c6 c7
+append c7 c8
+append c8 c9
+append c9 c10
+append c10 c11
+append c11 c12
+append c12 c13
+append c13 c14
+append c14 c15
+append c15 c16
+append c16 c17
+append c17 c18
+append c18 c19
+append c19 c20
+append c20 c21
+append c21 c22
+append c22 c23
+append c23 c24
+append c24 c25
+append c25 c26
+append c26 c27
+append c27 c28
+append c28 c29
+append c29 c30
+append c30 c31
+append c31 c32
+append c32 c33
+append c33 c34
+append c34 c35
+append c35 c36
+append c36 c37
+append c37 c38
+append c38 c39
+append c39 c40
+append c40 c41
+append c41 c42
+append c42 c43
+append c43 c44
+append c44 c45
+append c45 c46
+append c46 c47
+append c47 c48
+append c48 c49
+append c49 c50
+append c50 c51
+append c51 c52
+append c52 c53
+append c53 c54
+append c54 c55
+append c55 c56
+append c56 c57
+append c57 c58
+append c58 c59
+append c59 c60
+append c60 c61
+append c61 c62
+append c62 c63
+append c63 c64
+append c64 c65
+append c65 c66
+append c66 c67
+append c67 c68
+append c68 c69
+append c69 c70
+append c70 c71
+append c71 c72
+append c72 c73
+append c73 c74
+append c74 c75
+append c75 c76
+append c76 c77
+append c77 c78
+append c78 c79
+append c79 c80
+append c80 c81
+append c81 c82
+append c82 c83
+append c83 c84
+append c84 c85
+append c85 c86
+append c86 c87
+append c87 c88
+append c88 c89
+append c89 c90
+append c90 c91
+append c91 c92
+append c92 c93
+append c93 c94
+append c94 c95
+append c95 c96
+append c96 c97
+append c97 c98
+append c98 c99
+append c99 c100
+append c100 c101
+append c101 c102
+append c102 c103
+append c103 c104
+append c104 c105
+append c105 c106
+append c106 c107
+append c107 c108
+append c108 c109
+append c109 c110
+append c110 c111
+append c111 c112
+append c112 c113
+append c113 c114
+append c114 c115
+append c115 c116
+append c116 c117
+append c117 c118
+append c118 c119
+append c119 c120
+append c120 c121
+append c121 c122
+append c122 c123
+append c123 c124
+append c124 c125
+append c125 c126
+append c126 c127
+append c127 c128
+append c128 c129
+append c129 c130
+append c130 c131
+append c131 c132
+append c132 c133
+append c133 c134
+append c134 c135
+append c135 c136
+append c136 c137
+append c137 c138
+append c138 c139
+append c139 c140
+append c140 c141
+append c141 c142
+append c142 c143
+append c143 c144
+append c144 c145
+append c145 c146
+append c146 c147
+append c147 c148
+append c148 c149
+append c149 c150
+append c150 c151
+append c151 c152
+append c152 c153
+append c153 c154
+append c154 c155
+append c155 c156
+append c156 c157
+append c157 c158
+append c158 c159
+append c159 c160
+append c160 c161
+append c161 c162
+append c162 c163
+append c163 c164
+append c164 c165
+append c165 c166
+append c166 c167
+append c167 c168
+append c168 c169
+append c169 c170
+append c170 c171
+append c171 c172
+append c172 c173
+append c173 c174
+append c174 c175
+append c175 c176
+append c176 c177
+append c177 c178
+append c178 c179
+append c179 c180
+append c180 c181
+append c181 c182
+append c182 c183
+append c183 c184
+append c184 c185
+append c185 c186
+append c186 c187
+append c187 c188
+append c188 c189
+append c189 c190
+append c190 c191
+append c191 c192
+append c192 c193
+append c193 c194
+append c194 c195
+append c195 c196
+append c196 c197
+append c197 c198
+append c198 c199
+append c199 c200
+append c200 c201
+append c201 c202
+append c202 c203
+append c203 c204
+append c204 c205
+append c205 c206
+append c206 c207
+append c207 c208
+append c208 c209
+append c209 c210
+append c210 c211
+append c211 c212
+append c212 c213
+append c213 c214
+append c214 c215
+append c215 c216
+append c216 c217
+append c217 c218
+append c218 c219
+append c219 c220
+append c220 c221
+append c221 c222
+append c222 c223
+append c223 c224
+append c224 c225
+append c225 c226
+append c226 c227
+append c227 c228
+append c228 c229
+append c229 c230
+append c230 c231
+append c231 c232
+append c232 c233
+append c233 c234
+append c234 c235
+append c235 c236
+append c236 c237
+append c237 c238
+append c238 c239
+append c239 c240
+append c240 c241
+append c241 c242
+append c242 c243
+append c243 c244
+append c244 c245
+append c245 c246
+append c246 c247
+append c247 c248
+append c248 c249
+append c249 c250
+append c250 c251
+append c251 c252
+append c252 c253
+append c253 c254
+append c254 c255
+append c255 c256
+append c256 c257
+let leaf = int 1
+append c257 leaf
+add NULL "d" c1
+emit

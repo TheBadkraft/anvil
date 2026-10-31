@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# path "a\rb"
+option on-error continue
+dialect AML
+include "a\rb"
+get_error

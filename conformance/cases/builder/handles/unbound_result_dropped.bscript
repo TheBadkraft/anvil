@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# a constructor without let is legal and the node is dropped
+dialect AML
+int 1
+string "s"
+array
+emit

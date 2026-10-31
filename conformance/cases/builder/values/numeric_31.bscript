@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# numeric "\xd9\xa1\xd9\xa2\xd9\xa3"
+dialect AML
+let v = numeric "\xd9\xa1\xd9\xa2\xd9\xa3"
+add NULL "v" v
+emit

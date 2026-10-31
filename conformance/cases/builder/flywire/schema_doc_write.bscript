@@ -1,0 +1,44 @@
+anvil-builder-script 1
+dialect AML
+attribute "schema" "orders"
+attribute_string "title" "Order tables"
+include "common.anvl"
+let base = object
+let bid = int 1
+add base "id" bid
+let bm = add NULL "base_table" base
+member_attribute bm "abstract" NULL
+let orders = object
+let t = string "orders"
+add orders "table" t
+let cols = array
+let c0 = object
+let n0 = string "id"
+add c0 "name" n0
+let y0 = bare int64
+add c0 "type" y0
+append cols c0
+let c1 = object
+let n1 = string "customer"
+add c1 "name" n1
+let y1 = bare string
+add c1 "type" y1
+append cols c1
+let c2 = object
+let n2 = string "total"
+add c2 "name" n2
+let y2 = bare decimal
+add c2 "type" y2
+append cols c2
+let c3 = object
+let n3 = string "placed"
+add c3 "name" n3
+let y3 = bare timestamp
+add c3 "type" y3
+append cols c3
+add orders "columns" cols
+let om = add NULL "orders" orders
+set_base om "base_table"
+member_attribute om "version" "3"
+member_attribute_string om "note" "primary table"
+write

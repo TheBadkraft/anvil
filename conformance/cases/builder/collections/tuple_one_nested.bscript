@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# a 1-tuple deep in the tree fails at emit
+dialect AML
+let a = array
+let t = tuple
+let x = int 1
+append t x
+append a t
+add NULL "a" a
+emit

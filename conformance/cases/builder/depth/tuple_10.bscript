@@ -1,0 +1,46 @@
+anvil-builder-script 1
+# 10 nested tuples
+dialect AML
+let c1 = tuple
+let c2 = tuple
+let c3 = tuple
+let c4 = tuple
+let c5 = tuple
+let c6 = tuple
+let c7 = tuple
+let c8 = tuple
+let c9 = tuple
+let c10 = tuple
+append c1 c2
+append c2 c3
+append c3 c4
+append c4 c5
+append c5 c6
+append c6 c7
+append c7 c8
+append c8 c9
+append c9 c10
+let x1 = int 1
+let x2 = int 2
+let x3 = int 3
+let x4 = int 4
+let x5 = int 5
+let x6 = int 6
+let x7 = int 7
+let x8 = int 8
+let x9 = int 9
+let x10 = int 10
+append c1 x1
+append c2 x2
+append c3 x3
+append c4 x4
+append c5 x5
+append c6 x6
+append c7 x7
+append c8 x8
+append c9 x9
+append c10 x10
+let leaf = int 1
+append c10 leaf
+add NULL "d" c1
+emit

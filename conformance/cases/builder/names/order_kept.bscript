@@ -1,0 +1,14 @@
+anvil-builder-script 1
+# statements are emitted in the order added
+dialect AML
+let v0 = int 0
+add NULL "z" v0
+let v1 = int 1
+add NULL "a" v1
+let v2 = int 2
+add NULL "m" v2
+let v3 = int 3
+add NULL "b" v3
+let v4 = int 4
+add NULL "y" v4
+emit

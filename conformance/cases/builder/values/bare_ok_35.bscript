@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# bare "Infinity"
+dialect AML
+let v = bare "Infinity"
+add NULL "v" v
+emit

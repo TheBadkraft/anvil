@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# member key "caf\xc3\xa9"
+option on-error continue
+dialect AML
+let a = int 1
+let m = add NULL "a" a
+member_attribute m "caf\xc3\xa9" "v"
+get_error

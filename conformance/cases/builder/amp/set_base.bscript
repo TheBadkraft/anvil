@@ -1,0 +1,7 @@
+anvil-builder-script 1
+option on-error continue
+dialect AMP
+let v = int 1
+let m = add NULL "a" v
+set_base m "b"
+get_error

@@ -1,0 +1,17 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let o_v = int 1
+let o = object
+add o "k" o_v
+let m = add NULL "base" o
+let d = object
+let x = int 2
+add d "j" x
+let dm = add NULL "derived" d
+set_base dm "base"
+emit
+let s = int 5
+add NULL "base2" s
+set_base dm "base2"
+emit

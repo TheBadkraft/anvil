@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# the raw enum value
+dialect 0
+let v = string "x"
+add NULL "v" v
+emit

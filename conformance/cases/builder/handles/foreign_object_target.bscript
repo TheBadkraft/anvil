@@ -1,0 +1,10 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+builder2 AML
+let o = object
+let n = other int 1
+other add o "k" n
+other get_error
+add o "k" n
+get_error

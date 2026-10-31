@@ -1,0 +1,21 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let v = null
+add o "f0" v
+let v = bool true
+add o "f1" v
+let v = int 7
+add o "f2" v
+let v = string "s"
+add o "f3" v
+let v = bare b
+add o "f4" v
+let v = blob "t" "d"
+add o "f5" v
+let v = varref "r"
+add o "f6" v
+let v = double 0.25
+add o "f7" v
+add NULL "o" o
+emit
