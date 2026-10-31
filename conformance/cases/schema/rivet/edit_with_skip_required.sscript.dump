@@ -1,0 +1,33 @@
+anvil-schema-run 1
+schema line=120 name=s file="schemas/FR.schema.anvl" doc=ok result=ok diagnostics=0 fields=10
+  field name="title" kind=ANVIL_TYPE_STRING type="types.Title" required=1 nullable=0 integer=0 size=300 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="project" kind=ANVIL_TYPE_STRING type="types.Slug" required=1 nullable=0 integer=0 size=63 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="code" kind=ANVIL_TYPE_STRING type="types.IdCode" required=0 nullable=0 integer=0 size=63 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="summary" kind=ANVIL_TYPE_STRING type="types.Summary" required=0 nullable=0 integer=0 size=4000 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="tags" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_STRING type="types.Tag" required=0 nullable=0 integer=0 size=64 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="priority" kind=ANVIL_TYPE_ENUM type="types.Priority" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=4 nested=0 items=0 extras=0
+    label index=0 text="critical"
+    label index=1 text="high"
+    label index=2 text="normal"
+    label index=3 text="low"
+  field name="filed_by" kind=ANVIL_TYPE_STRING type="types.Handle" required=0 nullable=0 integer=0 size=63 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="requested_by" kind=ANVIL_TYPE_STRING type="types.Handle" required=0 nullable=0 integer=0 size=63 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="assignee" kind=ANVIL_TYPE_STRING type="types.Handle" required=0 nullable=0 integer=0 size=63 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="sections" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=5 items=0 extras=0
+    nested name="motivation" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="design" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="test_cases" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="non_goals" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="notes" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=121 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="zz" message="field is not declared in the schema"
+validate_value line=122 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=123 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="priority" message="field value is not one of the declared values"
+validate_value line=124 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=125 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=126 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="unknown" message="field is not declared in the schema"
+steps 13
+status ok

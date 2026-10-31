@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; format := iso8601_date; size := 8; values := ["2026-01-01"]; };
+schema s load "s.anvl"
+validate_value s "{ f := \"2026-01-01\"; }"
+validate_value s "{ f := \"2026-01-02\"; }"
+validate_value s "{ f := \"x\"; }"

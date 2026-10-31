@@ -1,0 +1,11 @@
+anvil-schema-run 1
+registry line=9 name=r how=load file="t.anvl" doc=ok result=ok diagnostics=4
+  diag index=0 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="Lo" source="t.anvl" message="type 'Lo': 'min' is not a valid number; treated as not declared"
+  diag index=1 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="Hi" source="t.anvl" message="type 'Hi': 'max' is not a valid number; treated as not declared"
+  diag index=2 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="Both" source="t.anvl" message="type 'Both': 'min' is not a valid number; treated as not declared"
+  diag index=3 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="Both" source="t.anvl" message="type 'Both': 'max' is not a valid number; treated as not declared"
+type line=10 how=find registry=r name="Lo" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=11 how=find registry=r name="Hi" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=12 how=find registry=r name="Both" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+steps 5
+status ok

@@ -1,0 +1,67 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f0 := { type := Numeric; min := 0; };
+|f1 := { type := Numeric; min := 1; };
+|f2 := { type := Numeric; min := 2; };
+|f3 := { type := Numeric; min := 3; };
+|f4 := { type := Numeric; min := 4; };
+|f5 := { type := Numeric; min := 5; };
+|f6 := { type := Numeric; min := 6; };
+|f7 := { type := Numeric; min := 7; };
+|f8 := { type := Numeric; min := 8; };
+|f9 := { type := Numeric; min := 9; };
+|f10 := { type := Numeric; min := 10; };
+|f11 := { type := Numeric; min := 11; };
+|f12 := { type := Numeric; min := 12; };
+|f13 := { type := Numeric; min := 13; };
+|f14 := { type := Numeric; min := 14; };
+|f15 := { type := Numeric; min := 15; };
+|f16 := { type := Numeric; min := 16; };
+|f17 := { type := Numeric; min := 17; };
+|f18 := { type := Numeric; min := 18; };
+|f19 := { type := Numeric; min := 19; };
+|f20 := { type := Numeric; min := 20; };
+|f21 := { type := Numeric; min := 21; };
+|f22 := { type := Numeric; min := 22; };
+|f23 := { type := Numeric; min := 23; };
+|f24 := { type := Numeric; min := 24; };
+|f25 := { type := Numeric; min := 25; };
+|f26 := { type := Numeric; min := 26; };
+|f27 := { type := Numeric; min := 27; };
+|f28 := { type := Numeric; min := 28; };
+|f29 := { type := Numeric; min := 29; };
+|f30 := { type := Numeric; min := 30; };
+|f31 := { type := Numeric; min := 31; };
+|f32 := { type := Numeric; min := 32; };
+|f33 := { type := Numeric; min := 33; };
+|f34 := { type := Numeric; min := 34; };
+|f35 := { type := Numeric; min := 35; };
+|f36 := { type := Numeric; min := 36; };
+|f37 := { type := Numeric; min := 37; };
+|f38 := { type := Numeric; min := 38; };
+|f39 := { type := Numeric; min := 39; };
+|f40 := { type := Numeric; min := 40; };
+|f41 := { type := Numeric; min := 41; };
+|f42 := { type := Numeric; min := 42; };
+|f43 := { type := Numeric; min := 43; };
+|f44 := { type := Numeric; min := 44; };
+|f45 := { type := Numeric; min := 45; };
+|f46 := { type := Numeric; min := 46; };
+|f47 := { type := Numeric; min := 47; };
+|f48 := { type := Numeric; min := 48; };
+|f49 := { type := Numeric; min := 49; };
+|f50 := { type := Numeric; min := 50; };
+|f51 := { type := Numeric; min := 51; };
+|f52 := { type := Numeric; min := 52; };
+|f53 := { type := Numeric; min := 53; };
+|f54 := { type := Numeric; min := 54; };
+|f55 := { type := Numeric; min := 55; };
+|f56 := { type := Numeric; min := 56; };
+|f57 := { type := Numeric; min := 57; };
+|f58 := { type := Numeric; min := 58; };
+|f59 := { type := Numeric; min := 59; };
+schema s load "s.anvl"
+field s "f0"
+field s "f59"

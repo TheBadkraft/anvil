@@ -1,0 +1,35 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_datetime" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=pass count=0
+validate_value line=8 schema=s doc=ANVIL_ERR_SYNTAX opts=default result=fail count=0
+validate_value line=9 schema=s doc=ok opts=default result=pass count=0
+validate_value line=10 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=11 schema=s doc=ANVIL_ERR_SYNTAX opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=12 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=13 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=14 schema=s doc=ok opts=default result=pass count=0
+validate_value line=15 schema=s doc=ANVIL_ERR_SYNTAX opts=default result=fail count=0
+validate_value line=16 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=17 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=18 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=19 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=20 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=21 schema=s doc=ok opts=default result=pass count=0
+validate_value line=22 schema=s doc=ok opts=default result=pass count=0
+validate_value line=23 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+validate_value line=24 schema=s doc=ok opts=default result=pass count=0
+validate_value line=25 schema=s doc=ANVIL_ERR_SYNTAX opts=default result=fail count=0
+validate_value line=26 schema=s doc=ANVIL_ERR_SYNTAX opts=default result=fail count=0
+steps 22
+status ok

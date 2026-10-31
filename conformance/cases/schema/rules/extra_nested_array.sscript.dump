@@ -1,0 +1,15 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="sibling" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=2
+    extra index=0 name="pooled"
+      value type=ARRAY count=2
+        value type=ARRAY count=2
+          value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC text="2" kind=integer overflow=0 i64=2
+        value type=ARRAY count=1
+          value type=NUMERIC text="3" kind=integer overflow=0 i64=3
+    extra index=1 name="after"
+      value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+steps 2
+status ok

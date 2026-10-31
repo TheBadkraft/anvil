@@ -1,0 +1,11 @@
+anvil-schema-run 1
+schema line=8 name=s file="v.anvl" doc=ok result=ok diagnostics=2 fields=2
+  diag index=0 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="vehicle_id" message="field 'vehicle_id': type 'int32' is neither a native type nor a known types.X"
+  diag index=1 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="vin" message="field 'vin': type 'str' is neither a native type nor a known types.X"
+  field name="vehicle_id" kind=ANVIL_TYPE_UNKNOWN type="int32" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="vin" kind=ANVIL_TYPE_UNKNOWN type="str" required=0 nullable=0 integer=0 size=17 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=9 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="vehicle_id" message="the rule's declared type is unresolved; the value cannot be validated"
+  violation index=1 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="vin" message="the rule's declared type is unresolved; the value cannot be validated"
+steps 3
+status ok

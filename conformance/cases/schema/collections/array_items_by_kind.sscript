@@ -1,0 +1,23 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|numeric := { type := Array; items := { type := Numeric; }; };
+|string := { type := Array; items := { type := String; }; };
+|bool := { type := Array; items := { type := Bool; }; };
+|object := { type := Array; items := { type := Object; }; };
+|tuple := { type := Array; items := { type := Tuple; }; };
+|array := { type := Array; items := { type := Array; }; };
+|enum := { type := Array; items := { type := enum; values := [word, s, a]; }; };
+|blob := { type := Array; items := { type := Blob; }; };
+|untyped := { type := Array; items := { pooled := true; }; };
+schema s load "s.anvl"
+validate_value s "{ numeric := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ string := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ bool := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ object := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ tuple := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ array := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ enum := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ blob := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"
+validate_value s "{ untyped := [ 1, \"s\", word, true, null, `b`, [1], (1, 2), { a := 1; } ]; }"

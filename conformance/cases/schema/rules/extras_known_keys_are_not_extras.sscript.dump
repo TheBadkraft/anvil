@@ -1,0 +1,10 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=1 integer=0 size=1 min=i64:1 max=i64:2 min_items=1 max_items=2 format="uuid" tag="t" values=1 nested=1 items=1 extras=1
+    label index=0 text="a"
+    extra index=0 name="mine"
+      value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+    nested name="a" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    items name="" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+steps 2
+status ok

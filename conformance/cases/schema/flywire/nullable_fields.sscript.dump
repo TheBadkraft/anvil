@@ -1,0 +1,42 @@
+anvil-schema-run 1
+schema line=61 name=s file="assets.meta.anvl" doc=ok result=ok diagnostics=0 fields=12
+  field name="asset_id" kind=ANVIL_TYPE_NUMERIC type="types.Int32" required=0 nullable=0 integer=1 size=none min=i64:-2147483648 max=i64:2147483647 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="indexBy"
+      value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+  field name="asset_type" kind=ANVIL_TYPE_NUMERIC type="types.Int32" required=1 nullable=0 integer=1 size=none min=i64:-2147483648 max=i64:2147483647 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="vin_serial" kind=ANVIL_TYPE_STRING type="types.Str" required=1 nullable=0 integer=0 size=17 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="ascii"
+      value type=BOOL text="true"
+  field name="make" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=64 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="model" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=64 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="year" kind=ANVIL_TYPE_NUMERIC type="types.Int32" required=1 nullable=0 integer=1 size=none min=i64:-2147483648 max=i64:2147483647 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="license_plate" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=1 integer=0 size=16 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="state" kind=ANVIL_TYPE_STRING type="types.Str" required=0 nullable=1 integer=0 size=2 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="ascii"
+      value type=BOOL text="true"
+  field name="fleet_id" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=32 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="status" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=32 min=none max=none min_items=none max_items=none format=none tag=none values=3 nested=0 items=0 extras=1
+    label index=0 text="active"
+    label index=1 text="maintenance"
+    label index=2 text="out_of_service"
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="created_at" kind=ANVIL_TYPE_STRING type="types.Timestamptz" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_datetime" tag=none values=0 nested=0 items=0 extras=0
+  field name="updated_at" kind=ANVIL_TYPE_STRING type="types.Timestamptz" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_datetime" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=62 schema=s doc=ok opts=default result=pass count=0
+validate_value line=63 schema=s doc=ok opts=default result=pass count=0
+validate_value line=64 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="asset_id" message="field is not nullable"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="created_at" message="field is not nullable"
+validate_value line=65 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="year" message="field is not nullable"
+steps 7
+status ok

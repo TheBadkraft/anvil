@@ -1,0 +1,16 @@
+anvil-schema-run 1
+schema line=14 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=4
+  field name="id" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=1 size=none min=i64:1 max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="title" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=0 integer=0 size=8 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="tags" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=2 format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=3 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="meta" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="k" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate line=15 schema=s file="d.anvl" doc=ok result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="id" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="title" message="required field is missing"
+violations line=16 schema=s count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="id" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="title" message="required field is missing"
+steps 6
+status ok

@@ -1,0 +1,12 @@
+anvil-schema-run 1
+violations line=2 schema=NULL count=0
+validate line=3 schema=NULL file="gone.anvl" doc=ANVIL_ERR_IO result=fail count=0
+validate_value line=4 schema=NULL doc=ok opts=default result=fail count=0
+validate_value line=5 schema=NULL doc=none opts=default result=fail count=0
+field line=6 schema=NULL path="a" depth=1 result=none
+field line=7 schema=NULL path="a.b" depth=2 result=none
+type line=8 how=find registry=NULL name="A" result=none
+type line=9 how=resolve registry=NULL name="Numeric" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=10 how=resolve registry=NULL name="A" result=none
+steps 9
+status ok

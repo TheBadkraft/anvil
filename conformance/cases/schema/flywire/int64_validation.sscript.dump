@@ -1,0 +1,64 @@
+anvil-schema-run 1
+schema line=52 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=5
+  field name="big" kind=ANVIL_TYPE_NUMERIC type="types.Int64" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="big_req" kind=ANVIL_TYPE_NUMERIC type="types.Int64" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="f64" kind=ANVIL_TYPE_NUMERIC type="types.Float64" required=0 nullable=0 integer=0 size=none min=f64:0xffefffffffffffff max=f64:0x7fefffffffffffff min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="ts" kind=ANVIL_TYPE_NUMERIC type="types.Timestamp" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="flag" kind=ANVIL_TYPE_BOOL type="types.Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=53 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=54 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=55 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=56 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=57 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=58 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=59 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=60 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=61 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=62 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=63 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=64 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="big" message="field value does not match the declared type"
+validate_value line=65 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="big" message="field value does not match the declared type"
+validate_value line=66 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="big" message="field value does not match the declared type"
+validate_value line=67 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="big" message="field value does not match the declared type"
+validate_value line=68 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="big" message="field is not nullable"
+validate_value line=69 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=70 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=71 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=72 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=73 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=74 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="f64" message="field value is outside the declared min/max range"
+validate_value line=75 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="f64" message="field value is outside the declared min/max range"
+validate_value line=76 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="f64" message="field value is outside the declared min/max range"
+validate_value line=77 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=78 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="f64" message="field value does not match the declared type"
+validate_value line=79 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="f64" message="field value does not match the declared type"
+validate_value line=80 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="f64" message="field value does not match the declared type"
+validate_value line=81 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="f64" message="field value does not match the declared type"
+validate_value line=82 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="f64" message="field value does not match the declared type"
+validate_value line=83 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="flag" message="field value does not match the declared type"
+validate_value line=84 schema=s doc=ok opts=skip_required result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="ts" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="flag" message="field value does not match the declared type"
+validate_value line=85 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="flag" message="field value does not match the declared type"
+validate_value line=86 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="ts" message="field value does not match the declared type"
+validate_value line=87 schema=s doc=ok opts=skip_required result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="ts" message="field is not nullable"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="flag" message="field is not nullable"
+steps 38
+status ok

@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+schema s load "s.anvl"
+validate_value s "{ a := 1; }"
+validate_value s "{ a := 1; }" allow_unknown

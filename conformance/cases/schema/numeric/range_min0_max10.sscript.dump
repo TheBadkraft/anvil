@@ -1,0 +1,90 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="n" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=i64:0 max=i64:10 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=pass count=0
+validate_value line=9 schema=s doc=ok opts=default result=pass count=0
+validate_value line=10 schema=s doc=ok opts=default result=pass count=0
+validate_value line=11 schema=s doc=ok opts=default result=pass count=0
+validate_value line=12 schema=s doc=ok opts=default result=pass count=0
+validate_value line=13 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=14 schema=s doc=ok opts=default result=pass count=0
+validate_value line=15 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=16 schema=s doc=ok opts=default result=pass count=0
+validate_value line=17 schema=s doc=ok opts=default result=pass count=0
+validate_value line=18 schema=s doc=ok opts=default result=pass count=0
+validate_value line=19 schema=s doc=ok opts=default result=pass count=0
+validate_value line=20 schema=s doc=ok opts=default result=pass count=0
+validate_value line=21 schema=s doc=ok opts=default result=pass count=0
+validate_value line=22 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=23 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=24 schema=s doc=ok opts=default result=pass count=0
+validate_value line=25 schema=s doc=ok opts=default result=pass count=0
+validate_value line=26 schema=s doc=ok opts=default result=pass count=0
+validate_value line=27 schema=s doc=ok opts=default result=pass count=0
+validate_value line=28 schema=s doc=ok opts=default result=pass count=0
+validate_value line=29 schema=s doc=ok opts=default result=pass count=0
+validate_value line=30 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=31 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=32 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=33 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=34 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=35 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=36 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=37 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=38 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=39 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=40 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=41 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=42 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=43 schema=s doc=ok opts=default result=pass count=0
+validate_value line=44 schema=s doc=ok opts=default result=pass count=0
+validate_value line=45 schema=s doc=ok opts=default result=pass count=0
+validate_value line=46 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=47 schema=s doc=ok opts=default result=pass count=0
+validate_value line=48 schema=s doc=ok opts=default result=pass count=0
+validate_value line=49 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=50 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=51 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=52 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=53 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=54 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=55 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=56 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=57 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=58 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=59 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=60 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=61 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+steps 56
+status ok

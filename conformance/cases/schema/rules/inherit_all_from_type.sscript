@@ -1,0 +1,17 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|T := { type := String; size := 5; format := uuid; nullable := true; };
+|N := { type := Numeric; min := 1; max := 9; integer := true; };
+|E := { type := enum; values := [a, b, c]; };
+|B := { type := Blob; tag := png; size := 3; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|t := { type := types.T; };
+|n := { type := types.N; };
+|e := { type := types.E; };
+|b := { type := types.B; };
+schema s load "s.anvl"

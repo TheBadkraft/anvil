@@ -1,0 +1,23 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := types.Nope; required := true; nullable := true; };
+|b := { type := Nope2; };
+schema s load "s.anvl"
+validate_value s "{ zz := 1; }"
+validate_value s "{ zz := 1; }" skip_required
+validate_value s "{ zz := 1; }" allow_unknown
+validate_value s "{ zz := 1; }" skip_required allow_unknown
+validate_value s "{ a := 1; }"
+validate_value s "{ a := 1; }" skip_required
+validate_value s "{ a := 1; }" allow_unknown
+validate_value s "{ a := 1; }" skip_required allow_unknown
+validate_value s "{ a := null; b := null; }"
+validate_value s "{ a := null; b := null; }" skip_required
+validate_value s "{ a := null; b := null; }" allow_unknown
+validate_value s "{ a := null; b := null; }" skip_required allow_unknown
+validate_value s "{ z := 1; }"
+validate_value s "{ z := 1; }" skip_required
+validate_value s "{ z := 1; }" allow_unknown
+validate_value s "{ z := 1; }" skip_required allow_unknown

@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|r := { type := Array; items := { type := Object; fields := { k := { type := String; required := true; }; l := { type := Array; items := { type := Object; fields := { z := { type := Numeric; }; }; }; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ r := [ { k := \"a\"; l := [ { z := 1; }, { z := \"b\"; }, { y := 1; } ]; }, { l := [ 5 ]; } ]; }"

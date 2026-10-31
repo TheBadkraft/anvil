@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := 1; nullable := 1; integer := 1; size := x; min := y; max := z; values := 1; format := q; tag := 1; min_items := a; max_items := b; };
+|b := { type := String; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; b := \"x\"; }"

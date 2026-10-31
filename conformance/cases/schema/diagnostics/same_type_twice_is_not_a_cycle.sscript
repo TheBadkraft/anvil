@@ -1,0 +1,14 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|P := { type := Object; fields := { x := { type := Numeric; }; }; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|a := { type := types.P; };
+|b := { type := types.P; };
+|c := { type := Object; fields := { d := { type := types.P; }; e := { type := types.P; }; }; };
+schema s load "s.anvl"
+validate_value s "{ a := { x := 1; }; b := { y := 1; }; c := { d := { x := 2; }; e := { x := \"s\"; }; }; }"

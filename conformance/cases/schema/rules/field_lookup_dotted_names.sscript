@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; fields := { a := { type := Bool; }; }; };
+schema s load "s.anvl"
+field s "o.a"
+field s "o" "a"

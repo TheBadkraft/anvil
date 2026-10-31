@@ -1,0 +1,23 @@
+anvil-schema-script 1
+# a non-object value is one TYPE_MISMATCH with an empty path
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := true; };
+|b := { type := String; };
+|c := { type := Bool; required := true; nullable := true; };
+schema s load "s.anvl"
+validate_value s "null"
+validate_value s "true"
+validate_value s "false"
+validate_value s "1"
+validate_value s "-5"
+validate_value s "1.5"
+validate_value s "1e3"
+validate_value s "\"s\""
+validate_value s "\"\""
+validate_value s "word"
+validate_value s "`blob`"
+validate_value s "@png`xyz`"
+validate_value s "[1, 2]"
+validate_value s "(1, 2)"

@@ -1,0 +1,43 @@
+anvil-schema-run 1
+schema line=15 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=10
+  field name="numeric" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="string" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="bool" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="object" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="tuple" kind=ANVIL_TYPE_TUPLE type="Tuple" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="array" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="enum" kind=ANVIL_TYPE_ENUM type="enum" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=2 nested=0 items=0 extras=0
+    label index=0 text="a"
+    label index=1 text="b"
+  field name="blob" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="untyped" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="empty_rule" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=16 schema=s path="numeric" depth=1 result=found
+  field name="numeric" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=17 schema=s path="string" depth=1 result=found
+  field name="string" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=18 schema=s path="bool" depth=1 result=found
+  field name="bool" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=19 schema=s path="object" depth=1 result=found
+  field name="object" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=20 schema=s path="tuple" depth=1 result=found
+  field name="tuple" kind=ANVIL_TYPE_TUPLE type="Tuple" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=21 schema=s path="array" depth=1 result=found
+  field name="array" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=22 schema=s path="enum" depth=1 result=found
+  field name="enum" kind=ANVIL_TYPE_ENUM type="enum" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=2 nested=0 items=0 extras=0
+    label index=0 text="a"
+    label index=1 text="b"
+field line=23 schema=s path="blob" depth=1 result=found
+  field name="blob" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=24 schema=s path="untyped" depth=1 result=found
+  field name="untyped" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+field line=25 schema=s path="empty_rule" depth=1 result=found
+  field name="empty_rule" kind=ANVIL_TYPE_UNKNOWN type=none required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=26 schema=s path="nope" depth=1 result=none
+steps 13
+status ok

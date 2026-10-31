@@ -1,0 +1,21 @@
+anvil-schema-run 1
+schema line=50 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="d" kind=ANVIL_TYPE_STRING type="types.Date" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=0 nested=0 items=0 extras=0
+  field name="u" kind=ANVIL_TYPE_STRING type="types.Uuid" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="uuid" tag=none values=0 nested=0 items=0 extras=0
+  field name="tx" kind=ANVIL_TYPE_STRING type="types.Text" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=51 schema=s doc=ok opts=default result=pass count=0
+validate_value line=52 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="d" message="value does not match the declared format"
+validate_value line=53 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="d" message="value does not match the declared format"
+validate_value line=54 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="d" message="value does not match the declared format"
+validate_value line=55 schema=s doc=ok opts=default result=pass count=0
+validate_value line=56 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="d" message="value does not match the declared format"
+validate_value line=57 schema=s doc=ok opts=default result=pass count=0
+validate_value line=58 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="u" message="value does not match the declared format"
+validate_value line=59 schema=s doc=ok opts=default result=pass count=0
+steps 12
+status ok

@@ -1,0 +1,25 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; format := uuid; };
+schema s load "s.anvl"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-446655440000\"; }"
+validate_value s "{ f := \"550E8400-E29B-41D4-A716-446655440000\"; }"
+validate_value s "{ f := \"550e8400-E29B-41d4-a716-446655440000\"; }"
+validate_value s "{ f := \"00000000-0000-0000-0000-000000000000\"; }"
+validate_value s "{ f := \"ffffffff-ffff-ffff-ffff-ffffffffffff\"; }"
+validate_value s "{ f := \"550e8400e29b41d4a716446655440000\"; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-44665544000\"; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-4466554400000\"; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-44665544000g\"; }"
+validate_value s "{ f := \"{550e8400-e29b-41d4-a716-446655440000}\"; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-446655440000 \"; }"
+validate_value s "{ f := \" 550e8400-e29b-41d4-a716-446655440000\"; }"
+validate_value s "{ f := \"\"; }"
+validate_value s "{ f := \"urn:uuid:550e8400-e29b-41d4-a716-446655440000\"; }"
+validate_value s "{ f := \"550e840-0e29b-41d4-a716-446655440000\"; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716_446655440000\"; }"
+validate_value s "{ f := \"550e8400-e29b-11d4-a716-446655440000\"; }"
+validate_value s "{ f := \"550e8400-e29b-51d4-f716-446655440000\"; }"
+validate_value s "{ f := \"g50e8400-e29b-41d4-a716-446655440000\"; }"

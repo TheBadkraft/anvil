@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := String; nullable := true; size := 2; };
+schema s load "s.anvl"
+validate_value s "{ a := null; }"
+validate_value s "{ a := \"null\"; }"
+validate_value s "{ a := `null`; }"
+validate_value s "{ a := Null; }"
+validate_value s "{ a := NULL; }"
+validate_value s "{ a := nil; }"
+validate_value s "{ a := none; }"

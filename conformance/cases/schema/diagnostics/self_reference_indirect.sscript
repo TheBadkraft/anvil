@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|A := { type := Object; fields := { b := { type := types.B; }; }; };
+|B := { type := Object; fields := { a := { type := types.A; }; }; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|root := { type := types.A; };
+schema s load "s.anvl"
+validate_value s "{ root := { b := { a := { b := { x := 1; }; }; }; }; }"

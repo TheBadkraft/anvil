@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|other := { type := String; };
+|a := (1, 2);
+|b := { type := Bool; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; b := true; other := \"x\"; }"

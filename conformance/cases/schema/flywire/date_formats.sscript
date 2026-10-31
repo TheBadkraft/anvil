@@ -1,0 +1,59 @@
+anvil-schema-script 1
+file "schema-gen/postgres.types.anvl"
+|#!aml
+|@[types]
+|Int32 := {
+|    type := Numeric;
+|    min := -2147483648;
+|    max := 2147483647;
+|    integer := true;
+|};
+|Str := {
+|    type := String;
+|};
+|Date := {
+|    type := String;
+|    format := "iso8601_date";
+|};
+|Int64 := {
+|    type := Numeric;
+|};
+|Timestamptz := {
+|    type := String;
+|    format := "iso8601_datetime";
+|};
+|Timestamp := {
+|    type := Numeric;
+|};
+|Text := {
+|    type := String;
+|};
+|Bool := {
+|    type := Numeric;
+|};
+|Float64 := {
+|    type := Numeric;
+|    min := -1.7976931348623157e+308;
+|    max := 1.7976931348623157e+308;
+|};
+|Uuid := {
+|    type := String;
+|    format := "uuid";
+|};
+file "s.anvl"
+|#!aml
+|include "schema-gen/postgres.types.anvl";
+|@[schema, table=t]
+|d { type := types.Date; };
+|u { type := types.Uuid; };
+|tx { type := types.Text; };
+schema s load "s.anvl"
+validate_value s "{ d := \"2023-02-28\"; }"
+validate_value s "{ d := \"2023-02-29\"; }"
+validate_value s "{ d := \"x\"; }"
+validate_value s "{ d := \"2026-13-01\"; }"
+validate_value s "{ d := \"2024-02-29\"; }"
+validate_value s "{ d := \"\"; }"
+validate_value s "{ u := \"550e8400-e29b-41d4-a716-446655440000\"; tx := \"t\"; }"
+validate_value s "{ u := \"nope\"; tx := \"\"; }"
+validate_value s "{ u := \"550E8400-E29B-41D4-A716-446655440000\"; tx := \"\\xc3\\xa9\"; }"

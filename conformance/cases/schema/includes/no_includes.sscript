@@ -1,0 +1,6 @@
+anvil-schema-script 1
+file "main.anvl"
+|#!aml
+|x := 1;
+registry r includes "main.anvl"
+type find r "x"

@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; fields := { l := { type := Array; items := { type := Object; fields := { k := { type := Bool; }; }; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ o := { l := [ { k := true; zz := 1; } ]; yy := 2; }; xx := 3; }"
+validate_value s "{ o := { l := [ { k := true; zz := 1; } ]; yy := 2; }; xx := 3; }" allow_unknown

@@ -1,0 +1,26 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="o" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=2 items=0 extras=0
+    nested name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="b" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=pass count=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="o.a" message="required field is missing"
+validate_value line=9 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o.a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o.b" message="field value does not match the declared type"
+validate_value line=10 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="o.c" message="field is not declared in the schema"
+validate_value line=11 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="o.c" message="field is not declared in the schema"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="o.d" message="field is not declared in the schema"
+validate_value line=12 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o" message="field value does not match the declared type"
+validate_value line=13 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o" message="field value does not match the declared type"
+validate_value line=14 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o" message="field is not nullable"
+validate_value line=15 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="o.a" message="field is not nullable"
+steps 11
+status ok

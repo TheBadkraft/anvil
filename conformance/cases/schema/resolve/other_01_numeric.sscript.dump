@@ -1,0 +1,4 @@
+anvil-schema-run 1
+type line=2 how=resolve registry=NULL name="NUMERIC" result=none
+steps 1
+status ok

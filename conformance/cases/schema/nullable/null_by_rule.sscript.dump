@@ -1,0 +1,34 @@
+anvil-schema-run 1
+schema line=19 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=14
+  field name="numeric" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="string" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="bool" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="object" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="tuple" kind=ANVIL_TYPE_TUPLE type="Tuple" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="array" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="enum" kind=ANVIL_TYPE_ENUM type="enum" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=3 nested=0 items=0 extras=0
+    label index=0 text="word"
+    label index=1 text="s"
+    label index=2 text="a"
+  field name="blob" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="untyped" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="n_numeric" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=1 integer=0 size=none min=i64:1 max=i64:2 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="n_string" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=1 integer=0 size=0 min=none max=none min_items=none max_items=none format="uuid" tag=none values=0 nested=0 items=0 extras=0
+  field name="n_enum" kind=ANVIL_TYPE_ENUM type="enum" required=0 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=1 nested=0 items=0 extras=0
+    label index=0 text="a"
+  field name="n_obj" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="x" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="n_arr" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=1 integer=0 size=none min=none max=none min_items=3 max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=20 schema=s doc=ok opts=default result=fail count=8
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="numeric" message="field is not nullable"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="string" message="field is not nullable"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="bool" message="field is not nullable"
+  violation index=3 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="object" message="field is not nullable"
+  violation index=4 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="tuple" message="field is not nullable"
+  violation index=5 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="array" message="field is not nullable"
+  violation index=6 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="enum" message="field is not nullable"
+  violation index=7 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="blob" message="field is not nullable"
+steps 3
+status ok

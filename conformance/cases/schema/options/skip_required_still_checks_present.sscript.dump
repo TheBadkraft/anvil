@@ -1,0 +1,13 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=i64:5 max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=2 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=skip_required result=fail count=2
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="a" message="field value is outside the declared min/max range"
+  violation index=1 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="b" message="field value exceeds the declared size"
+validate_value line=9 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="b" message="field value exceeds the declared size"
+validate_value line=10 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="zz" message="field is not declared in the schema"
+steps 5
+status ok

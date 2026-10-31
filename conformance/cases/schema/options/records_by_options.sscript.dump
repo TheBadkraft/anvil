@@ -1,0 +1,118 @@
+anvil-schema-run 1
+schema line=9 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="c" kind=ANVIL_TYPE_BOOL type="Bool" required=1 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=10 schema=s doc=ok opts=default result=pass count=0
+validate_value line=11 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=12 schema=s doc=ok opts=allow_unknown result=pass count=0
+validate_value line=13 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=14 schema=s doc=ok opts=null result=pass count=0
+validate_value line=15 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=16 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+validate_value line=17 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=18 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+validate_value line=19 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=20 schema=s doc=ok opts=null result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+validate_value line=21 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=22 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=23 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=24 schema=s doc=ok opts=allow_unknown result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=25 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=26 schema=s doc=ok opts=null result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=27 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=28 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=29 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=30 schema=s doc=ok opts=allow_unknown result=pass count=0
+validate_value line=31 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=32 schema=s doc=ok opts=null result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=33 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=34 schema=s doc=ok opts=default result=fail count=3
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="y" message="field is not declared in the schema"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="x" message="field is not declared in the schema"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=35 schema=s doc=ok opts=skip_required result=fail count=3
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="y" message="field is not declared in the schema"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="x" message="field is not declared in the schema"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=36 schema=s doc=ok opts=allow_unknown result=pass count=0
+validate_value line=37 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=38 schema=s doc=ok opts=null result=fail count=3
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="y" message="field is not declared in the schema"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="x" message="field is not declared in the schema"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=39 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=40 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=41 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+validate_value line=42 schema=s doc=ok opts=allow_unknown result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=43 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+validate_value line=44 schema=s doc=ok opts=null result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+validate_value line=45 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+validate_value line=46 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=47 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=48 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=49 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=50 schema=s doc=ok opts=null result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=51 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field is not nullable"
+validate_value line=52 schema=s doc=ok opts=default result=fail count=4
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+  violation index=3 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="d" message="field is not declared in the schema"
+validate_value line=53 schema=s doc=ok opts=skip_required result=fail count=4
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+  violation index=3 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="d" message="field is not declared in the schema"
+validate_value line=54 schema=s doc=ok opts=allow_unknown result=fail count=3
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+validate_value line=55 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=3
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+validate_value line=56 schema=s doc=ok opts=null result=fail count=4
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+  violation index=3 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="d" message="field is not declared in the schema"
+validate_value line=57 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=3
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+validate_value line=58 schema=s doc=ok opts=default result=pass count=0
+validate_value line=59 schema=s doc=ok opts=skip_required result=pass count=0
+validate_value line=60 schema=s doc=ok opts=allow_unknown result=pass count=0
+validate_value line=61 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=62 schema=s doc=ok opts=null result=pass count=0
+validate_value line=63 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+steps 56
+status ok

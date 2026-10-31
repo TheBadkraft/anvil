@@ -1,0 +1,20 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|n := { type := Numeric; format := uuid; };
+|u := { format := uuid; };
+|e := { type := enum; values := [x]; format := uuid; };
+schema s load "s.anvl"
+validate_value s "{ n := 1; }"
+validate_value s "{ n := \"x\"; }"
+validate_value s "{ n := x; }"
+validate_value s "{ n := `x`; }"
+validate_value s "{ u := 1; }"
+validate_value s "{ u := \"x\"; }"
+validate_value s "{ u := x; }"
+validate_value s "{ u := `x`; }"
+validate_value s "{ e := 1; }"
+validate_value s "{ e := \"x\"; }"
+validate_value s "{ e := x; }"
+validate_value s "{ e := `x`; }"

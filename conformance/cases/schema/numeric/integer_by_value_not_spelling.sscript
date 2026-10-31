@@ -1,0 +1,20 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|n := { type := Numeric; integer := true; };
+schema s load "s.anvl"
+validate_value s "{ n := 2; }"
+validate_value s "{ n := 2.0; }"
+validate_value s "{ n := 2.50; }"
+validate_value s "{ n := 1e+3; }"
+validate_value s "{ n := 1e-1; }"
+validate_value s "{ n := 1e2; }"
+validate_value s "{ n := 12e-1; }"
+validate_value s "{ n := 0.0; }"
+validate_value s "{ n := -0.0; }"
+validate_value s "{ n := 1.0000000000000001; }"
+validate_value s "{ n := 9007199254740993.0; }"
+validate_value s "{ n := 1e400; }"
+validate_value s "{ n := -2.0; }"
+validate_value s "{ n := 5e-324; }"

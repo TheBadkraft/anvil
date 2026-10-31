@@ -1,0 +1,12 @@
+anvil-schema-script 1
+# bound 18446744073709551615
+file "t.anvl"
+|#!aml
+|@[types]
+|Lo := { type := Numeric; min := 18446744073709551615; };
+|Hi := { type := Numeric; max := 18446744073709551615; };
+|Both := { type := Numeric; min := 18446744073709551615; max := 18446744073709551615; };
+registry r load "t.anvl"
+type find r "Lo"
+type find r "Hi"
+type find r "Both"

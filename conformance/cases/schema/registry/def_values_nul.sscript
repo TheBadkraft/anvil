@@ -1,0 +1,5 @@
+anvil-schema-script 1
+file "t.anvl" "#!aml\n@[types]\nT := { type := enum; values := [\"a\x00b\", a]; };\nAfter := { type := Bool; };\n"
+registry r load "t.anvl"
+type find r "T"
+type find r "After"

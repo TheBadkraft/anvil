@@ -1,0 +1,20 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|numeric := { type := Numeric; };
+|string := { type := String; };
+|bool := { type := Bool; };
+|object := { type := Object; };
+|tuple := { type := Tuple; };
+|array := { type := Array; };
+|enum := { type := enum; values := [word, s, a]; };
+|blob := { type := Blob; };
+|untyped := { pooled := true; };
+|n_numeric := { type := Numeric; nullable := true; min := 1; max := 2; };
+|n_string := { type := String; nullable := true; size := 0; format := uuid; };
+|n_enum := { type := enum; nullable := true; values := [a]; };
+|n_obj := { type := Object; nullable := true; fields := { x := { type := Numeric; required := true; }; }; };
+|n_arr := { type := Array; nullable := true; min_items := 3; };
+schema s load "s.anvl"
+validate_value s "{ numeric := null; string := null; bool := null; object := null; tuple := null; array := null; enum := null; blob := null; untyped := null; n_numeric := null; n_string := null; n_enum := null; n_obj := null; n_arr := null; }"

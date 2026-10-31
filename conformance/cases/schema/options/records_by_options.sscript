@@ -1,0 +1,63 @@
+anvil-schema-script 1
+# every record under every option set
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := true; };
+|b := { type := String; };
+|c := { type := Bool; required := true; nullable := true; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; c := true; }"
+validate_value s "{ a := 1; c := true; }" skip_required
+validate_value s "{ a := 1; c := true; }" allow_unknown
+validate_value s "{ a := 1; c := true; }" skip_required allow_unknown
+validate_value s "{ a := 1; c := true; }" no_opts
+validate_value s "{ a := 1; c := true; }" allow_unknown skip_required
+validate_value s "{ c := true; }"
+validate_value s "{ c := true; }" skip_required
+validate_value s "{ c := true; }" allow_unknown
+validate_value s "{ c := true; }" skip_required allow_unknown
+validate_value s "{ c := true; }" no_opts
+validate_value s "{ c := true; }" allow_unknown skip_required
+validate_value s "{ b := \"x\"; }"
+validate_value s "{ b := \"x\"; }" skip_required
+validate_value s "{ b := \"x\"; }" allow_unknown
+validate_value s "{ b := \"x\"; }" skip_required allow_unknown
+validate_value s "{ b := \"x\"; }" no_opts
+validate_value s "{ b := \"x\"; }" allow_unknown skip_required
+validate_value s "{ a := 1; c := null; z := 1; }"
+validate_value s "{ a := 1; c := null; z := 1; }" skip_required
+validate_value s "{ a := 1; c := null; z := 1; }" allow_unknown
+validate_value s "{ a := 1; c := null; z := 1; }" skip_required allow_unknown
+validate_value s "{ a := 1; c := null; z := 1; }" no_opts
+validate_value s "{ a := 1; c := null; z := 1; }" allow_unknown skip_required
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }"
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }" skip_required
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }" allow_unknown
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }" skip_required allow_unknown
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }" no_opts
+validate_value s "{ y := 1; a := 1; c := true; x := 2; z := 3; }" allow_unknown skip_required
+validate_value s "{ a := \"s\"; }"
+validate_value s "{ a := \"s\"; }" skip_required
+validate_value s "{ a := \"s\"; }" allow_unknown
+validate_value s "{ a := \"s\"; }" skip_required allow_unknown
+validate_value s "{ a := \"s\"; }" no_opts
+validate_value s "{ a := \"s\"; }" allow_unknown skip_required
+validate_value s "{ a := null; c := null; }"
+validate_value s "{ a := null; c := null; }" skip_required
+validate_value s "{ a := null; c := null; }" allow_unknown
+validate_value s "{ a := null; c := null; }" skip_required allow_unknown
+validate_value s "{ a := null; c := null; }" no_opts
+validate_value s "{ a := null; c := null; }" allow_unknown skip_required
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }"
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }" skip_required
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }" allow_unknown
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }" skip_required allow_unknown
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }" no_opts
+validate_value s "{ a := true; b := 1; c := 1; d := 2; }" allow_unknown skip_required
+validate_value s "{ c := true; b := \"x\"; a := 1; }"
+validate_value s "{ c := true; b := \"x\"; a := 1; }" skip_required
+validate_value s "{ c := true; b := \"x\"; a := 1; }" allow_unknown
+validate_value s "{ c := true; b := \"x\"; a := 1; }" skip_required allow_unknown
+validate_value s "{ c := true; b := \"x\"; a := 1; }" no_opts
+validate_value s "{ c := true; b := \"x\"; a := 1; }" allow_unknown skip_required

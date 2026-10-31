@@ -1,0 +1,24 @@
+anvil-schema-run 1
+schema line=10 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=5
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="c" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="d" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="e" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=11 schema=s doc=ok opts=default result=fail count=7
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="b" message="required field is missing"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="c" message="field value does not match the declared type"
+  violation index=3 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="d" message="required field is missing"
+  violation index=4 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="e" message="field value does not match the declared type"
+  violation index=5 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+  violation index=6 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="y" message="field is not declared in the schema"
+validate_value line=12 schema=s doc=ok opts=default result=fail count=6
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="b" message="required field is missing"
+  violation index=2 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="c" message="required field is missing"
+  violation index=3 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="d" message="required field is missing"
+  violation index=4 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="e" message="required field is missing"
+  violation index=5 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+steps 4
+status ok

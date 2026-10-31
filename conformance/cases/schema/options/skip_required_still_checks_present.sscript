@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := true; min := 5; };
+|b := { type := String; size := 2; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; b := \"xyz\"; }" skip_required
+validate_value s "{ b := \"xyz\"; }" skip_required
+validate_value s "{ zz := 1; }" skip_required

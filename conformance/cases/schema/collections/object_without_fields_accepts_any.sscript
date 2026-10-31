@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; };
+schema s load "s.anvl"
+validate_value s "{ o := { anything := [1, 2]; goes := { deep := 1; }; }; }"

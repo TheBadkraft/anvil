@@ -1,0 +1,9 @@
+anvil-schema-script 1
+# int32 and str are not native type names
+file "v.anvl"
+|#!aml
+|@[schema]
+|vehicle_id := { type := int32; };
+|vin := { type := str; size := 17; };
+schema s load "v.anvl"
+validate_value s "{ vehicle_id := 1; vin := \"x\"; }"

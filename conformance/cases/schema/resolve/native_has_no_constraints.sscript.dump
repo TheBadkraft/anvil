@@ -1,0 +1,6 @@
+anvil-schema-run 1
+type line=2 how=resolve registry=NULL name="String" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=3 how=resolve registry=NULL name="Numeric" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=4 how=resolve registry=NULL name="enum" result=found kind=ANVIL_TYPE_ENUM size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+steps 3
+status ok

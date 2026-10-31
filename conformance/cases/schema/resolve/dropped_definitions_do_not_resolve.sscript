@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Bad := { type := Nope; };
+|NoType := { size := 1; };
+registry r load "t.anvl"
+type resolve r "Bad"
+type resolve r "NoType"

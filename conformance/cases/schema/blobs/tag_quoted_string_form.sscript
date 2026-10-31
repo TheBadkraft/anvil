@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|b := { type := Blob; tag := "png"; };
+|c := { type := Blob; tag := "p n"; };
+schema s load "s.anvl"
+validate_value s "{ b := @png`x`; c := @png`x`; }"
+validate_value s "{ b := `x`; }"

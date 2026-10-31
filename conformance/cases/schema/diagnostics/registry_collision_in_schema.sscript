@@ -1,0 +1,18 @@
+anvil-schema-script 1
+file "t1.anvl"
+|#!aml
+|@[types]
+|T := { type := String; };
+file "t2.anvl"
+|#!aml
+|@[types]
+|T := { type := Numeric; };
+file "s.anvl"
+|#!aml
+|include "t1.anvl";
+|include "t2.anvl";
+|@[schema]
+|a := { type := types.T; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; }"
+validate_value s "{ a := \"x\"; }"

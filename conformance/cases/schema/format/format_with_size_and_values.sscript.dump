@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=8 min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=1 nested=0 items=0 extras=0
+    label index=0 text="2026-01-01"
+validate_value line=7 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="f" message="field value exceeds the declared size"
+validate_value line=8 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="f" message="field value exceeds the declared size"
+  violation index=1 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="f" message="field value is not one of the declared values"
+validate_value line=9 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="f" message="value does not match the declared format"
+  violation index=1 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="f" message="field value is not one of the declared values"
+steps 5
+status ok

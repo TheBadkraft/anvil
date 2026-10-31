@@ -1,0 +1,16 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|D := { type := String; format := iso8601_date; };
+|U := { type := String; format := uuid; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|d := { type := types.D; };
+|u := { type := types.U; format := iso8601_date; };
+|x := { type := types.D; format := nonsense; };
+schema s load "s.anvl"
+validate_value s "{ d := \"2026-01-01\"; u := \"2026-01-01\"; x := \"garbage\"; }"
+validate_value s "{ d := \"garbage\"; u := \"550e8400-e29b-41d4-a716-446655440000\"; x := \"2026-02-30\"; }"

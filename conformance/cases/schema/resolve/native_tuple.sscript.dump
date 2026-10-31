@@ -1,0 +1,5 @@
+anvil-schema-run 1
+type line=2 how=resolve registry=NULL name="Tuple" result=found kind=ANVIL_TYPE_TUPLE size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=3 how=find registry=NULL name="Tuple" result=none
+steps 2
+status ok

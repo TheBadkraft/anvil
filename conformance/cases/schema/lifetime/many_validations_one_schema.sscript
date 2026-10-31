@@ -1,0 +1,19 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; min := 3; };
+schema s load "s.anvl"
+validate_value s "{ a := 0; }"
+validate_value s "{ a := 1; }"
+validate_value s "{ a := 2; }"
+validate_value s "{ a := 3; }"
+validate_value s "{ a := 4; }"
+validate_value s "{ a := 5; }"
+validate_value s "{ a := 6; }"
+validate_value s "{ a := 7; }"
+validate_value s "{ a := 8; }"
+validate_value s "{ a := 9; }"
+validate_value s "{ a := 10; }"
+validate_value s "{ a := 11; }"
+violations s

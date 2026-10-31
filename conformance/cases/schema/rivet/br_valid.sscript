@@ -1,0 +1,123 @@
+anvil-schema-script 1
+file "types/rivet.types.anvl"
+|#!aml
+|// types/rivet.types.anvl: shared types for the kind schemas in schemas/.
+|@[types]
+|
+|Title := { type := String; size := 300; };
+|Summary := { type := String; size := 4000; };
+|Tag := { type := String; size := 64; };
+|Slug := { type := String; size := 63; };
+|Handle := { type := String; size := 63; };
+|IdCode := { type := String; size := 63; };
+|TicketId := { type := String; size := 120; };
+|Timestamp := { type := String; format := iso8601_datetime; };
+|Priority := { type := enum; values := [critical, high, normal, low]; };
+|Severity := { type := enum; values := [critical, major, minor, trivial]; };
+file "schemas/BR.schema.anvl"
+|#!aml
+|include "../types/rivet.types.anvl";
+|@[schema]
+|
+|title := { type := types.Title; required := true; };
+|project := { type := types.Slug; required := true; };
+|code := { type := types.IdCode; };
+|summary := { type := types.Summary; };
+|tags := { type := Array; items := { type := types.Tag; }; };
+|priority := { type := types.Priority; };
+|severity := { type := types.Severity; };
+|filed_by := { type := types.Handle; };
+|requested_by := { type := types.Handle; };
+|assignee := { type := types.Handle; };
+|sections := {
+|   type := Object;
+|   fields := {
+|      reproduction := { type := String; };
+|      impact := { type := String; };
+|      workaround := { type := String; };
+|      root_cause := { type := String; };
+|      test_cases := { type := String; };
+|      notes := { type := String; };
+|   };
+|};
+file "schemas/FR.schema.anvl"
+|#!aml
+|include "../types/rivet.types.anvl";
+|@[schema]
+|
+|title := { type := types.Title; required := true; };
+|project := { type := types.Slug; required := true; };
+|code := { type := types.IdCode; };
+|summary := { type := types.Summary; };
+|tags := { type := Array; items := { type := types.Tag; }; };
+|priority := { type := types.Priority; };
+|filed_by := { type := types.Handle; };
+|requested_by := { type := types.Handle; };
+|assignee := { type := types.Handle; };
+|sections := {
+|   type := Object;
+|   fields := {
+|      motivation := { type := String; };
+|      design := { type := String; };
+|      test_cases := { type := String; };
+|      non_goals := { type := String; };
+|      notes := { type := String; };
+|   };
+|};
+file "schemas/SR.schema.anvl"
+|#!aml
+|include "../types/rivet.types.anvl";
+|@[schema]
+|
+|title := { type := types.Title; required := true; };
+|project := { type := types.Slug; required := true; };
+|code := { type := types.IdCode; };
+|summary := { type := types.Summary; };
+|tags := { type := Array; items := { type := types.Tag; }; };
+|priority := { type := types.Priority; };
+|filed_by := { type := types.Handle; };
+|requested_by := { type := types.Handle; };
+|assignee := { type := types.Handle; };
+|sections := {
+|   type := Object;
+|   fields := {
+|      motivation := { type := String; };
+|      design := { type := String; };
+|      test_cases := { type := String; };
+|      notes := { type := String; };
+|   };
+|};
+file "schemas/TASK.schema.anvl"
+|#!aml
+|include "../types/rivet.types.anvl";
+|@[schema]
+|
+|title := { type := types.Title; required := true; };
+|project := { type := types.Slug; required := true; };
+|code := { type := types.IdCode; };
+|summary := { type := types.Summary; };
+|tags := { type := Array; items := { type := types.Tag; }; };
+|priority := { type := types.Priority; };
+|filed_by := { type := types.Handle; };
+|requested_by := { type := types.Handle; };
+|assignee := { type := types.Handle; };
+|sections := {
+|   type := Object;
+|   fields := {
+|      description := { type := String; };
+|      reason := { type := String; };
+|      notes := { type := String; };
+|   };
+|};
+file "schemas/actions/comment.schema.anvl"
+|#!aml
+|include "../../types/rivet.types.anvl";
+|@[schema]
+|
+|id := { type := types.TicketId; required := true; };
+|body := { type := String; required := true; };
+|internal := { type := Bool; };
+schema s load "schemas/BR.schema.anvl"
+validate_value s "{ title := \"Null bitmap off by one\"; project := \"flywire\"; priority := high; severity := major; tags := [codec, nulls]; sections := { reproduction := \"steps\"; impact := \"bad\"; }; }"
+validate_value s "{ title := \"Null bitmap off by one\"; project := \"flywire\"; priority := high; severity := major; tags := [codec, nulls]; sections := { reproduction := \"steps\"; impact := \"bad\"; }; }" skip_required
+validate_value s "{ title := \"x\"; project := \"p\"; }"

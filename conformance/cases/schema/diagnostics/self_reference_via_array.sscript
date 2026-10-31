@@ -1,0 +1,12 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Tree := { type := Object; fields := { kids := { type := Array; items := { type := types.Tree; }; }; }; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|tree := { type := types.Tree; };
+schema s load "s.anvl"
+validate_value s "{ tree := { kids := [ { kids := [ 1 ]; } ]; }; }"

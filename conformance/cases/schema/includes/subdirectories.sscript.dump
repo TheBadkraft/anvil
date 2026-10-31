@@ -1,0 +1,8 @@
+anvil-schema-run 1
+registry line=16 name=r how=includes file="main.anvl" doc=ANVIL_ERR_RESOLVE result=ok diagnostics=1
+  diag index=0 code=1 name=ANVIL_TYPE_DIAG_NAME_COLLISION type="A2" source="./lib/a.anvl" message="type 'A2' is defined in both './lib/sub/b.anvl' and './lib/a.anvl'; the one in './lib/a.anvl' is used"
+type line=17 how=find registry=r name="A" result=found kind=ANVIL_TYPE_BOOL size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=18 how=find registry=r name="A2" result=found kind=ANVIL_TYPE_BOOL size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=19 how=find registry=r name="B" result=found kind=ANVIL_TYPE_BOOL size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+steps 7
+status ok

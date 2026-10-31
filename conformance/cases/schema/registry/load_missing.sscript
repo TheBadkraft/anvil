@@ -1,0 +1,4 @@
+anvil-schema-script 1
+registry r load "nope.anvl"
+registry s includes "nope.anvl"
+type find r "T"

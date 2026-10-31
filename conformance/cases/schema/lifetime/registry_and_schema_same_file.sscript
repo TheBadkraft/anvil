@@ -1,0 +1,10 @@
+anvil-schema-script 1
+# a document with both attributes
+file "t.anvl"
+|#!aml
+|@[types, schema]
+|T := { type := String; };
+registry r load "t.anvl"
+schema s load "t.anvl"
+type find r "T"
+field s "T"

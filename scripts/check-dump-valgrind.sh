@@ -10,7 +10,7 @@ tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT INT TERM
 n=0; bad=0
 for input in "$@"; do
-   opts=; case $input in *.frag) opts=--fragment;; *.wscript) opts=--writer-script;; *.bscript) opts=--builder-script;; esac
+   opts=; case $input in *.frag) opts=--fragment;; *.wscript) opts=--writer-script;; *.bscript) opts=--builder-script;; *.sscript) opts=--schema-script;; esac
    n=$((n + 1))
    valgrind -q --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=9 \
       "$dump" $opts "$input" > /dev/null 2> "$tmp/vg"

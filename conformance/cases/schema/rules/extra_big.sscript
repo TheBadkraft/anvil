@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|sibling := { type := Bool; };
+|f := { type := String; pooled := 9223372036854775808; after := 1; };
+schema s load "s.anvl"

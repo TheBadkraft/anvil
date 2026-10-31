@@ -1,0 +1,8 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=1 fields=1
+  diag index=0 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="b" message="field 'b': 'tag' must be an identifier or string; treated as not declared"
+  field name="b" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=pass count=0
+validate_value line=8 schema=s doc=ok opts=default result=pass count=0
+steps 4
+status ok

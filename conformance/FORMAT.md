@@ -877,7 +877,23 @@ with role `field` for depth 1 and `nested` deeper.
 equals the committed `.dump`, and `make check-schema-gen` checks that the generator reproduces the committed scripts and
 writes nothing else (no dump, no other file).
 
-AREAS_PLACEHOLDER
+Areas (549 scripts): `registry` (type definitions of every kind, every constraint spelling and every registry diagnostic: size,
+min and max forms, formats, enum values, `type :=` forms, non-object statements, bases between types, bad documents), `resolve`
+(`anvil_type_resolve` and `find`, the native vocabulary, shadowing), `includes` (the `types.X` namespace: chains, fan-out, overrides,
+collisions, cycles, missing files, subdirectories), `diagnostics` (every schema diagnostic, including the registry's, their order,
+rules that are not objects, self-reference), `rules` (introspection of the effective rule: every kind, inherited and overridden
+constraints, nested rules, `field` lookups, extension keys of every value kind), `kinds` (every value form against every rule kind),
+`options` (`skip_required`, `allow_unknown`, `no_opts`, non-object and unparsable values), `numeric` (bounds, `integer`, the decimal
+forms, overflow, int32 and int64 edges), `strings` (`size` in bytes, enum membership, escapes, NUL), `format` (`iso8601_date`,
+`iso8601_datetime`, `uuid` over strings, bare words and other kinds), `blobs` (tags, payload size), `collections` (array counts and
+items, tuples, objects, nesting and paths, duplicate keys), `nullable`, `data` (whole data documents through `validate`), `lifetime`
+(violations persisting, null handles, failed loads), `flywire` (FlyWire's types file and schemas, int32 and int64 validation, the
+crosscheck boundaries, `repeated_key`) and `rivet` (Rivet's types file and kind schemas, valid and invalid tickets).
+
+Notes for a port: an empty object, an empty array, a one-element tuple and a repeated key are parse errors of the fragment (and of a
+document), so a script that validates `{ }` reports `doc=ANVIL_ERR_SYNTAX`; FlyWire's schema is loaded from a buffer with the
+repository root as the working directory, so the `flywire` cases keep the schema at the root of the file tree and its types file at
+`schema-gen/postgres.types.anvl`.
 
 ## Drift tables
 

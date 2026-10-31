@@ -1,0 +1,19 @@
+anvil-schema-run 1
+schema line=12 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="owner" kind=ANVIL_TYPE_OBJECT type="types.Person" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=2 items=0 extras=0
+    nested name="id" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+    nested name="name" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=4 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="staff" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_OBJECT type="types.Person" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=2 items=0 extras=0
+      nested name="id" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+      nested name="name" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=4 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=13 schema=s doc=ok opts=default result=fail count=6
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="owner.id" message="required field is missing"
+  violation index=1 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="owner.name" message="field value exceeds the declared size"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="owner.x" message="field is not declared in the schema"
+  violation index=3 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="staff[1].id" message="required field is missing"
+  violation index=4 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="staff[1].x" message="field is not declared in the schema"
+  violation index=5 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="staff[2].id" message="field value does not match the declared type"
+validate_value line=14 schema=s doc=ok opts=default result=pass count=0
+steps 5
+status ok

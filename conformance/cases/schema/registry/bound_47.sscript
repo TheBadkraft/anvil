@@ -1,0 +1,12 @@
+anvil-schema-script 1
+# bound NaN
+file "t.anvl"
+|#!aml
+|@[types]
+|Lo := { type := Numeric; min := NaN; };
+|Hi := { type := Numeric; max := NaN; };
+|Both := { type := Numeric; min := NaN; max := NaN; };
+registry r load "t.anvl"
+type find r "Lo"
+type find r "Hi"
+type find r "Both"

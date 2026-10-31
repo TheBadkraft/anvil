@@ -1,0 +1,12 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Bool; };
+|A := { type := Bool; };
+|b_c := { type := Bool; };
+schema s load "s.anvl"
+field s "a"
+field s "A"
+field s ""
+field s "a "

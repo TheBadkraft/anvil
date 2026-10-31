@@ -1,0 +1,28 @@
+anvil-schema-run 1
+schema line=19 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=4
+  field name="id" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=1 size=none min=i64:1 max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="title" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=0 integer=0 size=8 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="tags" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=2 format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=3 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="meta" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="k" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate line=20 schema=s file="d.anvl" doc=ok result=fail count=8
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="id" message="value must be an integer"
+  violation index=1 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="id" message="field value is outside the declared min/max range"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="title" message="field value does not match the declared type"
+  violation index=3 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="tags" message="array has more items than max_items"
+  violation index=4 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="tags[0]" message="field value exceeds the declared size"
+  violation index=5 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="tags[1]" message="field value exceeds the declared size"
+  violation index=6 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="meta.z" message="field is not declared in the schema"
+  violation index=7 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="extra" message="field is not declared in the schema"
+violations line=21 schema=s count=8
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="id" message="value must be an integer"
+  violation index=1 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="id" message="field value is outside the declared min/max range"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="title" message="field value does not match the declared type"
+  violation index=3 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="tags" message="array has more items than max_items"
+  violation index=4 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="tags[0]" message="field value exceeds the declared size"
+  violation index=5 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="tags[1]" message="field value exceeds the declared size"
+  violation index=6 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="meta.z" message="field is not declared in the schema"
+  violation index=7 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="extra" message="field is not declared in the schema"
+steps 6
+status ok

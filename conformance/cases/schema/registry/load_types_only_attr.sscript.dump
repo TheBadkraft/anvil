@@ -1,0 +1,4 @@
+anvil-schema-run 1
+registry line=5 name=r how=load file="a.anvl" doc=ok result=ok diagnostics=0
+steps 2
+status ok

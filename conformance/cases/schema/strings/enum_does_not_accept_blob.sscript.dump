@@ -1,0 +1,11 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="e" kind=ANVIL_TYPE_ENUM type="enum" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=1 nested=0 items=0 extras=0
+    label index=0 text="abc"
+validate_value line=7 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="e" message="field value does not match the declared type"
+validate_value line=8 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="e" message="field value does not match the declared type"
+validate_value line=9 schema=s doc=ok opts=default result=pass count=0
+steps 5
+status ok

@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Node := { type := Object; fields := { next := { type := types.Node; }; value := { type := Numeric; }; }; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|root := { type := types.Node; };
+schema s load "s.anvl"
+validate_value s "{ root := { value := 1; next := { value := 2; }; }; }"
+validate_value s "{ root := { value := 1; }; }"

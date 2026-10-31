@@ -1,0 +1,3 @@
+anvil-schema-script 1
+schema s load "gone.anvl"
+validate_value s "{ a := 1; }"

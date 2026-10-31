@@ -1,0 +1,12 @@
+anvil-schema-script 1
+# bound true
+file "t.anvl"
+|#!aml
+|@[types]
+|Lo := { type := Numeric; min := true; };
+|Hi := { type := Numeric; max := true; };
+|Both := { type := Numeric; min := true; max := true; };
+registry r load "t.anvl"
+type find r "Lo"
+type find r "Hi"
+type find r "Both"

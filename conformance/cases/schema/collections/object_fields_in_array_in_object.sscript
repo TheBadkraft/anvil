@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; fields := { l := { type := Array; items := { type := Object; fields := { n := { type := Numeric; min := 0; }; }; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ o := { l := [ { n := 1; }, { n := -1; } ]; }; }"

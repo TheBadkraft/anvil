@@ -1,0 +1,8 @@
+anvil-schema-run 1
+registry line=11 name=r how=load file="a.anvl" doc=ok result=ok diagnostics=0
+type line=12 how=find registry=r name="X" result=none
+type line=13 how=find registry=r name="Y" result=none
+type line=14 how=find registry=r name="T" result=found kind=ANVIL_TYPE_BOOL size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=15 how=find registry=r name="V" result=none
+steps 6
+status ok

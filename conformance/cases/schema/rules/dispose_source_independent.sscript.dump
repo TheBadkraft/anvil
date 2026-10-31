@@ -1,0 +1,11 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=3 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="extra"
+      value type=ARRAY count=2
+        value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+        value type=NUMERIC text="2" kind=integer overflow=0 i64=2
+validate_value line=8 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="f" message="field value exceeds the declared size"
+steps 3
+status ok

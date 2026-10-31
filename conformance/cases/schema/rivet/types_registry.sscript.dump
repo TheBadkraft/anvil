@@ -1,0 +1,22 @@
+anvil-schema-run 1
+registry line=120 name=r how=load file="types/rivet.types.anvl" doc=ok result=ok diagnostics=0
+type line=121 how=find registry=r name="Title" result=found kind=ANVIL_TYPE_STRING size=300 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=122 how=find registry=r name="Summary" result=found kind=ANVIL_TYPE_STRING size=4000 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=123 how=find registry=r name="Tag" result=found kind=ANVIL_TYPE_STRING size=64 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=124 how=find registry=r name="Slug" result=found kind=ANVIL_TYPE_STRING size=63 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=125 how=find registry=r name="Handle" result=found kind=ANVIL_TYPE_STRING size=63 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=126 how=find registry=r name="IdCode" result=found kind=ANVIL_TYPE_STRING size=63 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=127 how=find registry=r name="TicketId" result=found kind=ANVIL_TYPE_STRING size=120 min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=128 how=find registry=r name="Timestamp" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format="iso8601_datetime" values=0
+type line=129 how=find registry=r name="Priority" result=found kind=ANVIL_TYPE_ENUM size=none min=none max=none min_numeric=none max_numeric=none format=none values=4
+  label index=0 text="critical"
+  label index=1 text="high"
+  label index=2 text="normal"
+  label index=3 text="low"
+type line=130 how=find registry=r name="Severity" result=found kind=ANVIL_TYPE_ENUM size=none min=none max=none min_numeric=none max_numeric=none format=none values=4
+  label index=0 text="critical"
+  label index=1 text="major"
+  label index=2 text="minor"
+  label index=3 text="trivial"
+steps 17
+status ok

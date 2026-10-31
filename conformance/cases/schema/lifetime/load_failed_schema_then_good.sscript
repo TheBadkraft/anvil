@@ -1,0 +1,11 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; };
+schema bad load "gone.anvl"
+schema good load "s.anvl"
+validate_value bad "{ a := 1; }"
+validate_value good "{ a := \"x\"; }"
+violations bad
+violations good

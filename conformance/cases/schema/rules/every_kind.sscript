@@ -1,0 +1,26 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|numeric := { type := Numeric;  };
+|string := { type := String;  };
+|bool := { type := Bool;  };
+|object := { type := Object;  };
+|tuple := { type := Tuple;  };
+|array := { type := Array;  };
+|enum := { type := enum; values := [a, b]; };
+|blob := { type := Blob;  };
+|untyped := { pooled := true; };
+|empty_rule := { required := true; };
+schema s load "s.anvl"
+field s "numeric"
+field s "string"
+field s "bool"
+field s "object"
+field s "tuple"
+field s "array"
+field s "enum"
+field s "blob"
+field s "untyped"
+field s "empty_rule"
+field s "nope"

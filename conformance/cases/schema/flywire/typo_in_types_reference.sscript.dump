@@ -1,0 +1,8 @@
+anvil-schema-run 1
+schema line=49 name=s file="s.anvl" doc=ok result=ok diagnostics=1 fields=1
+  diag index=0 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="asset_id" message="field 'asset_id': type 'types.Int23' is neither a native type nor a known types.X"
+  field name="asset_id" kind=ANVIL_TYPE_UNKNOWN type="types.Int23" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=50 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="asset_id" message="the rule's declared type is unresolved; the value cannot be validated"
+steps 4
+status ok

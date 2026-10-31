@@ -1,0 +1,67 @@
+anvil-schema-script 1
+file "main.anvl"
+|#!aml
+|include "f0.anvl";
+|include "f1.anvl";
+|include "f2.anvl";
+|include "f3.anvl";
+|include "f4.anvl";
+|include "f5.anvl";
+|include "f6.anvl";
+|include "f7.anvl";
+|include "f8.anvl";
+|include "f9.anvl";
+|include "f10.anvl";
+|include "f11.anvl";
+file "f0.anvl"
+|#!aml
+|@[types]
+|F0 := { type := Numeric; min := 0; };
+file "f1.anvl"
+|#!aml
+|@[types]
+|F1 := { type := Numeric; min := 1; };
+file "f2.anvl"
+|#!aml
+|@[types]
+|F2 := { type := Numeric; min := 2; };
+file "f3.anvl"
+|#!aml
+|@[types]
+|F3 := { type := Numeric; min := 3; };
+file "f4.anvl"
+|#!aml
+|@[types]
+|F4 := { type := Numeric; min := 4; };
+file "f5.anvl"
+|#!aml
+|@[types]
+|F5 := { type := Numeric; min := 5; };
+file "f6.anvl"
+|#!aml
+|@[types]
+|F6 := { type := Numeric; min := 6; };
+file "f7.anvl"
+|#!aml
+|@[types]
+|F7 := { type := Numeric; min := 7; };
+file "f8.anvl"
+|#!aml
+|@[types]
+|F8 := { type := Numeric; min := 8; };
+file "f9.anvl"
+|#!aml
+|@[types]
+|F9 := { type := Numeric; min := 9; };
+file "f10.anvl"
+|#!aml
+|@[types]
+|F10 := { type := Numeric; min := 10; };
+file "f11.anvl"
+|#!aml
+|@[types]
+|F11 := { type := Numeric; min := 11; };
+registry r includes "main.anvl"
+type find r "F0"
+type find r "F5"
+type find r "F11"

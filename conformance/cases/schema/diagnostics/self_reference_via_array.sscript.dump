@@ -1,0 +1,9 @@
+anvil-schema-run 1
+schema line=11 name=s file="s.anvl" doc=ok result=ok diagnostics=1 fields=1
+  diag index=0 code=5 name=ANVIL_SCHEMA_DIAG_SELF_REFERENCE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="tree.kids[]" message="field 'tree.kids[]': its type's 'fields' refer back to the type itself; not expanded"
+  field name="tree" kind=ANVIL_TYPE_OBJECT type="types.Tree" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="kids" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+      items name="" kind=ANVIL_TYPE_OBJECT type="types.Tree" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=12 schema=s doc=ok opts=default result=pass count=0
+steps 4
+status ok

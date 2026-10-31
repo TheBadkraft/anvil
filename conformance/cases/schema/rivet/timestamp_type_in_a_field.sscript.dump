@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=126 name=s file="schemas/stamp.schema.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="at" kind=ANVIL_TYPE_STRING type="types.Timestamp" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_datetime" tag=none values=0 nested=0 items=0 extras=0
+  field name="until" kind=ANVIL_TYPE_STRING type="types.Timestamp" required=0 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_datetime" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=127 schema=s doc=ok opts=default result=pass count=0
+validate_value line=128 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="at" message="value does not match the declared format"
+validate_value line=129 schema=s doc=ok opts=default result=pass count=0
+validate_value line=130 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="at" message="value does not match the declared format"
+validate_value line=131 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="at" message="value does not match the declared format"
+steps 13
+status ok
