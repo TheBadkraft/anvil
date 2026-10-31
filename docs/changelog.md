@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
+  statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and
+  `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` (19), whether or not an include exists. A base
+  that names no top-level statement fails with the new `ANVIL_WRITER_ERR_MISSING_BASE` (20) when the builder holds no
+  `include`; with any include (added before or after) it is accepted as before, because the included file may declare
+  it. Both were emitted before and rejected on load (the reader's 4050 and 4051). The check runs after the non-object base
+  check (`INHERITANCE_REQUIRES_OBJECT`) of BR-2610-anvl-writer-002, across every member the builder created. The two
+  codes are appended to `anvil_writer_err_code` (existing values unchanged); the 165 exported symbols are unchanged.
+  Bindings that mirror the writer codes (anvil.js `WriterErrorCode`, py, net) need the two new values.
+- **A member handle from another builder is refused (BR-2610-anvl-writer-005).** `anvil_builder_set_base`,
+  `anvil_builder_member_attribute` and `anvil_builder_member_attribute_string` now fail with
+  `ANVIL_WRITER_ERR_INVALID_ARGUMENT` for a member of another builder (before the dialect check), as node handles
+  already were. They used to edit the other builder's member.
+
+### Changed
+
+- Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
+  and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not
+  declare, so its known list is down to the one absolute-path harness limit. Dumps changed: the builder cases
+  `bases/missing_target`, `replaced`, `replaced_back_to_valid`, `target_is_self`,
+  `target_nested_non_object_not_checked`, `unattached_member_missing_target`, `find/then_set_base`,
+  `lifecycle/error_message_19` and `_20`, and the writer case `lifecycle/error_message_all` (codes 19 and 20 were
+  `unknown error`); no reader dump changed. `conformance/drift-tables.txt` has the two codes. `check-js-package.sh`
+  excludes `cases/builder` from the reader corpus count and requires it to be 1867.
+
+
 ### Added
 
 - **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that

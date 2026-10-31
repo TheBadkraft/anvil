@@ -68,6 +68,7 @@ struct anvil_node_t {
 };
 
 struct anvil_member_t {
+   struct anvil_builder_t *builder; // the owner: a member handle from another builder is refused
    char *name;
    char *base;
    attr_list attrs;
@@ -500,6 +501,9 @@ anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *n
       return NULL;
    }
    struct anvil_member_t *m = calloc(1, sizeof *m);
+   if (m) {
+      m->builder = b;
+   }
    if (!m || !(m->name = copy_string(name))) {
       free(m);
       outcome(b, ANVIL_WRITER_ERR_MEMORY);
@@ -531,7 +535,7 @@ static bool member_ready(anvil_builder b, anvil_member m) {
    if (!b) {
       return false;
    }
-   if (!m) {
+   if (!m || m->builder != b) {
       return outcome(b, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
    }
    if (b->dialect == ANVIL_WRITER_AMP) {
@@ -712,7 +716,23 @@ static anvil_writer_err_code check_depth(anvil_builder b) {
 // reader requires (4020). The builder only writes `name := { ... }`, never the anonymous block
 // form `name { ... }` (4052), so an object is the one thing a base can legally be. A base the
 // builder does not hold (one from an include) is left to the reader.
+static bool has_include(const struct anvil_builder_t *b) {
+   for (size_t i = 0; i < b->header_count; i++) {
+      if (b->header[i].is_include) {
+         return true;
+      }
+   }
+   return false;
+}
+
+// BR-2610-anvl-writer-002 and -004: what the reader would refuse about the bases, across every member the builder
+// created (attached or not). A base names a top-level member of this document. In this order:
+//  - the member it names must be an object (INHERITANCE_REQUIRES_OBJECT);
+//  - it must exist, unless the builder holds an include, which may supply it (MISSING_BASE);
+//  - the chain of top-level members' bases must not loop (INHERITANCE_CYCLE).
 static anvil_writer_err_code check_bases(anvil_builder b) {
+   bool includes = has_include(b);
+   bool missing = false;
    for (size_t i = 0; i < b->all_member_count; i++) {
       const struct anvil_member_t *m = b->all_members[i];
       if (!m->base) {
@@ -721,6 +741,20 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
       anvil_member target = anvil_builder_find(b, NULL, m->base);
       if (target && target->value->kind != NODE_OBJECT) {
          return ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      }
+      missing = missing || (!target && !includes);
+   }
+   if (missing) {
+      return ANVIL_WRITER_ERR_MISSING_BASE;
+   }
+   for (size_t i = 0; i < b->member_count; i++) {
+      // follow the chain from this top-level member: more steps than members means it loops
+      const struct anvil_member_t *cur = b->members[i];
+      for (size_t steps = 0; cur && cur->base; steps++) {
+         if (steps > b->member_count) {
+            return ANVIL_WRITER_ERR_INHERITANCE_CYCLE;
+         }
+         cur = anvil_builder_find(b, NULL, cur->base);
       }
    }
    return ANVIL_WRITER_OK;

@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=110 text="#!aml\n\ninclude \"x.anvl\";\n\nouter := {\n   sib := {\n      f := 1;\n   };\n   der : sib := {\n      f := 2;\n   };\n};\n"
+steps 14
+status ok

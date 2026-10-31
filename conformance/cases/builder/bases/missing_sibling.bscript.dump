@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=16 code=20 name=ANVIL_WRITER_ERR_MISSING_BASE call="emit" message="base names no member of the document and no include could supply it"
+steps 14
+status error code=20 name=ANVIL_WRITER_ERR_MISSING_BASE

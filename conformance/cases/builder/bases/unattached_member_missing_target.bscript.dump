@@ -1,4 +1,4 @@
 anvil-builder-run 1
-emit bytes=7 text="#!aml\n\n"
+failed line=9 code=20 name=ANVIL_WRITER_ERR_MISSING_BASE call="emit" message="base names no member of the document and no include could supply it"
 steps 8
-status ok
+status error code=20 name=ANVIL_WRITER_ERR_MISSING_BASE

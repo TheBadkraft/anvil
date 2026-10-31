@@ -69,7 +69,9 @@ mkdir "$work/conf" && cp -r "$pkg/src" "$pkg/node" "$pkg/package.json" "$pkg/BUI
 git -C "$repo" archive "$commit" js scripts/conformance.js | tar -x -C "$work/conf" || fail "no driver at binding commit $commit in $repo"
 ntag=${tag:-v$(node -p "require('$pkg/BUILD_INFO.json').version")}
 mkdir -p "$work/conf/vendor/anvil" && git -C "$core" archive "$ntag" conformance | tar -x -C "$work/conf/vendor/anvil"
-total=$(find "$work/conf/vendor/anvil/conformance/cases" -path '*/cases/writer' -prune -o -type f ! -name '*.dump' -print | wc -l)
+# the reader corpus: cases/writer (.wscript) and cases/builder (.bscript) are other contracts with their own drivers
+total=$(find "$work/conf/vendor/anvil/conformance/cases" -path '*/cases/writer' -prune -o -path '*/cases/builder' -prune -o -type f ! -name '*.dump' -print | wc -l)
+[ "$total" -eq 1867 ] || fail "reader corpus size $total != 1867 (cases/writer and cases/builder excluded)"
 out=$(cd "$work/conf" && node scripts/conformance.js 2>&1) || { echo "$out" | tail -8; fail "conformance through the installed copy"; }
 echo "$out" | grep -q "^conformance (all): $total/$total passed, 0 failed" || { echo "$out"; fail "conformance count != corpus size $total"; }
 echo "PASS js: conformance through the installed copy: $total/$total"
