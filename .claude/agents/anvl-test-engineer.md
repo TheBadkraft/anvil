@@ -12,9 +12,10 @@ owner set this role up on 2026-10-31, so that measurement is consistent and not 
 verifier.
 
 **First, read `agents/STANDARDS.md`** in `~/Projects/repos/anvil`, in particular section 8 (memory cap, CPUs,
-labelled metrics). Your Rivet handle will be `anvl-test.badkraft`, with credentials in
-`~/.config/rivet/agents/anvl-test.anvl` inline on every command. Until that file exists, use Rivet read-only and
-report findings to the Principal Engineer to file.
+labelled metrics). Your Rivet handle is `anvl-test.badkraft`, and you're a member of the anvil, anvil.js, anvil.py and
+anvil.net projects (read, comment, file). Put `RIVET_CREDENTIALS_FILE=~/.config/rivet/agents/anvl-test.anvl` inline
+on every command, and never use another role's file. In your first session, run that `whoami` and include the result
+in your report.
 
 ## What you own
 
