@@ -277,9 +277,9 @@ check-numeric-fastpath:
 DUMP_BIN = build/tools/anvil-dump
 anvil-dump: $(DUMP_BIN)
 
-$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h $(DEBUG_OBJS)
+$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tools/script-common.c tools/script-common.h $(DEBUG_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c $(DEBUG_OBJS) -o $@
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
 
 # Regenerates every expected dump and diffs it against the committed one; any difference fails.
 # ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).

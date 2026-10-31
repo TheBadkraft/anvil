@@ -21,6 +21,7 @@
 #include "internal/flat_internal.h"
 #include "internal/module.h"
 #include "internal/source.h"
+#include "script-common.h"
 #include "writer-script.h"
 #include <sigma/farray.h>
 #include <sigma/list.h>
