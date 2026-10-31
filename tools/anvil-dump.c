@@ -14,6 +14,9 @@
  * (tools/writer-script.c; FORMAT.md, "The writer script").                *
  * --builder-script runs a builder script and prints the run               *
  * (tools/builder-script.c; FORMAT.md, "The builder script").              *
+ * --schema-script runs a schema script through the type registry and     *
+ * schema APIs and prints the run (tools/schema-script.c; FORMAT.md,       *
+ * "The schema script").                                                   *
  * Exit status: 0 for a dump (even of an input that fails to parse), 2 for  *
  * a usage or I/O error of the tool itself.                                *
  * ********************************************************************** */
@@ -25,6 +28,7 @@
 #include "internal/source.h"
 #include "script-common.h"
 #include "builder-script.h"
+#include "schema-script.h"
 #include "writer-script.h"
 #include <sigma/farray.h>
 #include <sigma/list.h>
@@ -565,7 +569,7 @@ static bool has_suffix(const char *s, const char *suffix) {
 }
 
 int main(int argc, char **argv) {
-   bool fragment = false, batch = false, writer_script = false, writer_output = false, builder_script = false;
+   bool fragment = false, batch = false, writer_script = false, writer_output = false, builder_script = false, schema_script = false;
    const char *path = NULL, *emit_dir = NULL;
    for (int i = 1; i < argc; i++) {
       if (strcmp(argv[i], "--fragment") == 0) {
@@ -576,6 +580,8 @@ int main(int argc, char **argv) {
          writer_output = true;
       } else if (strcmp(argv[i], "--builder-script") == 0) {
          builder_script = true;
+      } else if (strcmp(argv[i], "--schema-script") == 0) {
+         schema_script = true;
       } else if (strcmp(argv[i], "--emit-dir") == 0 && i + 1 < argc && !emit_dir) {
          emit_dir = argv[++i];
       } else if (strcmp(argv[i], "--batch") == 0) {
@@ -613,12 +619,16 @@ int main(int argc, char **argv) {
       free(line);
       return rc;
    }
-   if (!path || ((writer_script || writer_output || builder_script) && (fragment || (writer_script && writer_output) || (builder_script && (writer_script || writer_output)))) ||
+   if (!path || ((writer_script || writer_output || builder_script || schema_script) && (fragment || (writer_script && writer_output) || (builder_script && (writer_script || writer_output)) || (schema_script && (writer_script || writer_output || builder_script)))) ||
        (emit_dir && !builder_script)) {
       fputs("usage: anvil-dump [--fragment] <file | ->\n       anvil-dump --batch  (paths on stdin)\n"
             "       anvil-dump --writer-script <script> | --writer-output <script>\n"
-            "       anvil-dump --builder-script <script> [--emit-dir <dir>]\n", stderr);
+            "       anvil-dump --builder-script <script> [--emit-dir <dir>]\n"
+            "       anvil-dump --schema-script <script>\n", stderr);
       return 2;
+   }
+   if (schema_script) {
+      return schema_script_run(path);
    }
    if (builder_script) {
       return builder_script_run(path, emit_dir);

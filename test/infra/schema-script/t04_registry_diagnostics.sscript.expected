@@ -1,0 +1,16 @@
+anvil-schema-run 1
+registry line=17 name=r how=load file="a.anvl" doc=ok result=ok diagnostics=4
+  diag index=0 code=2 name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE type="B" source="a.anvl" message="type 'B' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=2 name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE type="C" source="a.anvl" message="type 'C' declares no 'type :=' base type"
+  diag index=2 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="D" source="a.anvl" message="type 'D': 'size' is not a non-negative integer; treated as not declared"
+  diag index=3 code=4 name=ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES type="E" source="a.anvl" message="type 'E': 'values' must be an array of labels"
+registry line=18 name=s how=includes file="main.anvl" doc=ok result=ok diagnostics=5
+  diag index=0 code=2 name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE type="B" source="a.anvl" message="type 'B' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=2 name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE type="C" source="a.anvl" message="type 'C' declares no 'type :=' base type"
+  diag index=2 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="D" source="a.anvl" message="type 'D': 'size' is not a non-negative integer; treated as not declared"
+  diag index=3 code=4 name=ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES type="E" source="a.anvl" message="type 'E': 'values' must be an array of labels"
+  diag index=4 code=1 name=ANVIL_TYPE_DIAG_NAME_COLLISION type="A" source="b.anvl" message="type 'A' is defined in both 'a.anvl' and 'b.anvl'; the one in 'b.anvl' is used"
+type line=19 how=find registry=s name="A" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=20 how=find registry=s name="B" result=none
+steps 8
+status ok
