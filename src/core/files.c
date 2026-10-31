@@ -48,9 +48,14 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
       goto error;
    }
 
-   fseek(f, 0, SEEK_END);
-   long len = ftell(f);
-   fseek(f, 0, SEEK_SET);
+   long len;
+   if (S_ISREG(st.st_mode)) {
+      len = (long)st.st_size; // the one fstat above also gives the size: no seeking needed
+   } else {
+      fseek(f, 0, SEEK_END);
+      len = ftell(f);
+      fseek(f, 0, SEEK_SET);
+   }
    if (len < 0) {
       fclose(f);
       err_code = ANVL_ERR_IO_FILE_READ;
