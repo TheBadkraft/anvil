@@ -15,6 +15,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that
+  a second implementation (the `AnvilBuilder` of anvil.js) must reproduce byte for byte, like the writer corpus. A
+  versioned builder script (`anvil-builder-script 1`, specified in `conformance/FORMAT.md`) reuses the writer script's
+  quoting, `NULL`, number and input rules and adds handles (`let m = add ...`) for nodes and members, a second builder
+  (`builder2`, `other`) for the foreign-handle error, and `emit` and `write` steps. `anvil-dump --builder-script <file>`
+  prints the run (`anvil-builder-run 1`): every failed call with its error code, every `find` result, the exact bytes of
+  every `emit` and `write`, and the final status; `--emit-dir <dir>` also writes each emitted document for the
+  round-trip check. 915 generated scripts under `conformance/cases/builder/` (`conformance/seed/gen_builder.py`, scripts
+  only; the runs are native's) cover every call, every value kind, nesting to and past the depth limit
+  (`ANVIL_WRITER_ERR_DEPTH_EXCEEDED`), module and member attributes, include ordering, bases (valid, non-object,
+  unattached, missing), every error path, and King & Crucible and FlyWire shaped documents. Wired into
+  `make check-conformance`, `update-conformance` and `check-dump-valgrind`, with `check-builder-script` (tool tests),
+  `check-builder-gen` and `check-builder-roundtrip` (every successful emit loads through the native reader; 1 known
+  entry, `conformance/builder-roundtrip-known.txt`, tracked through a `.gitignore` exception). No library, ABI or builder behaviour change. The script lexer
+  of `anvil-dump` moved into a shared file (`tools/script-common.c`) with no change to the writer mode.
+
+### Changed
+
+- Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
+  and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not
+  declare, so its known list is down to the one absolute-path harness limit. Dumps changed: the builder cases
+  `bases/missing_target`, `replaced`, `replaced_back_to_valid`, `target_is_self`,
+  `target_nested_non_object_not_checked` (renamed `target_only_nested_missing`: it is now refused with MISSING_BASE), `unattached_member_missing_target`, `find/then_set_base`,
+  `lifecycle/error_message_19` and `_20`, and the writer case `lifecycle/error_message_all` (codes 19 and 20 were
+  `unknown error`); no reader dump changed. `conformance/drift-tables.txt` has the two codes. `bases/replaced_back_to_valid` now declares its target, so its second `emit` succeeds. Scripts edited:
+  `scripts/check-builder-roundtrip.sh` (the include harness) and `scripts/release/check-js-package.sh`, which excludes
+  `cases/builder` from the reader corpus count and takes the expected count from the core tag's own corpus instead of a
+  hard-coded 1867.
+
 ### Fixed
 
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
@@ -30,38 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `anvil_builder_member_attribute` and `anvil_builder_member_attribute_string` now fail with
   `ANVIL_WRITER_ERR_INVALID_ARGUMENT` for a member of another builder (before the dialect check), as node handles
   already were. They used to edit the other builder's member.
-
-### Changed
-
-- Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
-  and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not
-  declare, so its known list is down to the one absolute-path harness limit. Dumps changed: the builder cases
-  `bases/missing_target`, `replaced`, `replaced_back_to_valid`, `target_is_self`,
-  `target_nested_non_object_not_checked`, `unattached_member_missing_target`, `find/then_set_base`,
-  `lifecycle/error_message_19` and `_20`, and the writer case `lifecycle/error_message_all` (codes 19 and 20 were
-  `unknown error`); no reader dump changed. `conformance/drift-tables.txt` has the two codes. `check-js-package.sh`
-  excludes `cases/builder` from the reader corpus count and requires it to be 1867.
-
-
-### Added
-
-- **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that
-  a second implementation (the `AnvilBuilder` of anvil.js) must reproduce byte for byte, like the writer corpus. A
-  versioned builder script (`anvil-builder-script 1`, specified in `conformance/FORMAT.md`) reuses the writer script's
-  quoting, `NULL`, number and input rules and adds handles (`let m = add ...`) for nodes and members, a second builder
-  (`builder2`, `other`) for the foreign-handle error, and `emit` and `write` steps. `anvil-dump --builder-script <file>`
-  prints the run (`anvil-builder-run 1`): every failed call with its error code, every `find` result, the exact bytes of
-  every `emit` and `write`, and the final status; `--emit-dir <dir>` also writes each emitted document for the
-  round-trip check. 892 generated scripts under `conformance/cases/builder/` (`conformance/seed/gen_builder.py`, scripts
-  only; the runs are native's) cover every call, every value kind, nesting to and past the depth limit
-  (`ANVIL_WRITER_ERR_DEPTH_EXCEEDED`), module and member attributes, include ordering, bases (valid, non-object,
-  unattached, missing), every error path, and King & Crucible and FlyWire shaped documents. Wired into
-  `make check-conformance`, `update-conformance` and `check-dump-valgrind`, with `check-builder-script` (tool tests),
-  `check-builder-gen` and `check-builder-roundtrip` (every successful emit loads through the native reader; 7 known
-  entries, `conformance/builder-roundtrip-known.txt`). No library, ABI or builder behaviour change. The script lexer
-  of `anvil-dump` moved into a shared file (`tools/script-common.c`) with no change to the writer mode.
-- **Found, not fixed:** BR-2610-anvl-writer-004 (the builder accepts a base that names the statement itself or a name
-  missing from the document; the reader rejects both).
+- **The builder's base checks are linear (BR-2610-anvl-writer-004).** `emit` and `write` resolve each base once through one
+  name table and find cycles with an iterative three-colour walk, so a chain of 100000 members neither recurses nor is
+  quadratic. Time to `anvil_builder_emit`, native subject (this branch) vs native v0.12.1-rc (d10c9df), ms, lower is
+  faster: 4000 members with bases 1.9 vs 17.1; 20000 with bases 12.6 vs 533.8; 2000 with bases declared later 0.8 vs 12.7;
+  5000 later 2.2 vs 78.4; chains of 1000: 0.22 vs 1.18, 3000: 0.70 vs 9.17, 10000: 2.6 vs 97.7, 100000: 38 vs 40441.
+  The `parse_validate` bench is unchanged (ratios 0.992x to 1.001x, time, lower is faster).
 
 ---
 
