@@ -111,12 +111,13 @@ export PYTHONPATH="$PWD/anvil-py-v0.12.1-rc-linux-x64/src:$PYTHONPATH"</code></p
     server["port"].as_int()  # 8080</code></pre>
     </div>
 
-    <h2>Previous builds &mdash; Node.js and WebAssembly (v0.11.0-rc, no further updates)</h2>
+    <h2>Previous builds &mdash; Node.js<sup>*</sup> and WebAssembly<sup>*</sup> (Unsupported; v0.11.0-rc, no further updates)</h2>
     <p class="lede" style="font-size: 15px;">
       These two are frozen at v0.11.0-rc and replaced by anvil.js. They stay downloadable at their
       existing addresses and nothing about them changes.
     </p>
-    <h3>WebAssembly &mdash; browser, or any JS host</h3>
+    <p class="lede" style="font-size: 15px;">* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.</p>
+    <h3>WebAssembly<sup>*</sup> (Unsupported) &mdash; browser, or any JS host</h3>
     <div class="card">
       <div class="dl-row">
         <div>
@@ -143,7 +144,7 @@ doc.get('foo').asInt(); // 1</code></pre>
 &lt;/script&gt;</code></pre>
     </div>
 
-    <h3>Node.js &mdash; N-API</h3>
+    <h3>Node.js<sup>*</sup> (Unsupported) &mdash; N-API</h3>
     <div class="card">
       <div class="dl-row">
         <div>
@@ -182,19 +183,20 @@ doc.get('foo').asInt(); // 1</code></pre>
       (<a href="/assets/downloads/SHA256SUMS-v0.12.0-rc">SHA256SUMS-v0.12.0-rc</a>);
       v0.11.0-rc &mdash;
       <a href="/assets/downloads/anvil-v0.11.0-rc-linux-x86_64.tar.gz">C library</a>,
-      <a href="/assets/downloads/anvil-wasm-v0.11.0-rc.tar.gz">WebAssembly</a>,
-      <a href="/assets/downloads/anvil-node-v0.11.0-rc-linux-x86_64.tar.gz">Node.js</a>,
+      <a href="/assets/downloads/anvil-wasm-v0.11.0-rc.tar.gz">WebAssembly</a><sup>*</sup> (Unsupported),
+      <a href="/assets/downloads/anvil-node-v0.11.0-rc-linux-x86_64.tar.gz">Node.js</a><sup>*</sup> (Unsupported),
       <a href="/assets/downloads/anvil-net-v0.11.0-rc-linux-x64.tar.gz">.NET</a>,
       <a href="/assets/downloads/anvil-py-v0.11.0-rc-linux-x64.tar.gz">Python</a>
       (<a href="/assets/downloads/SHA256SUMS-v0.11.0-rc">SHA256SUMS-v0.11.0-rc</a>);
       v0.10.0-rc &mdash;
       <a href="/assets/downloads/anvil-v0.10.0-rc-linux-x86_64.tar.gz">C library</a>,
-      <a href="/assets/downloads/anvil-wasm-v0.10.0-rc.tar.gz">WebAssembly</a>,
-      <a href="/assets/downloads/anvil-node-v0.10.0-rc-linux-x86_64.tar.gz">Node.js</a>,
+      <a href="/assets/downloads/anvil-wasm-v0.10.0-rc.tar.gz">WebAssembly</a><sup>*</sup> (Unsupported),
+      <a href="/assets/downloads/anvil-node-v0.10.0-rc-linux-x86_64.tar.gz">Node.js</a><sup>*</sup> (Unsupported),
       <a href="/assets/downloads/anvil-net-v0.10.0-rc-linux-x64.tar.gz">.NET</a>,
       <a href="/assets/downloads/anvil-py-v0.10.0-rc-linux-x64.tar.gz">Python</a>
       (<a href="/assets/downloads/SHA256SUMS-v0.10.0-rc">SHA256SUMS-v0.10.0-rc</a>).
     </p>
+    <p class="lede" style="margin-top: 8px; font-size: 14px;">* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.</p>
     <p class="lede" style="margin-top: 16px; font-size: 15px;">
       Full usage guide for every binding is in <a href="/docs#Bindings-Guide.md">Docs → Bindings</a>; what changed in this release is in the <a href="/docs#changelog.md">Changelog</a>.
       This is release-candidate software — the format and API are stable enough to build

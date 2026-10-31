@@ -30,9 +30,10 @@
       <strong>Most stacks solve this with three separate tools.</strong> Config, structured
       messaging, and — eventually — embedded scripting: one grammar, one parser, no exceptions.
       <strong>Anvil Native</strong>, the reference implementation, is a single C parser with no
-      runtime dependencies; bindings — currently Node.js and WebAssembly — wrap it directly, so a
+      runtime dependencies; bindings — currently Node.js<sup>*</sup> and WebAssembly<sup>*</sup> (both <strong>Unsupported</strong>) — wrap it directly, so a
       document parses identically no matter which one reads it.
     </p>
+    <p style="font-size: 13px;">* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.</p>
 
     <div class="cta-row">
       <a class="btn primary" href="/download">Download →</a>
@@ -207,7 +208,7 @@ endpoint:server {
     </p>
 
     <h2>Try it now</h2>
-    <p><a href="/download">Download</a> the native library or the WebAssembly bundle and parse
+    <p><a href="/download">Download</a> the native library or the WebAssembly<sup>*</sup> (Unsupported) bundle and parse
       real source in minutes — see the <a href="/docs#Bindings-Guide.md">Bindings guide</a> for
       a runnable example in each. A live in-browser <a href="/sandbox">sandbox</a> is in
       progress.</p>

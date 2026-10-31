@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Site: Node.js and WebAssembly marked Unsupported (owner request, 2026-10-31).** Every Node.js and WebAssembly entry
+  on the site (Bindings guide table, the two section intros and the feature table, download page "Previous builds" and
+  previous-releases links, home page, sandbox, footers) now carries `*` and the word Unsupported, with one footnote:
+  frozen at v0.11.0-rc, no longer updated, replaced by anvil.js; the v0.11.0-rc downloads stay available. No download
+  link or file changed. Not deployed yet.
+
 - Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
   and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not
   declare, so its known list is down to the one absolute-path harness limit. Dumps changed: the builder cases
