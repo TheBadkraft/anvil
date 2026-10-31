@@ -109,9 +109,14 @@ line and column are those inside the included document, and the dump does not sa
 
 When a load fails, **nothing but the error is defined**: no tree is dumped, because the partial tree native
 leaves behind is an implementation artifact, not behaviour a port should copy. If native failed before it
-recorded anything (an unreadable file), one line `error code=0 name=ANVL_ERR_NONE ...` with the public
-category and an empty message is written (and no `dialect` line, see above). The corpus holds no such case,
-since an input is always an existing file; the line exists for completeness.
+recorded anything, one line `error code=0 name=ANVL_ERR_NONE ...` with the public category and an empty message
+is written (and no `dialect` line, see above). An unreadable root file no longer takes this path (BR-2610-anvl-io-001):
+native records the specific code, so a missing file is `error code=1002 name=ANVL_ERR_FILE_NOT_FOUND ... message="IO file
+not found"`, a directory or a file that cannot be opened is `code=1001 name=ANVL_ERR_FILE_READ` ("IO error reading source
+file"), and a NULL or empty path is `code=1003 name=ANVL_ERR_FILE_INVALID_PATH` ("IO invalid file path"), all with category
+`ANVIL_ERR_IO` and line and column 0. The corpus holds no such case, since an input is always an existing file; the lines
+exist for completeness. The same codes govern an `include` that names a directory: it is an include error, not an empty
+document.
 
 Two errors depend on the resolved include path (see **Includes**): an include whose joined path is 1024 bytes
 or longer is `error code=9002 name=ANVL_ERR_INVALID_ARGUMENT category=3` (an include category, not an argument
@@ -682,7 +687,9 @@ extension is the dialect hint, `include "x";` resolves against the including fil
 includes is one document, and an include cycle, a missing file or a syntax error is the reader's error. (A port with no
 file system keeps the files in memory and resolves the same paths.) A file name is `[A-Za-z0-9_.-]` components separated
 by `/`, at most 200 bytes, with no empty component, no leading `/`, and no `.` or `..` component. Declaring a name twice is
-a script error. All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
+a script error (`file declared twice`), and so is a name that conflicts with another file: one that is a directory prefix of
+another (`lib` after `lib/a.anvl`, or the reverse) cannot be both a file and a directory (`file name conflicts with another
+file`). All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
 declared: it does not exist, and loading it is the reader's `ANVIL_ERR_IO`. The paths the run prints (the `source` of a
 registry diagnostic, and the document names inside a name-collision message) are `anvil_document_get_path`: the root
 document is the `FILE` of the step exactly as written, and an included document is its includer's directory (`.` when the
@@ -723,6 +730,9 @@ find` is `anvil_type_registry_find` only. The *option*s of `validate_value` are 
 With none of them the call passes a zeroed options struct with `size` set, which is `anvil_schema_validate`'s behaviour.
 The word `NULL` as the text passes the null value.
 
+A step line has at most **16 tokens**: the call name and its arguments, so at most 15 arguments. A seventeenth token is a
+script error (`too many arguments`).
+
 **What a load does with a bad document.** A step that loads a document (`registry`, `schema`, `validate`) records how the
 load went (`doc=` below) and **goes on with the API call regardless**, with whatever `anvil_load` returned (a document
 with errors, or `NULL`): the library's behaviour for that input is the contract. A fragment that does not parse is the
@@ -746,6 +756,11 @@ exits 2 and is not part of the corpus). Every record starts with its **record na
 single spaces; a value is an integer, a word, or a quoted string. A record with **child lines** is followed by them, each
 indented two spaces more than its parent (the records of a step have no indent). A key is written even when its value is
 `none`.
+
+The numeric values behind every `code=`, `type_code=` and `kind=` name in a run (violation, schema diagnostic, type
+diagnostic and type kind codes, and the reader's error categories) are in `conformance/drift-tables.txt`
+(`enum:anvil_schema_err_code`, `enum:anvil_schema_diag_code`, `enum:anvil_type_diag_code`, `enum:anvil_type_kind`,
+`enum:anvil_err_code`); this section does not repeat them, and `make check-conformance` fails when that file is stale.
 
 **`doc=D`** is how the step's document loaded: `ok` when `anvil_load` returned a document and `anvil_has_errors` is false,
 `null` when it returned `NULL`, and otherwise the name of the category of `anvil_get_error`: `ANVIL_ERR_IO`,
@@ -822,6 +837,11 @@ also has `kind=integer|float overflow=0|1` and `i64=N` or `f64=0x...` as in the 
 (`anvil_value_get_blob_tag`, empty if untagged) and `text="..."` (`anvil_value_get_bytes`); an array or tuple has
 `count=N` followed by its elements; an object has `count=N` followed, for each statement, by `stmt name="N"` and the
 statement's value tree two spaces deeper.
+
+`text=` is the **source span** of a scalar, exactly as written, for every scalar but a string (decoded) and a blob (its
+bytes). That includes a numeric that overflowed: `1e400` is `value type=NUMERIC text="1e400" kind=float overflow=1`, and
+`99999999999999999999` is `kind=integer overflow=1`, in both cases with **neither `i64=` nor `f64=`**. A reader must not
+substitute infinity or a clamped number for the text.
 
 **`validate`**
 
