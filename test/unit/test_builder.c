@@ -946,7 +946,7 @@ static void test_b21_base_checks_are_linear(void) {
    b = chain_builder(100000, false);
    clock_gettime(CLOCK_MONOTONIC, &t0); // the emit alone; a quadratic check would take minutes even natively
    TestBit.is_not_null(anvil_builder_emit(b, NULL), "B21: a 100000-member chain emits");
-   TestBit.is_true(seconds_since(&t0) < 60.0, "B21: a 100000-member chain emits in well under 60 s");
+   TestBit.is_true(seconds_since(&t0) < 10.0, "B21: a 100000-member chain emits in well under 10 s");
    anvil_builder_dispose(b);
    b = chain_builder(100000, true);
    TestBit.is_null(anvil_builder_emit(b, NULL), "B21: a 100000-member ring is refused");
