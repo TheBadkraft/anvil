@@ -2,6 +2,10 @@ anvil-builder-script 1
 # emit fails while the base names a scalar, and works after the base is replaced
 option on-error continue
 dialect AML
+let o_v = int 1
+let o = object
+add o "k" o_v
+let m = add NULL "base" o
 let n = int 1
 add NULL "scalar" n
 let d = object

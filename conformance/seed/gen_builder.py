@@ -308,10 +308,10 @@ def obj_member(name="base", h="o", mh="m"):
     return [let(h + "_v", "int 1"), let(h, "object"), 'add %s "k" %s_v' % (h, h), let(mh, 'add NULL %s %s' % (q(name), h))]
 case(BS, "valid", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', "emit"])
 case(BS, "valid_after_target", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"'] + obj_member("base") + ["emit"], desc="the base may be declared later")
-case(BS, "missing_target", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "nothere"', "emit"], desc="a base that names no top-level member is accepted")
+case(BS, "missing_target", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "nothere"', "emit"], desc="no include: a base that names no top-level member is refused with MISSING_BASE")
 case(BS, "target_is_self", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "d" d'), 'set_base dm "d"', "emit"])
 case(BS, "replaced", obj_member("base") + obj_member("other", "p", "pm") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', 'set_base dm "other"', "emit"], desc="set_base again replaces the base")
-case(BS, "replaced_back_to_valid", [let("n", "int 1"), 'add NULL "scalar" n', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "scalar"', "emit", 'set_base dm "base"', "emit"], cont=True,
+case(BS, "replaced_back_to_valid", obj_member("base") + [let("n", "int 1"), 'add NULL "scalar" n', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "scalar"', "emit", 'set_base dm "base"', "emit"], cont=True,
      desc="emit fails while the base names a scalar, and works after the base is replaced")
 case(BS, "chain", obj_member("a") + [let("b", "object"), let("x", "int 2"), 'add b "j" x', let("bm", 'add NULL "b" b'), 'set_base bm "a"', let("c", "object"), let("y", "int 3"), 'add c "l" y', let("cm", 'add NULL "c" c'), 'set_base cm "b"', "emit"])
 case(BS, "several_derived", obj_member("base") + sum([[let("d%d" % i, "object"), let("x%d" % i, "int %d" % i), 'add d%d "j" x%d' % (i, i), let("m%d" % i, 'add NULL "d%d" d%d' % (i, i)), 'set_base m%d "base"' % i] for i in range(4)], []) + ["emit"])
@@ -359,8 +359,8 @@ for k in ("null", "bool true", "int 1", 'string "s"', 'bare "x"', 'blob "t" "d"'
 case(BS, "target_non_object_array", [let("t", "array"), let("e", "int 1"), "append t e", 'add NULL "target" t', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"])
 case(BS, "target_non_object_tuple", [let("t", "tuple"), let("e", "int 1"), let("f", "int 2"), "append t e", "append t f", 'add NULL "target" t', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"])
 case(BS, "target_non_object_declared_later", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', let("t", "int 1"), 'add NULL "target" t', "emit"])
-case(BS, "target_nested_non_object_not_checked", [let("o", "object"), let("n", "int 1"), 'add o "target" n', 'add NULL "outer" o', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"],
-     desc="only top-level names are looked up")
+case(BS, "target_only_nested_missing", [let("o", "object"), let("n", "int 1"), 'add o "target" n', 'add NULL "outer" o', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"],
+     desc="a name that exists only inside an object (a scalar there) is not a top-level name: MISSING_BASE, not the non-object error")
 # nested and unattached members: the check runs over every member the builder created
 case(BS, "nested_member_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "target"', 'add NULL "outer" outer', "emit"])
 case(BS, "unattached_member_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "target"', "emit", "write", "get_error"], cont=True,

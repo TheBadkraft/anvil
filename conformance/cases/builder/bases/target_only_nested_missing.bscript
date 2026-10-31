@@ -1,5 +1,5 @@
 anvil-builder-script 1
-# only top-level names are looked up
+# a name that exists only inside an object (a scalar there) is not a top-level name: MISSING_BASE, not the non-object error
 dialect AML
 let o = object
 let n = int 1

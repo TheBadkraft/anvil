@@ -539,11 +539,11 @@ optional length; `N` a node handle, `M` a member handle (a bound name or `NULL`)
 
 | call | arguments | result | native function |
 |---|---|---|---|
-| `dialect` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 1; an integer is the raw enum value, to reach an invalid dialect) |
-| `builder2` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 2, for `other`; once, after `dialect`) |
+| `dialect` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 1; an integer is the raw enum value, to reach an invalid dialect; a decimal within `int32`, -2147483648 to 2147483647) |
+| `builder2` | `AML` \| `AMP` \| *integer* | | `anvil_builder_new` (builder 2, for `other`; once, after `dialect`; the integer is within `int32` as for `dialect`) |
 | `option` | `on-error stop` \| `on-error continue` | | script control, as in the writer script |
 | `get_error` | | | `anvil_builder_get_error` |
-| `error_message` | *integer* | | `anvil_writer_error_message` (the builder reports the writer's codes) |
+| `error_message` | *integer* | | `anvil_writer_error_message` (the builder reports the writer's codes; any decimal within `int32`, -2147483648 to 2147483647, in or out of the enum) |
 | `attribute` | *key* `P`, *value* `P` | | `anvil_builder_attribute` |
 | `attribute_string` | *key* `P`, *text* `S` [, *len*] | | `anvil_builder_attribute_string` |
 | `include` | *path* `P` | | `anvil_builder_include` |
@@ -565,6 +565,19 @@ optional length; `N` a node handle, `M` a member handle (a bound name or `NULL`)
 | `find` | *object* `N` (`NULL` is the document), *name* `P` | member | `anvil_builder_find` |
 | `emit` | | | `anvil_builder_emit` |
 | `write` | [`AML` \| `AMP` \| `NULL`] | | `anvil_builder_write` into a fresh writer, then `anvil_writer_finish` (below) |
+
+**Bases.** `set_base` accepts any member of the builder and a valid name; nothing else about a base is checked there, except that
+the member's value must be an object (`ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT`) and, for a member handle of the
+other builder, `ANVIL_WRITER_ERR_INVALID_ARGUMENT`. The rest is checked when the document is written, by `emit` and
+`write`, before anything is written, across **every member the builder created**, attached to the document or not. A base
+names a top-level statement (the reader looks bases up among the top-level names only, never in the enclosing object).
+The checks run in this order, and the first failure is the error:
+
+1. **Non-object.** The base names a top-level member whose value is not an object: `ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT` (BR-2610-anvl-writer-002).
+2. **Missing.** The base names no top-level member: `ANVIL_WRITER_ERR_MISSING_BASE` (BR-2610-anvl-writer-004). **Unless the builder
+   holds any `include`** (added before or after the base): the included file may declare the base, so it is accepted.
+3. **Cycle.** The bases of the top-level statements loop back, a statement based on itself or `a` on `b` on `a`, or any longer
+   ring, including a statement whose chain leads into a ring: `ANVIL_WRITER_ERR_INHERITANCE_CYCLE`. An include does not excuse it.
 
 Every `S` and *len* rule, and the `int` and `double` forms, are the writer script's (`string NULL 3` passes the null
 pointer with the length 3; a *len* longer than a quoted string is a script error). The builder has **no removal or
@@ -621,14 +634,15 @@ step (counting from 1, either builder) to `<dir>/emit-<k>.anvl`; `scripts/check-
 **generated** by `conformance/seed/gen_builder.py`, which writes scripts only; the runs are native's, written by
 `make update-conformance` and by nothing else. `make check-conformance` checks, for every `.bscript`, that native's run
 equals the committed `.dump`, and `make check-builder-roundtrip` checks that **every successful `emit` and `write` loads
-through the native reader with `status ok`** (an `include` is satisfied by an empty file of that name; known
-inconsistencies are listed with their ticket or reason in `conformance/builder-roundtrip-known.txt`). `make check-builder-gen`
+through the native reader with `status ok`** (the harness writes each `include` as a file of that name: the first holds, for every base name the document uses but does
+not declare itself, a statement `name := { f := 1; };` so that an include can supply a base, and the others are empty; an
+absolute or directory path cannot be written and is listed. Known inconsistencies are listed with their ticket or reason in
+`conformance/builder-roundtrip-known.txt`). `make check-builder-gen`
 checks that the generator reproduces the committed scripts and writes no dump.
 
 Areas: `lifecycle` (new, get_error, error_message, non-sticky errors, emit twice, write), `values` (every value kind and
 its errors), `names` (statement names, duplicates), `collections` (arrays, tuples, objects, attaching rules, nesting),
-`attributes` (module and member attributes), `include` (include ordering), `bases` (`set_base`, the
-INHERITANCE_REQUIRES_OBJECT check across all members), `find`, `depth` (nesting up to and beyond the limit), `amp` (the
+`attributes` (module and member attributes), `include` (include ordering), `bases` (`set_base` and the three base checks above, across all members), `find`, `depth` (nesting up to and beyond the limit), `amp` (the
 AMP dialect and what it refuses), `handles` (null, foreign and misused handles), `envelope` (King & Crucible shaped
 documents) and `flywire` (FlyWire shaped documents).
 
