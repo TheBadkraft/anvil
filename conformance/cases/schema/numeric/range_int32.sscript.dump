@@ -48,12 +48,15 @@ validate_value line=38 schema=s doc=ok opts=default result=fail count=1
   violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
 validate_value line=39 schema=s doc=ok opts=default result=fail count=1
   violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
-validate_value line=40 schema=s doc=ok opts=default result=fail count=1
-  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
-validate_value line=41 schema=s doc=ok opts=default result=fail count=1
-  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
-validate_value line=42 schema=s doc=ok opts=default result=fail count=1
-  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=40 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
+  violation index=1 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=41 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
+  violation index=1 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+validate_value line=42 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
+  violation index=1 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
 validate_value line=43 schema=s doc=ok opts=default result=fail count=1
   violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
 validate_value line=44 schema=s doc=ok opts=default result=pass count=0

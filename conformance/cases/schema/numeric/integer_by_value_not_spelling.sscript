@@ -1,4 +1,5 @@
 anvil-schema-script 1
+# BR-2610-anvl-schema-004: a decimal/exponent literal beyond double range (1e400) is not an integer and fails; a digits-only literal past int64 is whole and passes
 file "s.anvl"
 |#!aml
 |@[schema]
@@ -18,3 +19,8 @@ validate_value s "{ n := 9007199254740993.0; }"
 validate_value s "{ n := 1e400; }"
 validate_value s "{ n := -2.0; }"
 validate_value s "{ n := 5e-324; }"
+validate_value s "{ n := -1e400; }"
+validate_value s "{ n := 1.5e999; }"
+validate_value s "{ n := 1e308; }"
+validate_value s "{ n := 99999999999999999999; }"
+validate_value s "{ n := -99999999999999999999; }"

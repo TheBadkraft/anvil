@@ -794,8 +794,14 @@ bool anvil_type_def_integer(anvil_type_def def, bool *out_declared) {
 
 bool anvil_numeric_is_whole(anvil_value data) {
    anvil_numeric_t n = anvil_value_get_numeric(data);
-   if (n.overflowed || n.is_integral) {
-      return true; // beyond double range every value is whole; an integral literal is whole
+   if (n.is_integral) {
+      // A digits-only literal is whole, even past int64 (overflowed): it has no fraction.
+      return true;
+   }
+   if (n.overflowed) {
+      // A decimal/exponent literal beyond double range (1e400) has no finite value to be whole, and
+      // an infinity is not an integer (BR-2610-anvl-schema-004). Also what a non-number reads as.
+      return false;
    }
    double d = n.as_double;
    if (d >= 9223372036854775808.0 || d <= -9223372036854775808.0) {

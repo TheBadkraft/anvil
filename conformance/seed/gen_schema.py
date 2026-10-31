@@ -400,7 +400,8 @@ COMBOS = [("none", ""), ("min0", "min := 0;"), ("max10", "max := 10;"), ("min0_m
           ("min_tiny", "min := 5e-324;"), ("max_tiny_neg", "max := -5e-324;"), ("min_u64", "min := 18446744073709551615;"), ("min_bignum", "min := 123456789012345678901234567890;")]
 for cn, body in COMBOS:
     case(N, "range_" + cn, [("s.anvl", SCHEMA + "n := { type := Numeric; %s };\n" % body)], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in NUMS], desc=body)
-case(N, "integer_by_value_not_spelling", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["2", "2.0", "2.50", "1e+3", "1e-1", "1e2", "12e-1", "0.0", "-0.0", "1.0000000000000001", "9007199254740993.0", "1e400", "-2.0", "5e-324"]])
+case(N, "integer_by_value_not_spelling", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["2", "2.0", "2.50", "1e+3", "1e-1", "1e2", "12e-1", "0.0", "-0.0", "1.0000000000000001", "9007199254740993.0", "1e400", "-2.0", "5e-324", "-1e400", "1.5e999", "1e308", "99999999999999999999", "-99999999999999999999"]],
+     desc="BR-2610-anvl-schema-004: a decimal/exponent literal beyond double range (1e400) is not an integer and fails; a digits-only literal past int64 is whole and passes")
 case(N, "numbers_as_other_kinds", [("s.anvl", SCHEMA + "s := { type := String; };\nb := { type := Bool; };\ne := { type := enum; values := [1, 2.0, 1e1, 007]; };\n")],
      ['schema s load "s.anvl"'] + [vv("s", "{ %s := %s; }" % (f, v)) for f in "sbe" for v in ["1", "2.0", "1e1", "007", "2", "10", "true"]])
 case(N, "enum_numeric_membership", [("s.anvl", SCHEMA + "e := { type := enum; values := [1, 2.5, \"3\", 1e2]; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ e := %s; }" % v) for v in ["1", "1.0", "2.5", "2.50", "3", '"3"', "1e2", "100", '"1e2"', "01"]])
