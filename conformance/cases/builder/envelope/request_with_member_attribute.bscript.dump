@@ -1,0 +1,5 @@
+anvil-builder-run 1
+find line=9 result=found
+emit bytes=71 text="#!aml\n\nutid := @utid`id-1`;\nseq @[k=v] := 3;\npayload := @table`[(1)]`;\n"
+steps 10
+status ok

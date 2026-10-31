@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=7 code=12 name=ANVIL_WRITER_ERR_EMPTY_COLLECTION call="emit" message="empty collection (arrays and objects need 1 element, tuples 2)"
+emit bytes=17 text="#!aml\n\na := [1];\n"
+steps 8
+status ok

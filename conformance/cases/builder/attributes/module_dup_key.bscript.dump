@@ -1,0 +1,6 @@
+anvil-builder-run 1
+failed line=5 code=18 name=ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY call="attribute \"k\" \"2\"" message="attribute key given twice"
+get_error code=18 name=ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY
+emit bytes=14 text="#!aml\n\n@[k=1]\n"
+steps 6
+status ok

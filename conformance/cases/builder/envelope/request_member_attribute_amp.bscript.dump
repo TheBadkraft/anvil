@@ -1,0 +1,5 @@
+anvil-builder-run 1
+find line=10 result=found
+failed line=11 code=4 name=ANVIL_WRITER_ERR_DIALECT call="member_attribute m \"k\" \"v\"" message="construct is forbidden in this dialect"
+steps 9
+status error code=4 name=ANVIL_WRITER_ERR_DIALECT

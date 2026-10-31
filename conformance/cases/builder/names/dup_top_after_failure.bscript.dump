@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=8 code=15 name=ANVIL_WRITER_ERR_DUPLICATE_NAME call="add NULL \"x\" b" message="top-level name declared twice"
+emit bytes=23 text="#!aml\n\nx := 1;\ny := 2;\n"
+steps 8
+status ok

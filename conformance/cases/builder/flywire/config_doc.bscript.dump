@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=387 text="#!aml\n\ninclude \"base.anvl\";\ninclude \"secrets.anvl\";\n@[profile=prod]\n\ndatabase @[secret] := {\n   host := \"db.internal\";\n   port := 5432;\n   password := $db_password;\n   tls := true;\n};\nhosts := [\"node0.example\", \"node1.example\", \"node2.example\", \"node3.example\", \"node4.example\"];\nlimits := (10, 100);\ntimeout_ratio := 0.75;\nfallback := null;\nreplica : database := {\n   replicas := 3;\n};\n"
+steps 43
+status ok

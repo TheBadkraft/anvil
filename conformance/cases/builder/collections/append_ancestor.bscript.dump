@@ -1,0 +1,9 @@
+anvil-builder-run 1
+failed line=9 code=3 name=ANVIL_WRITER_ERR_STATE call="append c a" message="call is not legal at this point in the document"
+get_error code=3 name=ANVIL_WRITER_ERR_STATE
+failed line=11 code=3 name=ANVIL_WRITER_ERR_STATE call="append c b" message="call is not legal at this point in the document"
+get_error code=3 name=ANVIL_WRITER_ERR_STATE
+failed line=13 code=3 name=ANVIL_WRITER_ERR_STATE call="append c c" message="call is not legal at this point in the document"
+get_error code=3 name=ANVIL_WRITER_ERR_STATE
+steps 13
+status error code=3 name=ANVIL_WRITER_ERR_STATE

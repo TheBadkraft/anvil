@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=5 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="attribute \"a b\" \"v\"" message="invalid identifier"
+get_error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER
+steps 4
+status error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER

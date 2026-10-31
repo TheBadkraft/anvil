@@ -1,0 +1,7 @@
+anvil-builder-run 1
+failed line=4 code=8 name=ANVIL_WRITER_ERR_INVALID_BARE call="let a = bare \"1\"" message="text cannot be written as a bare literal"
+failed line=6 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="add NULL \"a\" a" message="invalid argument"
+get_error code=0 name=ANVIL_WRITER_OK
+emit bytes=16 text="#!aml\n\nb := ok;\n"
+steps 8
+status ok

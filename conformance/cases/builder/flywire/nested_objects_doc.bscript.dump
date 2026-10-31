@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=254 text="#!aml\n\nroot := {\n   child0 := {\n      value := 0;\n   };\n   child1 := {\n      value := 1;\n   };\n   child2 := {\n      value := 2;\n   };\n   child3 := {\n      value := 3;\n   };\n   child4 := {\n      value := 4;\n   };\n   child5 := {\n      value := 5;\n   };\n};\n"
+steps 28
+status ok

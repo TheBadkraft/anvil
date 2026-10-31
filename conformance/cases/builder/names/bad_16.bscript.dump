@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=5 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="add NULL \"a\\tb\" v" message="invalid identifier"
+steps 3
+status error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER

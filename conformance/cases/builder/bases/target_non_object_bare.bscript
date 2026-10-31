@@ -2,7 +2,7 @@ anvil-builder-script 1
 # BR-2610-anvl-writer-002: the base names a top-level member that is not an object
 option on-error continue
 dialect AML
-let t = bare x
+let t = bare "x"
 add NULL "target" t
 let d = object
 let x = int 2

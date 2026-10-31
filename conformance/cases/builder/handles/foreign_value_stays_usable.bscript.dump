@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=7 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="other add o \"a\" n" message="invalid argument"
+emit bytes=17 text="#!aml\n\na := \"x\";\n"
+steps 8
+status ok

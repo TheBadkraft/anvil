@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=110 text="#!aml\n\nquery := @sql`SELECT a, b FROM t WHERE c = \"x\";`;\nnotes := @md`# Notes\n- one\n- two\n`;\nraw := `opaque`;\n"
+steps 8
+status ok

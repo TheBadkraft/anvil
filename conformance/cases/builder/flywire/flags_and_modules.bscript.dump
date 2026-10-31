@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=141 text="#!aml\n\ninclude \"types.anvl\";\n@[module=flywire.core]\n@[strict]\n@[description=\"FlyWire core module\"]\n\nversion @[frozen, since=1.0] := \"1.2.3\";\n"
+steps 10
+status ok

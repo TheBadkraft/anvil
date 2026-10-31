@@ -1,0 +1,6 @@
+anvil-builder-run 1
+failed line=8 code=3 name=ANVIL_WRITER_ERR_STATE call="append b x" message="call is not legal at this point in the document"
+get_error code=3 name=ANVIL_WRITER_ERR_STATE
+emit bytes=17 text="#!aml\n\na := [1];\n"
+steps 10
+status ok

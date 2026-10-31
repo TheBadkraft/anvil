@@ -1,0 +1,6 @@
+anvil-builder-run 1
+failed line=13 code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT call="emit" message="a statement with a base must have an object value"
+failed line=14 code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT call="write" message="a statement with a base must have an object value"
+get_error code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT
+steps 13
+status error code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT

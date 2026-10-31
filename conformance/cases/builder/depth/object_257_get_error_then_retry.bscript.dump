@@ -1,0 +1,8 @@
+anvil-builder-run 1
+failed line=521 code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED call="emit" message="nesting is too deep"
+get_error code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED
+failed line=523 code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED call="emit" message="nesting is too deep"
+failed line=524 code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED call="write" message="nesting is too deep"
+get_error code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED
+steps 523
+status error code=16 name=ANVIL_WRITER_ERR_DEPTH_EXCEEDED

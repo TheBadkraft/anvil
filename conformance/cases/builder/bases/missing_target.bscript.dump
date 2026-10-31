@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=44 text="#!aml\n\nderived : nothere := {\n   j := 2;\n};\n"
+steps 7
+status ok

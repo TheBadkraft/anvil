@@ -1,0 +1,17 @@
+anvil-builder-run 1
+failed line=4 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="dialect 9" message="invalid argument"
+failed line=5 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="attribute \"a\" NULL" message="invalid argument"
+failed line=6 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="include \"x\"" message="invalid argument"
+failed line=7 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="let n = null" message="invalid argument"
+failed line=8 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="let o = object" message="invalid argument"
+failed line=9 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="append n n" message="invalid argument"
+failed line=10 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="let m = add NULL \"a\" n" message="invalid argument"
+failed line=11 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="set_base m \"b\"" message="invalid argument"
+failed line=12 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute m \"k\" \"v\"" message="invalid argument"
+failed line=13 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute_string m \"k\" \"v\"" message="invalid argument"
+find line=14 result=none
+failed line=15 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="write" message="invalid argument"
+failed line=16 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="write AMP" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+steps 15
+status error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT

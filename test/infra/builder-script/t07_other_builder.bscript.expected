@@ -4,5 +4,5 @@ get_error code=0 name=ANVIL_WRITER_OK
 get_error code=0 name=ANVIL_WRITER_OK
 emit bytes=30 text="#!aml\n\nd := {\n   k := \"y\";\n};\n"
 get_error code=0 name=ANVIL_WRITER_OK
-steps 12
+steps 13
 status ok

@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=61 text="#!aml\n\n@[version=1]\n@[title=\"T\"]\n\na @[doc=x] := 1;\nb := \"s\";\n"
+steps 9
+status ok

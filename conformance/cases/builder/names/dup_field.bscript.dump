@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=8 code=17 name=ANVIL_WRITER_ERR_DUPLICATE_FIELD call="add o \"k\" b" message="field name declared twice in one object"
+emit bytes=28 text="#!aml\n\no := {\n   k := 1;\n};\n"
+steps 9
+status ok

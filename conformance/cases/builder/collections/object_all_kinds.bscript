@@ -9,7 +9,7 @@ let v = int 7
 add o "f2" v
 let v = string "s"
 add o "f3" v
-let v = bare b
+let v = bare "b"
 add o "f4" v
 let v = blob "t" "d"
 add o "f5" v

@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=66 text="#!aml\n\nd := ((((((((((10, 1), 9), 8), 7), 6), 5), 4), 3), 2), 1);\n"
+steps 44
+status ok

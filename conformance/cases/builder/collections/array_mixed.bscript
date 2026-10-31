@@ -9,7 +9,7 @@ let e2 = bool true
 append a e2
 let e3 = null
 append a e3
-let e4 = bare x
+let e4 = bare "x"
 append a e4
 let e5 = blob "t" "d"
 append a e5

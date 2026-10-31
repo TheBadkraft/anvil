@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=10 code=15 name=ANVIL_WRITER_ERR_DUPLICATE_NAME call="add NULL \"utid\" f3" message="top-level name declared twice"
+steps 9
+status error code=15 name=ANVIL_WRITER_ERR_DUPLICATE_NAME

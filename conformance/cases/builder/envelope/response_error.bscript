@@ -5,7 +5,7 @@ add NULL "utid" u
 let s = int 7
 add NULL "seq" s
 let r = tuple
-let r0 = bare error
+let r0 = bare "error"
 append r r0
 let r1 = string "boom: \"quoted\""
 append r r1

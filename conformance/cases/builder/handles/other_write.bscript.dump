@@ -1,0 +1,6 @@
+anvil-builder-run 1
+write bytes=15 text="#!aml\n\nb := 2;\n"
+write bytes=15 text="#!aml\n\na := 1;\n"
+write bytes=15 text="#!amp\n\nb := 2;\n"
+steps 9
+status ok

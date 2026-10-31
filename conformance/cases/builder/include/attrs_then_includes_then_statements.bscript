@@ -6,5 +6,6 @@ include "x.anvl"
 include "y.anvl"
 let v = int 1
 add NULL "n" v
-let m = add NULL "m" v
+let w = int 2
+let m = add NULL "m" w
 emit

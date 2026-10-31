@@ -2,7 +2,7 @@
 # The round-trip property of the builder corpus: every successful emit and write of every builder script in
 # conformance/cases/builder must be a document the native reader loads with status ok. An `include "p";` in the output
 # is satisfied by an empty file p. conformance/builder-roundtrip-known.txt lists known failures as
-# "<script> <emit-number> <ticket>" lines. Usage: check-builder-roundtrip.sh <anvil-dump>
+# "<script> <emit-number> <ticket or reason>" lines. Usage: check-builder-roundtrip.sh <anvil-dump>
 set -u
 dump=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -22,7 +22,8 @@ for s in $(find . -type f -name '*.bscript' | sed 's|^\./||' | LC_ALL=C sort); d
       n=$((n + 1))
       rm -rf "$tmp/w"; mkdir "$tmp/w"; cp "$f" "$tmp/w/doc.anvl"
       sed -n 's/^include "\(.*\)";$/\1/p' "$tmp/w/doc.anvl" | while IFS= read -r inc; do
-         mkdir -p "$tmp/w/$(dirname "$inc")" && : > "$tmp/w/$inc"
+         case $inc in /*|.|..|*/.|*/..) continue;; esac # absolute and directory paths cannot be satisfied
+         mkdir -p "$tmp/w/$(dirname "$inc")" 2>/dev/null && : > "$tmp/w/$inc" 2>/dev/null
       done
       (cd "$tmp/w" && "$dump" doc.anvl) > "$tmp/dump" 2>&1
       is_known=$(grep -v '^#' "$known" 2>/dev/null | awk -v c="$s" -v k="$k" '$1 == c && $2 == k { print $3 }')

@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that
+  a second implementation (the `AnvilBuilder` of anvil.js) must reproduce byte for byte, like the writer corpus. A
+  versioned builder script (`anvil-builder-script 1`, specified in `conformance/FORMAT.md`) reuses the writer script's
+  quoting, `NULL`, number and input rules and adds handles (`let m = add ...`) for nodes and members, a second builder
+  (`builder2`, `other`) for the foreign-handle error, and `emit` and `write` steps. `anvil-dump --builder-script <file>`
+  prints the run (`anvil-builder-run 1`): every failed call with its error code, every `find` result, the exact bytes of
+  every `emit` and `write`, and the final status; `--emit-dir <dir>` also writes each emitted document for the
+  round-trip check. 892 generated scripts under `conformance/cases/builder/` (`conformance/seed/gen_builder.py`, scripts
+  only; the runs are native's) cover every call, every value kind, nesting to and past the depth limit
+  (`ANVIL_WRITER_ERR_DEPTH_EXCEEDED`), module and member attributes, include ordering, bases (valid, non-object,
+  unattached, missing), every error path, and King & Crucible and FlyWire shaped documents. Wired into
+  `make check-conformance`, `update-conformance` and `check-dump-valgrind`, with `check-builder-script` (tool tests),
+  `check-builder-gen` and `check-builder-roundtrip` (every successful emit loads through the native reader; 7 known
+  entries, `conformance/builder-roundtrip-known.txt`). No library, ABI or builder behaviour change. The script lexer
+  of `anvil-dump` moved into a shared file (`tools/script-common.c`) with no change to the writer mode.
+- **Found, not fixed:** BR-2610-anvl-writer-004 (the builder accepts a base that names the statement itself or a name
+  missing from the document; the reader rejects both).
+
 ---
 
 ## [v0.12.1-rc] — (2026-10-30)

@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=70 text="#!amp\n\nutid := @utid`id-1`;\nseq := 3;\npayload := @text`caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac`;\n"
+steps 8
+status ok

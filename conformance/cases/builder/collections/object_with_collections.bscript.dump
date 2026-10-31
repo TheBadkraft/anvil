@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=53 text="#!aml\n\no := {\n   arr := [1, 2];\n   tup := (2, 3);\n};\n"
+steps 16
+status ok

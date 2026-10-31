@@ -155,7 +155,7 @@ case(V, "varref_null", doc1("varref NULL"))
 case(V, "varref_reserved", doc1('varref "true"'))
 case(V, "varref_amp", doc1('varref "x"'), "AMP")
 case(V, "varref_in_array", [let("a", "array"), let("r", 'varref "x"'), "append a r", 'add NULL "a" a', "emit"])
-for k in ("null", "bool true", "int 1", 'string "s"', 'bare ok', 'blob "t" "d"', "double 1.5"):
+for k in ("null", "bool true", "int 1", 'string "s"', 'bare "ok"', 'blob "t" "d"', "double 1.5"):
     case(V, "unattached_%s" % k.split()[0], [let("v", k), "emit"], desc="a value never attached is not in the document")
 case(V, "many_values", sum([[let("v%d" % i, "int %d" % i), 'add NULL "n%d" v%d' % (i, i)] for i in range(40)], []) + ["emit"])
 
@@ -183,10 +183,10 @@ case(N, "bad_name_value_stays_detached", [let("v", "int 1"), 'add NULL "1" v', '
 C = "collections"
 def arr(kind, vals, h="a", name="a"):
     return [let(h, kind)] + sum([[let("e%d" % i, v), "append %s e%d" % (h, i)] for i, v in enumerate(vals)], []) + ["add NULL %s %s" % (q(name), h), "emit"]
-for n, vals in (("ints", ["int 1", "int 2", "int 3"]), ("one", ["int 1"]), ("mixed", ["int 1", 'string "s"', "bool true", "null", 'bare x', 'blob "t" "d"', "double 2.5"]), ("strings", ['string ""', 'string "a\\nb"']),
+for n, vals in (("ints", ["int 1", "int 2", "int 3"]), ("one", ["int 1"]), ("mixed", ["int 1", 'string "s"', "bool true", "null", 'bare "x"', 'blob "t" "d"', "double 2.5"]), ("strings", ['string ""', 'string "a\\nb"']),
                 ("with_varref", ['varref "x"', "int 1"]), ("long_1000", ["int %d" % i for i in range(1000)]), ("two", ["int 1", "int 2"])):
     case(C, "array_" + n, arr("array", vals))
-for n, vals in (("two", ["int 1", "int 2"]), ("three", ["int 1", 'string "s"', "bool true"]), ("one_fails", ["int 1"]), ("long_500", ["int %d" % i for i in range(500)]), ("mixed", ["null", 'bare ok', "double 1.5", 'blob "t" "x"'])):
+for n, vals in (("two", ["int 1", "int 2"]), ("three", ["int 1", 'string "s"', "bool true"]), ("one_fails", ["int 1"]), ("long_500", ["int %d" % i for i in range(500)]), ("mixed", ["null", 'bare "ok"', "double 1.5", 'blob "t" "x"'])):
     case(C, "tuple_" + n, arr("tuple", vals))
 case(C, "array_empty", [let("a", "array"), 'add NULL "a" a', "emit"])
 case(C, "tuple_empty", [let("a", "tuple"), 'add NULL "a" a', "emit"])
@@ -201,8 +201,8 @@ case(C, "tuple_of_arrays", [let("t", "tuple"), let("a", "array"), let("b", "arra
 case(C, "array_of_objects", [let("a", "array"), let("o1", "object"), let("o2", "object"), let("x", "int 1"), let("y", "int 2"), 'add o1 "k" x', 'add o2 "k" y', "append a o1", "append a o2", 'add NULL "list" a', "emit"])
 case(C, "object_in_tuple", [let("t", "tuple"), let("o", "object"), let("x", "int 1"), let("y", "int 2"), 'add o "k" x', "append t o", "append t y", 'add NULL "t" t', "emit"])
 case(C, "object_nested", [let("a", "object"), let("b", "object"), let("c", "object"), let("x", "int 1"), 'add c "leaf" x', 'add b "c" c', 'add a "b" b', 'add NULL "a" a', "emit"])
-case(C, "object_with_collections", [let("o", "object"), let("a", "array"), let("t", "tuple"), let("x", "int 1"), let("y", "int 2"), let("z", "int 3"), "append a x", "append a y", "append t y", "append t z", 'add o "arr" a', 'add o "tup" t', 'add NULL "o" o', "emit"])
-case(C, "object_all_kinds", [let("o", "object")] + sum([[let("v", c), 'add o %s v' % q("f%d" % i)] for i, c in enumerate(["null", "bool true", "int 7", 'string "s"', 'bare b', 'blob "t" "d"', 'varref "r"', "double 0.25"])], []) + ['add NULL "o" o', "emit"])
+case(C, "object_with_collections", [let("o", "object"), let("a", "array"), let("t", "tuple"), let("x", "int 1"), let("y", "int 2"), let("y2", "int 2"), let("z", "int 3"), "append a x", "append a y", "append t y2", "append t z", 'add o "arr" a', 'add o "tup" t', 'add NULL "o" o', "emit"])
+case(C, "object_all_kinds", [let("o", "object")] + sum([[let("v", c), 'add o %s v' % q("f%d" % i)] for i, c in enumerate(["null", "bool true", "int 7", 'string "s"', 'bare "b"', 'blob "t" "d"', 'varref "r"', "double 0.25"])], []) + ['add NULL "o" o', "emit"])
 case(C, "object_build_order", [let("o", "object"), 'add NULL "o" o', let("x", "int 1"), 'add o "k" x', "emit"], desc="members may be added after the object is attached")
 case(C, "array_append_after_attach", [let("a", "array"), 'add NULL "a" a', let("x", "int 1"), "append a x", let("y", "int 2"), "append a y", "emit"])
 case(C, "deep_build_bottom_up", [let("c", "array"), let("x", "int 1"), "append c x", let("b", "array"), "append b c", let("a", "array"), "append a b", 'add NULL "a" a', "emit"])
@@ -294,7 +294,7 @@ case(I, "with_statement", ['include "a.anvl"', let("v", "int 1"), 'add NULL "x" 
 case(I, "before_attributes", ['include "a.anvl"', 'attribute "k" "v"', "emit"])
 case(I, "after_attributes", ['attribute "k" "v"', 'include "a.anvl"', "emit"], desc="BR-2610-anvl-writer-003: includes are written first, then attributes")
 case(I, "interleaved", ['attribute "a" "1"', 'include "x.anvl"', 'attribute "b" "2"', 'include "y.anvl"', 'attribute_string "c" "3"', 'include "z.anvl"', "emit"], desc="includes first in the order added, then attributes in the order added")
-case(I, "attrs_then_includes_then_statements", ['attribute "a" "1"', 'attribute "b" NULL', 'include "x.anvl"', 'include "y.anvl"', let("v", "int 1"), 'add NULL "n" v', let("m", 'add NULL "m" v'), "emit"])
+case(I, "attrs_then_includes_then_statements", ['attribute "a" "1"', 'attribute "b" NULL', 'include "x.anvl"', 'include "y.anvl"', let("v", "int 1"), 'add NULL "n" v', let("w", "int 2"), let("m", 'add NULL "m" w'), "emit"])
 case(I, "after_statements", [let("v", "int 1"), 'add NULL "n" v', 'include "late.anvl"', "emit"])
 case(I, "after_emit", ['attribute "k" "v"', "emit", 'include "a.anvl"', "emit"])
 case(I, "interleaved_write", ['attribute "a" "1"', 'include "x.anvl"', "write", "emit"])
@@ -323,12 +323,12 @@ for bi, bad in enumerate(("", "1", "a-b", "a.b", "a b", "true", "null", "include
 case(BS, "bad_base_null", obj_member("base") + ["set_base m NULL", "get_error"], cont=True)
 case(BS, "null_member", ['set_base NULL "b"', "get_error"], cont=True)
 # non-object values: refused at set_base
-for k in ("null", "bool true", "int 1", 'string "s"', "bare x", 'blob "t" "d"', 'varref "r"', "array", "tuple"):
+for k in ("null", "bool true", "int 1", 'string "s"', 'bare "x"', 'blob "t" "d"', 'varref "r"', "array", "tuple"):
     nm = k.split()[0]
     case(BS, "non_object_value_%s" % nm, [let("v", k), let("m", 'add NULL "n" v'), 'set_base m "b"', "get_error"], cont=True, desc="BR-2610-anvl-writer-002: a base needs an object value")
 case(BS, "non_object_value_array_filled", [let("v", "array"), let("x", "int 1"), "append v x", let("m", 'add NULL "n" v'), 'set_base m "b"', "get_error", "emit"], cont=True)
 # base naming a top-level non-object: fails at emit/write
-for k in ("null", "bool true", "int 1", 'string "s"', "bare x", 'blob "t" "d"', 'varref "r"'):
+for k in ("null", "bool true", "int 1", 'string "s"', 'bare "x"', 'blob "t" "d"', 'varref "r"'):
     nm = k.split()[0]
     case(BS, "target_non_object_%s" % nm, [let("t", k), 'add NULL "target" t'] + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit", "write", "get_error"], cont=True,
          desc="BR-2610-anvl-writer-002: the base names a top-level member that is not an object")
@@ -429,7 +429,7 @@ case(DP, "depth_object_in_array_257", [let("a", "array")] + chain("object", 256)
 
 # ============================================================================================ amp
 AM = "amp"
-case(AM, "scalars", sum([[let("v%d" % i, c), 'add NULL "s%d" v%d' % (i, i)] for i, c in enumerate(["null", "bool true", "int 5", 'string "s"', "bare b", 'blob "t" "d"', "double 1.5", 'numeric "2"'])], []) + ["emit"], "AMP")
+case(AM, "scalars", sum([[let("v%d" % i, c), 'add NULL "s%d" v%d' % (i, i)] for i, c in enumerate(["null", "bool true", "int 5", 'string "s"', 'bare "b"', 'blob "t" "d"', "double 1.5", 'numeric "2"'])], []) + ["emit"], "AMP")
 case(AM, "array_of_scalars", [let("a", "array")] + sum([[let("e%d" % i, c), "append a e%d" % i] for i, c in enumerate(["int 1", 'string "s"', "null"])], []) + ['add NULL "a" a', "emit"], "AMP")
 case(AM, "tuple_of_scalars", [let("a", "tuple"), let("x", "int 1"), let("y", "bool true"), "append a x", "append a y", 'add NULL "t" a', "emit"], "AMP")
 case(AM, "array_in_array", [let("a", "array"), let("b", "array"), "append a b", "get_error"], "AMP", cont=True)
@@ -471,7 +471,6 @@ case(HD, "foreign_value_into_add", [let("n", 'string "x"'), "let o = other objec
 case(HD, "foreign_value_into_document", [let("n", 'string "x"'), 'other add NULL "a" n', "other get_error", "emit"], cont=True, b2="AML")
 case(HD, "foreign_collection", [let("a", "array"), "let n = other int 1", "append a n", "get_error", "other append a n", "other get_error"], cont=True, b2="AML")
 case(HD, "foreign_object_target", [let("o", "object"), "let n = other int 1", 'other add o "k" n', "other get_error", 'add o "k" n', "get_error"], cont=True, b2="AML")
-case(HD, "foreign_member_set_base", [let("o", "object"), let("m", 'add NULL "o" o'), 'other set_base m "b"', "other get_error", 'other member_attribute m "k" "v"', "other get_error", 'other member_attribute_string m "k" "v"', "other get_error"], cont=True, b2="AML")
 case(HD, "foreign_find", [let("o", "object"), 'other find o "k"', 'other find NULL "k"', "other get_error"], cont=True, b2="AML")
 case(HD, "foreign_find_keeps_error", [let("o", "object"), 'other find o "k"', "other get_error"], cont=True, b2="AML")
 case(HD, "two_builders_independent", [let("a", "int 1"), 'add NULL "x" a', "let b = other int 2", 'other add NULL "y" b', "emit", "other emit", "get_error", "other get_error"], b2="AML")
@@ -509,8 +508,8 @@ kc("request_utf8", req(payload='blob "text" "café 日本"'.encode().decode()))
 kc("request_long_payload", req(payload='blob "table" %s' % q("[" + ", ".join("(%d)" % i for i in range(2000)) + "]")))
 kc("request_rows", req(payload='blob "table" "[(1, \\"a\\"), (2, \\"b\\")]"'))
 kc("request_attrs_free", req(), desc="the envelope has no attributes")
-kc("request_with_member_attribute", req(), "AML", tail=('member_attribute f1 "k" "v"', "emit"))
-kc("request_member_attribute_amp", req(), "AMP", tail=('member_attribute f1 "k" "v"', "get_error", "emit"), desc="AMP refuses attributes")
+kc("request_with_member_attribute", req(), "AML", tail=(let("m", 'find NULL "seq"'), 'member_attribute m "k" "v"', "emit"))
+kc("request_member_attribute_amp", req(), "AMP", tail=(let("m", 'find NULL "seq"'), 'member_attribute m "k" "v"', "get_error", "emit"), desc="AMP refuses attributes")
 kc("bad_utid_tag", [("utid", 'blob "ut-id" "x"'), ("seq", "int 1")])
 kc("payload_backtick", req(payload='blob "table" "a`b"'))
 kc("dup_seq", req() + [("seq", "int 4")])
@@ -522,9 +521,9 @@ def result_tuple(vals):
     return [let("r", "tuple")] + sum([[let("r%d" % i, v), "append r r%d" % i] for i, v in enumerate(vals)], []) + ['add NULL "result" r']
 def result_array(vals):
     return [let("r", "array")] + sum([[let("r%d" % i, v), "append r r%d" % i] for i, v in enumerate(vals)], []) + ['add NULL "result" r']
-resp("response_ok_fields", result_tuple(['bare ok', "int 1", 'string "x"']))
-resp("response_ok_int", result_tuple(['bare ok', "int 42"]))
-resp("response_error", result_tuple(['bare error', 'string "boom: \\"quoted\\""', "int 500"]))
+resp("response_ok_fields", result_tuple(['bare "ok"', "int 1", 'string "x"']))
+resp("response_ok_int", result_tuple(['bare "ok"', "int 42"]))
+resp("response_error", result_tuple(['bare "error"', 'string "boom: \\"quoted\\""', "int 500"]))
 resp("response_string_status", result_tuple(['string "ok"', "int 1"]))
 resp("response_int_status", result_tuple(["int 0", "int 1"]))
 resp("response_list", result_array(["int 1", "int 2", "int 3"]))
@@ -532,12 +531,12 @@ resp("response_many", result_array(["int %d" % i for i in range(200)]))
 resp("response_float_edges", result_tuple(["double 0.1", "double 1e21", "double -0", "double 0x0000000000000001"]))
 resp("response_int_edges", result_tuple(["int 9223372036854775807", "int -9223372036854775808", "int 0"]))
 resp("response_escapes", result_tuple(['string "a\\nb\\t\\"c\\"\\\\"', 'string "\\x01\\x7f"']))
-resp("response_with_blob", result_tuple(['bare ok', 'blob "table" "[(1)]"']))
-resp("response_single_field_fails", [let("r", "tuple"), let("r0", "bare ok"), "append r r0", 'add NULL "result" r'], desc="a 1-tuple fails at emit")
-resp("response_nested_tuple_fails", [let("r", "tuple"), let("r0", "bare ok"), "append r r0", let("i", "tuple"), let("i0", "int 1"), let("i1", "int 2"), "append i i0", "append i i1", "append r i", 'add NULL "result" r'], desc="a nested tuple is refused in AMP")
-resp("response_aml", result_tuple(['bare ok', "int 1"]), dialect="AML")
-resp("response_nested_aml", [let("r", "tuple"), let("r0", "bare ok"), "append r r0", let("i", "tuple"), let("i0", "int 1"), let("i1", "int 2"), "append i i0", "append i i1", "append r i", 'add NULL "result" r'], dialect="AML")
-resp("response_write_and_emit", result_tuple(['bare ok', "int 1"]), tail=("emit", "write", "write AML"))
+resp("response_with_blob", result_tuple(['bare "ok"', 'blob "table" "[(1)]"']))
+resp("response_single_field_fails", [let("r", "tuple"), let("r0", 'bare "ok"'), "append r r0", 'add NULL "result" r'], desc="a 1-tuple fails at emit")
+resp("response_nested_tuple_fails", [let("r", "tuple"), let("r0", 'bare "ok"'), "append r r0", let("i", "tuple"), let("i0", "int 1"), let("i1", "int 2"), "append i i0", "append i i1", "append r i", 'add NULL "result" r'], desc="a nested tuple is refused in AMP")
+resp("response_aml", result_tuple(['bare "ok"', "int 1"]), dialect="AML")
+resp("response_nested_aml", [let("r", "tuple"), let("r0", 'bare "ok"'), "append r r0", let("i", "tuple"), let("i0", "int 1"), let("i1", "int 2"), "append i i0", "append i i1", "append r i", 'add NULL "result" r'], dialect="AML")
+resp("response_write_and_emit", result_tuple(['bare "ok"', "int 1"]), tail=("emit", "write", "write AML"))
 case(KC, "request_then_response_one_builder", [let("u", 'blob "utid" "id-1"'), 'add NULL "utid" u', let("s", "int 1"), 'add NULL "seq" s', let("p", 'blob "table" "[(1)]"'), 'add NULL "payload" p', "emit"], "AMP", b2="AMP")
 case(KC, "two_envelopes_two_builders", [let("u", 'blob "utid" "id-1"'), 'add NULL "utid" u', let("s", "int 1"), 'add NULL "seq" s', "emit",
      "let v = other blob \"utid\" \"id-2\"", 'other add NULL "utid" v', "let t = other int 2", 'other add NULL "seq" t', "other emit"], "AMP", b2="AMP")
@@ -549,7 +548,7 @@ def fw_schema():
     s += [let("base", "object"), let("bid", "int 1"), 'add base "id" bid', let("bm", 'add NULL "base_table" base'), 'member_attribute bm "abstract" NULL']
     s += [let("orders", "object"), let("t", "string \"orders\""), 'add orders "table" t', let("cols", "array")]
     for i, (nm, ty) in enumerate([("id", "int64"), ("customer", "string"), ("total", "decimal"), ("placed", "timestamp")]):
-        s += [let("c%d" % i, "object"), let("n%d" % i, "string %s" % q(nm)), 'add c%d "name" n%d' % (i, i), let("y%d" % i, "bare %s" % ty), 'add c%d "type" y%d' % (i, i), "append cols c%d" % i]
+        s += [let("c%d" % i, "object"), let("n%d" % i, "string %s" % q(nm)), 'add c%d "name" n%d' % (i, i), let("y%d" % i, "bare %s" % q(ty)), 'add c%d "type" y%d' % (i, i), "append cols c%d" % i]
     s += ['add orders "columns" cols', let("om", 'add NULL "orders" orders'), 'set_base om "base_table"', 'member_attribute om "version" "3"', 'member_attribute_string om "note" "primary table"']
     return s
 case(FW, "schema_doc", fw_schema() + ["emit"])

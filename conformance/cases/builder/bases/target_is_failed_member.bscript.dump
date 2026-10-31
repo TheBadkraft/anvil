@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=6 code=3 name=ANVIL_WRITER_ERR_STATE call="add NULL \"target\" t" message="call is not legal at this point in the document"
+failed line=12 code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT call="emit" message="a statement with a base must have an object value"
+steps 11
+status error code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT
