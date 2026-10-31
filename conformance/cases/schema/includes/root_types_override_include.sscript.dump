@@ -1,0 +1,6 @@
+anvil-schema-run 1
+registry line=12 name=r how=includes file="main.anvl" doc=ANVIL_ERR_RESOLVE result=ok diagnostics=1
+  diag index=0 code=1 name=ANVIL_TYPE_DIAG_NAME_COLLISION type="A" source="main.anvl" message="type 'A' is defined in both './a.anvl' and 'main.anvl'; the one in 'main.anvl' is used"
+type line=13 how=find registry=r name="A" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=5 min_numeric=none max_numeric=i64:5 format=none values=0
+steps 4
+status ok

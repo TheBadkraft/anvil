@@ -1200,6 +1200,67 @@ static void test_typ37_nul_in_identifier_positions_is_malformed(void) {
 /* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- *
+ * TYP38-40 (BR-2610-anvl-schema-005) - the root document's own @[types] are part of
+ * the registry load_from_includes builds, and they are the closest definitions.
+ * ---------------------------------------------------------------------- */
+static void test_typ38_root_types_are_included(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("rt_root.types.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP38: registry loaded");
+   if (reg) {
+      TestBit.is_not_null(anvil_type_registry_find(reg, "Own"), "TYP38: the root's own type is registered");
+      TestBit.is_not_null(anvil_type_registry_find(reg, "Base"), "TYP38: the included type is registered");
+      long long max = 0;
+      anvil_type_def id = anvil_type_resolve(reg, "Id");
+      TestBit.is_true(id && anvil_type_def_get_max(id, &max) && max == 5,
+                      "TYP38: the root's Id (max 5) overrides the included one (max 9)");
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP38: the override is reported once");
+      anvil_type_diagnostic d = anvil_type_registry_get_diagnostic(reg, 0);
+      TestBit.is_equal_int(ANVIL_TYPE_DIAG_NAME_COLLISION, anvil_type_diagnostic_get_category(d),
+                           "TYP38: as a NAME_COLLISION");
+      char out[512] = {0};
+      anvil_type_diagnostic_get_message(d, out, sizeof(out));
+      TestBit.is_true(strstr(out, "rt_root.types.anvl") && strstr(out, "rt_base.types.anvl"),
+                      "TYP38: naming both documents");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ39_root_types_without_includes(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("rt_solo.types.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP39: registry loaded");
+   if (reg) {
+      TestBit.is_not_null(anvil_type_registry_find(reg, "Solo"),
+                          "TYP39: a root with @[types] and no includes still yields its own types");
+      TestBit.is_equal_int(0, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP39: no diagnostics");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
+static void test_typ40_root_without_types_is_unchanged(void) {
+   anvil_document doc = NULL;
+   anvil_type_registry reg = include_registry("ovr_consumer.anvl", &doc);
+   TestBit.is_not_null(reg, "TYP40: registry loaded");
+   if (reg) {
+      TestBit.is_equal_int(1, (long long)anvil_type_registry_get_diagnostic_count(reg),
+                           "TYP40: a root without @[types] contributes nothing, as before");
+      anvil_type_registry_dispose(reg);
+   }
+   if (doc) {
+      anvil_dispose(doc);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("TYP01_load_and_find", NULL, test_typ01_load_and_find, th);
    TestBit.run_ex("TYP02_reject_non_types_document", NULL,
@@ -1259,6 +1320,9 @@ int main(void) {
    TestBit.run_ex("TYP36_ENUM_LABEL_WITH_NUL", NULL, test_typ36_enum_label_with_nul, th);
    TestBit.run_ex("TYP37_NUL_IN_IDENTIFIER_POSITIONS_IS_MALFORMED", NULL,
                   test_typ37_nul_in_identifier_positions_is_malformed, th);
+   TestBit.run_ex("TYP38_root_types_are_included", NULL, test_typ38_root_types_are_included, th);
+   TestBit.run_ex("TYP39_root_types_without_includes", NULL, test_typ39_root_types_without_includes, th);
+   TestBit.run_ex("TYP40_root_without_types_is_unchanged", NULL, test_typ40_root_without_types_is_unchanged, th);
 
    return TestBit.report();
 }

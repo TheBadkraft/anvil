@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   integer rule; it now fails with `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH` ("value must be an integer"), like
   `2.5`. A digits-only literal past int64 (`99999999999999999999`) is whole and still passes. Combined with `min` and
   `max`, an overflowed float reports both the integer and the range violation. No ABI change.
+- **`anvil_type_registry_load_from_includes` includes the root document's own `@[types]` (BR-2610-anvl-schema-005).** The
+  header said a definition closer to `doc` overrides a deeper one, but the walk visited only the includes, so a root
+  that itself carried `@[types]` (for example a types file that includes a base types file) contributed nothing. The
+  root's own definitions are now merged last, so they win over every included one; a name declared in both is the usual
+  `NAME_COLLISION` diagnostic, with the root's definition used. A root without `@[types]` is unchanged, and no consumer
+  document of FlyWire or Rivet carries `@[types]` on the document it loads from. The header comment now says so. No ABI
+  change.
 
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
   statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and

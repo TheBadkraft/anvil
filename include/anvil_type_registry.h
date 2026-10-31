@@ -93,11 +93,13 @@ anvil_type_registry anvil_type_registry_load(anvil_document doc);
  * way that carries @[types] has its type definitions merged into one combined
  * registry, keyed by bare name (e.g. "VIN", not "types.VIN"). A document
  * without @[types] is walked through but contributes nothing. Deeper
- * includes merge first, so a definition closer to `doc` overrides a deeper
- * one - `types.` is a flat namespace, independent of which included file a
- * given name actually came from. Any name declared twice resolves last-write
- * and is reported through the registry's diagnostics.
- * @param doc The (typically non-@[types]) document whose includes to walk.
+ * includes merge first and `doc`'s own @[types] (if it carries any) merge
+ * last, so a definition closer to `doc` overrides a deeper one, and `doc`'s
+ * own overrides them all - `types.` is a flat namespace, independent of which
+ * file a given name actually came from. Any name declared twice resolves
+ * last-write and is reported through the registry's diagnostics.
+ * @param doc The document whose includes to walk, and whose own @[types], if
+ * any, are merged last (typically it carries none).
  * @return The registry handle (real but empty if `doc` has no @[types]
  * includes), or NULL only if doc itself is NULL. Dispose with
  * anvil_type_registry_dispose once done.
