@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scripts/tdd/check-tdd.py`, a mechanical checker of the strict-TDD protocol (STANDARDS section 3).**
+  `check-tdd.py <repo> <base>..<head>` replays the non-merge commits of the range (`--first-parent` for first-parent
+  only) in a scratch clone, runs the repo's suite at each commit and at its parent, and classifies each commit by its
+  `<ticket>: RED.` / `GREEN.` / `PERF.` / `REFACTOR.` subject. RED: a test that passed or did not exist now fails, every
+  newly failing test fails on an assertion (a TypeError, missing export, build error or crash is not RED), and the
+  commit changes tests. GREEN: nothing that passed fails, a failing test passes, the test files of open REDs are
+  unchanged, the targets are named `[tests: a, b]`, tests that flip beyond the named, and a product diff over
+  `--max-green-lines` (150), are batches. PERF: suite green before and after, tests unchanged, and a `[gate: path]`
+  record that says fail -> pass. REFACTOR: suite green before and after, tests unchanged, same test set. Any other
+  commit that touches product code is a FAIL. One line per commit, exit 1 on any FAIL, `--json` for machines,
+  results cached per commit SHA (`--cache`), `--budget` to run in bounded chunks (exit 3, rerun resumes). Adapters:
+  `node` (anvil.js: `npm test` plus `npm run compat`, via the `node-reporter.js` test reporter) and `native`
+  (each `test/unit/test_*.c` through its `make` target, parsed from testbit output). Its own tests,
+  `scripts/tdd/test_check_tdd.py`, build tiny fixture repos with scripted commits (48 cases). Tooling only; no
+  product code changed.
+
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
   native-owned corpus that a second implementation (the schema phase of anvil.js) must reproduce byte for byte. A
   versioned schema script (`anvil-schema-script 1`, specified in `conformance/FORMAT.md`) carries its own files (types,
