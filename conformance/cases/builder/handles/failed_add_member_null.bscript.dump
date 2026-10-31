@@ -1,0 +1,8 @@
+anvil-builder-run 1
+failed line=7 code=15 name=ANVIL_WRITER_ERR_DUPLICATE_NAME call="let m = add NULL \"x\" b" message="top-level name declared twice"
+failed line=8 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="set_base m \"b\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+failed line=10 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute m \"k\" \"v\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+steps 10
+status error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT

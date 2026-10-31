@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# find on a non-object is none, and sets no error
+option on-error continue
+dialect AML
+let a = array
+find a "k"
+get_error

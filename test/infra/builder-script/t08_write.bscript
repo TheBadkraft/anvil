@@ -1,0 +1,9 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let s = string "v"
+add NULL "a" s
+write
+write AMP
+write NULL
+get_error

@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# name "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+dialect AML
+let v = int 1
+add NULL "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" v
+emit

@@ -1,0 +1,5 @@
+anvil-builder-run 1
+find line=5 result=found
+emit bytes=22 text="#!aml\n\na @[k=v] := 1;\n"
+steps 6
+status ok

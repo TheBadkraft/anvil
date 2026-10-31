@@ -1,0 +1,6 @@
+anvil-builder-script 1
+dialect AMP
+let v = int 1
+add NULL "a" v
+find NULL "a"
+find NULL "b"

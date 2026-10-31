@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AMP
+let v = int 1
+add NULL "a" v
+emit

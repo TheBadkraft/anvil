@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static void th(void) {}
 
@@ -743,6 +744,223 @@ static void test_b15_keyword_names(void) {
    anvil_builder_dispose(b);
 }
 
+/* ---------------------------------------------------------------------- *
+ * B18 - BR-2610-anvl-writer-004: a base cycle among the top-level members fails at write/emit
+ * ---------------------------------------------------------------------- */
+// A top-level object member with one field, named `name`.
+static anvil_member obj_member(anvil_builder b, const char *name) {
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+   return ADD(b, name, o);
+}
+
+static void expect_emit_error(anvil_builder b, anvil_writer_err_code code, const char *msg) {
+   TestBit.is_null(anvil_builder_emit(b, NULL), msg);
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), msg);
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_false(anvil_builder_write(b, w), msg);
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), msg);
+   TestBit.is_null(anvil_writer_data(w, NULL), msg); // nothing was written
+   anvil_writer_dispose(w);
+}
+
+static void test_b18_base_cycles(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member d = obj_member(b, "d");
+   TestBit.is_true(anvil_builder_set_base(b, d, "d"), "B18: set_base itself accepts a self base");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_CYCLE, "B18: a statement based on itself");
+   anvil_builder_dispose(b);
+
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member a = obj_member(b, "a"), bb = obj_member(b, "b"), c = obj_member(b, "c");
+   anvil_builder_set_base(b, a, "b");
+   anvil_builder_set_base(b, bb, "a");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_CYCLE, "B18: a -> b -> a");
+   anvil_builder_set_base(b, bb, "c");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B18: a chain a -> b -> c is not a cycle");
+   anvil_builder_set_base(b, c, "a");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_CYCLE, "B18: a -> b -> c -> a");
+   anvil_builder_set_base(b, c, "b"); // c -> b -> c ... and a -> b
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_CYCLE, "B18: a member that leads into a cycle it is not part of");
+   anvil_builder_dispose(b);
+
+   // an include does not excuse a cycle
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder_include(b, "x.anvl");
+   anvil_member s = obj_member(b, "s");
+   anvil_builder_set_base(b, s, "s");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_CYCLE, "B18: a cycle with an include");
+   anvil_builder_dispose(b);
+
+   // a derived chain declared in any order is fine
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member z = obj_member(b, "z"), y = obj_member(b, "y"), x = obj_member(b, "x");
+   anvil_builder_set_base(b, z, "y");
+   anvil_builder_set_base(b, y, "x");
+   (void)x;
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B18: z -> y -> x emits");
+   anvil_builder_dispose(b);
+
+   // the non-object check still comes first
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "n", anvil_builder_int(b, 1));
+   anvil_member p = obj_member(b, "p"), q = obj_member(b, "q");
+   anvil_builder_set_base(b, p, "q");
+   anvil_builder_set_base(b, q, "p");
+   anvil_member r = obj_member(b, "r");
+   anvil_builder_set_base(b, r, "n");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, "B18: a scalar base is reported before a cycle");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B19 - BR-2610-anvl-writer-004: with no include, a base that names no top-level member fails at
+ * write/emit (the reader's MISSING_BASE); with any include it is accepted
+ * ---------------------------------------------------------------------- */
+static void test_b19_missing_base(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member d = obj_member(b, "d");
+   TestBit.is_true(anvil_builder_set_base(b, d, "nothere"), "B19: set_base itself accepts it");
+   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: a base that names nothing, no include");
+   anvil_builder_include(b, "base.anvl");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B19: an include added later makes it acceptable");
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_builder_write(b, w), "B19: write accepts it too");
+   anvil_writer_dispose(w);
+   anvil_builder_dispose(b);
+
+   // declared later, or on a nested member whose base is a top-level name
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node outer = anvil_builder_object(b);
+   anvil_node inner = anvil_builder_object(b);
+   anvil_builder_add(b, inner, "g", anvil_builder_int(b, 1));
+   anvil_member nested = anvil_builder_add(b, outer, "inner", inner);
+   anvil_builder_set_base(b, nested, "later");
+   ADD(b, "outer", outer);
+   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: nested member, base declared nowhere");
+   obj_member(b, "later");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B19: the base declared later is found");
+   anvil_builder_dispose(b);
+
+   // a sibling is not in scope: the reader looks bases up among the top-level names only
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node o = anvil_builder_object(b);
+   anvil_node sib = anvil_builder_object(b);
+   anvil_builder_add(b, sib, "g", anvil_builder_int(b, 1));
+   anvil_builder_add(b, o, "sib", sib);
+   anvil_node der = anvil_builder_object(b);
+   anvil_builder_add(b, der, "g", anvil_builder_int(b, 1));
+   anvil_member dm = anvil_builder_add(b, o, "der", der);
+   anvil_builder_set_base(b, dm, "sib");
+   ADD(b, "o", o);
+   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: a sibling base");
+   anvil_builder_dispose(b);
+
+   // a member of an object that is never attached counts too
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node loose = anvil_builder_object(b);
+   anvil_node ld = anvil_builder_object(b);
+   anvil_builder_add(b, ld, "g", anvil_builder_int(b, 1));
+   anvil_member lm = anvil_builder_add(b, loose, "ld", ld);
+   anvil_builder_set_base(b, lm, "nothere");
+   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: an unattached member with a missing base");
+   anvil_builder_dispose(b);
+
+   // the non-object check comes before the missing-base check
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "n", anvil_builder_int(b, 1));
+   anvil_member m1 = obj_member(b, "m1"), m2 = obj_member(b, "m2");
+   anvil_builder_set_base(b, m1, "gone");
+   anvil_builder_set_base(b, m2, "n");
+   expect_emit_error(b, ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, "B19: a scalar base is reported first");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B20 - BR-2610-anvl-writer-005: a member handle from another builder is refused
+ * ---------------------------------------------------------------------- */
+static void test_b20_foreign_member(void) {
+   anvil_builder b1 = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder b2 = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member m = obj_member(b1, "m");
+   TestBit.is_false(anvil_builder_set_base(b2, m, "x"), "B20: set_base with a foreign member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(b2), "B20: set_base is INVALID_ARGUMENT");
+   TestBit.is_false(anvil_builder_member_attribute(b2, m, "k", "v"), "B20: member_attribute with a foreign member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(b2), "B20: member_attribute is INVALID_ARGUMENT");
+   TestBit.is_false(anvil_builder_member_attribute_string(b2, m, "k", "v", 1), "B20: member_attribute_string with a foreign member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(b2), "B20: member_attribute_string is INVALID_ARGUMENT");
+   expect_emit(b1, "#!aml\n\nm := {\n   f := 1;\n};\n", "B20: the member of b1 is unchanged");
+   TestBit.is_true(anvil_builder_member_attribute(b1, m, "k", "v"), "B20: b1 can still use it");
+   // the foreign check comes before the dialect check
+   anvil_builder amp = anvil_builder_new(ANVIL_WRITER_AMP);
+   TestBit.is_false(anvil_builder_set_base(amp, m, "x"), "B20: foreign member into an AMP builder");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(amp), "B20: foreign before DIALECT");
+   anvil_builder_dispose(amp);
+   anvil_builder_dispose(b2);
+   anvil_builder_dispose(b1);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B21 - the base checks of write/emit are linear in the number of members: a long chain, bases declared
+ * later, and a ring, all under a generous bound (the first version walked every chain with a linear find,
+ * so 3000 members took seconds; 100k must not blow the stack either)
+ * ---------------------------------------------------------------------- */
+static double seconds_since(const struct timespec *t0) {
+   struct timespec t1;
+   clock_gettime(CLOCK_MONOTONIC, &t1);
+   return (double)(t1.tv_sec - t0->tv_sec) + (double)(t1.tv_nsec - t0->tv_nsec) / 1e9;
+}
+
+// n top-level object members m0..m(n-1); member i has base m(i+1), the last one none (or m0 when `ring`).
+static anvil_builder chain_builder(size_t n, bool ring) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member *ms = malloc(n * sizeof *ms);
+   char name[32];
+   for (size_t i = 0; i < n; i++) {
+      snprintf(name, sizeof name, "m%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+      ms[i] = ADD(b, name, o);
+   }
+   for (size_t i = 0; i < n; i++) {
+      if (i + 1 < n || ring) {
+         snprintf(name, sizeof name, "m%zu", (i + 1) % n);
+         anvil_builder_set_base(b, ms[i], name);
+      }
+   }
+   free(ms);
+   return b;
+}
+
+static void test_b21_base_checks_are_linear(void) {
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   anvil_builder b = chain_builder(3000, false);
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_not_null(text, "B21: a 3000-member chain emits");
+   TestBit.is_true(seconds_since(&t0) < 2.0, "B21: a 3000-member chain emits in well under 2 s");
+   anvil_builder_dispose(b);
+
+   // a long chain, a ring and a chain that ends in a cycle: iterative, so the stack does not matter
+   b = chain_builder(100000, false);
+   clock_gettime(CLOCK_MONOTONIC, &t0); // the emit alone; a quadratic check would take minutes even natively
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B21: a 100000-member chain emits");
+   TestBit.is_true(seconds_since(&t0) < 60.0, "B21: a 100000-member chain emits in well under 60 s");
+   anvil_builder_dispose(b);
+   b = chain_builder(100000, true);
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B21: a 100000-member ring is refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_CYCLE, anvil_builder_get_error(b), "B21: the ring is a cycle");
+   anvil_builder_dispose(b);
+   b = chain_builder(50000, false);
+   anvil_member last = anvil_builder_find(b, NULL, "m49999");
+   anvil_builder_set_base(b, last, "m25000"); // the tail loops back into the middle of the chain
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B21: a chain that ends in a cycle is refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_CYCLE, anvil_builder_get_error(b), "B21: the tail cycle");
+   anvil_builder_dispose(b);
+
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -761,5 +979,9 @@ int main(void) {
    TestBit.run_ex("B15_keyword_names", NULL, test_b15_keyword_names, th);
    TestBit.run_ex("B16_attribute_values_are_scalars", NULL, test_b16_attribute_values_are_scalars, th);
    TestBit.run_ex("B17_base_must_be_object_at_emit", NULL, test_b17_base_must_be_object_at_emit, th);
+   TestBit.run_ex("B18_base_cycles", NULL, test_b18_base_cycles, th);
+   TestBit.run_ex("B19_missing_base", NULL, test_b19_missing_base, th);
+   TestBit.run_ex("B20_foreign_member", NULL, test_b20_foreign_member, th);
+   TestBit.run_ex("B21_base_checks_are_linear", NULL, test_b21_base_checks_are_linear, th);
    return TestBit.report();
 }

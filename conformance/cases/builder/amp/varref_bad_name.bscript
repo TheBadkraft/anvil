@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# the dialect is checked first
+option on-error continue
+dialect AMP
+varref "1"
+get_error

@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = int 1
+add NULL "import" v
+emit

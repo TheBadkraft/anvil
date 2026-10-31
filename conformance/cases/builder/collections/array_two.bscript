@@ -1,0 +1,9 @@
+anvil-builder-script 1
+dialect AML
+let a = array
+let e0 = int 1
+append a e0
+let e1 = int 2
+append a e1
+add NULL "a" a
+emit

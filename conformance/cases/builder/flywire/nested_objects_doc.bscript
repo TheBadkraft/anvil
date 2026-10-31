@@ -1,0 +1,29 @@
+anvil-builder-script 1
+dialect AML
+let root = object
+let o0 = object
+let v0 = int 0
+add o0 "value" v0
+let o1 = object
+let v1 = int 1
+add o1 "value" v1
+let o2 = object
+let v2 = int 2
+add o2 "value" v2
+let o3 = object
+let v3 = int 3
+add o3 "value" v3
+let o4 = object
+let v4 = int 4
+add o4 "value" v4
+let o5 = object
+let v5 = int 5
+add o5 "value" v5
+add root "child0" o0
+add root "child1" o1
+add root "child2" o2
+add root "child3" o3
+add root "child4" o4
+add root "child5" o5
+add NULL "root" root
+emit

@@ -89,7 +89,8 @@ struct anvil_builder_t {
    struct anvil_member_t **members; // document-level statements, in order
    size_t member_count;
    size_t member_cap;
-   wg_nameset names; // document-level statement names
+   wg_nameset names; // document-level statement names; each name's value is its member's position + 1 in members
+   size_t base_count; // members that have a base
    struct anvil_node_t **nodes; // every node, for disposal
    size_t node_count;
    size_t node_cap;
@@ -508,7 +509,7 @@ anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *n
    // Names are unique per object (the reader rejects a repeat at any depth; at the top level its
    // resolver does): a repeat is DUPLICATE_NAME at the top level and DUPLICATE_FIELD inside an object.
    {
-      int added = wg_nameset_add(object ? &object->names : &b->names, name);
+      int added = object ? wg_nameset_add(&object->names, name) : wg_nameset_put(&b->names, name, b->member_count + 1);
       if (added <= 0) {
          free(m->name);
          free(m);
@@ -531,7 +532,7 @@ static bool member_ready(anvil_builder b, anvil_member m) {
    if (!b) {
       return false;
    }
-   if (!m) {
+   if (!m || m->value->builder != b) { // a member's owner is its value's
       return outcome(b, ANVIL_WRITER_ERR_INVALID_ARGUMENT);
    }
    if (b->dialect == ANVIL_WRITER_AMP) {
@@ -554,6 +555,9 @@ bool anvil_builder_set_base(anvil_builder b, anvil_member m, const char *base) {
    char *copy = copy_string(base);
    if (!copy) {
       return outcome(b, ANVIL_WRITER_ERR_MEMORY);
+   }
+   if (!m->base) {
+      b->base_count++;
    }
    free(m->base);
    m->base = copy;
@@ -712,18 +716,111 @@ static anvil_writer_err_code check_depth(anvil_builder b) {
 // reader requires (4020). The builder only writes `name := { ... }`, never the anonymous block
 // form `name { ... }` (4052), so an object is the one thing a base can legally be. A base the
 // builder does not hold (one from an include) is left to the reader.
+static bool has_include(const struct anvil_builder_t *b) {
+   for (size_t i = 0; i < b->header_count; i++) {
+      if (b->header[i].is_include) {
+         return true;
+      }
+   }
+   return false;
+}
+
+// BR-2610-anvl-writer-002 and -004: what the reader would refuse about the bases, across every member the builder
+// created (attached or not). A base names a top-level member of this document. In this order:
+//  - the member it names must be an object (INHERITANCE_REQUIRES_OBJECT);
+//  - it must exist, unless the builder holds an include, which may supply it (MISSING_BASE);
+//  - the chain of top-level members' bases must not loop (INHERITANCE_CYCLE).
 static anvil_writer_err_code check_bases(anvil_builder b) {
-   for (size_t i = 0; i < b->all_member_count; i++) {
-      const struct anvil_member_t *m = b->all_members[i];
+   if (b->base_count == 0) {
+      return ANVIL_WRITER_OK;
+   }
+   // Every base is resolved through the builder's own top-level name table (hashed when the statement was added; the
+   // value is the member's position + 1 in b->members), so the whole check is linear in the members however long a
+   // chain is. A run of members on the same base costs one lookup.
+   size_t n = b->member_count;
+   bool includes = has_include(b);
+   bool missing = false;
+   bool chain = false; // some member's base names a member that has a base itself: only then can there be a cycle
+   anvil_writer_err_code result = ANVIL_WRITER_OK;
+   const char *last_base = NULL;
+   size_t last_at = 0, top_based = 0;
+   // the top-level members first...
+   for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
+      const struct anvil_member_t *m = b->members[i];
       if (!m->base) {
          continue;
       }
-      anvil_member target = anvil_builder_find(b, NULL, m->base);
-      if (target && target->value->kind != NODE_OBJECT) {
-         return ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      top_based++;
+      if (last_base && strcmp(last_base, m->base) == 0) {
+         continue; // the same base as the previous based member: already checked
+      }
+      last_base = m->base;
+      last_at = wg_nameset_get(&b->names, m->base);
+      if (!last_at) {
+         missing = missing || !includes;
+      } else if (b->members[last_at - 1]->value->kind != NODE_OBJECT) {
+         result = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      } else if (b->members[last_at - 1]->base) {
+         chain = true;
       }
    }
-   return ANVIL_WRITER_OK;
+   // ...then, only if some member below the top level (or never attached) has a base, every member the builder
+   // created. Those are the ones whose value has a parent; a top-level member's value has none.
+   last_base = NULL;
+   for (size_t i = 0; result == ANVIL_WRITER_OK && top_based < b->base_count && i < b->all_member_count; i++) {
+      const struct anvil_member_t *m = b->all_members[i];
+      if (!m->base || m->value->parent == NULL) {
+         continue;
+      }
+      if (last_base && strcmp(last_base, m->base) == 0) {
+         continue;
+      }
+      last_base = m->base;
+      size_t at = wg_nameset_get(&b->names, m->base);
+      if (!at) {
+         missing = missing || !includes;
+      } else if (b->members[at - 1]->value->kind != NODE_OBJECT) {
+         result = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      }
+   }
+   if (result != ANVIL_WRITER_OK) {
+      return result;
+   }
+   if (missing) {
+      return ANVIL_WRITER_ERR_MISSING_BASE;
+   }
+   if (!chain) {
+      return ANVIL_WRITER_OK;
+   }
+   // Cycles among the top-level members: an iterative walk along each base (position + 1 in `next`, 0 for none) with
+   // three colours (1 on the current path, 2 done), so each member is visited once and nothing recurses.
+   size_t *next = malloc(n * sizeof *next);
+   unsigned char *colour = calloc(n, 1);
+   if (!next || !colour) {
+      free(next);
+      free(colour);
+      return ANVIL_WRITER_ERR_MEMORY;
+   }
+   for (size_t i = 0; i < n; i++) {
+      next[i] = b->members[i]->base ? wg_nameset_get(&b->names, b->members[i]->base) : 0;
+   }
+   for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
+      size_t cur = i + 1;
+      while (cur && colour[cur - 1] == 0) {
+         colour[cur - 1] = 1;
+         cur = next[cur - 1];
+      }
+      if (cur && colour[cur - 1] == 1) {
+         result = ANVIL_WRITER_ERR_INHERITANCE_CYCLE;
+         break;
+      }
+      for (cur = i + 1; cur && colour[cur - 1] == 1; cur = next[cur - 1]) {
+         colour[cur - 1] = 2;
+      }
+   }
+   free(next);
+   free(colour);
+   return result;
 }
 
 bool anvil_builder_write(anvil_builder b, anvil_writer w) {

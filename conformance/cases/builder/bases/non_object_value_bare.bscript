@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# BR-2610-anvl-writer-002: a base needs an object value
+option on-error continue
+dialect AML
+let v = bare "x"
+let m = add NULL "n" v
+set_base m "b"
+get_error

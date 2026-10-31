@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=4 code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC call="let v = numeric \"x\"" message="invalid numeric"
+get_error code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC
+steps 4
+status error code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC

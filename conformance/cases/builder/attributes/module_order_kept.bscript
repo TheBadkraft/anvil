@@ -1,0 +1,6 @@
+anvil-builder-script 1
+dialect AML
+attribute "z" NULL
+attribute "a" "1"
+attribute_string "m" "s"
+emit

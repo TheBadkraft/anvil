@@ -6,6 +6,7 @@
  * ********************************************************************** */
 
 #include "writer-script.h"
+#include "script-common.h"
 #include "anvil_writer.h"
 // ----------------
 #include <errno.h>
@@ -18,11 +19,7 @@
 #define SCRIPT_VERSION_LINE "anvil-writer-script 1"
 #define MAX_ARGS 3
 
-typedef struct {
-   bool quoted;
-   char *bytes; // NUL-terminated copy; `len` is the decoded length
-   size_t len;
-} arg;
+typedef script_arg arg;
 
 typedef struct {
    size_t line;
@@ -70,33 +67,6 @@ static const struct {
    [V_DATA] = {"data", "", 0},
 };
 
-static const char *const err_names[] = {
-   "ANVIL_WRITER_OK",
-   "ANVIL_WRITER_ERR_INVALID_ARGUMENT",
-   "ANVIL_WRITER_ERR_MEMORY",
-   "ANVIL_WRITER_ERR_STATE",
-   "ANVIL_WRITER_ERR_DIALECT",
-   "ANVIL_WRITER_ERR_INVALID_IDENTIFIER",
-   "ANVIL_WRITER_ERR_RESERVED_WORD",
-   "ANVIL_WRITER_ERR_INVALID_NUMERIC",
-   "ANVIL_WRITER_ERR_INVALID_BARE",
-   "ANVIL_WRITER_ERR_INVALID_BLOB",
-   "ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE",
-   "ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH",
-   "ANVIL_WRITER_ERR_EMPTY_COLLECTION",
-   "ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT",
-   "ANVIL_WRITER_ERR_UNFINISHED",
-   "ANVIL_WRITER_ERR_DUPLICATE_NAME",
-   "ANVIL_WRITER_ERR_DEPTH_EXCEEDED",
-   "ANVIL_WRITER_ERR_DUPLICATE_FIELD",
-   "ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY",
-};
-#define ERR_NAME_COUNT (sizeof err_names / sizeof err_names[0])
-
-static const char *err_name(int code) {
-   return code >= 0 && (size_t)code < ERR_NAME_COUNT ? err_names[code] : "ANVIL_WRITER_ERR_UNKNOWN";
-}
-
 static const char *g_path;
 
 static int script_error(size_t line, const char *what) {
@@ -112,143 +82,6 @@ static void free_steps(step *steps, size_t n) {
       }
    }
    free(steps);
-}
-
-static bool blank(char c) { return c == ' ' || c == '\t'; }
-
-static int hexval(int c) {
-   return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
-}
-
-// Parses one argument at *p (a quoted string or a word); advances *p. Returns NULL, or an error message.
-static const char *parse_arg(const char **p, arg *out) {
-   const char *s = *p;
-   if (*s == '"') {
-      s++;
-      size_t cap = strlen(s) + 1, n = 0;
-      char *buf = malloc(cap);
-      if (!buf) {
-         return "out of memory";
-      }
-      for (;;) {
-         unsigned char c = (unsigned char)*s;
-         if (c == '\0') {
-            free(buf);
-            return "unterminated string";
-         }
-         s++;
-         if (c == '"') {
-            break;
-         }
-         if (c < 0x20) {
-            free(buf);
-            return "control byte in a string (write it as \\xHH)";
-         }
-         if (c == '\\') {
-            char e = *s++;
-            int h1, h2;
-            switch (e) {
-            case '\\': c = '\\'; break;
-            case '"': c = '"'; break;
-            case 'n': c = '\n'; break;
-            case 'r': c = '\r'; break;
-            case 't': c = '\t'; break;
-            case 'x':
-               h1 = hexval((unsigned char)s[0]);
-               h2 = h1 < 0 ? -1 : hexval((unsigned char)s[1]);
-               if (h2 < 0) {
-                  free(buf);
-                  return "bad \\x escape";
-               }
-               c = (unsigned char)(h1 * 16 + h2);
-               s += 2;
-               break;
-            default:
-               free(buf);
-               return "unknown escape";
-            }
-         }
-         buf[n++] = (char)c;
-      }
-      buf[n] = '\0';
-      if (*s && !blank(*s)) {
-         free(buf);
-         return "text after a closing quote";
-      }
-      *out = (arg){true, buf, n};
-   } else {
-      const char *start = s;
-      while (*s && !blank(*s)) {
-         if (*s == '"') {
-            return "quote inside a word";
-         }
-         s++;
-      }
-      size_t n = (size_t)(s - start);
-      char *buf = malloc(n + 1);
-      if (!buf) {
-         return "out of memory";
-      }
-      memcpy(buf, start, n);
-      buf[n] = '\0';
-      *out = (arg){false, buf, n};
-   }
-   *p = s;
-   return NULL;
-}
-
-static bool parse_int64(const char *s, int64_t *out) {
-   if (*s != '-' && (*s < '0' || *s > '9')) {
-      return false;
-   }
-   if (*s == '-' && (s[1] < '0' || s[1] > '9')) {
-      return false;
-   }
-   errno = 0;
-   char *end;
-   long long v = strtoll(s, &end, 10);
-   if (errno || *end) {
-      return false;
-   }
-   *out = v;
-   return true;
-}
-
-static bool parse_double(const char *s, double *out) {
-   if (strcmp(s, "nan") == 0) {
-      *out = __builtin_nan("");
-      return true;
-   }
-   if (strcmp(s, "inf") == 0 || strcmp(s, "-inf") == 0) {
-      *out = *s == '-' ? -__builtin_inf() : __builtin_inf();
-      return true;
-   }
-   if (s[0] == '0' && s[1] == 'x') {
-      if (strlen(s) != 18) {
-         return false;
-      }
-      uint64_t bits = 0;
-      for (int i = 2; i < 18; i++) {
-         int h = hexval((unsigned char)s[i]);
-         if (h < 0) {
-            return false;
-         }
-         bits = bits << 4 | (uint64_t)h;
-      }
-      memcpy(out, &bits, sizeof bits);
-      return true;
-   }
-   for (const char *c = s; *c; c++) {
-      if (!((*c >= '0' && *c <= '9') || *c == '.' || *c == 'e' || *c == 'E' || *c == '+' || *c == '-')) {
-         return false;
-      }
-   }
-   if (!*s) {
-      return false;
-   }
-   char *end;
-   *out = strtod(s, &end);
-   return *end == '\0';
 }
 
 // Checks one parsed step against its verb's parameters. Returns NULL, or a message.
@@ -274,7 +107,7 @@ static const char *check_step(const step *st) {
          }
          break;
       case 'I':
-         if (a->quoted || !parse_int64(a->bytes, &iv)) {
+         if (a->quoted || !script_parse_int64(a->bytes, &iv)) {
             return "expected a 64-bit integer";
          }
          if (i > 0 && params[i - 1] == 'S') {
@@ -289,12 +122,12 @@ static const char *check_step(const step *st) {
          }
          break;
       case 'D':
-         if (a->quoted || !parse_double(a->bytes, &dv)) {
+         if (a->quoted || !script_parse_double(a->bytes, &dv)) {
             return "expected a decimal, 0x + 16 hex digits, nan, inf or -inf";
          }
          break;
       case 'E':
-         if (a->quoted || (strcmp(a->bytes, "AML") != 0 && strcmp(a->bytes, "AMP") != 0 && !parse_int64(a->bytes, &iv))) {
+         if (a->quoted || (strcmp(a->bytes, "AML") != 0 && strcmp(a->bytes, "AMP") != 0 && !script_parse_int64(a->bytes, &iv))) {
             return "expected AML, AMP or an integer";
          }
          break;
@@ -308,7 +141,7 @@ static const char *check_step(const step *st) {
    // dialect and error_message take a C int
    if (st->verb == V_ERROR_MESSAGE || (st->verb == V_DIALECT && strcmp(st->args[0].bytes, "AML") != 0 && strcmp(st->args[0].bytes, "AMP") != 0)) {
       int64_t iv = 0;
-      parse_int64(st->args[0].bytes, &iv);
+      script_parse_int64(st->args[0].bytes, &iv);
       if (iv < INT32_MIN || iv > INT32_MAX) {
          return "expected a 32-bit integer";
       }
@@ -356,11 +189,11 @@ static int parse_script(const char *data, size_t size, step **out, size_t *count
          free(line);
          continue;
       }
-      while (llen > 0 && blank(line[llen - 1])) {
+      while (llen > 0 && script_blank(line[llen - 1])) {
          line[--llen] = '\0';
       }
       const char *s = line;
-      while (blank(*s)) {
+      while (script_blank(*s)) {
          s++;
       }
       if (*s == '\0' || *s == '#') {
@@ -369,7 +202,7 @@ static int parse_script(const char *data, size_t size, step **out, size_t *count
       }
       step st = {.line = lineno, .verb = -1};
       const char *vstart = s;
-      while (*s && !blank(*s)) {
+      while (*s && !script_blank(*s)) {
          s++;
       }
       size_t vlen = (size_t)(s - vstart);
@@ -380,7 +213,7 @@ static int parse_script(const char *data, size_t size, step **out, size_t *count
       }
       const char *msg = st.verb < 0 ? "unknown call" : NULL;
       while (!msg) {
-         while (blank(*s)) {
+         while (script_blank(*s)) {
             s++;
          }
          if (!*s) {
@@ -390,7 +223,7 @@ static int parse_script(const char *data, size_t size, step **out, size_t *count
             msg = "too many arguments";
             break;
          }
-         msg = parse_arg(&s, &st.args[st.argc]);
+         msg = script_parse_arg(&s, &st.args[st.argc]);
          if (!msg) {
             st.argc++;
          }
@@ -440,31 +273,6 @@ static int parse_script(const char *data, size_t size, step **out, size_t *count
    return 0;
 }
 
-static char *read_file(const char *path, size_t *len) {
-   FILE *f = fopen(path, "rb");
-   if (!f) {
-      return NULL;
-   }
-   size_t cap = 4096, n = 0;
-   char *buf = malloc(cap);
-   size_t got;
-   while (buf && (got = fread(buf + n, 1, cap - n, f)) > 0) {
-      n += got;
-      if (n == cap) {
-         char *nb = realloc(buf, cap *= 2);
-         if (!nb) {
-            free(buf);
-            buf = NULL;
-         } else {
-            buf = nb;
-         }
-      }
-   }
-   fclose(f);
-   *len = n;
-   return buf;
-}
-
 // The argument as a C pointer: NULL for the word NULL, else the string.
 static const char *ptr_of(const step *st, int i) {
    return st->args[i].quoted ? st->args[i].bytes : NULL;
@@ -477,16 +285,10 @@ static size_t len_of(const step *st, int bytes_idx, int len_idx) {
    return st->args[bytes_idx].quoted ? st->args[bytes_idx].len : 0;
 }
 
-static void print_data(const char *tag, const char *data, size_t n) {
-   printf("%s bytes=%zu text=", tag, n);
-   dump_put_quoted(data, n);
-   putchar('\n');
-}
-
 int writer_script_run(const char *path, bool output_only) {
    g_path = path;
    size_t size = 0;
-   char *data = read_file(path, &size);
+   char *data = script_read_file(path, &size);
    if (!data) {
       fprintf(stderr, "anvil-dump: cannot read %s\n", path);
       return 2;
@@ -517,7 +319,7 @@ int writer_script_run(const char *path, bool output_only) {
          } else if (strcmp(st->args[0].bytes, "AMP") == 0) {
             d = ANVIL_WRITER_AMP;
          } else {
-            parse_int64(st->args[0].bytes, &d);
+            script_parse_int64(st->args[0].bytes, &d);
          }
          w = anvil_writer_new((anvil_writer_dialect)d);
          ok = w != NULL;
@@ -529,13 +331,13 @@ int writer_script_run(const char *path, bool output_only) {
       case V_GET_ERROR: {
          int code = (int)anvil_writer_get_error(w);
          if (!output_only) {
-            printf("get_error code=%d name=%s\n", code, err_name(code));
+            printf("get_error code=%d name=%s\n", code, script_err_name(code));
          }
          break;
       }
       case V_ERROR_MESSAGE: {
          int64_t code = 0;
-         parse_int64(st->args[0].bytes, &code);
+         script_parse_int64(st->args[0].bytes, &code);
          if (!output_only) {
             printf("error_message code=%" PRId64 " text=", code);
             const char *m = anvil_writer_error_message((anvil_writer_err_code)code);
@@ -555,13 +357,13 @@ int writer_script_run(const char *path, bool output_only) {
       case V_NUMERIC: ok = anvil_writer_numeric(w, ptr_of(st, 0)); break;
       case V_INT: {
          int64_t v = 0;
-         parse_int64(st->args[0].bytes, &v);
+         script_parse_int64(st->args[0].bytes, &v);
          ok = anvil_writer_int(w, v);
          break;
       }
       case V_DOUBLE: {
          double v = 0;
-         parse_double(st->args[0].bytes, &v);
+         script_parse_double(st->args[0].bytes, &v);
          ok = anvil_writer_double(w, v);
          break;
       }
@@ -581,7 +383,7 @@ int writer_script_run(const char *path, bool output_only) {
          const char *d = anvil_writer_data(w, &n);
          if (!output_only) {
             if (d) {
-               print_data("data", d, n);
+               script_print_data("data", d, n);
             } else {
                puts("data none");
             }
@@ -592,7 +394,7 @@ int writer_script_run(const char *path, bool output_only) {
       if (!ok) {
          int code = (int)anvil_writer_get_error(w);
          if (!output_only) {
-            printf("failed line=%zu code=%d name=%s call=", st->line, code, err_name(code));
+            printf("failed line=%zu code=%d name=%s call=", st->line, code, script_err_name(code));
             dump_put_quoted(st->text, strlen(st->text));
             const char *m = anvil_writer_error_message((anvil_writer_err_code)code);
             printf(" message=");
@@ -620,10 +422,10 @@ int writer_script_run(const char *path, bool output_only) {
       if (code == 0) {
          puts("status ok");
       } else {
-         printf("status error code=%d name=%s\n", code, err_name(code));
+         printf("status error code=%d name=%s\n", code, script_err_name(code));
       }
       if (out) {
-         print_data("output", out, outlen);
+         script_print_data("output", out, outlen);
       } else {
          puts("output none");
       }

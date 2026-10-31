@@ -1,0 +1,6 @@
+anvil-builder-run 1
+find line=9 result=found
+find line=11 result=found
+emit bytes=57 text="#!aml\n\no := {\n   p @[k=v] := {\n      leaf := 1;\n   };\n};\n"
+steps 11
+status ok

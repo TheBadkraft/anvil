@@ -1,0 +1,10 @@
+anvil-builder-script 1
+dialect AML
+builder2 AML
+let a = int 1
+add NULL "a" a
+let b = other int 2
+other add NULL "b" b
+other write
+write
+other write AMP

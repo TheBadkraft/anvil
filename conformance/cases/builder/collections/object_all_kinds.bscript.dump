@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=129 text="#!aml\n\no := {\n   f0 := null;\n   f1 := true;\n   f2 := 7;\n   f3 := \"s\";\n   f4 := b;\n   f5 := @t`d`;\n   f6 := $r;\n   f7 := 0.25;\n};\n"
+steps 20
+status ok

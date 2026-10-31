@@ -15,16 +15,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Site updated for v0.12.1-rc (technical writer).** The download page now highlights v0.12.1-rc and links v0.12.0-rc and
-  the older releases. anvil.js is described as reader and writer (named ES-module imports, `lastError()` with `code` and
-  `name`, the two documented writer differences), with the builder, types and schema still to come. The four new tarballs,
-  the cumulative `SHA256SUMS` (18 lines) and `SHA256SUMS-v0.12.1-rc` were added and every earlier file kept. The Bindings
-  guide's anvil.js section covers the writer, and the public changelog gained the v0.12.1-rc entry. The licence stays
-  described as in progress.
-
 ### Added
+
+- **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that
+  a second implementation (the `AnvilBuilder` of anvil.js) must reproduce byte for byte, like the writer corpus. A
+  versioned builder script (`anvil-builder-script 1`, specified in `conformance/FORMAT.md`) reuses the writer script's
+  quoting, `NULL`, number and input rules and adds handles (`let m = add ...`) for nodes and members, a second builder
+  (`builder2`, `other`) for the foreign-handle error, and `emit` and `write` steps. `anvil-dump --builder-script <file>`
+  prints the run (`anvil-builder-run 1`): every failed call with its error code, every `find` result, the exact bytes of
+  every `emit` and `write`, and the final status; `--emit-dir <dir>` also writes each emitted document for the
+  round-trip check. 915 generated scripts under `conformance/cases/builder/` (`conformance/seed/gen_builder.py`, scripts
+  only; the runs are native's) cover every call, every value kind, nesting to and past the depth limit
+  (`ANVIL_WRITER_ERR_DEPTH_EXCEEDED`), module and member attributes, include ordering, bases (valid, non-object,
+  unattached, missing), every error path, and King & Crucible and FlyWire shaped documents. Wired into
+  `make check-conformance`, `update-conformance` and `check-dump-valgrind`, with `check-builder-script` (tool tests),
+  `check-builder-gen` and `check-builder-roundtrip` (every successful emit loads through the native reader; 1 known
+  entry, `conformance/builder-roundtrip-known.txt`, tracked through a `.gitignore` exception). No library, ABI or builder behaviour change. The script lexer
+  of `anvil-dump` moved into a shared file (`tools/script-common.c`) with no change to the writer mode.
 
 - **AnvilScript parser completion plan (design only; nothing implemented).** `notes/plan-2610-anvilscript-parser.md`
   gives the complete grammar with an AST node kind per production, a versioned and additive-only AST contract for the
@@ -33,6 +40,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   design, the specific 51xx error codes, and 26 small tickets in order (the six open parser tickets plus
   FR-2610-anvl-asl-003 to 020 and SR-2610-anvl-asl-002 and 003) in three milestones. It lists 13 decisions the owner
   has to make. No code and no design note changed.
+
+### Changed
+
+- Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
+  and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not
+  declare, so its known list is down to the one absolute-path harness limit. Dumps changed: the builder cases
+  `bases/missing_target`, `replaced`, `replaced_back_to_valid`, `target_is_self`,
+  `target_nested_non_object_not_checked` (renamed `target_only_nested_missing`: it is now refused with MISSING_BASE), `unattached_member_missing_target`, `find/then_set_base`,
+  `lifecycle/error_message_19` and `_20`, and the writer case `lifecycle/error_message_all` (codes 19 and 20 were
+  `unknown error`); no reader dump changed. `conformance/drift-tables.txt` has the two codes. `bases/replaced_back_to_valid` now declares its target, so its second `emit` succeeds. Scripts edited:
+  `scripts/check-builder-roundtrip.sh` (the include harness) and `scripts/release/check-js-package.sh`, which excludes
+  `cases/builder` from the reader corpus count and takes the expected count from the core tag's own corpus instead of a
+  hard-coded 1867.
+
+- **Site updated for v0.12.1-rc (technical writer).** The download page now highlights v0.12.1-rc and links v0.12.0-rc and
+  the older releases. anvil.js is described as reader and writer (named ES-module imports, `lastError()` with `code` and
+  `name`, the two documented writer differences), with the builder, types and schema still to come. The four new tarballs,
+  the cumulative `SHA256SUMS` (18 lines) and `SHA256SUMS-v0.12.1-rc` were added and every earlier file kept. The Bindings
+  guide's anvil.js section covers the writer, and the public changelog gained the v0.12.1-rc entry. The licence stays
+  described as in progress.
+
+### Fixed
+
+- **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
+  statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and
+  `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` (19), whether or not an include exists. A base
+  that names no top-level statement fails with the new `ANVIL_WRITER_ERR_MISSING_BASE` (20) when the builder holds no
+  `include`; with any include (added before or after) it is accepted as before, because the included file may declare
+  it. Both were emitted before and rejected on load (the reader's 4050 and 4051). The check runs after the non-object base
+  check (`INHERITANCE_REQUIRES_OBJECT`) of BR-2610-anvl-writer-002, across every member the builder created. The two
+  codes are appended to `anvil_writer_err_code` (existing values unchanged); the 165 exported symbols are unchanged.
+  Bindings that mirror the writer codes (anvil.js `WriterErrorCode`, py, net) need the two new values.
+- **A member handle from another builder is refused (BR-2610-anvl-writer-005).** `anvil_builder_set_base`,
+  `anvil_builder_member_attribute` and `anvil_builder_member_attribute_string` now fail with
+  `ANVIL_WRITER_ERR_INVALID_ARGUMENT` for a member of another builder (before the dialect check), as node handles
+  already were. They used to edit the other builder's member.
+- **The builder's base checks are linear (BR-2610-anvl-writer-004).** `emit` and `write` resolve each base once through one
+  name table and find cycles with an iterative three-colour walk, so a chain of 100000 members neither recurses nor is
+  quadratic. Time to `anvil_builder_emit`, native subject (this branch) vs native v0.12.1-rc (d10c9df), ms, lower is
+  faster: 4000 members with bases 1.9 vs 17.1; 20000 with bases 12.6 vs 533.8; 2000 with bases declared later 0.8 vs 12.7;
+  5000 later 2.2 vs 78.4; chains of 1000: 0.22 vs 1.18, 3000: 0.70 vs 9.17, 10000: 2.6 vs 97.7, 100000: 38 vs 40441.
+  The `parse_validate` bench is unchanged (ratios 0.992x to 1.001x, time, lower is faster).
 
 ---
 

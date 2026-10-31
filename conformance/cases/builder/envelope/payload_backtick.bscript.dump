@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=7 code=9 name=ANVIL_WRITER_ERR_INVALID_BLOB call="let f2 = blob \"table\" \"a`b\"" message="invalid blob tag or content"
+steps 6
+status error code=9 name=ANVIL_WRITER_ERR_INVALID_BLOB

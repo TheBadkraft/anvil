@@ -1,0 +1,12 @@
+anvil-builder-run 1
+failed line=4 code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC call="let n = numeric \"1x\"" message="invalid numeric"
+failed line=5 code=8 name=ANVIL_WRITER_ERR_INVALID_BARE call="let b = bare \"\"" message="text cannot be written as a bare literal"
+failed line=6 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="let s = string NULL 3" message="invalid argument"
+failed line=7 code=9 name=ANVIL_WRITER_ERR_INVALID_BLOB call="let t = blob \"a-b\" \"x\"" message="invalid blob tag or content"
+failed line=8 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="let r = varref \"1\"" message="invalid identifier"
+failed line=9 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="add NULL \"1\" NULL" message="invalid identifier"
+failed line=10 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="attribute \"\" NULL" message="invalid identifier"
+failed line=11 code=11 name=ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH call="include \"\"" message="invalid include path"
+get_error code=11 name=ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH
+steps 11
+status error code=11 name=ANVIL_WRITER_ERR_INVALID_INCLUDE_PATH

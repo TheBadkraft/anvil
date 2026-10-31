@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=93 text="#!amp\n\ns0 := null;\ns1 := true;\ns2 := 5;\ns3 := \"s\";\ns4 := b;\ns5 := @t`d`;\ns6 := 1.5;\ns7 := 2;\n"
+steps 18
+status ok

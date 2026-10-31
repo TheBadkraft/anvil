@@ -1,0 +1,4 @@
+anvil-builder-script 1
+dialect AML
+attribute_string "k" "\x01\x02\x1f\x7f"
+emit

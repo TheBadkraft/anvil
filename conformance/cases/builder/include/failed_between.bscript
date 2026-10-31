@@ -1,0 +1,9 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+include "a.anvl"
+include ""
+attribute "k" "v"
+attribute "1" "v"
+include "b.anvl"
+emit

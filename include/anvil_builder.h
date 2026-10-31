@@ -104,9 +104,11 @@ bool anvil_builder_append(anvil_builder b, anvil_node collection, anvil_node ele
  */
 anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *name, anvil_node value);
 
-/** @brief Declare an inheritance base. The statement's value must be an object. AML only. */
+/** @brief Declare an inheritance base. The statement's value must be an object. AML only. A member
+ * handle of another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT, as for the node handles. */
 bool anvil_builder_set_base(anvil_builder b, anvil_member member, const char *base);
-/** @brief Statement attribute; same rules as anvil_writer_attribute. AML only. */
+/** @brief Statement attribute; same rules as anvil_writer_attribute. AML only. A member handle of
+ * another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT. */
 bool anvil_builder_member_attribute(anvil_builder b, anvil_member member, const char *key, const char *value);
 bool anvil_builder_member_attribute_string(anvil_builder b, anvil_member member, const char *key,
                                            const char *text, size_t length);
@@ -120,9 +122,15 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  * @brief Stream the whole document into `w`: header, then every statement. `w` must be a fresh
  * writer of the same dialect; it is not finished - that, and reading its data, is the caller's.
  * On failure the writer's error is also reported by anvil_builder_get_error.
- * Before anything is written, every member's base that names a top-level member must name an
- * object (else ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT). This is checked across every member
- * the builder created, including members never attached to the tree.
+ * Before anything is written, the bases are checked across every member the builder created,
+ * including members never attached to the tree. A base names a top-level member, in this order:
+ *  - the member it names must be an object (ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT);
+ *  - it must exist (ANVIL_WRITER_ERR_MISSING_BASE) - unless the builder holds an include (even one
+ *    added after the base was set), because the included file may declare it, so the builder
+ *    cannot know and accepts it as before;
+ *  - the chain of top-level members' bases must not loop, a statement based on itself or
+ *    a -> b -> a included (ANVIL_WRITER_ERR_INHERITANCE_CYCLE), include or not.
+ * A base set on a nested member is looked up among the top-level names, as the reader does.
  */
 bool anvil_builder_write(anvil_builder b, anvil_writer w);
 

@@ -66,6 +66,8 @@ typedef enum {
    ANVIL_WRITER_ERR_DEPTH_EXCEEDED,              // nesting deeper than the builder will emit
    ANVIL_WRITER_ERR_DUPLICATE_FIELD,             // a field name declared twice in one object (the reader rejects it)
    ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,     // an attribute key given twice on one statement, or twice in the module header
+   ANVIL_WRITER_ERR_INHERITANCE_CYCLE,           // the builder's base chains loop back (a statement based on itself, a -> b -> a)
+   ANVIL_WRITER_ERR_MISSING_BASE,                // a builder base names no top-level member and the document includes nothing that could supply it
 } anvil_writer_err_code;
 
 #ifdef __cplusplus

@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# a null member is checked before the dialect
+option on-error continue
+dialect AMP
+member_attribute NULL "k" "v"
+get_error

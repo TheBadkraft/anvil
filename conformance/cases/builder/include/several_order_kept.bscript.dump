@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=61 text="#!aml\n\ninclude \"z.anvl\";\ninclude \"a.anvl\";\ninclude \"m.anvl\";\n"
+steps 5
+status ok

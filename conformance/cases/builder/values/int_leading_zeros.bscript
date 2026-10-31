@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# the script integer 007 is 7
+dialect AML
+let v = int 007
+add NULL "v" v
+emit

@@ -336,8 +336,10 @@ These cover the grammar rules above:
 | `ANVIL_WRITER_ERR_DUPLICATE_NAME` | 15 | a top-level name declared twice (the reader's 4053) |
 | `ANVIL_WRITER_ERR_DUPLICATE_FIELD` | 17 | a field name repeated in one object, at any depth (the reader's 4001) |
 | `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` | 18 | an attribute key repeated on one statement, or in the module header (the reader's 4013) |
+| `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` | 19 | the builder's top-level statements' bases loop back (a statement based on itself, `a` on `b` on `a`; the reader's 4050) |
+| `ANVIL_WRITER_ERR_MISSING_BASE` | 20 | the builder holds a base that names no top-level statement and the builder holds no `include` that could supply it (the reader's 4051) |
 
-Codes 17 and 18 were appended, so the existing values keep their numbers. The writer can't see names that an
+Codes 17 to 20 were appended, so the existing values keep their numbers. The builder reports 19 and 20 when it is written or emitted; with any `include` a base that names nothing in the document is accepted, because the included file may declare it. The writer can't see names that an
 `include` brings in, so a collision with an included name is found only when the document is read.
 
 ### Real language bindings today

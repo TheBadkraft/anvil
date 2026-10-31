@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# raw value "$x"
+dialect AML
+attribute "k" "$x"
+emit

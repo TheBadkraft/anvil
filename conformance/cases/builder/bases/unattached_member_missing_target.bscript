@@ -1,0 +1,9 @@
+anvil-builder-script 1
+dialect AML
+let loose = object
+let d = object
+let x = int 2
+add d "j" x
+let dm = add loose "derived" d
+set_base dm "nothere"
+emit

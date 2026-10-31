@@ -1,0 +1,5 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+set_base NULL "b"
+get_error

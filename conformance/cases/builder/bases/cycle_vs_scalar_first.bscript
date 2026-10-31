@@ -1,0 +1,22 @@
+anvil-builder-script 1
+# the scalar base is reported before the cycle
+option on-error continue
+dialect AML
+let n = int 1
+add NULL "n" n
+let oa = object
+let xa = int 1
+add oa "f" xa
+let ma = add NULL "p" oa
+let ob = object
+let xb = int 2
+add ob "f" xb
+let mb = add NULL "q" ob
+let oc = object
+let xc = int 3
+add oc "f" xc
+let mc = add NULL "r" oc
+set_base ma "q"
+set_base mb "p"
+set_base mc "n"
+emit

@@ -1,0 +1,26 @@
+anvil-builder-script 1
+# handle names are not reserved against call names
+dialect AML
+let a = int 0
+add NULL "n0" a
+let A = int 1
+add NULL "n1" A
+let _a = int 2
+add NULL "n2" _a
+let a1 = int 3
+add NULL "n3" a1
+let _ = int 4
+add NULL "n4" _
+let add = int 5
+add NULL "n5" add
+let emit = int 6
+add NULL "n6" emit
+let int = int 7
+add NULL "n7" int
+let find = int 8
+add NULL "n8" find
+let dialect = int 9
+add NULL "n9" dialect
+let xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = int 10
+add NULL "n10" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+emit

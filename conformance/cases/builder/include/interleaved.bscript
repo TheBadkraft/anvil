@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# includes first in the order added, then attributes in the order added
+dialect AML
+attribute "a" "1"
+include "x.anvl"
+attribute "b" "2"
+include "y.anvl"
+attribute_string "c" "3"
+include "z.anvl"
+emit

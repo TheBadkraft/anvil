@@ -1,0 +1,9 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let x = int 1
+let m = add o "k" x
+member_attribute m "inner" "1"
+let p = add NULL "o" o
+member_attribute p "outer" "2"
+emit

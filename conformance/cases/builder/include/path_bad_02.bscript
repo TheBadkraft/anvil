@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# path "a\tb"
+option on-error continue
+dialect AML
+include "a\tb"
+get_error

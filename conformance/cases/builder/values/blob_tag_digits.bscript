@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = blob "t1x2" "x"
+add NULL "v" v
+emit

@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=16 code=13 name=ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT call="emit" message="a statement with a base must have an object value"
+emit bytes=78 text="#!aml\n\nbase := {\n   k := 1;\n};\nscalar := 1;\nderived : base := {\n   j := 2;\n};\n"
+steps 16
+status ok

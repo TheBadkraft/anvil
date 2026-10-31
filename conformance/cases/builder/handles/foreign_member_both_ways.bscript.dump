@@ -1,0 +1,9 @@
+anvil-builder-run 1
+failed line=9 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute n \"k\" \"v\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+failed line=11 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="other member_attribute m \"k\" \"v\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+emit bytes=22 text="#!aml\n\nv @[k=v] := 1;\n"
+emit bytes=15 text="#!aml\n\nw := 2;\n"
+steps 14
+status ok

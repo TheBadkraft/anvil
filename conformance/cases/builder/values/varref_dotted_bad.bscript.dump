@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=3 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="let v = varref \"a.b\"" message="invalid identifier"
+steps 2
+status error code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER

@@ -1,0 +1,205 @@
+anvil-builder-script 1
+dialect AML
+let rows = array
+let r0 = tuple
+let a0 = int 0
+let b0 = string "row 0"
+let c0 = double 0.5
+append r0 a0
+append r0 b0
+append r0 c0
+append rows r0
+let r1 = tuple
+let a1 = int 1
+let b1 = string "row 1"
+let c1 = double 1.5
+append r1 a1
+append r1 b1
+append r1 c1
+append rows r1
+let r2 = tuple
+let a2 = int 2
+let b2 = string "row 2"
+let c2 = double 2.5
+append r2 a2
+append r2 b2
+append r2 c2
+append rows r2
+let r3 = tuple
+let a3 = int 3
+let b3 = string "row 3"
+let c3 = double 3.5
+append r3 a3
+append r3 b3
+append r3 c3
+append rows r3
+let r4 = tuple
+let a4 = int 4
+let b4 = string "row 4"
+let c4 = double 4.5
+append r4 a4
+append r4 b4
+append r4 c4
+append rows r4
+let r5 = tuple
+let a5 = int 5
+let b5 = string "row 5"
+let c5 = double 5.5
+append r5 a5
+append r5 b5
+append r5 c5
+append rows r5
+let r6 = tuple
+let a6 = int 6
+let b6 = string "row 6"
+let c6 = double 6.5
+append r6 a6
+append r6 b6
+append r6 c6
+append rows r6
+let r7 = tuple
+let a7 = int 7
+let b7 = string "row 7"
+let c7 = double 7.5
+append r7 a7
+append r7 b7
+append r7 c7
+append rows r7
+let r8 = tuple
+let a8 = int 8
+let b8 = string "row 8"
+let c8 = double 8.5
+append r8 a8
+append r8 b8
+append r8 c8
+append rows r8
+let r9 = tuple
+let a9 = int 9
+let b9 = string "row 9"
+let c9 = double 9.5
+append r9 a9
+append r9 b9
+append r9 c9
+append rows r9
+let r10 = tuple
+let a10 = int 10
+let b10 = string "row 10"
+let c10 = double 10.5
+append r10 a10
+append r10 b10
+append r10 c10
+append rows r10
+let r11 = tuple
+let a11 = int 11
+let b11 = string "row 11"
+let c11 = double 11.5
+append r11 a11
+append r11 b11
+append r11 c11
+append rows r11
+let r12 = tuple
+let a12 = int 12
+let b12 = string "row 12"
+let c12 = double 12.5
+append r12 a12
+append r12 b12
+append r12 c12
+append rows r12
+let r13 = tuple
+let a13 = int 13
+let b13 = string "row 13"
+let c13 = double 13.5
+append r13 a13
+append r13 b13
+append r13 c13
+append rows r13
+let r14 = tuple
+let a14 = int 14
+let b14 = string "row 14"
+let c14 = double 14.5
+append r14 a14
+append r14 b14
+append r14 c14
+append rows r14
+let r15 = tuple
+let a15 = int 15
+let b15 = string "row 15"
+let c15 = double 15.5
+append r15 a15
+append r15 b15
+append r15 c15
+append rows r15
+let r16 = tuple
+let a16 = int 16
+let b16 = string "row 16"
+let c16 = double 16.5
+append r16 a16
+append r16 b16
+append r16 c16
+append rows r16
+let r17 = tuple
+let a17 = int 17
+let b17 = string "row 17"
+let c17 = double 17.5
+append r17 a17
+append r17 b17
+append r17 c17
+append rows r17
+let r18 = tuple
+let a18 = int 18
+let b18 = string "row 18"
+let c18 = double 18.5
+append r18 a18
+append r18 b18
+append r18 c18
+append rows r18
+let r19 = tuple
+let a19 = int 19
+let b19 = string "row 19"
+let c19 = double 19.5
+append r19 a19
+append r19 b19
+append r19 c19
+append rows r19
+let r20 = tuple
+let a20 = int 20
+let b20 = string "row 20"
+let c20 = double 20.5
+append r20 a20
+append r20 b20
+append r20 c20
+append rows r20
+let r21 = tuple
+let a21 = int 21
+let b21 = string "row 21"
+let c21 = double 21.5
+append r21 a21
+append r21 b21
+append r21 c21
+append rows r21
+let r22 = tuple
+let a22 = int 22
+let b22 = string "row 22"
+let c22 = double 22.5
+append r22 a22
+append r22 b22
+append r22 c22
+append rows r22
+let r23 = tuple
+let a23 = int 23
+let b23 = string "row 23"
+let c23 = double 23.5
+append r23 a23
+append r23 b23
+append r23 c23
+append rows r23
+let r24 = tuple
+let a24 = int 24
+let b24 = string "row 24"
+let c24 = double 24.5
+append r24 a24
+append r24 b24
+append r24 c24
+append rows r24
+add NULL "rows" rows
+emit

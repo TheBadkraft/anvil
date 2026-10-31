@@ -1,0 +1,12 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let p = object
+let x = int 1
+add p "leaf" x
+add o "p" p
+add NULL "o" o
+let m = find o "p"
+member_attribute m "k" "v"
+find p "leaf"
+emit

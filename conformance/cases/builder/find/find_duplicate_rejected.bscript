@@ -1,0 +1,8 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let a = int 1
+let b = int 2
+add NULL "a" a
+add NULL "a" b
+find NULL "a"

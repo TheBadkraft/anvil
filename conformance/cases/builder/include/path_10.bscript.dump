@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=22 text="#!aml\n\ninclude \"a;b\";\n"
+steps 3
+status ok

@@ -1,0 +1,11 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let p = object
+let a = int 1
+let b = int 2
+add o "k" a
+add p "k" b
+add NULL "o" o
+add NULL "p" p
+emit

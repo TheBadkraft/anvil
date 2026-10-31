@@ -1,0 +1,8 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+builder2 9
+let n = other int 1
+other get_error
+other emit
+other find NULL "a"

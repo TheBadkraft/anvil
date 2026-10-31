@@ -1,0 +1,11 @@
+anvil-builder-run 1
+failed line=4 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="append NULL NULL" message="invalid argument"
+failed line=5 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="add NULL \"a\" NULL" message="invalid argument"
+failed line=6 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="set_base NULL \"b\"" message="invalid argument"
+failed line=7 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute NULL \"k\" \"v\"" message="invalid argument"
+failed line=8 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="member_attribute_string NULL \"k\" \"v\"" message="invalid argument"
+find line=9 result=none
+emit bytes=7 text="#!aml\n\n"
+get_error code=0 name=ANVIL_WRITER_OK
+steps 10
+status ok

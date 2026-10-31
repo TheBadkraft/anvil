@@ -1,0 +1,14 @@
+anvil-builder-script 1
+# 2 nested tuples
+dialect AML
+let c1 = tuple
+let c2 = tuple
+append c1 c2
+let x1 = int 1
+let x2 = int 2
+append c1 x1
+append c2 x2
+let leaf = int 1
+append c2 leaf
+add NULL "d" c1
+emit

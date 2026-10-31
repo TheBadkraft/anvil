@@ -1,0 +1,19 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let o = object
+let v = int 1
+add o "k" v
+add NULL "o" o
+let f = find o "k"
+let g = find o "zzz"
+let h = find NULL "o"
+let j = find NULL "k"
+set_base f "p"
+get_error
+find NULL "none"
+get_error
+set_base h "p"
+get_error
+set_base g "p"
+get_error

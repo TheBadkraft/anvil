@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# bare "_"
+dialect AML
+let v = bare "_"
+add NULL "v" v
+emit

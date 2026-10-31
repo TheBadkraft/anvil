@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# the default stops at the first failed call
+dialect AML
+let v = numeric "x"
+let w = null
+get_error

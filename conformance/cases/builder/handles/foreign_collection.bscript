@@ -1,0 +1,10 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+builder2 AML
+let a = array
+let n = other int 1
+append a n
+get_error
+other append a n
+other get_error

@@ -1,0 +1,13 @@
+anvil-builder-script 1
+dialect AML
+let a = tuple
+let e0 = null
+append a e0
+let e1 = bare "ok"
+append a e1
+let e2 = double 1.5
+append a e2
+let e3 = blob "t" "x"
+append a e3
+add NULL "a" a
+emit

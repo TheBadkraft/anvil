@@ -1,0 +1,11 @@
+anvil-builder-script 1
+dialect AML
+let t = tuple
+let o = object
+let x = int 1
+let y = int 2
+add o "k" x
+append t o
+append t y
+add NULL "t" t
+emit

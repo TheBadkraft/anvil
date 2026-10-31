@@ -1,0 +1,7 @@
+anvil-builder-run 1
+failed line=8 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="other set_base m \"b\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+failed line=10 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="other member_attribute m \"k\" \"v\"" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+steps 9
+status ok

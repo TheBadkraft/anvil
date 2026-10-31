@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = string "na\xc3\xafve \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e \xf0\x9d\x84\x9e"
+add NULL "v" v
+emit

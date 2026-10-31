@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# find does not touch the error
+option on-error continue
+dialect AML
+let v = numeric "x"
+find NULL "a"
+get_error

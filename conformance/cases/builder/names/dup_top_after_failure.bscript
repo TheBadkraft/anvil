@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# the value of a failed add stays detached
+option on-error continue
+dialect AML
+let a = int 1
+add NULL "x" a
+let b = int 2
+add NULL "x" b
+add NULL "y" b
+emit

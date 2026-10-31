@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# writer dialect differs from the builder's
+dialect AML
+let v = int 1
+add NULL "v" v
+write AMP

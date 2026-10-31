@@ -1,0 +1,7 @@
+anvil-builder-script 1
+# member key "true"
+dialect AML
+let a = int 1
+let m = add NULL "a" a
+member_attribute m "true" "v"
+emit

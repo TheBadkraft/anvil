@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=4 code=7 name=ANVIL_WRITER_ERR_INVALID_NUMERIC call="let v = numeric \"x\"" message="invalid numeric"
+emit bytes=18 text="#!aml\n\nw := null;\n"
+steps 6
+status ok

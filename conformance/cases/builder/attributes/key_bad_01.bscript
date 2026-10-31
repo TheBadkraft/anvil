@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# module key "1"
+option on-error continue
+dialect AML
+attribute "1" "v"
+get_error

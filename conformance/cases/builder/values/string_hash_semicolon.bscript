@@ -1,0 +1,5 @@
+anvil-builder-script 1
+dialect AML
+let v = string "a; b := c; # d"
+add NULL "v" v
+emit

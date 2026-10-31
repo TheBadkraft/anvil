@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# an empty array fails at emit; adding an element fixes it
+option on-error continue
+dialect AML
+let a = array
+add NULL "a" a
+emit
+let e = int 1
+append a e
+emit

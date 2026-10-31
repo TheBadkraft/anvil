@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# path "../a.anvl"
+dialect AML
+include "../a.anvl"
+emit

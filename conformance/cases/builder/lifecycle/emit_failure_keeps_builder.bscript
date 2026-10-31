@@ -1,0 +1,14 @@
+anvil-builder-script 1
+# a 1-tuple fails at emit, and the builder is unchanged
+option on-error continue
+dialect AML
+let a = tuple
+add NULL "t" a
+let x = int 1
+append a x
+emit
+get_error
+emit
+let y = int 2
+append a y
+emit

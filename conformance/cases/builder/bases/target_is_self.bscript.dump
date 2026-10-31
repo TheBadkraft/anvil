@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=8 code=19 name=ANVIL_WRITER_ERR_INHERITANCE_CYCLE call="emit" message="inheritance cycle: a statement's base chain loops back to itself"
+steps 7
+status error code=19 name=ANVIL_WRITER_ERR_INHERITANCE_CYCLE

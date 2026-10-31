@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=6 code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD call="member_attribute m \"null\" \"v\"" message="reserved word"
+steps 4
+status error code=6 name=ANVIL_WRITER_ERR_RESERVED_WORD

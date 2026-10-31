@@ -1,0 +1,6 @@
+anvil-builder-script 1
+dialect AML
+let t = tuple
+let x = int 1
+append t x
+emit

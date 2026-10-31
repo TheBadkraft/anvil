@@ -1,0 +1,7 @@
+anvil-builder-script 1
+dialect AMP
+let f0 = blob "ut-id" "x"
+add NULL "utid" f0
+let f1 = int 1
+add NULL "seq" f1
+emit

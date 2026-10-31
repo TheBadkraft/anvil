@@ -1,0 +1,5 @@
+anvil-builder-script 1
+# path "caf\xc3\xa9.anvl"
+dialect AML
+include "caf\xc3\xa9.anvl"
+emit

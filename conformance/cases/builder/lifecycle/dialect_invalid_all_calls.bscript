@@ -1,0 +1,17 @@
+anvil-builder-script 1
+# every call on the null builder fails with INVALID_ARGUMENT, find returns none
+option on-error continue
+dialect 9
+attribute "a" NULL
+include "x"
+let n = null
+let o = object
+append n n
+let m = add NULL "a" n
+set_base m "b"
+member_attribute m "k" "v"
+member_attribute_string m "k" "v"
+find NULL "a"
+write
+write AMP
+get_error

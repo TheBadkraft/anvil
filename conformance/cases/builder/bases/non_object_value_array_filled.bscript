@@ -1,0 +1,10 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let v = array
+let x = int 1
+append v x
+let m = add NULL "n" v
+set_base m "b"
+get_error
+emit

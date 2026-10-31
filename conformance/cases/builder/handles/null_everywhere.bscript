@@ -1,0 +1,11 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+append NULL NULL
+add NULL "a" NULL
+set_base NULL "b"
+member_attribute NULL "k" "v"
+member_attribute_string NULL "k" "v"
+find NULL "a"
+emit
+get_error

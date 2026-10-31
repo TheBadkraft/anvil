@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=23 text="#!aml\n\nx := 1;\nX := 2;\n"
+steps 6
+status ok

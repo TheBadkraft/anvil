@@ -1,0 +1,4 @@
+anvil-builder-script 1
+dialect AML
+attribute "k" "true"
+emit

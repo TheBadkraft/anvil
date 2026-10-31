@@ -1,0 +1,19 @@
+anvil-builder-script 1
+dialect AML
+let a = array
+let e0 = int 1
+append a e0
+let e1 = string "s"
+append a e1
+let e2 = bool true
+append a e2
+let e3 = null
+append a e3
+let e4 = bare "x"
+append a e4
+let e5 = blob "t" "d"
+append a e5
+let e6 = double 2.5
+append a e6
+add NULL "a" a
+emit

@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# members may be added after the object is attached
+dialect AML
+let o = object
+add NULL "o" o
+let x = int 1
+add o "k" x
+emit

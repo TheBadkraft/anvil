@@ -1,0 +1,4 @@
+anvil-builder-run 1
+failed line=6 code=10 name=ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE call="member_attribute m \"k\" \"a\\nb\"" message="invalid attribute value"
+steps 4
+status error code=10 name=ANVIL_WRITER_ERR_INVALID_ATTRIBUTE_VALUE

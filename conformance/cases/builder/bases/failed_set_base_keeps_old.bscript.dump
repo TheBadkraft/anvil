@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=13 code=5 name=ANVIL_WRITER_ERR_INVALID_IDENTIFIER call="set_base dm \"1x\"" message="invalid identifier"
+emit bytes=65 text="#!aml\n\nbase := {\n   k := 1;\n};\nderived : base := {\n   j := 2;\n};\n"
+steps 13
+status ok

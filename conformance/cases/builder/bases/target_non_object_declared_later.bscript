@@ -1,0 +1,10 @@
+anvil-builder-script 1
+dialect AML
+let d = object
+let x = int 2
+add d "j" x
+let dm = add NULL "derived" d
+set_base dm "target"
+let t = int 1
+add NULL "target" t
+emit

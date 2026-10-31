@@ -1,0 +1,4 @@
+anvil-builder-run 1
+write bytes=497 text="#!aml\n\ninclude \"common.anvl\";\n@[schema=orders]\n@[title=\"Order tables\"]\n\nbase_table @[abstract] := {\n   id := 1;\n};\norders : base_table @[version=3, note=\"primary table\"] := {\n   table := \"orders\";\n   columns := [\n      {\n         name := \"id\";\n         type := int64;\n      },\n      {\n         name := \"customer\";\n         type := string;\n      },\n      {\n         name := \"total\";\n         type := decimal;\n      },\n      {\n         name := \"placed\";\n         type := timestamp;\n      }\n   ];\n};\n"
+steps 43
+status ok

@@ -1,0 +1,9 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let a = int 1
+let m = add NULL "a" a
+member_attribute m "k" "1"
+member_attribute m "k" "2"
+get_error
+emit

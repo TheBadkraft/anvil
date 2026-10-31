@@ -1,0 +1,13 @@
+anvil-builder-script 1
+# AMP refuses attributes
+dialect AMP
+let f0 = blob "utid" "id-1"
+add NULL "utid" f0
+let f1 = int 3
+add NULL "seq" f1
+let f2 = blob "table" "[(1)]"
+add NULL "payload" f2
+let m = find NULL "seq"
+member_attribute m "k" "v"
+get_error
+emit

@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# numeric "1.e3"
+dialect AML
+let v = numeric "1.e3"
+add NULL "v" v
+emit

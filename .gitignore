@@ -89,3 +89,4 @@ __pycache__/
 
 # The conformance drift tables are a committed contract, not build output.
 !conformance/drift-tables.txt
+!conformance/*-roundtrip-known.txt

@@ -1,0 +1,26 @@
+anvil-builder-script 1
+# 10 nested objects
+dialect AML
+let c1 = object
+let c2 = object
+let c3 = object
+let c4 = object
+let c5 = object
+let c6 = object
+let c7 = object
+let c8 = object
+let c9 = object
+let c10 = object
+add c1 "k" c2
+add c2 "k" c3
+add c3 "k" c4
+add c4 "k" c5
+add c5 "k" c6
+add c6 "k" c7
+add c7 "k" c8
+add c8 "k" c9
+add c9 "k" c10
+let leaf = int 1
+add c10 "k" leaf
+add NULL "d" c1
+emit

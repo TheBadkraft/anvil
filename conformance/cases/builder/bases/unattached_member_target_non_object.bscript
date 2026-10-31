@@ -1,0 +1,15 @@
+anvil-builder-script 1
+# a member of an object that is never attached still fails the check
+option on-error continue
+dialect AML
+let t = int 1
+add NULL "target" t
+let loose = object
+let d = object
+let x = int 2
+add d "j" x
+let dm = add loose "derived" d
+set_base dm "target"
+emit
+write
+get_error

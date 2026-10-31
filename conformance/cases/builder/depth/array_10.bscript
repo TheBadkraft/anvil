@@ -1,0 +1,26 @@
+anvil-builder-script 1
+# 10 nested arrays
+dialect AML
+let c1 = array
+let c2 = array
+let c3 = array
+let c4 = array
+let c5 = array
+let c6 = array
+let c7 = array
+let c8 = array
+let c9 = array
+let c10 = array
+append c1 c2
+append c2 c3
+append c3 c4
+append c4 c5
+append c5 c6
+append c6 c7
+append c7 c8
+append c8 c9
+append c9 c10
+let leaf = int 1
+append c10 leaf
+add NULL "d" c1
+emit

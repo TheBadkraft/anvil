@@ -1,0 +1,4 @@
+anvil-builder-run 1
+error_message code=15 text="top-level name declared twice"
+steps 2
+status ok

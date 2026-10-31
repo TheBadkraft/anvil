@@ -1,0 +1,13 @@
+anvil-builder-script 1
+# a name that exists only inside an object (a scalar there) is not a top-level name: MISSING_BASE, not the non-object error
+dialect AML
+let o = object
+let n = int 1
+add o "target" n
+add NULL "outer" o
+let d = object
+let x = int 2
+add d "j" x
+let dm = add NULL "derived" d
+set_base dm "target"
+emit
