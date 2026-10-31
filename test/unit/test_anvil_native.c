@@ -14,6 +14,7 @@
 #include "anvil_flat.h"
 #include "anvil_types.h"
 #include "internal/source_registry.h"
+#include "errors.h"
 #include "testbit.h"
 // ----------------
 #include "../utilities/helpers.h"
@@ -22,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
@@ -2045,6 +2048,67 @@ static void test_anv67_asl_rejected_without_with_asl(void) {
 #endif
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV68-71 (BR-2610-anvl-io-001) - a root file that cannot be read reports the
+ * specific IO code's message through the public error API, not an empty one.
+ * The messages are unique per code, so equality with anvl_error_code_message
+ * identifies the code.
+ * ---------------------------------------------------------------------- */
+static void expect_io_message(anvil_document doc, anvl_err_code code, const char *tag) {
+   TestBit.is_not_null(doc, tag);
+   if (!doc) {
+      return;
+   }
+   TestBit.is_equal_int(ANVIL_ERR_IO, anvil_get_error(doc), tag);
+   anvil_error err = anvil_document_get_error(doc);
+   TestBit.is_not_null(err, tag);
+   if (err) {
+      char buf[128];
+      size_t n = anvil_error_get_message(err, buf, sizeof buf);
+      const char *want = anvl_error_code_message(code);
+      TestBit.is_equal_int((long long)strlen(want), (long long)n, tag);
+      TestBit.is_equal_int(0, strcmp(want, buf), tag);
+   }
+   anvil_dispose(doc);
+}
+
+static void test_anv68_missing_root_file_code(void) {
+   expect_io_message(anvil_load(fixture_path("anvil_nonexistent_file_xyz.anvl")),
+                     ANVL_ERR_IO_FILE_NOT_FOUND, "ANV68: a missing root reports FILE_NOT_FOUND");
+   expect_io_message(anvil_load("../../test/fixtures/no_such_dir/x.anvl"),
+                     ANVL_ERR_IO_FILE_NOT_FOUND, "ANV68: a missing directory reports FILE_NOT_FOUND");
+}
+
+static void test_anv69_directory_root_code(void) {
+   expect_io_message(anvil_load("../../test/fixtures"), ANVL_ERR_IO_FILE_READ,
+                     "ANV69: a directory as the root reports FILE_READ");
+}
+
+static void test_anv70_unreadable_root_code(void) {
+   if (geteuid() == 0) {
+      TestBit.is_true(true, "ANV70: skipped as root (permissions are not enforced)");
+      return;
+   }
+   char path[] = "/tmp/anvl_io001_XXXXXX";
+   int fd = mkstemp(path);
+   TestBit.is_true(fd >= 0, "ANV70: temp file created");
+   if (fd < 0) {
+      return;
+   }
+   close(fd);
+   chmod(path, 0);
+   expect_io_message(anvil_load(path), ANVL_ERR_IO_FILE_READ,
+                     "ANV70: a file without read permission reports FILE_READ");
+   unlink(path);
+}
+
+static void test_anv71_invalid_path_code(void) {
+   expect_io_message(anvil_load(NULL), ANVL_ERR_IO_INVALID_PATH,
+                     "ANV71: a NULL path reports INVALID_PATH");
+   expect_io_message(anvil_load(""), ANVL_ERR_IO_INVALID_PATH,
+                     "ANV71: an empty path reports INVALID_PATH");
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -2155,6 +2219,10 @@ int main(void) {
                   test_anv66_script_enabled_reports_build_flag, th);
    TestBit.run_ex("ANV67_asl_rejected_without_with_asl", NULL,
                   test_anv67_asl_rejected_without_with_asl, th);
+   TestBit.run_ex("ANV68_missing_root_file_code", NULL, test_anv68_missing_root_file_code, th);
+   TestBit.run_ex("ANV69_directory_root_code", NULL, test_anv69_directory_root_code, th);
+   TestBit.run_ex("ANV70_unreadable_root_code", NULL, test_anv70_unreadable_root_code, th);
+   TestBit.run_ex("ANV71_invalid_path_code", NULL, test_anv71_invalid_path_code, th);
 
    return TestBit.report();
 }

@@ -83,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A root file that cannot be read now reports its specific error (BR-2610-anvl-io-001).** `anvil_load` of a missing or
+  unreadable file returned category `ANVIL_ERR_IO` with an empty message and no recorded error (code 0). It now records
+  the specific code and `anvil_error_get_message` returns its message: `ANVL_ERR_IO_FILE_NOT_FOUND` ("IO file not found")
+  for a name that does not exist, `ANVL_ERR_IO_FILE_READ` for a directory, a file that cannot be opened for reading
+  (permissions) or a failed read, and `ANVL_ERR_IO_INVALID_PATH` for a NULL or empty path. The category stays
+  `ANVIL_ERR_IO`; no code and no ABI is added. Side effect: an `include` that names a directory used to load as an empty
+  document and is now an include error, like any unreadable include.
+
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
   statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and
   `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` (19), whether or not an include exists. A base

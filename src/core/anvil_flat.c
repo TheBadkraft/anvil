@@ -120,6 +120,9 @@ static anvil_document load_common(anvl_source_origin origin, const char *source,
    if (ANVL_RES_OK != doc_load_source(doc, origin, source, length, &err_code)) {
       // Never registered with ctx - mod_ctx_dispose won't reach it, so dispose it directly
       // here to avoid a leak, and clear the handle's reference to it.
+      // Record why (file not found, unreadable, invalid path, ...), so the detail carries the
+      // specific code's message instead of reading as an empty Io error (BR-2610-anvl-io-001).
+      anvl_error_set(ctx->errors, err_code, 0, 0, __FILE__, NULL);
       doc_dispose(doc);
       handle->root = NULL;
       handle->error = ANVIL_ERR_IO;

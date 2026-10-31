@@ -569,7 +569,9 @@ anvl_result doc_load_source(module_document doc, anvl_source_origin origin, cons
 
    // validate parameters
    if (!doc || !source) {
-      err_code = ANVL_ERR_INVALID_ARGUMENT;
+      // a file load without a path is a path error; anything else is a bad argument
+      err_code = (doc && origin == ANVL_SOURCE_FROM_FILE) ? ANVL_ERR_IO_INVALID_PATH
+                                                          : ANVL_ERR_INVALID_ARGUMENT;
       goto error;
    }
 

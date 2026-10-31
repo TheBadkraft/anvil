@@ -1,4 +1,4 @@
 anvil-schema-run 1
-registry line=9 name=r how=includes file="main.anvl" doc=ok result=ok diagnostics=0
+registry line=9 name=r how=includes file="main.anvl" doc=ANVIL_ERR_INCLUDE result=ok diagnostics=0
 steps 3
 status ok
