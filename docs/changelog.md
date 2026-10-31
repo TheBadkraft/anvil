@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Site updated for v0.12.1-rc (technical writer).** The download page now highlights v0.12.1-rc and links v0.12.0-rc and
+  the older releases. anvil.js is described as reader and writer (named ES-module imports, `lastError()` with `code` and
+  `name`, the two documented writer differences), with the builder, types and schema still to come. The four new tarballs,
+  the cumulative `SHA256SUMS` (18 lines) and `SHA256SUMS-v0.12.1-rc` were added and every earlier file kept. The Bindings
+  guide's anvil.js section covers the writer, and the public changelog gained the v0.12.1-rc entry. The licence stays
+  described as in progress.
+
 ### Added
 
 - **AnvilScript parser completion plan (design only; nothing implemented).** `notes/plan-2610-anvilscript-parser.md`
