@@ -1,0 +1,7 @@
+#!aml
+@[types]
+
+Solo := {
+   type := String;
+   size := 3;
+};

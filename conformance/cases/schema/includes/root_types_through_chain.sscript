@@ -1,0 +1,17 @@
+anvil-schema-script 1
+# BR-2610-anvl-schema-005: the root's types alongside types reached through a document without @[types]
+file "main.anvl"
+|#!aml
+|include "a.anvl";
+|@[types]
+|M := { type := Bool; };
+file "a.anvl"
+|#!aml
+|include "b.anvl";
+file "b.anvl"
+|#!aml
+|@[types]
+|A := { type := String; size := 1; };
+registry r includes "main.anvl"
+type find r "A"
+type find r "M"

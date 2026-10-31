@@ -1,0 +1,8 @@
+anvil-schema-script 1
+# BR-2610-anvl-schema-005: a root with @[types] and no includes yields its own types
+file "main.anvl"
+|#!aml
+|@[types]
+|A := { type := String; size := 1; };
+registry r includes "main.anvl"
+type find r "A"

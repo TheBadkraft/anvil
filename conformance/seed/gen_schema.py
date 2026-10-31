@@ -194,7 +194,13 @@ case(INC, "collision_two_files", [("main.anvl", '#!aml\ninclude "a.anvl";\ninclu
 case(INC, "collision_override_chain", [("main.anvl", '#!aml\ninclude "a.anvl";\n'), ("a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Numeric; };\n'), ("b.anvl", T1)],
      ['registry r includes "main.anvl"', 'type find r "A"'])
 case(INC, "root_has_types", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nM := { type := Bool; };\n'), ("a.anvl", T1)],
-     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"', 'registry s load "main.anvl"', 'type find s "M"', 'type find s "A"'])
+     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"', 'registry s load "main.anvl"', 'type find s "M"', 'type find s "A"'],
+     desc="BR-2610-anvl-schema-005: the root's own @[types] are part of the registry load_from_includes builds (includes contribute A, the root contributes M); load sees only the root's own")
+case(INC, "root_types_override_include", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Numeric; max := 5; };\n'), ("a.anvl", TYPES + "A := { type := Numeric; max := 9; };\n")],
+     ['registry r includes "main.anvl"', 'type find r "A"'], desc="BR-2610-anvl-schema-005: the root's A overrides the included A, reported as a name collision")
+case(INC, "root_types_no_includes", [("main.anvl", T1)], ['registry r includes "main.anvl"', 'type find r "A"'], desc="BR-2610-anvl-schema-005: a root with @[types] and no includes yields its own types")
+case(INC, "root_types_through_chain", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nM := { type := Bool; };\n'), ("a.anvl", '#!aml\ninclude "b.anvl";\n'), ("b.anvl", T1)],
+     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"'], desc="BR-2610-anvl-schema-005: the root's types alongside types reached through a document without @[types]")
 case(INC, "no_includes", [("main.anvl", "#!aml\nx := 1;\n")], ['registry r includes "main.anvl"', 'type find r "x"'])
 case(INC, "missing_include", [("main.anvl", '#!aml\ninclude "gone.anvl";\n')], ['registry r includes "main.anvl"'])
 case(INC, "include_cycle", [("d/a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')],

@@ -1,4 +1,5 @@
 anvil-schema-script 1
+# BR-2610-anvl-schema-005: the root's own @[types] are part of the registry load_from_includes builds (includes contribute A, the root contributes M); load sees only the root's own
 file "main.anvl"
 |#!aml
 |include "a.anvl";

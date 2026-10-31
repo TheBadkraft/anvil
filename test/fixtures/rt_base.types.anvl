@@ -1,0 +1,12 @@
+#!aml
+@[types]
+
+Id := {
+   type := Numeric;
+   max := 9;
+};
+
+Base := {
+   type := String;
+   size := 4;
+};

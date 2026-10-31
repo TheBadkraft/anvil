@@ -707,7 +707,7 @@ line may not contain a NUL byte (use the quoted form). A `file` step prints noth
 | step | arguments | native calls |
 |---|---|---|
 | `file` | *name* [*content*] | declares a file (above) |
-| `registry` | *R*, `load` \| `includes`, *file* | `anvil_load`, then `anvil_type_registry_load` or `anvil_type_registry_load_from_includes` |
+| `registry` | *R*, `load` \| `includes`, *file* | `anvil_load`, then `anvil_type_registry_load` or `anvil_type_registry_load_from_includes` (which also merges the root's own `@[types]`, last, so they override the included ones: `root_types_override_include`) |
 | `type` | `find` \| `resolve`, *registry* or `NULL`, *name* | `anvil_type_registry_find` or `anvil_type_resolve`, and the `anvil_type_def_get_*` accessors |
 | `schema` | *S*, `load`, *file* | `anvil_load`, `anvil_schema_load`, the document disposed, then the diagnostics and every rule read back |
 | `validate` | *schema* or `NULL`, *file* | `anvil_load`, `anvil_schema_validate`, the violations read |

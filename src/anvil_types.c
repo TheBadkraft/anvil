@@ -564,6 +564,11 @@ anvil_type_registry anvil_type_registry_load_from_includes(anvil_document doc) {
       mark_visited(visited, visited_paths, root_path);
    }
    walk_includes(doc, reg, visited, visited_paths);
+   // doc's own @[types] come last: they are the closest definitions, so they override the included
+   // ones (reported as a NAME_COLLISION, like any name declared twice). BR-2610-anvl-schema-005.
+   if (anvil_document_find_attribute(doc, "types")) {
+      collect_type_defs(doc, reg);
+   }
    for (usize i = 0, n = List.size(visited_paths); i < n; i++) {
       char *p = NULL;
       List.get(visited_paths, i, (object *)&p);
