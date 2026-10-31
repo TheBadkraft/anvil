@@ -292,18 +292,51 @@ static bool nameset_grow(wg_nameset *set) {
    return true;
 }
 
-int wg_nameset_add(wg_nameset *set, const char *name) {
+// A name is stored as [size_t value][name bytes\0]; the slot points at the name.
+static char *name_copy(const char *name, size_t value) {
+   size_t n = strlen(name) + 1;
+   char *block = malloc(sizeof(size_t) + n);
+   if (!block) {
+      return NULL;
+   }
+   memcpy(block, &value, sizeof value);
+   memcpy(block + sizeof value, name, n);
+   return block + sizeof value;
+}
+
+static void name_free(char *name) {
+   if (name) {
+      free(name - sizeof(size_t));
+   }
+}
+
+// One probe sequence for both add and put: the slot of `name`, or the empty slot where it belongs. -1 on allocation failure.
+static long nameset_slot(wg_nameset *set, const char *name, bool *found) {
    if (set->count * 2 >= set->capacity && !nameset_grow(set)) {
       return -1;
    }
    size_t at = slot_for(name, set->capacity);
    while (set->slots[at]) {
       if (strcmp(set->slots[at], name) == 0) {
-         return 0;
+         *found = true;
+         return (long)at;
       }
       at = (at + 1) & (set->capacity - 1);
    }
-   char *copy = strdup(name);
+   *found = false;
+   return (long)at;
+}
+
+int wg_nameset_put(wg_nameset *set, const char *name, size_t value) {
+   bool found;
+   long at = nameset_slot(set, name, &found);
+   if (at < 0) {
+      return -1;
+   }
+   if (found) {
+      return 0;
+   }
+   char *copy = name_copy(name, value);
    if (!copy) {
       return -1;
    }
@@ -312,9 +345,29 @@ int wg_nameset_add(wg_nameset *set, const char *name) {
    return 1;
 }
 
+size_t wg_nameset_get(const wg_nameset *set, const char *name) {
+   if (set->capacity == 0) {
+      return 0;
+   }
+   size_t at = slot_for(name, set->capacity);
+   while (set->slots[at]) {
+      if (strcmp(set->slots[at], name) == 0) {
+         size_t value;
+         memcpy(&value, set->slots[at] - sizeof value, sizeof value);
+         return value;
+      }
+      at = (at + 1) & (set->capacity - 1);
+   }
+   return 0;
+}
+
+int wg_nameset_add(wg_nameset *set, const char *name) {
+   return wg_nameset_put(set, name, 0);
+}
+
 void wg_nameset_free(wg_nameset *set) {
    for (size_t i = 0; i < set->capacity; i++) {
-      free(set->slots[i]);
+      name_free(set->slots[i]);
    }
    free(set->slots);
    *set = (wg_nameset){0};

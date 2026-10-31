@@ -942,6 +942,23 @@ static void test_b21_base_checks_are_linear(void) {
    TestBit.is_true(seconds_since(&t0) < 2.0, "B21: a 3000-member chain emits in well under 2 s");
    anvil_builder_dispose(b);
 
+   // a long chain, a ring and a chain that ends in a cycle: iterative, so the stack does not matter
+   b = chain_builder(100000, false);
+   clock_gettime(CLOCK_MONOTONIC, &t0); // the emit alone; a quadratic check would take minutes even natively
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B21: a 100000-member chain emits");
+   TestBit.is_true(seconds_since(&t0) < 60.0, "B21: a 100000-member chain emits in well under 60 s");
+   anvil_builder_dispose(b);
+   b = chain_builder(100000, true);
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B21: a 100000-member ring is refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_CYCLE, anvil_builder_get_error(b), "B21: the ring is a cycle");
+   anvil_builder_dispose(b);
+   b = chain_builder(50000, false);
+   anvil_member last = anvil_builder_find(b, NULL, "m49999");
+   anvil_builder_set_base(b, last, "m25000"); // the tail loops back into the middle of the chain
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B21: a chain that ends in a cycle is refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_CYCLE, anvil_builder_get_error(b), "B21: the tail cycle");
+   anvil_builder_dispose(b);
+
 }
 
 int main(void) {

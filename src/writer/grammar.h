@@ -36,7 +36,7 @@ bool wg_format_double(double value, char out[40]);
 
 /* A set of names, for rejecting a top-level name declared twice (the reader's resolver does). */
 typedef struct {
-   char **slots;
+   char **slots; // each name is preceded in memory by a size_t, the value of wg_nameset_put (0 for wg_nameset_add)
    size_t capacity; // power of two, or 0 before the first add
    size_t count;
 } wg_nameset;
@@ -46,4 +46,8 @@ uint64_t wg_hash_name(const char *s);
 
 /** @return 1 if added, 0 if already present, -1 on allocation failure. */
 int wg_nameset_add(wg_nameset *set, const char *name);
+/** As wg_nameset_add, and records `value` (non-zero) with the name when it is added. @return 1 added, 0 already present, -1 on allocation failure. */
+int wg_nameset_put(wg_nameset *set, const char *name, size_t value);
+/** @return the value recorded for `name` by wg_nameset_put, or 0 if the name is absent. */
+size_t wg_nameset_get(const wg_nameset *set, const char *name);
 void wg_nameset_free(wg_nameset *set);
