@@ -1,0 +1,25 @@
+anvil-schema-script 1
+file "lib/common.types.anvl"
+|#!aml
+|@[types]
+|Int32 := { type := Numeric; min := -2147483648; max := 2147483647; integer := true; };
+|Code := { type := String; size := 3; nullable := true; };
+file "lib/ticket.types.anvl"
+|#!aml
+|include "common.types.anvl";
+|@[types]
+|Status := { type := enum; values := [open, closed]; };
+file "s.anvl"
+|#!aml
+|include "lib/ticket.types.anvl";
+|@[schema]
+|n := { type := types.Int32; required := true; };
+|code := { type := types.Code; nullable := false; size := 2; };
+|status := { type := types.Status; };
+registry r includes "s.anvl"
+type find r "Int32"
+type find r "Status"
+schema s load "s.anvl"
+validate_value s "{ n := 2147483648; code := \"abc\"; status := ghost; }"
+validate_value s "{ n := 2.5; code := null; status := open; }"
+validate_value s "{ n := -2147483648.0; code := \"ab\"; status := closed; }"

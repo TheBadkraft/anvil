@@ -682,11 +682,14 @@ extension is the dialect hint, `include "x";` resolves against the including fil
 includes is one document, and an include cycle, a missing file or a syntax error is the reader's error. (A port with no
 file system keeps the files in memory and resolves the same paths.) A file name is `[A-Za-z0-9_.-]` components separated
 by `/`, at most 200 bytes, with no empty component, no leading `/`, and no `.` or `..` component. Declaring a name twice is
-a script error. A step may name a file no `file` step declared: it does not exist, and loading it is the reader's
-`ANVIL_ERR_IO`. The paths the run prints (the `source` of a registry diagnostic, and the document names inside a
-name-collision message) are those relative paths as the loader composes them (`dir/x.anvl` for `include "x.anvl"` in
-`dir/y.anvl`), never a path of the directory anvil-dump put the files in. anvil-dump writes the files to a private
-temporary directory, runs with it as the working directory, and removes it before it exits.
+a script error. All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
+declared: it does not exist, and loading it is the reader's `ANVIL_ERR_IO`. The paths the run prints (the `source` of a
+registry diagnostic, and the document names inside a name-collision message) are `anvil_document_get_path`: the root
+document is the `FILE` of the step exactly as written, and an included document is its includer's directory (`.` when the
+includer's path has no directory), then `/`, then the include string, so `include "a.anvl";` in `b.anvl` is `./a.anvl`
+and the same include in `lib/b.anvl` is `lib/a.anvl`. They are never a path of the directory anvil-dump put the files in.
+anvil-dump writes the files to a private temporary directory, runs with it as the working directory, and removes it before
+it exits.
 
 ```
 file "NAME" "content"          the content is the decoded quoted string (any bytes)

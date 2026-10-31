@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "bad.anvl" "#!aml\n@[types]\nA := { type := ;\n"
+file "plain.anvl" "#!aml\nx := 1;\n"
+registry a load "bad.anvl"
+registry b load "plain.anvl"
+registry c load "missing.anvl"
+schema d load "plain.anvl"
+schema e load "missing.anvl"
+validate NULL "plain.anvl"
+type find a "A"

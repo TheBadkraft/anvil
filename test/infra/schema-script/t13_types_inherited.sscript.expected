@@ -1,0 +1,22 @@
+anvil-schema-run 1
+registry line=19 name=r how=includes file="s.anvl" doc=ok result=ok diagnostics=0
+type line=20 how=find registry=r name="Int32" result=found kind=ANVIL_TYPE_NUMERIC size=none min=-2147483648 max=2147483647 min_numeric=i64:-2147483648 max_numeric=i64:2147483647 format=none values=0
+type line=21 how=find registry=r name="Status" result=found kind=ANVIL_TYPE_ENUM size=none min=none max=none min_numeric=none max_numeric=none format=none values=2
+  label index=0 text="open"
+  label index=1 text="closed"
+schema line=22 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="n" kind=ANVIL_TYPE_NUMERIC type="types.Int32" required=1 nullable=0 integer=1 size=none min=i64:-2147483648 max=i64:2147483647 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="code" kind=ANVIL_TYPE_STRING type="types.Code" required=0 nullable=0 integer=0 size=2 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="status" kind=ANVIL_TYPE_ENUM type="types.Status" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=2 nested=0 items=0 extras=0
+    label index=0 text="open"
+    label index=1 text="closed"
+validate_value line=23 schema=s doc=ok opts=default result=fail count=3
+  violation index=0 code=4 name=ANVIL_SCHEMA_ERR_VALIDATION_RANGE field="n" message="field value is outside the declared min/max range"
+  violation index=1 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="code" message="field value exceeds the declared size"
+  violation index=2 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="status" message="field value is not one of the declared values"
+validate_value line=24 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="code" message="field is not nullable"
+validate_value line=25 schema=s doc=ok opts=default result=pass count=0
+steps 10
+status ok

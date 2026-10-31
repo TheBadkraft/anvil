@@ -1,0 +1,16 @@
+anvil-schema-script 1
+file "lib/b.anvl"
+|#!aml
+|include "a.anvl";
+|include "sub/c.anvl";
+|@[types]
+|A := { type := Numeric; };
+file "lib/a.anvl"
+|#!aml
+|@[types]
+|A := { type := String; };
+file "lib/sub/c.anvl"
+|#!aml
+|@[types]
+|A := { type := Bool; };
+registry r includes "lib/b.anvl"

@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "t.anvl" "#!aml\n@[types]\nBad := { type := Nope; };\nOk := { type := Numeric; };\n"
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|a := { type := types.Typo; };
+|b := 5;
+|c := { type := Numeric; min := 9; max := 1; };
+|d := { type := types.Ok; required := maybe; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; d := 2; }"
+validate_value s "{ a := null; }"

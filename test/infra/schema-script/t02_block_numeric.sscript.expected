@@ -1,6 +1,6 @@
 anvil-schema-run 1
-registry line=7 name=r how=load file="t.anvl" doc=ok result=ok diagnostics=0
-type line=8 how=find registry=r name="N" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=f64:0x3fe0000000000000 max_numeric=f64:0x408f400000000000 format=none values=0
-type line=9 how=find registry=r name="I" result=found kind=ANVIL_TYPE_NUMERIC size=none min=-7 max=9223372036854775807 min_numeric=i64:-7 max_numeric=i64:9223372036854775807 format=none values=0
-steps 5
+registry line=8 name=r how=load file="t.anvl" doc=ok result=ok diagnostics=0
+type line=9 how=find registry=r name="N" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=f64:0x3fe0000000000000 max_numeric=f64:0x408f400000000000 format=none values=0
+type line=10 how=find registry=r name="I" result=found kind=ANVIL_TYPE_NUMERIC size=none min=-7 max=9223372036854775807 min_numeric=i64:-7 max_numeric=i64:9223372036854775807 format=none values=0
+steps 4
 status ok
