@@ -19,6 +19,7 @@ that owns the work. Sub-agents last for one task and report only to the Principa
 | **AnvilScript Language Engineer** | `anvl-asl-language-engineer` | `anvl-scribe.badkraft` | Sonnet | Scribe |
 | **AnvilScript Runtime Engineer** | `anvl-asl-runtime-engineer` | `anvl-runner.badkraft` | Sonnet | Runner |
 | **Verification Engineer** | `anvl-verification-engineer` | `anvl-verification.badkraft` | Sonnet | *new* |
+| **Test & Performance Engineer** | `anvl-test-engineer` | `anvl-test.badkraft` (login pending) | Sonnet | *new*: benchmarks, speed gates, differential fuzzing, corpus runs; owner's suggestion, 2026-10-31 |
 | **Release Engineer** | `anvl-release-engineer` | `anvl-release.badkraft` | Sonnet | ANVL Release |
 | **Technical Writer** | `anvl-technical-writer` | `anvl-documentor.badkraft` | Sonnet | ANVL Documentor |
 | **JS Engineer** | `anvl-js-engineer` | `anvl-js.badkraft` | Sonnet | *new*: anvil.js, shipped as `anvil-node` |
