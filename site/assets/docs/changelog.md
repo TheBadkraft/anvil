@@ -3,6 +3,112 @@
 What changed in each release of Anvil, for people using it. Downloads are on the
 [download page](/download).
 
+## v0.12.1-rc
+
+Released 2026-10-30. This is a release candidate.
+
+v0.12.1-rc is a patch release. The C headers can now be included from C++, the writer follows the grammar's
+`include` rule, and anvil.js gains a writer, ES-module named imports and error codes from `lastError()`.
+
+### Downloads
+
+The native downloads (core, Python and .NET) are Linux x86_64 (glibc). anvil.js is plain JavaScript: it runs in
+Node 18 or later and in any browser. Each native file is built from the same source tag, and the library inside
+reports exactly `0.12.1-rc+420`; anvil.js reports the same string from `getVersion()`.
+
+| Download | What it is |
+|---|---|
+| `anvil-v0.12.1-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
+| `anvil.js-v0.12.1-rc.tar.gz` | The pure-JavaScript package for Node and browsers: reader and writer |
+| `anvil-py-v0.12.1-rc-linux-x64.tar.gz` | Python package (CPython 3.11+, standard library only) |
+| `anvil-net-v0.12.1-rc-linux-x64.tar.gz` | .NET 9 assembly (`Anvil.Net.dll`) with its native library |
+
+`SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.12.1-rc` lists this
+release only):
+
+```
+ee89439b3b1ce61134b7432dfb5fe7d9e3456bbd887b1a4f01824f48ce4ab6f1  anvil.js-v0.12.1-rc.tar.gz
+4be20e69edc39228659589fb9ce5759b1324218f4178f4c1274ef95809be0ade  anvil-net-v0.12.1-rc-linux-x64.tar.gz
+9dd6636973dfcb2bc84aa5753e871ba9638a5272445f4bb21eb5b1f375ff9748  anvil-py-v0.12.1-rc-linux-x64.tar.gz
+7adc031aaadb5301fdfe06b798eaa366a63b7db7fd283fed0efebec05d8052b3  anvil-v0.12.1-rc-linux-x86_64.tar.gz
+bbdfba42f6bb4b1cd2195eef4915713f007da5ce53d9bf096fdc4992edc93472  anvil.js-v0.12.0-rc.tar.gz
+3f665f841a9c6c17e53fc4ff405f680d5757470cb3a94c37aaae353896191653  anvil-net-v0.12.0-rc-linux-x64.tar.gz
+39bb99217acbb7262ebe88511b2f9766794782770c247ebc71882ed90f8a9b41  anvil-py-v0.12.0-rc-linux-x64.tar.gz
+e695abf19d8a16dc71bcffb6346f8e28843eacf14cd3d6561cbd07f69dab2bcf  anvil-v0.12.0-rc-linux-x86_64.tar.gz
+fee2cc4abb5fb72e162735ba72edeef450610b650dec0b02c11d3548c27c07f6  anvil-net-v0.11.0-rc-linux-x64.tar.gz
+2cf2f5120318d2c0307c378c4a951f89107358e5c932cdb3bfbf511fc45f24f5  anvil-node-v0.11.0-rc-linux-x86_64.tar.gz
+0c5a14bcd117d15fef9bd0a5dd00467fac9786e69d7c0999edcf5d0eec89a952  anvil-py-v0.11.0-rc-linux-x64.tar.gz
+1d8ae18e21f150b979e751a0d43cfe4d88931c5a5a79fe0c8e1de0ec35874794  anvil-v0.11.0-rc-linux-x86_64.tar.gz
+17ca4e8c3433178b86e2d08bf215a914564f5c207691c59cbc4378e0c0498339  anvil-wasm-v0.11.0-rc.tar.gz
+ecaffbd1fc88b13b5a51164d320d1cbc8d38c6981f0890ab3c685d054f91c470  anvil-net-v0.10.0-rc-linux-x64.tar.gz
+0f4990601ee4d92dc74284ab96c1fc802e213df336609b7c7bfebc0a8d716ccc  anvil-node-v0.10.0-rc-linux-x86_64.tar.gz
+de6596406ad838a532bc65332b83d79efa3ff6d7145f0c951f5dd55b77dfab99  anvil-py-v0.10.0-rc-linux-x64.tar.gz
+32e52f3979659ecc56f652e5cedc739856ea0a90a60bb66558c13380b4c45880  anvil-v0.10.0-rc-linux-x86_64.tar.gz
+10eb6cc989d0a9615c951a941602d148a02caee76bb25c8168e3fe85021047d9  anvil-wasm-v0.10.0-rc.tar.gz
+```
+
+The Node (`anvil-node`) and WebAssembly (`anvil-wasm`) builds are not part of this release. Their v0.11.0-rc
+downloads stay available at their existing addresses. The Java binding is not distributed.
+
+### What changed
+
+#### Native library
+
+- **C++ can include every public header.** Each header now has `extern "C"` guards, and the release build
+  compiles and links a C++ program against every header.
+- **The writer follows the grammar's `include` rule.** An `include` after a module attribute is refused with
+  the writer's state error, and the builder writes its includes first. The grammar itself is unchanged: the writer
+  now matches it. A program that wrote an include after attributes now gets an error and must write the include first.
+- **AnvilScript parsing has a depth limit** (error 5106). AnvilScript is off by default.
+- **A writer test corpus ships with the source** for people writing a second implementation: scripts of writer
+  calls with the exact bytes the library produces.
+
+#### anvil.js
+
+- **The writer.** `AnvilWriter`, `AnvilDialect`, `WriterErrorCode` and `AnvilWriterError`, with the
+  `AnvilWriter` API of `anvil-node` and the same bytes as the C library on all 749 cases of the native writer corpus.
+  Where a JavaScript API cannot say what the C API can, 15 further cases are not run: 10 pass a null where a string is
+  required and 5 write text that is not valid UTF-8. `value()` writes a safe integer as an integer, and a number
+  with a fraction or beyond the safe range as a double, as `anvil-node` does. The builder is not in anvil.js yet.
+- **Named imports in Node ES modules.** `import { parse, AnvilWriter, AnvilDialect } from 'anvil.js'` works, as does
+  the default import. `require('anvil.js')` is unchanged.
+- **`lastError()` carries the error code and its name** next to the message, line and column (a repeated key is
+  `4001`).
+- Types, schema validation and the builder are still not in anvil.js. Use the Python or .NET packages, or the C
+  library, where you need those.
+
+#### Python and .NET
+
+No API changes. Both pick up the writer change through the native library.
+
+### Performance
+
+Measured on the packaged files, as time taken (lower is faster).
+
+- **Native.** native v0.12.1-rc vs native v0.12.0-rc: parse 0.97x to 1.00x, validate 0.995x to 1.00x (packaged static
+  library, 9 interleaved runs, one CPU); loading 20,000 small documents through `libanvil.so` 1.00x or better
+  (0.998x). The .NET package, same assembly with only the library swapped: 0.995x to 1.000x on every workload.
+- **anvil.js reading.** anvil.js vs anvil-node v0.10.0-rc takes 0.09x to 0.21x of the time to parse and 0.12x to 0.49x of
+  the time to parse and read every value, across nine workloads. anvil.js vs `JSON.parse` (information only): 0.31x to
+  1.79x to parse, 0.67x to 5.13x to parse and read through the public API.
+- **anvil.js writing.** anvil.js write vs anvil-node v0.10.0-rc write takes 0.19x to 0.67x of the time across nine
+  workloads (King and Crucible requests and responses, a 200-statement configuration, 2,000 numbers, 1,000 strings with
+  escapes). anvil.js write vs `JSON.stringify` of the equivalent data (information only): 3.2x to 5.3x the time, so
+  `JSON.stringify` is much faster.
+- The known cost from v0.12.0-rc (tiny-document loads through `libanvil.so`, 1.027x to 1.039x vs v0.11.0-rc) is
+  unchanged from v0.12.0-rc: native v0.12.1-rc vs native v0.12.0-rc is 1.00x.
+
+### Licence
+
+Every download includes a `LICENSE.txt` with the ANVL Software Licence terms, which are still in progress: free for
+personal and educational use, free for commercial use by organizations with up to 3 developer seats, and no
+redistribution.
+
+### The version string
+
+The library reports its version as `0.12.1-rc+420`: the release, then the build number after a `+`. This is valid
+semver. The build number is the same in every download of this release.
+
 ## v0.12.0-rc
 
 Released 2026-10-30. This is a release candidate.

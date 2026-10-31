@@ -3,19 +3,19 @@
 **Anvil Native** — a reference C implementation of the AML/AMP parser — is the one parser behind
 everything below. Nothing here is a separate reimplementation: the Node, WebAssembly, .NET, and
 Python bindings are thin wrappers over the exact same C source, and anvil.js is a pure-JavaScript
-reader held to the same results by a shared conformance corpus, so a document parses identically
+reader and writer held to the same results (and the same output bytes) by a shared conformance corpus, so a document parses identically
 no matter which one reads it. Pick the one that matches where your code runs.
 
 | | Runtime | Status |
 |---|---|---|
 | [Native library](Bindings-Guide.md#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
-| [anvil.js](Bindings-Guide.md#javascript-anvil-js) | Node.js 18+ and any browser (plain JavaScript) | Downloadable today (reader only) |
+| [anvil.js](Bindings-Guide.md#javascript-anvil-js) | Node.js 18+ and any browser (plain JavaScript) | Downloadable today (reader and writer) |
 | [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | v0.11.0-rc, no further updates; replaced by anvil.js |
 | [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | v0.11.0-rc, no further updates; replaced by anvil.js |
 | [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
 | [Python](Bindings-Guide.md#python) | CPython 3.11+ (ctypes) | Downloadable today |
 
-The current release is `v0.12.0-rc`, built from one source tag: the native library, anvil.js,
+The current release is `v0.12.1-rc`, built from one source tag: the native library, anvil.js,
 .NET and Python. The Node.js and WebAssembly downloads are from `v0.11.0-rc`: they are frozen,
 receive no further updates and are replaced by anvil.js, but they stay downloadable at their
 existing addresses. Checksums for every download are in
@@ -29,9 +29,9 @@ binding too, but it is not distributed.
 ### The version string
 
 A library reports its version as the release plus a build number after a `+`, valid semver:
-a prebuilt `v0.12.0-rc` download reports `0.12.0-rc+389` (anvil.js reports it from `getVersion()`),
+a prebuilt `v0.12.1-rc` download reports `0.12.1-rc+420` (anvil.js reports it from `getVersion()`),
 and the build number is the same in every download of the release. A binding **built from source**
-has no build number of its own, so it reports plain `0.12.0-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
+has no build number of its own, so it reports plain `0.12.1-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
 or install from source if you want a build number in the string. Treat the string as a
 sanity check, not a compatibility contract to branch logic on.
 
@@ -49,30 +49,64 @@ instead of a one-call conversion, and each follows its own language's idiom.
 
 ## JavaScript (anvil.js)
 
-**[Download anvil.js-v0.12.0-rc.tar.gz](/assets/downloads/anvil.js-v0.12.0-rc.tar.gz)** — a
-pure-JavaScript ANVL reader: no native code, no WebAssembly. It replaces the Node.js and WebAssembly
+**[Download anvil.js-v0.12.1-rc.tar.gz](/assets/downloads/anvil.js-v0.12.1-rc.tar.gz)** — a
+pure-JavaScript ANVL reader and writer: no native code, no WebAssembly. It replaces the Node.js and WebAssembly
 downloads going forward (both stay available at v0.11.0-rc). It has the same reader API as the Node.js
 binding below (`parse`, `parseRawValue`, `lastError`, `getVersion`, nodes and statements, `asInt`,
 `asBigInt`, `numericKind` and the rest), plus `isNull()`, the blob tag, an `implementation` property
 (`'anvil.js'`) and a `BUILD_INFO.json`. It reads every document the same way Anvil Native does: it
 passes all 1,867 cases of the shared conformance corpus.
 
-**This release has the reader only.** Types, schema validation and the writer are not in anvil.js
-yet; use the Python or .NET packages, or the C library, where you need those.
+**This release has the reader and the writer.** The builder, types and schema validation are still
+to come in anvil.js; use the Python or .NET packages, or the C library, where you need those.
 
 ```sh
-npm install ./anvil.js-v0.12.0-rc.tar.gz
+npm install ./anvil.js-v0.12.1-rc.tar.gz
 ```
 
 ```js
 const anvl = require('anvil.js');           // Node 18 or later
 const doc = anvl.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1
-anvl.getVersion();      // "0.12.0-rc+389"
+anvl.getVersion();      // "0.12.1-rc+420"
 ```
 
-In an ES module use the default import: `import anvl from 'anvil.js'` (named imports from the package
-entry are not offered). An `include` resolves against the working directory.
+In a Node ES module, both forms work: the default import (`import anvl from 'anvil.js'`) and named
+imports (`import { parse, AnvilWriter, AnvilDialect } from 'anvil.js'`). `require('anvil.js')` is
+unchanged. An `include` resolves against the working directory.
+
+### Writing
+
+The writer is the `AnvilWriter` API of the Node.js binding (see
+[Writing: `AnvilWriter` and `AnvilBuilder`](Bindings-Guide.md#writing-anvilwriter-and-anvilbuilder)
+below), exported with `AnvilDialect`, `WriterErrorCode` and `AnvilWriterError`. It writes the same
+bytes as Anvil Native: it matches all 749 cases of the native writer corpus, in Node and in the browser.
+
+```js
+import { AnvilWriter, AnvilDialect } from 'anvil.js';
+
+const w = AnvilWriter.create(AnvilDialect.AMP);
+const text = w.statement('status').bare('ok')
+              .statement('code').value(200)
+              .finish();
+w.dispose();
+```
+
+Two differences from the Node.js binding and the C API are documented:
+
+- **15 native writer cases are C-API-only and are not run.** Ten pass a null where a string is
+  required, and five write text that is not valid UTF-8. A JavaScript API cannot say either.
+- **`value()` writes a safe integer as an integer**, and a number with a fraction or beyond the safe
+  range as a double, as the Node.js binding does.
+
+The builder (`AnvilBuilder`) is not in anvil.js yet.
+
+### Errors
+
+`lastError()` returns `{ code, name, message, line, column }` for the most recent `parse()` or
+`parseRawValue()` failure, or `null` if that call succeeded. The `code` is the numeric error code (a
+repeated key is `4001`) and `name` is its name. A rejected writer call throws `AnvilWriterError`
+with a `.code`.
 
 In a browser, with no bundler, the tarball holds `dist/anvil.mjs` (an ES module) or
 `dist/anvil.global.js` (a script tag that defines `window.anvl`). The browser builds have no `include`.
@@ -84,19 +118,19 @@ The package licence is `SEE LICENSE IN LICENSE.txt`; the terms are in progress (
 
 The C library itself — link it directly if you're not going through a JS binding at all.
 
-**[Download anvil-v0.12.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.12.0-rc-linux-x86_64.tar.gz)**
+**[Download anvil-v0.12.1-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.12.1-rc-linux-x86_64.tar.gz)**
 — static (`libanvil.a`) and shared (`libanvil.so`) builds, release (stripped, `-O2`), plus every
 public header (`include/anvil_*.h`). Linux x86_64 only today; other platforms build from source
 (`make lib` in the [anvil repo](https://github.com/TheBadkraft/anvil)) until real cross-platform
 CI exists.
 
 ```sh
-tar -xzf anvil-v0.12.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.12.0-rc-linux-x86_64/include \
-    -L anvil-v0.12.0-rc-linux-x86_64/lib -lanvil -o your_program
+tar -xzf anvil-v0.12.1-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.12.1-rc-linux-x86_64/include \
+    -L anvil-v0.12.1-rc-linux-x86_64/lib -lanvil -o your_program
 ```
 
-The library reports `0.12.0-rc+389` from `anvil_get_version()`. `libanvil.so` exports exactly
+The library reports `0.12.1-rc+420` from `anvil_get_version()`. `libanvil.so` exports exactly
 the public API and no internal symbols, so it cannot collide with other libraries loaded in the
 same process.
 
@@ -513,7 +547,7 @@ compatibility contract to branch logic on.
 
 ## .NET
 
-**[Download anvil-net-v0.12.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.12.0-rc-linux-x64.tar.gz)**
+**[Download anvil-net-v0.12.1-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.12.1-rc-linux-x64.tar.gz)**
 — a prebuilt managed assembly plus the native library it links against. The tarball holds
 `lib/Anvil.Net.dll`, `lib/libanvil.so`, a README and the licence. **There is no NuGet package**:
 nothing is published to nuget.org, and the tarball contains no `.nupkg`. Reference the assembly
@@ -690,21 +724,21 @@ string text2 = b.Emit();
 
 ### `AnvilDocument.GetVersion()`
 
-Returns the underlying Anvil Native version string (`"0.12.0-rc+389"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.12.1-rc+420"` for the prebuilt download) —
 same toolchain sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility
 contract.
 
 ## Python
 
-**[Download anvil-py-v0.12.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.12.0-rc-linux-x64.tar.gz)**
+**[Download anvil-py-v0.12.1-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.12.1-rc-linux-x64.tar.gz)**
 — a pure-`ctypes` binding, no compiled extension module, plus the native library it links
 against (`libanvil.so`, inside the package at `src/anvil/runtimes/linux-x64/native/`).
 
 Extract it and put the `src` directory on `PYTHONPATH`:
 
 ```sh
-tar xzf anvil-py-v0.12.0-rc-linux-x64.tar.gz
-export PYTHONPATH="$PWD/anvil-py-v0.12.0-rc-linux-x64/src:$PYTHONPATH"
+tar xzf anvil-py-v0.12.1-rc-linux-x64.tar.gz
+export PYTHONPATH="$PWD/anvil-py-v0.12.1-rc-linux-x64/src:$PYTHONPATH"
 python3 -c "from anvil import AnvilDocument; print('ok')"
 ```
 
@@ -873,5 +907,5 @@ with AnvilBuilder.create(AnvilDialect.AML) as b:         # builder: attach in an
 
 ### `AnvilDocument.get_version()`
 
-Returns the underlying Anvil Native version string (`"0.12.0-rc+389"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.12.1-rc+420"` for the prebuilt download) —
 same toolchain sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.
