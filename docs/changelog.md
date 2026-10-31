@@ -90,6 +90,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (permissions) or a failed read, and `ANVL_ERR_IO_INVALID_PATH` for a NULL or empty path. The category stays
   `ANVIL_ERR_IO`; no code and no ABI is added. Side effect: an `include` that names a directory used to load as an empty
   document and is now an include error, like any unreadable include.
+- **An include cycle through a bare root file name is found (BR-2610-anvl-004).** `anvil_load("a.anvl")` where `a.anvl`
+  and `b.anvl` include each other, or a file that includes itself, returned status ok, because the root kept its name as
+  given while its includer composed `./a.anvl`, and the cycle check compared the exact strings (the repeat was then
+  merged as a "diamond" by its content). A document is now identified by its normalised path (`.` components and
+  repeated slashes removed, `name/..` cancelled; textual, symbolic links are not followed), so `a.anvl`, `./a.anvl`,
+  `.//a.anvl` and `d/../a.anvl` are one document and the load fails with `ANVL_ERR_INCLUDE_CYCLIC` (4206), as it
+  already did for `./a.anvl` and `dir/a.anvl`. Behaviour change: an include spelled with `./` or `..` that loops back
+  was accepted before and is a cycle error now (`coverage/includes/self_dot`, `mutual_dot_a` and `mutual_dot_b` dumps
+  changed). The printed document paths do not change. Include-graph speed is unchanged (the normal form is a pointer
+  into the composed path in the usual case; no allocation). No ABI change.
 
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
   statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and

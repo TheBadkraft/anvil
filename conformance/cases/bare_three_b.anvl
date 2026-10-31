@@ -1,0 +1,2 @@
+include "bare_three_c.anvl";
+b := 1;

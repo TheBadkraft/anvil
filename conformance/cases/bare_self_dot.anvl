@@ -1,0 +1,2 @@
+include "./bare_self_dot.anvl";
+x := 1;

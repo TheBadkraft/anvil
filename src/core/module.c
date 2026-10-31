@@ -518,8 +518,9 @@ void mod_ctx_dispose_arena(bump_allocator arena) {
  * ----------------------------------------------------------------------- */
 #define INCLUDE_PATH_MAX 1024
 
-static anvl_result include_load_dependencies(module_context ctx, module_document doc, list stack,
-                                             usize *out_size, anvl_err_code *out_err_code);
+static anvl_result include_load_dependencies(module_context ctx, module_document doc,
+                                             const char *identity, list stack, usize *out_size,
+                                             anvl_err_code *out_err_code);
 
 static void include_resolve_dir(const char *path, char *out_dir, usize out_size) {
    if (!path || out_size == 0) {
@@ -546,15 +547,114 @@ static void include_resolve_dir(const char *path, char *out_dir, usize out_size)
    out_dir[len] = '\0';
 }
 
-static bool include_path_on_stack(list stack, const char *path) {
-   if (!stack || !path) {
+// Lexically normalises a path into `out` (`out_size` bytes): "." components and repeated slashes
+// vanish, "name/.." cancels, a leading ".." is kept for a relative path and dropped for an absolute
+// one. "a.anvl", "./a.anvl", "d/../a.anvl" and ".//a.anvl" all become "a.anvl". It is textual
+// (symbolic links are not followed), which is what document identity for include-cycle detection
+// needs: the same file reached by another spelling is the same document. Never longer than the input.
+// Returns the normal form: a pointer into `path` itself when only a leading "./" had to go (the
+// common composed spelling, no copy), otherwise `out`, which then holds it (`out_size` bytes, at
+// least strlen(path) + 1 for the result never to be cut short).
+static const char *include_normalize_path(const char *path, char *out, usize out_size) {
+   if (out_size == 0) {
+      return path;
+   }
+   // Fast path for the common composed spelling "./name/sub/file": drop leading "./", and when what
+   // is left has no "." or empty component it is already in normal form and is returned as it is.
+   if (path) {
+      const char *p = path;
+      while (p[0] == '.' && p[1] == '/') {
+         p += 2;
+         while (*p == '/') {
+            p++;
+         }
+      }
+      if (*p && *p != '.' && *p != '/') {
+         const char *slash = strchr(p, '/');
+         while (slash) {
+            // a separator followed by another separator, a "." or the end is not in normal form
+            if (slash[1] == '/' || slash[1] == '.' || slash[1] == '\0') {
+               break;
+            }
+            slash = strchr(slash + 1, '/');
+         }
+         if (!slash) {
+            return p;
+         }
+      }
+   }
+   usize n = path ? strlen(path) : 0;
+   bool absolute = n > 0 && path[0] == '/';
+   usize w = 0;
+   usize floor = 0; // output length that ".." may not pop below (after leading ".." components)
+   if (absolute && w + 1 < out_size) {
+      out[w++] = '/';
+      floor = 1;
+   }
+   usize i = absolute ? 1 : 0;
+   while (i < n) {
+      usize start = i;
+      while (i < n && path[i] != '/') {
+         i++;
+      }
+      usize len = i - start;
+      if (i < n) {
+         i++; // the slash
+      }
+      if (len == 0 || (len == 1 && path[start] == '.')) {
+         continue;
+      }
+      if (len == 2 && path[start] == '.' && path[start + 1] == '.') {
+         if (w > floor) {
+            // pop the last component, unless it is itself a kept ".."
+            usize e = w;
+            while (e > floor && out[e - 1] == '/') {
+               e--;
+            }
+            usize b = e;
+            while (b > floor && out[b - 1] != '/') {
+               b--;
+            }
+            if (!(e - b == 2 && out[b] == '.' && out[b + 1] == '.')) {
+               w = b;
+               continue;
+            }
+         } else if (absolute) {
+            continue; // the parent of the root is the root
+         }
+      }
+      if (w > 0 && out[w - 1] != '/' && w + 1 < out_size) {
+         out[w++] = '/';
+      }
+      if (w + len >= out_size) {
+         len = out_size - 1 - w;
+      }
+      memcpy(out + w, path + start, len);
+      w += len;
+      if (len == 2 && path[start] == '.' && path[start + 1] == '.') {
+         floor = w; // a kept leading ".." cannot be popped
+      }
+   }
+   while (w > floor && out[w - 1] == '/') {
+      w--;
+   }
+   if (w == 0) {
+      out[w++] = '.';
+   }
+   out[w] = '\0';
+   return out;
+}
+
+// The recursion stack holds the normalised path of every document still being loaded.
+static bool include_path_on_stack(list stack, const char *normalized) {
+   if (!stack || !normalized) {
       return false;
    }
 
    for (usize i = 0; i < List.size(stack); i++) {
       const char *entry = NULL;
       List.get(stack, i, (object *)&entry);
-      if (entry && strcmp(entry, path) == 0) {
+      if (entry && strcmp(entry, normalized) == 0) {
          return true;
       }
    }
@@ -603,7 +703,10 @@ static anvl_result include_load_child(module_context ctx, module_document parent
    }
 
    // Cycle detection: the resolved path must not already be on the recursion stack.
-   if (include_path_on_stack(stack, resolved)) {
+   // The include name is dead once `resolved` is composed, so its buffer holds the identity (the
+   // normalised path) without growing this recursive function's stack frame.
+   const char *resolved_id = include_normalize_path(resolved, include_name, sizeof(include_name));
+   if (include_path_on_stack(stack, resolved_id)) {
       err_code = ANVL_ERR_INCLUDE_CYCLIC;
       goto error;
    }
@@ -652,7 +755,7 @@ static anvl_result include_load_child(module_context ctx, module_document parent
 
    inc->resolved = child;
 
-   res = include_load_dependencies(ctx, child, stack, out_size, &err_code);
+   res = include_load_dependencies(ctx, child, resolved_id, stack, out_size, &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
@@ -671,8 +774,10 @@ error:
    return ANVL_RES_ERR;
 }
 
-static anvl_result include_load_dependencies(module_context ctx, module_document doc, list stack,
-                                             usize *out_size, anvl_err_code *out_err_code) {
+// `identity` is the normalised path of `doc`, owned by the caller for the duration of the call.
+static anvl_result include_load_dependencies(module_context ctx, module_document doc,
+                                             const char *identity, list stack, usize *out_size,
+                                             anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (!doc || !doc->filepath) {
@@ -680,8 +785,8 @@ static anvl_result include_load_dependencies(module_context ctx, module_document
       goto error;
    }
 
-   // Push this document onto the recursion stack for cycle detection.
-   List.append(stack, (object)doc->filepath);
+   // Push this document's normalised path onto the recursion stack for cycle detection.
+   List.append(stack, (object)identity);
 
    for (usize i = 0; i < List.size(doc->header->includes); i++) {
       anvl_include inc = NULL;
@@ -729,7 +834,9 @@ anvl_result mod_load_includes(module_context ctx, module_document root, usize *o
       goto error;
    }
 
-   anvl_result res = include_load_dependencies(ctx, root, stack, &total, &err_code);
+   char root_buf[INCLUDE_PATH_MAX];
+   const char *root_id = include_normalize_path(root->filepath, root_buf, sizeof(root_buf));
+   anvl_result res = include_load_dependencies(ctx, root, root_id, stack, &total, &err_code);
 
    List.dispose(stack);
 

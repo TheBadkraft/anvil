@@ -1,0 +1,3 @@
+include "bare_diamond_b.anvl";
+include "bare_diamond_c.anvl";
+r := 1;

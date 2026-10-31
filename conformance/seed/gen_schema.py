@@ -198,8 +198,20 @@ case(INC, "root_has_types", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\n
 case(INC, "no_includes", [("main.anvl", "#!aml\nx := 1;\n")], ['registry r includes "main.anvl"', 'type find r "x"'])
 case(INC, "missing_include", [("main.anvl", '#!aml\ninclude "gone.anvl";\n')], ['registry r includes "main.anvl"'])
 case(INC, "include_cycle", [("d/a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')],
-     ['registry r includes "d/a.anvl"', 'type find r "A"', 'type find r "B"'], desc="the roots carry a directory part: a bare root name misses the cycle (BR-2610-anvl-004)")
-case(INC, "self_include", [("d/a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="a directory part in the root name: see BR-2610-anvl-004")
+     ['registry r includes "d/a.anvl"', 'type find r "A"', 'type find r "B"'], desc="the roots carry a directory part; include_cycle_bare is the same graph with bare root names")
+case(INC, "self_include", [("d/a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="a directory part in the root name; self_include_bare has none")
+# BR-2610-anvl-004: a bare root name is the same document as the "./name" its includer composes
+_AB = [("a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')]
+case(INC, "include_cycle_bare", _AB, ['registry r includes "a.anvl"', 'type find r "A"', 'type find r "B"'], desc="bare root names: the cycle is found (BR-2610-anvl-004)")
+case(INC, "include_cycle_bare_load", _AB, ['registry r load "a.anvl"', 'type find r "A"'], desc="bare root name through registry load (BR-2610-anvl-004)")
+case(INC, "self_include_bare", [("a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "a.anvl"', 'type find r "A"'], desc="a bare root that includes itself (BR-2610-anvl-004)")
+case(INC, "self_include_dot_bare", [("a.anvl", '#!aml\ninclude "./a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "a.anvl"', 'type find r "A"'], desc="a bare root that includes ./itself (BR-2610-anvl-004)")
+case(INC, "include_cycle_dot_spelling", [("d/a.anvl", '#!aml\ninclude "./b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "./a.anvl";\n@[types]\nB := { type := Bool; };\n')],
+     ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="./ spellings of the same documents (BR-2610-anvl-004)")
+case(INC, "include_cycle_three_bare", [("a.anvl", '#!aml\ninclude "b.anvl";\n'), ("b.anvl", '#!aml\ninclude "c.anvl";\n'), ("c.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nC := { type := Bool; };\n')],
+     ['registry r includes "a.anvl"', 'type find r "C"'], desc="a three-document cycle from a bare root (BR-2610-anvl-004)")
+case(INC, "diamond_bare", [("r.anvl", '#!aml\ninclude "b.anvl";\ninclude "c.anvl";\n'), ("b.anvl", '#!aml\ninclude "d.anvl";\n'), ("c.anvl", '#!aml\ninclude "d.anvl";\n'), ("d.anvl", T1)],
+     ['registry r includes "r.anvl"', 'type find r "A"'], desc="a diamond under a bare root is not a cycle (BR-2610-anvl-004)")
 case(INC, "subdirectories", [("main.anvl", '#!aml\ninclude "lib/a.anvl";\n'), ("lib/a.anvl", '#!aml\ninclude "sub/b.anvl";\n@[types]\nA := { type := Bool; };\nA2 := { type := Bool; };\n'), ("lib/sub/b.anvl", TYPES + "B := { type := Bool; };\nA2 := { type := String; };\n")],
      ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "A2"', 'type find r "B"'])
 case(INC, "parent_include", [("lib/a.anvl", '#!aml\ninclude "../t.anvl";\n'), ("t.anvl", T1)], ['registry r includes "lib/a.anvl"', 'type find r "A"'])

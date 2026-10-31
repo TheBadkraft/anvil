@@ -1,0 +1,2 @@
+include "bare_diamond_d.anvl";
+b := 1;
