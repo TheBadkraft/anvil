@@ -159,6 +159,11 @@ deliberate marketing. `docs/` and `notes/` are internal and may name anything.
   "0.5x". Put the label on every table header, report, changelog entry and ticket. Native-vs-previous-native
   (the 1.02x gate), anvil.js-vs-anvil-node (the ≤1.00x gate) and anvil.js-vs-`JSON.parse` (a target, not a
   gate) are different comparisons and must never share a table without labels.
+- **The cap is enforced, not just asked for (2026-10-31).** A project hook, `.claude/hooks/require-memcap.py`, refuses
+  any Bash command that starts `node`, `python3`, `npm`, `npx`, `make` or `dotnet` on a script or target without
+  `systemd-run … -p MemoryMax=…` on the same command line. `node -e`, `python3 -c`, `python3 -` heredocs and `--version`
+  are allowed. VS Code's scope also runs with `OOMPolicy=continue`, so a runaway kills only itself. Don't work around
+  either guard. On 2026-10-30 an uncapped `node` profiling script grew to 26 GB and took VS Code and every agent down.
 - **The owner's home directory is not scratch space.** Put temporary state in your session scratchpad or under
   `/tmp`, clean it up on exit, and leave no processes running. Before reporting, `ls -A ~` must be unchanged and
   `pgrep -fa 'firefox|chrom|playwright'` must show nothing of yours.
