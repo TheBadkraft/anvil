@@ -58,8 +58,10 @@ bool anvil_type_def_nullable(anvil_type_def def, bool *out_declared);
 bool anvil_type_def_integer(anvil_type_def def, bool *out_declared);
 
 /// The `integer := true` rule, value-based: a number satisfies it when its value is whole, so `2`,
-/// `2.0` and `1e+3` pass and `2.5` fails. A value beyond double range has no fractional part to
-/// speak of and passes. (anvil_numeric_t.is_integral follows the spelling and is not used.)
+/// `2.0` and `1e+3` pass and `2.5` fails. A digits-only literal past int64 (`99999999999999999999`)
+/// is whole and passes; a decimal or exponent literal beyond double range (`1e400`) has no finite
+/// value, is not an integer, and fails (BR-2610-anvl-schema-004). (For a finite literal
+/// anvil_numeric_t.is_integral follows the spelling and is not used.)
 bool anvil_numeric_is_whole(anvil_value data);
 
 /// A Blob type's declared `tag := ...` (copied at load), or NULL if it declares none.

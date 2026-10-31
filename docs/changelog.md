@@ -100,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was accepted before and is a cycle error now (`coverage/includes/self_dot`, `mutual_dot_a` and `mutual_dot_b` dumps
   changed). The printed document paths do not change. Include-graph speed is unchanged (the normal form is a pointer
   into the composed path in the usual case; no allocation). No ABI change.
+- **`integer := true` rejects an overflowed decimal or exponent literal (BR-2610-anvl-schema-004).** A value such as
+  `1e400` (a float literal beyond double range, which has no finite value and so is not a whole number) passed the
+  integer rule; it now fails with `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH` ("value must be an integer"), like
+  `2.5`. A digits-only literal past int64 (`99999999999999999999`) is whole and still passes. Combined with `min` and
+  `max`, an overflowed float reports both the integer and the range violation. No ABI change.
 
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
   statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and
