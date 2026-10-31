@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static void th(void) {}
 
@@ -899,6 +900,50 @@ static void test_b20_foreign_member(void) {
    anvil_builder_dispose(b1);
 }
 
+/* ---------------------------------------------------------------------- *
+ * B21 - the base checks of write/emit are linear in the number of members: a long chain, bases declared
+ * later, and a ring, all under a generous bound (the first version walked every chain with a linear find,
+ * so 3000 members took seconds; 100k must not blow the stack either)
+ * ---------------------------------------------------------------------- */
+static double seconds_since(const struct timespec *t0) {
+   struct timespec t1;
+   clock_gettime(CLOCK_MONOTONIC, &t1);
+   return (double)(t1.tv_sec - t0->tv_sec) + (double)(t1.tv_nsec - t0->tv_nsec) / 1e9;
+}
+
+// n top-level object members m0..m(n-1); member i has base m(i+1), the last one none (or m0 when `ring`).
+static anvil_builder chain_builder(size_t n, bool ring) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member *ms = malloc(n * sizeof *ms);
+   char name[32];
+   for (size_t i = 0; i < n; i++) {
+      snprintf(name, sizeof name, "m%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+      ms[i] = ADD(b, name, o);
+   }
+   for (size_t i = 0; i < n; i++) {
+      if (i + 1 < n || ring) {
+         snprintf(name, sizeof name, "m%zu", (i + 1) % n);
+         anvil_builder_set_base(b, ms[i], name);
+      }
+   }
+   free(ms);
+   return b;
+}
+
+static void test_b21_base_checks_are_linear(void) {
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   anvil_builder b = chain_builder(3000, false);
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_not_null(text, "B21: a 3000-member chain emits");
+   TestBit.is_true(seconds_since(&t0) < 2.0, "B21: a 3000-member chain emits in well under 2 s");
+   anvil_builder_dispose(b);
+
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -920,5 +965,6 @@ int main(void) {
    TestBit.run_ex("B18_base_cycles", NULL, test_b18_base_cycles, th);
    TestBit.run_ex("B19_missing_base", NULL, test_b19_missing_base, th);
    TestBit.run_ex("B20_foreign_member", NULL, test_b20_foreign_member, th);
+   TestBit.run_ex("B21_base_checks_are_linear", NULL, test_b21_base_checks_are_linear, th);
    return TestBit.report();
 }
