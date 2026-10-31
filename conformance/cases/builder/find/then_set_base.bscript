@@ -1,6 +1,10 @@
 anvil-builder-script 1
 # find returns the member add returned
 dialect AML
+let b = object
+let bx = int 1
+add b "k" bx
+add NULL "base" b
 let o = object
 let x = int 1
 add o "k" x

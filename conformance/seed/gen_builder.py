@@ -310,7 +310,7 @@ case(BS, "valid", obj_member("base") + [let("d", "object"), let("x", "int 2"), '
 case(BS, "valid_after_target", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"'] + obj_member("base") + ["emit"], desc="the base may be declared later")
 case(BS, "missing_target", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "nothere"', "emit"], desc="a base that names no top-level member is accepted")
 case(BS, "target_is_self", [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "d" d'), 'set_base dm "d"', "emit"])
-case(BS, "replaced", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', 'set_base dm "other"', "emit"], desc="set_base again replaces the base")
+case(BS, "replaced", obj_member("base") + obj_member("other", "p", "pm") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', 'set_base dm "other"', "emit"], desc="set_base again replaces the base")
 case(BS, "replaced_back_to_valid", [let("n", "int 1"), 'add NULL "scalar" n', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "scalar"', "emit", 'set_base dm "base"', "emit"], cont=True,
      desc="emit fails while the base names a scalar, and works after the base is replaced")
 case(BS, "chain", obj_member("a") + [let("b", "object"), let("x", "int 2"), 'add b "j" x', let("bm", 'add NULL "b" b'), 'set_base bm "a"', let("c", "object"), let("y", "int 3"), 'add c "l" y', let("cm", 'add NULL "c" c'), 'set_base cm "b"', "emit"])
@@ -322,6 +322,30 @@ for bi, bad in enumerate(("", "1", "a-b", "a.b", "a b", "true", "null", "include
     case(BS, "bad_base_%02d" % bi, obj_member("base") + ['set_base m %s' % q(bad), "get_error"], cont=True, desc="base %s" % q(bad))
 case(BS, "bad_base_null", obj_member("base") + ["set_base m NULL", "get_error"], cont=True)
 case(BS, "null_member", ['set_base NULL "b"', "get_error"], cont=True)
+
+# BR-2610-anvl-writer-004: base cycles and bases that name nothing
+def two_objs(a="a", b="b"):
+    return [let("oa", "object"), let("xa", "int 1"), 'add oa "f" xa', let("ma", 'add NULL %s oa' % q(a)),
+            let("ob", "object"), let("xb", "int 2"), 'add ob "f" xb', let("mb", 'add NULL %s ob' % q(b))]
+case(BS, "cycle_self", [let("o", "object"), let("x", "int 1"), 'add o "f" x', let("m", 'add NULL "d" o'), 'set_base m "d"', "emit", "get_error"], cont=True, desc="a statement based on itself")
+case(BS, "cycle_two", two_objs() + ['set_base ma "b"', 'set_base mb "a"', "emit", "write", "get_error"], cont=True, desc="a -> b -> a")
+case(BS, "cycle_three", two_objs() + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "c" oc'), 'set_base ma "b"', 'set_base mb "c"', 'set_base mc "a"', "emit"], cont=True, desc="a -> b -> c -> a")
+case(BS, "cycle_chain_ok", two_objs() + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "c" oc'), 'set_base ma "b"', 'set_base mb "c"', "emit"], desc="a -> b -> c is a chain")
+case(BS, "cycle_leads_into", two_objs() + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "c" oc'), 'set_base mc "a"', 'set_base ma "b"', 'set_base mb "a"', "emit"], cont=True, desc="c is not in the cycle a -> b -> a but leads into it")
+case(BS, "cycle_with_include", ['include "x.anvl"'] + two_objs() + ['set_base ma "b"', 'set_base mb "a"', "emit"], cont=True, desc="an include does not excuse a cycle")
+case(BS, "cycle_broken_by_replace", two_objs() + ['set_base ma "b"', 'set_base mb "a"', "emit", 'set_base mb "nothing"', "emit"], cont=True, desc="replacing a base in the cycle by one that names nothing gives MISSING_BASE instead")
+case(BS, "cycle_repaired", two_objs() + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "c" oc'), 'set_base ma "b"', 'set_base mb "a"', "emit", 'set_base mb "c"', "emit"], cont=True, desc="repointing b at c ends the cycle")
+case(BS, "cycle_vs_scalar_first", [let("n", "int 1"), 'add NULL "n" n'] + two_objs("p", "q") + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "r" oc'), 'set_base ma "q"', 'set_base mb "p"', 'set_base mc "n"', "emit"], cont=True, desc="the scalar base is reported before the cycle")
+case(BS, "cycle_nested_member_not_part", two_objs() + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "d" d'), 'set_base dm "a"', 'add NULL "outer" outer', 'set_base ma "b"', "emit"], desc="a nested member named like a top-level one is not part of a chain")
+case(BS, "missing_no_include", two_objs() + ['set_base ma "nothere"', "emit", "write", "get_error"], cont=True, desc="no include: the reader would reject MISSING_BASE")
+case(BS, "missing_with_include", ['include "x.anvl"'] + two_objs() + ['set_base ma "nothere"', "emit", "write"], desc="an include may supply the base")
+case(BS, "missing_include_added_later", two_objs() + ['set_base ma "nothere"', "emit", 'include "x.anvl"', "emit"], cont=True, desc="the check looks at the includes held at emit time")
+case(BS, "missing_declared_later", two_objs() + ['set_base ma "later"', let("ol", "object"), let("xl", "int 3"), 'add ol "f" xl', 'add NULL "later" ol', "emit"], desc="a base declared after the statement is found")
+case(BS, "missing_sibling", [let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"], cont=True, desc="bases are looked up among the top-level names only")
+case(BS, "missing_sibling_with_include", ['include "x.anvl"', let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"])
+case(BS, "missing_replaced_by_valid", two_objs() + ['set_base ma "nothere"', "emit", 'set_base ma "b"', "emit"], cont=True)
+case(BS, "missing_vs_scalar_first", [let("n", "int 1"), 'add NULL "n" n'] + two_objs("p", "q") + ['set_base ma "gone"', 'set_base mb "n"', "emit"], cont=True, desc="the scalar base is reported before the missing one")
+case(BS, "missing_nested_non_object_with_include", ['include "x.anvl"', let("o", "object"), let("n", "int 1"), 'add o "target" n', 'add NULL "outer" o', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"])
 # non-object values: refused at set_base
 for k in ("null", "bool true", "int 1", 'string "s"', 'bare "x"', 'blob "t" "d"', 'varref "r"', "array", "tuple"):
     nm = k.split()[0]
@@ -367,7 +391,7 @@ case(FD, "empty_name", ['find NULL ""'])
 case(FD, "bad_name_not_error", ['find NULL "1 bad"', "get_error"], cont=True)
 case(FD, "keeps_previous_error", [let("v", 'numeric "x"'), 'find NULL "a"', "get_error"], cont=True, desc="find does not touch the error")
 case(FD, "does_not_clear_error", [let("v", 'numeric "x"'), 'find NULL "a"', let("w", "null"), "get_error"], cont=True)
-case(FD, "then_set_base", [let("o", "object"), let("x", "int 1"), 'add o "k" x', 'add NULL "o" o', let("m", 'find NULL "o"'), 'set_base m "base"', "emit"], desc="find returns the member add returned")
+case(FD, "then_set_base", [let("b", "object"), let("bx", "int 1"), 'add b "k" bx', 'add NULL "base" b', let("o", "object"), let("x", "int 1"), 'add o "k" x', 'add NULL "o" o', let("m", 'find NULL "o"'), 'set_base m "base"', "emit"], desc="find returns the member add returned")
 case(FD, "then_attribute", [let("v", "int 1"), 'add NULL "a" v', let("m", 'find NULL "a"'), 'member_attribute m "k" "v"', "emit"])
 case(FD, "then_set_base_non_object", [let("v", "int 1"), 'add NULL "a" v', let("m", 'find NULL "a"'), 'set_base m "base"', "get_error"], cont=True)
 case(FD, "none_then_use", [let("m", 'find NULL "a"'), 'member_attribute m "k" "v"', "get_error", 'set_base m "b"', "get_error"], cont=True)
@@ -471,6 +495,10 @@ case(HD, "foreign_value_into_add", [let("n", 'string "x"'), "let o = other objec
 case(HD, "foreign_value_into_document", [let("n", 'string "x"'), 'other add NULL "a" n', "other get_error", "emit"], cont=True, b2="AML")
 case(HD, "foreign_collection", [let("a", "array"), "let n = other int 1", "append a n", "get_error", "other append a n", "other get_error"], cont=True, b2="AML")
 case(HD, "foreign_object_target", [let("o", "object"), "let n = other int 1", 'other add o "k" n', "other get_error", 'add o "k" n', "get_error"], cont=True, b2="AML")
+case(HD, "foreign_member_set_base", [let("o", "object"), let("m", 'add NULL "o" o'), 'other set_base m "b"', "other get_error", "get_error"], cont=True, b2="AML")
+case(HD, "foreign_member_attribute", [let("v", "int 1"), let("m", 'add NULL "v" v'), 'other member_attribute m "k" "v"', "other get_error", 'other member_attribute_string m "k" "v"', "other get_error", "emit"], cont=True, b2="AML")
+case(HD, "foreign_member_dialect_order", [let("v", "int 1"), let("m", 'add NULL "v" v'), 'other set_base m "b"', "other get_error", 'other member_attribute m "k" "v"', "other get_error"], cont=True, b2="AMP", desc="the foreign check comes before the dialect check")
+case(HD, "foreign_member_both_ways", [let("v", "int 1"), let("m", 'add NULL "v" v'), "let w = other int 2", "let n = other add NULL \"w\" w", 'member_attribute n "k" "v"', "get_error", 'other member_attribute m "k" "v"', "other get_error", 'member_attribute m "k" "v"', "emit", "other emit"], cont=True, b2="AML")
 case(HD, "foreign_find", [let("o", "object"), 'other find o "k"', 'other find NULL "k"', "other get_error"], cont=True, b2="AML")
 case(HD, "foreign_find_keeps_error", [let("o", "object"), 'other find o "k"', "other get_error"], cont=True, b2="AML")
 case(HD, "two_builders_independent", [let("a", "int 1"), 'add NULL "x" a', "let b = other int 2", 'other add NULL "y" b', "emit", "other emit", "get_error", "other get_error"], b2="AML")

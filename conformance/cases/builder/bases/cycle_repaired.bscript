@@ -1,0 +1,21 @@
+anvil-builder-script 1
+# repointing b at c ends the cycle
+option on-error continue
+dialect AML
+let oa = object
+let xa = int 1
+add oa "f" xa
+let ma = add NULL "a" oa
+let ob = object
+let xb = int 2
+add ob "f" xb
+let mb = add NULL "b" ob
+let oc = object
+let xc = int 3
+add oc "f" xc
+let mc = add NULL "c" oc
+set_base ma "b"
+set_base mb "a"
+emit
+set_base mb "c"
+emit

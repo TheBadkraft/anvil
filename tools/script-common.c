@@ -28,6 +28,8 @@ static const char *const err_names[] = {
    "ANVIL_WRITER_ERR_DEPTH_EXCEEDED",
    "ANVIL_WRITER_ERR_DUPLICATE_FIELD",
    "ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY",
+   "ANVIL_WRITER_ERR_INHERITANCE_CYCLE",
+   "ANVIL_WRITER_ERR_MISSING_BASE",
 };
 #define ERR_NAME_COUNT (sizeof err_names / sizeof err_names[0])
 

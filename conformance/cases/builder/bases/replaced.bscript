@@ -5,6 +5,10 @@ let o_v = int 1
 let o = object
 add o "k" o_v
 let m = add NULL "base" o
+let p_v = int 1
+let p = object
+add p "k" p_v
+let pm = add NULL "other" p
 let d = object
 let x = int 2
 add d "j" x

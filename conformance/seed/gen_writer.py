@@ -34,7 +34,7 @@ if os.path.exists(out_dir) and not force:
 ERRS = ["OK", "INVALID_ARGUMENT", "MEMORY", "STATE", "DIALECT", "INVALID_IDENTIFIER", "RESERVED_WORD",
         "INVALID_NUMERIC", "INVALID_BARE", "INVALID_BLOB", "INVALID_ATTRIBUTE_VALUE", "INVALID_INCLUDE_PATH",
         "EMPTY_COLLECTION", "INHERITANCE_REQUIRES_OBJECT", "UNFINISHED", "DUPLICATE_NAME", "DEPTH_EXCEEDED",
-        "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY"]
+        "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY", "INHERITANCE_CYCLE", "MISSING_BASE"]
 def ename(i): return "ANVIL_WRITER_OK" if i == 0 else "ANVIL_WRITER_ERR_" + ERRS[i]
 src = open(os.path.join(root, "src", "writer", "writer.c")).read()
 MSG = {}
@@ -221,9 +221,9 @@ for d in ("AML", "AMP"):
 raw(L, "get_error_ok", "AML", ["get_error", "finish", "get_error"], lambda n: (
     ["get_error code=0 name=ANVIL_WRITER_OK"] * 2, 4, 0, HDR["AML"]))
 # error_message for every code and out-of-range values
-steps = ["error_message %d" % c for c in list(range(0, 19)) + [19, 20, 100, -1, -2147483648, 2147483647]]
+steps = ["error_message %d" % c for c in list(range(0, 21)) + [100, -1, -2147483648, 2147483647]]
 raw(L, "error_message_all", "AML", steps, lambda n: (
-    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 19)) + [19, 20, 100, -1, -2147483648, 2147483647]],
+    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 21)) + [100, -1, -2147483648, 2147483647]],
     len(steps) + 1, 0, None), desc="every code, and values outside the enum (no finish: no output)")
 # invalid dialect: the writer is NULL
 for dv in (2, 7, -1, 255):

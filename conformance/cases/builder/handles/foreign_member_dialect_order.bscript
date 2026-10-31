@@ -1,0 +1,11 @@
+anvil-builder-script 1
+# the foreign check comes before the dialect check
+option on-error continue
+dialect AML
+builder2 AMP
+let v = int 1
+let m = add NULL "v" v
+other set_base m "b"
+other get_error
+other member_attribute m "k" "v"
+other get_error

@@ -21,9 +21,17 @@ for s in $(find . -type f -name '*.bscript' | sed 's|^\./||' | LC_ALL=C sort); d
       k=$(basename "$f" .anvl); k=${k#emit-}
       n=$((n + 1))
       rm -rf "$tmp/w"; mkdir "$tmp/w"; cp "$f" "$tmp/w/doc.anvl"
+      # An include is satisfied by a file that defines every base the document uses but does not declare itself (an
+      # include is how a builder document may name a base it does not hold). The first include gets the definitions,
+      # the others are empty.
+      sed -n 's/^.* : \([A-Za-z_][A-Za-z0-9_]*\) *\(@\[\|:=\).*$/\1/p' "$tmp/w/doc.anvl" | LC_ALL=C sort -u | while IFS= read -r base; do
+         grep -q "^$base[ :@]" "$tmp/w/doc.anvl" || printf '%s := {\n   f := 1;\n};\n' "$base"
+      done > "$tmp/defs"
+      first=1
       sed -n 's/^include "\(.*\)";$/\1/p' "$tmp/w/doc.anvl" | while IFS= read -r inc; do
          case $inc in /*|.|..|*/.|*/..) continue;; esac # absolute and directory paths cannot be satisfied
          mkdir -p "$tmp/w/$(dirname "$inc")" 2>/dev/null && : > "$tmp/w/$inc" 2>/dev/null
+         if [ $first -eq 1 ]; then cp "$tmp/defs" "$tmp/w/$inc" 2>/dev/null; first=0; fi
       done
       (cd "$tmp/w" && "$dump" doc.anvl) > "$tmp/dump" 2>&1
       is_known=$(grep -v '^#' "$known" 2>/dev/null | awk -v c="$s" -v k="$k" '$1 == c && $2 == k { print $3 }')

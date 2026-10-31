@@ -112,6 +112,10 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "field name declared twice in one object";
    case ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY:
       return "attribute key given twice";
+   case ANVIL_WRITER_ERR_INHERITANCE_CYCLE:
+      return "inheritance cycle: a statement's base chain loops back to itself";
+   case ANVIL_WRITER_ERR_MISSING_BASE:
+      return "base names no member of the document and no include could supply it";
    }
    return "unknown error";
 }

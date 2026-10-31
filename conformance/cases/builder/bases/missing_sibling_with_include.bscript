@@ -1,0 +1,15 @@
+anvil-builder-script 1
+dialect AML
+include "x.anvl"
+let outer = object
+let s = object
+let sx = int 1
+add s "f" sx
+add outer "sib" s
+let d = object
+let dx = int 2
+add d "f" dx
+let dm = add outer "der" d
+set_base dm "sib"
+add NULL "outer" outer
+emit

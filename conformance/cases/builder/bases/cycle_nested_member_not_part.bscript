@@ -1,0 +1,20 @@
+anvil-builder-script 1
+# a nested member named like a top-level one is not part of a chain
+dialect AML
+let oa = object
+let xa = int 1
+add oa "f" xa
+let ma = add NULL "a" oa
+let ob = object
+let xb = int 2
+add ob "f" xb
+let mb = add NULL "b" ob
+let outer = object
+let d = object
+let x = int 2
+add d "j" x
+let dm = add outer "d" d
+set_base dm "a"
+add NULL "outer" outer
+set_base ma "b"
+emit

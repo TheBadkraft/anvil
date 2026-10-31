@@ -1,0 +1,9 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+builder2 AML
+let o = object
+let m = add NULL "o" o
+other set_base m "b"
+other get_error
+get_error
