@@ -131,22 +131,27 @@ pre-order walk with the document numbered when it is first entered and an includ
 before its next sibling. It is not breadth-first: with `root` including `a` then `b`, `a` including `c`, and `b`
 including `d` then `c`, the numbering is `root 0, a 1, c 2, (c's own includes), b, d`, and `c` is not repeated under `b`
 (`coverage/includes/walk_root.anvl`; reverse the first two includes and the numbers change,
-`walk_root_reversed.anvl`). A document that is reached again (a diamond, a shared leaf, a cycle that native
-accepts) is not dumped again; the `include` record that reached it carries `resolved=<its first number>`, which may
+`walk_root_reversed.anvl`). A document that is reached again (a diamond, a shared leaf) is not dumped again; the `include` record that reached it carries `resolved=<its first number>`, which may
 be a smaller number than the current document's own. The `doc` records are then printed in number order.
 
 **What "the same document" means: identical bytes.** Native identifies a document by a hash of its source bytes
 (64-bit FNV-1a), not by its path. Two includes that name *different paths* with *byte-identical contents* (a
 copy of a file, an empty file named twice) resolve to the **same** document, which keeps the path of the first
-one reached (`coverage/includes/identical_copies.anvl`). An include of a file whose bytes equal the root's resolves to
-`doc 0` (`self_dot.anvl`). A port compares the bytes (a hash collision between different files is outside the
+one reached (`coverage/includes/identical_copies.anvl`). This is the rule for a document reached again that is **not** one of its
+own ancestors; an ancestor reached again is a cycle (below). A port compares the bytes (a hash collision between different files is outside the
 contract). Which of two spellings of one path is "first" is decided by the walk above.
 
-**Cycles.** An include that names, **by exactly the same joined path string**, a document still being loaded
-(one of its ancestors in the include chain) is `error code=4206` (`ANVL_ERR_INCLUDE_CYCLIC`) and the load fails
-(`self_exact.anvl`, `mutual_a.anvl`). The comparison is textual: `"./self.anvl"` against `"self.anvl"` is not
-the same string, so the include is accepted, the bytes are the same, and it resolves to the existing document
-(`self_dot.anvl`, `mutual_dot_a.anvl`: the dump then shows an include that resolves to a document with a smaller number).
+**Cycles.** An include that names a document still being loaded (one of its ancestors in the include chain) is
+`error code=4206` (`ANVL_ERR_INCLUDE_CYCLIC`) and the load fails. A document is identified here by its **normalised
+path**, the path native opens with `.` components and repeated slashes removed and `name/..` cancelled
+(`a.anvl`, `./a.anvl`, `.//a.anvl` and `d/../a.anvl` are one document; a leading `..` of a relative path is kept, and symbolic links
+are not followed: the normalisation is textual). So a root named with no directory part and the `./name` its includer composes
+are the same document, and a cycle through it is found (`bare_self.anvl`, `bare_mutual_a.anvl`, `bare_three_a.anvl` at the top of
+`cases/`; `self_exact.anvl`, `self_dot.anvl`, `mutual_a.anvl`, `mutual_dot_a.anvl` under `coverage/includes/`). Before
+BR-2610-anvl-004 the comparison was the exact joined string, which missed those cycles; `self_dot.anvl` and `mutual_dot_a.anvl`
+used to resolve to the existing document and are now cycle errors. Two different files with the same name in different
+directories are different documents, and a diamond is not a cycle. The `path` printed for an included document is unchanged: it is
+still the path as opened, not its normal form.
 
 ```
 doc 0 path="<root>" dialect=AML bytes=132
@@ -314,6 +319,8 @@ conformance/
 - An input is any file under `cases/` that is not a `.dump`. It is run from `cases/` by its relative path, so
   `include` resolves there. A `.frag` input is dumped with `--fragment`; the file extension of every other input
   is the dialect hint native uses (`.amp` for AMP).
+- An input directly under `cases/` (no group directory) is run with a **bare file name** as its root: the `bare_*.anvl`
+  inputs there are the include cycles through a bare root (BR-2610-anvl-004; `seed/gen_bare.py`).
 - Groups: `handmade` (written before the tool, TDD), `fixtures` (a verbatim copy of `test/fixtures`; the check
   fails if the two differ), `unit` (the inline inputs of the unit tests, extracted), `grammar` (generated
   from tables: numbers, strings and escapes, blobs, attributes, empty and one-element rules, statement
@@ -893,8 +900,9 @@ crosscheck boundaries, `repeated_key`) and `rivet` (Rivet's types file and kind 
 Notes for a port: an empty object, an empty array, a one-element tuple and a repeated key are parse errors of the fragment (and of a
 document), so a script that validates `{ }` reports `doc=ANVIL_ERR_SYNTAX`; FlyWire's schema is loaded from a buffer with the
 repository root as the working directory, so the `flywire` cases keep the schema at the root of the file tree and its types file at
-`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`) on purpose: native
-misses an include cycle when the root is a bare file name (BR-2610-anvl-004), and the corpus does not pin that defect.
+`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`); native
+used to miss an include cycle when the root was a bare file name (BR-2610-anvl-004); it is found now, and `include_cycle_bare`,
+`self_include_bare`, `self_include_dot_bare`, `include_cycle_three_bare` and `include_cycle_dot_spelling` pin it.
 
 ## Drift tables
 

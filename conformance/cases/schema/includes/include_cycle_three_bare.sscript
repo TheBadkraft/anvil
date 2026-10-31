@@ -1,0 +1,15 @@
+anvil-schema-script 1
+# a three-document cycle from a bare root (BR-2610-anvl-004)
+file "a.anvl"
+|#!aml
+|include "b.anvl";
+file "b.anvl"
+|#!aml
+|include "c.anvl";
+file "c.anvl"
+|#!aml
+|include "a.anvl";
+|@[types]
+|C := { type := Bool; };
+registry r includes "a.anvl"
+type find r "C"

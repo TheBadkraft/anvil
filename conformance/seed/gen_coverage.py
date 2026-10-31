@@ -2,7 +2,7 @@
 """Seeds conformance/cases/coverage/ (FR-2610-anvl-conformance-002): the cases the Phase 0 review found missing.
 
   includes/  the include graph: a missing include, a missing include in a nested child, a failing child, a
-             self include (exact spelling = cycle; "./" spelling = same document), mutual includes, byte-identical
+             self include (exact and "./" spellings are both cycles since BR-2610-anvl-004), mutual includes, byte-identical
              copies, the pre-order walk with a diamond, paths with "..", paths at the 1024-byte limit
   nesting/   arrays, tuples, objects, attributes and fragments nested up to 400 levels deep
   columns/   error columns after multibyte characters (2, 3 and 4 bytes), tabs, invalid UTF-8, a BOM, CR, CRLF
@@ -51,10 +51,10 @@ put(I + "failing_child_string.anvl", 'include "child_unterminated.anvl";\nx := 1
 put(I + "failing_child_number.anvl", 'include "leaf_a.anvl";\ninclude "child_bad_number.anvl";\n')
 put(I + "failing_child_shebang.anvl", 'include "child_wrong_shebang.anvl";\n')
 put(I + "self_exact.anvl", 'include "self_exact.anvl";\nx := 1;\n')                 # same spelling: a cycle
-put(I + "self_dot.anvl", 'include "./self_dot.anvl";\nx := 1;\n')                   # other spelling, same bytes: the same document
+put(I + "self_dot.anvl", 'include "./self_dot.anvl";\nx := 1;\n')                   # other spelling: still a cycle (BR-2610-anvl-004)
 put(I + "mutual_a.anvl", 'include "mutual_b.anvl";\na := 1;\n')                     # a -> b -> a, by name: a cycle
 put(I + "mutual_b.anvl", 'include "mutual_a.anvl";\nb := 1;\n')
-put(I + "mutual_dot_a.anvl", 'include "./mutual_dot_b.anvl";\na := 1;\n')           # a -> b -> a by "./" name: no cycle error
+put(I + "mutual_dot_a.anvl", 'include "./mutual_dot_b.anvl";\na := 1;\n')           # a -> b -> a by "./" name: a cycle too (BR-2610-anvl-004)
 put(I + "mutual_dot_b.anvl", 'include "./mutual_dot_a.anvl";\nb := 1;\n')
 put(I + "identical_copies.anvl", 'include "leaf_a.anvl";\ninclude "leaf_a_copy.anvl";\nx := 1;\n')
 put(I + "same_twice.anvl", 'include "leaf_a.anvl";\ninclude "leaf_a.anvl";\nx := 1;\n')

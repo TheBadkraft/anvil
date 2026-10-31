@@ -1,5 +1,5 @@
 anvil-schema-script 1
-# a directory part in the root name: see BR-2610-anvl-004
+# a directory part in the root name; self_include_bare has none
 file "d/a.anvl"
 |#!aml
 |include "a.anvl";

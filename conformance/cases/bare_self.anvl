@@ -1,0 +1,2 @@
+include "bare_self.anvl";
+x := 1;
