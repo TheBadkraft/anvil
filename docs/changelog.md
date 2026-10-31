@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AnvilScript parser completion plan (design only; nothing implemented).** `notes/plan-2610-anvilscript-parser.md`
+  gives the complete grammar with an AST node kind per production, a versioned and additive-only AST contract for the
+  compiler (kinds, fields, spans, ownership, bounds), the places where the four AnvilScript design notes are outdated
+  or contradict each other with a resolution for each, a native-owned AST corpus with a canonical dump and a fuzzing
+  design, the specific 51xx error codes, and 26 small tickets in order (the six open parser tickets plus
+  FR-2610-anvl-asl-003 to 020 and SR-2610-anvl-asl-002 and 003) in three milestones. It lists 13 decisions the owner
+  has to make. No code and no design note changed.
+
 ---
 
 ## [v0.12.1-rc] — (2026-10-30)
