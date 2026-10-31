@@ -523,7 +523,8 @@ A **step** is
   is a script error). Only the calls marked *node* or *member* below return something to bind. `NAME` is
   `[A-Za-z_][A-Za-z0-9_]*`, and is not `NULL`, `true`, `false`, `let` or `other`. A name may be bound again; the latest
   binding wins. A call that returns a handle without `let` is legal (the handle is dropped).
-- **`other`** makes the call on the **second builder** instead of the first. It is how a script reaches the
+- **`other`** makes the call on the **second builder** instead of the first (not for `dialect`, `builder2`, `option` or
+  `error_message`, which are script errors with `other`). It is how a script reaches the
   foreign-handle error (a node from one builder given to another).
 - A **handle argument** is a bound name, or the word `NULL` (the null handle). A quoted string in a handle position is a
   script error. A name used before it is bound is a script error, and so is a handle of the wrong kind (a member where a
@@ -621,7 +622,7 @@ step (counting from 1, either builder) to `<dir>/emit-<k>.anvl`; `scripts/check-
 `make update-conformance` and by nothing else. `make check-conformance` checks, for every `.bscript`, that native's run
 equals the committed `.dump`, and `make check-builder-roundtrip` checks that **every successful `emit` and `write` loads
 through the native reader with `status ok`** (an `include` is satisfied by an empty file of that name; known
-inconsistencies are listed with their ticket in `conformance/builder-roundtrip-known.txt`). `make check-builder-gen`
+inconsistencies are listed with their ticket or reason in `conformance/builder-roundtrip-known.txt`). `make check-builder-gen`
 checks that the generator reproduces the committed scripts and writes no dump.
 
 Areas: `lifecycle` (new, get_error, error_message, non-sticky errors, emit twice, write), `values` (every value kind and
