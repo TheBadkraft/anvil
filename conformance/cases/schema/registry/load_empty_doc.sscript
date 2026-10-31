@@ -1,0 +1,4 @@
+anvil-schema-script 1
+file "a.anvl" ""
+registry r load "a.anvl"
+registry s includes "a.anvl"

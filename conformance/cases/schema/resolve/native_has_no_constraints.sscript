@@ -1,0 +1,4 @@
+anvil-schema-script 1
+type resolve NULL "String"
+type resolve NULL "Numeric"
+type resolve NULL "enum"

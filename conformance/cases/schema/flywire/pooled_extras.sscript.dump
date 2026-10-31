@@ -1,0 +1,16 @@
+anvil-schema-run 1
+schema line=52 name=s file="p.anvl" doc=ok result=ok diagnostics=0 fields=4
+  field name="id" kind=ANVIL_TYPE_NUMERIC type="types.Int32" required=0 nullable=0 integer=1 size=none min=i64:-2147483648 max=i64:2147483647 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="vin" kind=ANVIL_TYPE_STRING type="types.Str" required=0 nullable=0 integer=0 size=17 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="ascii"
+      value type=BOOL text="true"
+  field name="make" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+  field name="status" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=1
+    extra index=0 name="pooled"
+      value type=BOOL text="true"
+validate_value line=53 schema=s doc=ok opts=default result=pass count=0
+validate_value line=54 schema=s doc=ok opts=default result=pass count=0
+steps 5
+status ok

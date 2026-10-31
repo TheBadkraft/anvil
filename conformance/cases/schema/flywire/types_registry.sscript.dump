@@ -1,0 +1,15 @@
+anvil-schema-run 1
+registry line=61 name=r how=load file="schema-gen/postgres.types.anvl" doc=ok result=ok diagnostics=0
+type line=62 how=find registry=r name="Int32" result=found kind=ANVIL_TYPE_NUMERIC size=none min=-2147483648 max=2147483647 min_numeric=i64:-2147483648 max_numeric=i64:2147483647 format=none values=0
+type line=63 how=find registry=r name="Str" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=64 how=find registry=r name="Date" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format="iso8601_date" values=0
+type line=65 how=find registry=r name="Int64" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=66 how=find registry=r name="Timestamptz" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format="iso8601_datetime" values=0
+type line=67 how=find registry=r name="Timestamp" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=68 how=find registry=r name="Text" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=69 how=find registry=r name="Bool" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+type line=70 how=find registry=r name="Float64" result=found kind=ANVIL_TYPE_NUMERIC size=none min=none max=none min_numeric=f64:0xffefffffffffffff max_numeric=f64:0x7fefffffffffffff format=none values=0
+type line=71 how=find registry=r name="Uuid" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format="uuid" values=0
+type line=72 how=find registry=r name="Nope" result=none
+steps 14
+status ok

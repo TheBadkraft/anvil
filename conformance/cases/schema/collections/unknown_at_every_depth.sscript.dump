@@ -1,0 +1,13 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="o" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="l" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+      items name="" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+        nested name="k" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=fail count=3
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="o.l[0].zz" message="field is not declared in the schema"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="o.yy" message="field is not declared in the schema"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="xx" message="field is not declared in the schema"
+validate_value line=8 schema=s doc=ok opts=allow_unknown result=pass count=0
+steps 4
+status ok

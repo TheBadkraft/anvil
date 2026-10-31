@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[schema, types]
+|T := { type := String; };
+registry r load "t.anvl"
+schema s load "t.anvl"
+field s "T"

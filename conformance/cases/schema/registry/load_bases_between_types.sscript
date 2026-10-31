@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+|Base := { type := String; size := 3; };
+|T : Base := { format := uuid; };
+registry r load "a.anvl"
+type find r "Base"
+type find r "T"

@@ -1,0 +1,14 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Person := { type := Object; fields := { id := { type := Numeric; required := true; }; name := { type := String; size := 4; }; }; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|owner := { type := types.Person; };
+|staff := { type := Array; items := { type := types.Person; }; };
+schema s load "s.anvl"
+validate_value s "{ owner := { name := \"toolong\"; x := 1; }; staff := [ { id := 1; }, { x := 1; }, { id := \"x\"; name := \"ab\"; } ]; }"
+validate_value s "{ owner := { id := 1; }; }"

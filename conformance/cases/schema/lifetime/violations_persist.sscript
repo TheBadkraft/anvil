@@ -1,0 +1,12 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := true; };
+schema s load "s.anvl"
+violations s
+validate_value s "{ zz := 1; }"
+violations s
+violations s
+validate_value s "{ a := 1; }"
+violations s

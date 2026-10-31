@@ -1,0 +1,5 @@
+anvil-schema-script 1
+registry r load "gone.anvl"
+type resolve r "Bool"
+type resolve r "VIN"
+type find r "VIN"

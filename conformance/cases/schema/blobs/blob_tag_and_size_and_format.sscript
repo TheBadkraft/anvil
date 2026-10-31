@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|b := { type := Blob; tag := txt; size := 36; format := uuid; };
+schema s load "s.anvl"
+validate_value s "{ b := @txt`550e8400-e29b-41d4-a716-446655440000`; }"
+validate_value s "{ b := @txt`550e8400-e29b-41d4-a716-44665544000`; }"
+validate_value s "{ b := @png`x`; }"
+validate_value s "{ b := `550e8400-e29b-41d4-a716-446655440000`; }"

@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "s.anvl" "#!aml\n@[schema]\ne := { type := enum; values := [a, ab, \"a\x00\"]; };\n"
+schema s load "s.anvl"
+validate_value s "{ e := \"a\"; }"
+validate_value s "{ e := \"ab\"; }"
+validate_value s "{ e := \"a\x00\"; }"
+validate_value s "{ e := \"a\x00b\"; }"
+validate_value s "{ e := \"abc\"; }"
+validate_value s "{ e := a; }"
+validate_value s "{ e := ab; }"

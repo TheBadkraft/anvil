@@ -1,0 +1,9 @@
+anvil-schema-script 1
+# a directory part in the root name: see BR-2610-anvl-004
+file "d/a.anvl"
+|#!aml
+|include "a.anvl";
+|@[types]
+|A := { type := Bool; };
+registry r includes "d/a.anvl"
+type find r "A"

@@ -1,0 +1,19 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; required := true; fields := { x := { type := Numeric; required := true; }; y := { type := String; }; }; };
+|l := { type := Array; items := { type := Object; fields := { t := { type := String; required := true; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ o := { y := \"s\"; }; }"
+validate_value s "{ o := { y := \"s\"; }; }" skip_required
+validate_value s "{ o := { y := \"s\"; }; }" allow_unknown
+validate_value s "{ o := { y := \"s\"; }; }" skip_required allow_unknown
+validate_value s "{ l := [ { t := \"a\"; }, { u := 1; } ]; }"
+validate_value s "{ l := [ { t := \"a\"; }, { u := 1; } ]; }" skip_required
+validate_value s "{ l := [ { t := \"a\"; }, { u := 1; } ]; }" allow_unknown
+validate_value s "{ l := [ { t := \"a\"; }, { u := 1; } ]; }" skip_required allow_unknown
+validate_value s "{ o := { x := 1; z := 2; }; l := [ { u := 1; } ]; }"
+validate_value s "{ o := { x := 1; z := 2; }; l := [ { u := 1; } ]; }" skip_required
+validate_value s "{ o := { x := 1; z := 2; }; l := [ { u := 1; } ]; }" allow_unknown
+validate_value s "{ o := { x := 1; z := 2; }; l := [ { u := 1; } ]; }" skip_required allow_unknown

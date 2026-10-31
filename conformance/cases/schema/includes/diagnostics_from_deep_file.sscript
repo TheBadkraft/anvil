@@ -1,0 +1,12 @@
+anvil-schema-script 1
+file "main.anvl"
+|#!aml
+|include "a.anvl";
+file "a.anvl"
+|#!aml
+|@[types]
+|Bad := { type := Nope; };
+|Good := { type := String; size := x; };
+registry r includes "main.anvl"
+type find r "Bad"
+type find r "Good"

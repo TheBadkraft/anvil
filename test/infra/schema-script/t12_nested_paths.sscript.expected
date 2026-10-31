@@ -1,0 +1,22 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="links" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=2 max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+      nested name="target" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="owner" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="name" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="links" message="field value does not match the declared type"
+validate_value line=9 schema=s doc=ok opts=default result=fail count=6
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="links[1].target" message="required field is missing"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="links[1].x" message="field is not declared in the schema"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="links[2].target" message="field value does not match the declared type"
+  violation index=3 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="links[2].x" message="field is not declared in the schema"
+  violation index=4 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="owner.name" message="required field is missing"
+  violation index=5 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="owner.z" message="field is not declared in the schema"
+validate_value line=10 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="links" message="array has fewer items than min_items"
+validate_value line=11 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="links[0]" message="field value does not match the declared type"
+steps 6
+status ok

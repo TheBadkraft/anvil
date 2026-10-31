@@ -1,0 +1,8 @@
+anvil-schema-run 1
+schema line=12 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="a" kind=ANVIL_TYPE_STRING type="types.T" required=0 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_STRING type="types.T" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=13 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="b" message="field is not nullable"
+steps 4
+status ok

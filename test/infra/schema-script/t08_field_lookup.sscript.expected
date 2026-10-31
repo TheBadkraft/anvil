@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="owner" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="name" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=40 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=7 schema=s path="owner" depth=1 result=found
+  field name="owner" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="name" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=40 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=8 schema=s path="owner.name" depth=2 result=found
+  nested name="name" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=40 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=9 schema=s path="owner.nope" depth=2 result=none
+field line=10 schema=s path="nope" depth=1 result=none
+field line=11 schema=NULL path="owner" depth=1 result=none
+steps 7
+status ok

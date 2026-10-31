@@ -1,0 +1,11 @@
+anvil-schema-run 1
+schema line=9 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=4
+  field name="f" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=1 integer=0 size=10 min=none max=none min_items=none max_items=none format="uuid" tag=none values=2 nested=0 items=0 extras=0
+    label index=0 text="a"
+    label index=1 text="b c"
+  field name="n" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=1 size=none min=f64:0xbff8000000000000 max=f64:0x409f400000000000 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=100 min=none max=none min_items=none max_items=none format=none tag="png" values=0 nested=0 items=0 extras=0
+  field name="a" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=1 max_items=9 format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+steps 2
+status ok

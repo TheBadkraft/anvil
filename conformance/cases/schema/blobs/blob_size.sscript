@@ -1,0 +1,16 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|b := { type := Blob; size := 4; };
+schema s load "s.anvl"
+validate_value s "{ b := ``; }"
+validate_value s "{ b := `abcd`; }"
+validate_value s "{ b := `abcde`; }"
+validate_value s "{ b := @longtag`abcd`; }"
+validate_value s "{ b := @longtag`abcde`; }"
+validate_value s "{ b := `\xc3\xa9\xc3\xa9`; }"
+validate_value s "{ b := `\xc3\xa9\xc3\xa9\xc3\xa9`; }"
+validate_value s "{ b := `a\x00b`; }"
+validate_value s "{ b := `a\x00bcd`; }"
+validate_value s "{ b := `ab\ncd`; }"

@@ -1,0 +1,5 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+registry r load "a.anvl"

@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Id := { type := Numeric; min := 1; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|id := { type := types.Id; };
+|plain := { type := Numeric; };
+|enumf := { type := enum; values := [x]; };
+schema s load "s.anvl"

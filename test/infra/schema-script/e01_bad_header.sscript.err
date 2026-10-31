@@ -1,0 +1,1 @@
+anvil-dump: e01_bad_header.sscript:1: first line must be "anvil-schema-script 1"

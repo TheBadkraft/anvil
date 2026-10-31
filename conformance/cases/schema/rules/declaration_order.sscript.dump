@@ -1,0 +1,12 @@
+anvil-schema-run 1
+schema line=13 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=8
+  field name="zebra" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="apple" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="mango" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="Apple" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="_x" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="a1" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="a10" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="a2" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+steps 2
+status ok

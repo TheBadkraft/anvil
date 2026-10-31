@@ -1,0 +1,13 @@
+anvil-schema-run 1
+schema line=8 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="a" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="A" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b_c" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=9 schema=s path="a" depth=1 result=found
+  field name="a" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=10 schema=s path="A" depth=1 result=found
+  field name="A" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=11 schema=s path="" depth=1 result=none
+field line=12 schema=s path="a " depth=1 result=none
+steps 6
+status ok

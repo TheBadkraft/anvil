@@ -1,0 +1,26 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; format := iso8601_datetime; };
+schema s load "s.anvl"
+validate_value s "{ f := 2026-10-29T12:30:00Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00.123+05:30; }"
+validate_value s "{ f := 2026-12-31T23:59:60Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00; }"
+validate_value s "{ f := 2026-10-29T12:30:00+05; }"
+validate_value s "{ f := 2026-10-29t12:30:00z; }"
+validate_value s "{ f := 2026-10-29T12:30:00z; }"
+validate_value s "{ f := 2026-10-29T12:30:00-08:00; }"
+validate_value s "{ f := 2026-10-29T12:30:00+0530; }"
+validate_value s "{ f := 2026-10-29T24:00:00Z; }"
+validate_value s "{ f := 2026-10-29T23:60:00Z; }"
+validate_value s "{ f := 2026-10-29T23:59:61Z; }"
+validate_value s "{ f := 2026-10-29T12:30Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00.Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00.1Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00.123456789Z; }"
+validate_value s "{ f := 2026-02-29T12:30:00Z; }"
+validate_value s "{ f := 2024-02-29T12:30:00Z; }"
+validate_value s "{ f := 2026-10-29T12:30:00+24:00; }"
+validate_value s "{ f := 2026-10-29T12:30:00+23:59; }"

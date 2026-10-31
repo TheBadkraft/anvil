@@ -1,0 +1,6 @@
+anvil-schema-run 1
+schema line=5 name=s file="s.anvl" doc=ok result=null diagnostics=0 fields=0
+validate_value line=6 schema=s doc=ok opts=default result=fail count=0
+violations line=7 schema=s count=0
+steps 4
+status ok

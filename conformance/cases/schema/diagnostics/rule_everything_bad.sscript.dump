@@ -1,0 +1,18 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=11 fields=2
+  diag index=0 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'required' must be true or false"
+  diag index=1 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'nullable' must be true or false; treated as false"
+  diag index=2 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'integer' must be true or false; treated as false"
+  diag index=3 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'size' is not a non-negative integer; treated as not declared"
+  diag index=4 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'min' is not a valid number; treated as not declared"
+  diag index=5 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'max' is not a valid number; treated as not declared"
+  diag index=6 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'values' must be an array of labels"
+  diag index=7 code=4 name=ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': unknown format 'q' (known: iso8601_date, iso8601_datetime, uuid); treated as not declared"
+  diag index=8 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'tag' must be an identifier or string; treated as not declared"
+  diag index=9 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'min_items' is not a non-negative integer; treated as not declared"
+  diag index=10 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': 'max_items' is not a non-negative integer; treated as not declared"
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=pass count=0
+steps 3
+status ok

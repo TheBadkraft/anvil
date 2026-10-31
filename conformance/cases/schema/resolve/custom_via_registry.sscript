@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|VIN := { type := String; size := 17; };
+registry r load "t.anvl"
+type resolve r "VIN"
+type resolve NULL "VIN"
+type resolve r "Numeric"

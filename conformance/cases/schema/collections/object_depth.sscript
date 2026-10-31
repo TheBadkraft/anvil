@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Object; fields := { b := { type := Object; fields := { c := { type := Object; fields := { d := { type := Object; fields := { e := { type := Numeric; required := true; }; }; }; }; }; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ a := { b := { c := { d := { e := \"x\"; }; }; }; }; }"
+validate_value s "{ a := { b := { c := { d := { f := 1; }; }; }; }; }"
+validate_value s "{ a := { b := { c := { d := 1; }; }; }; }"

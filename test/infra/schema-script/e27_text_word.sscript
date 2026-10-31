@@ -1,0 +1,3 @@
+anvil-schema-script 1
+schema s load "a.anvl"
+validate_value s hello

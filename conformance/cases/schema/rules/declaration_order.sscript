@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|zebra := { type := Bool; };
+|apple := { type := Bool; };
+|mango := { type := Bool; };
+|Apple := { type := Bool; };
+|_x := { type := Bool; };
+|a1 := { type := Bool; };
+|a10 := { type := Bool; };
+|a2 := { type := Bool; };
+schema s load "s.anvl"

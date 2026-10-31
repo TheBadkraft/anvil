@@ -1,0 +1,18 @@
+anvil-schema-run 1
+schema line=120 name=s file="schemas/actions/comment.schema.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="id" kind=ANVIL_TYPE_STRING type="types.TicketId" required=1 nullable=0 integer=0 size=120 min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="body" kind=ANVIL_TYPE_STRING type="String" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="internal" kind=ANVIL_TYPE_BOOL type="Bool" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=121 schema=s doc=ok opts=default result=pass count=0
+validate_value line=122 schema=s doc=ok opts=default result=fail count=4
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="id" message="field value does not match the declared type"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="body" message="field value does not match the declared type"
+  violation index=2 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="internal" message="field value does not match the declared type"
+  violation index=3 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="extra" message="field is not declared in the schema"
+validate_value line=123 schema=s doc=ok opts=default result=fail count=3
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="id" message="required field is missing"
+  violation index=1 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="body" message="required field is missing"
+  violation index=2 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="zz" message="field is not declared in the schema"
+validate_value line=124 schema=s doc=ok opts=skip_required result=pass count=0
+steps 11
+status ok

@@ -1,0 +1,5 @@
+anvil-schema-run 1
+registry line=10 name=r how=includes file="main.anvl" doc=ANVIL_ERR_HEADER result=ok diagnostics=0
+type line=11 how=find registry=r name="A" result=none
+steps 4
+status ok

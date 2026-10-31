@@ -1,0 +1,14 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Bad := { type := Nope; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|z := 5;
+|y := { type := types.Typo; };
+|x := { min := 3; max := 1; };
+|w := { type := Object; fields := { v := { type := Nope; }; u := 1; }; };
+schema s load "s.anvl"

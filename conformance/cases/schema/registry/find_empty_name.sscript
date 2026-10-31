@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+|T := { type := String; };
+registry r load "a.anvl"
+type find r ""
+type resolve r ""
+type find r "types.T"
+type find r " T"

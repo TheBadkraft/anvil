@@ -1,0 +1,11 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|owner := { type := Object; fields := { name := { type := String; size := 40; }; }; };
+schema s load "s.anvl"
+field s "owner"
+field s "owner" "name"
+field s "owner" "nope"
+field s "nope"
+field NULL "owner"

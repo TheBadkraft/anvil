@@ -1,0 +1,16 @@
+anvil-schema-run 1
+schema line=11 name=s file="s.anvl" doc=ok result=ok diagnostics=5 fields=3
+  diag index=0 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=2 type_name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE field="Bad" message="type 'Bad' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': type 'types.Typo' is neither a native type nor a known types.X"
+  diag index=2 code=3 name=ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="b" message="'b' is not a field rule (expected a '{ ... }' object); skipped"
+  diag index=3 code=6 name=ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="c" message="field 'c': 'min' is greater than 'max'; no value can satisfy it"
+  diag index=4 code=2 name=ANVIL_SCHEMA_DIAG_MALFORMED_CONSTRAINT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="d" message="field 'd': 'required' must be true or false"
+  field name="a" kind=ANVIL_TYPE_UNKNOWN type="types.Typo" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="c" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=i64:9 max=i64:1 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="d" kind=ANVIL_TYPE_NUMERIC type="types.Ok" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=12 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=13 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+steps 5
+status ok

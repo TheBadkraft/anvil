@@ -1,0 +1,61 @@
+anvil-schema-script 1
+file "schema-gen/postgres.types.anvl"
+|#!aml
+|@[types]
+|Int32 := {
+|    type := Numeric;
+|    min := -2147483648;
+|    max := 2147483647;
+|    integer := true;
+|};
+|Str := {
+|    type := String;
+|};
+|Date := {
+|    type := String;
+|    format := "iso8601_date";
+|};
+|Int64 := {
+|    type := Numeric;
+|};
+|Timestamptz := {
+|    type := String;
+|    format := "iso8601_datetime";
+|};
+|Timestamp := {
+|    type := Numeric;
+|};
+|Text := {
+|    type := String;
+|};
+|Bool := {
+|    type := Numeric;
+|};
+|Float64 := {
+|    type := Numeric;
+|    min := -1.7976931348623157e+308;
+|    max := 1.7976931348623157e+308;
+|};
+|Uuid := {
+|    type := String;
+|    format := "uuid";
+|};
+file "assets.meta.anvl"
+|#!aml
+|include "schema-gen/postgres.types.anvl";
+|
+|@[schema, table=assets]
+|
+|asset_id      { type := types.Int32; indexBy := 1; };
+|asset_type    { type := types.Int32; required := true; };
+|vin_serial    { type := types.Str; size := 17; ascii := true; required := true; };
+|make          { pooled := true; size := 64; required := true; };
+|model         { pooled := true; size := 64; required := true; };
+|year          { type := types.Int32; required := true; };
+|license_plate { pooled := true; size := 16; nullable := true; };
+|state         { type := types.Str; size := 2; ascii := true; nullable := true; };
+|fleet_id      { pooled := true; size := 32; required := true; };
+|status        { pooled := true; size := 32; required := true; values := ["active", "maintenance", "out_of_service"]; };
+|created_at    { type := types.Timestamptz; };
+|updated_at    { type := types.Timestamptz; };
+schema s load "assets.meta.anvl"

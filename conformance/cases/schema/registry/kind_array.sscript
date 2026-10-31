@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|T := { type := Array; };
+registry r load "t.anvl"
+type find r "T"
+type resolve r "T"

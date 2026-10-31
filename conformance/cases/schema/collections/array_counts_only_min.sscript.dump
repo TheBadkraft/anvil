@@ -1,0 +1,12 @@
+anvil-schema-run 1
+schema line=8 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="a" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=1 max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=1 format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="c" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=0 max_items=0 format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=9 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="c" message="array has more items than max_items"
+validate_value line=10 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="b" message="array has more items than max_items"
+  violation index=1 code=7 name=ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT field="c" message="array has more items than max_items"
+steps 4
+status ok

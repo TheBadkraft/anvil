@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := String; };
+|a := { type := Numeric; };
+schema s load "s.anvl"
+field s "a"

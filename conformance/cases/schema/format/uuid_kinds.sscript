@@ -1,0 +1,18 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; format := uuid; };
+schema s load "s.anvl"
+validate_value s "{ f := 550e8400-e29b-41d4-a716-446655440000; }"
+validate_value s "{ f := \"550e8400-e29b-41d4-a716-446655440000\"; }"
+validate_value s "{ f := `550e8400-e29b-41d4-a716-446655440000`; }"
+validate_value s "{ f := @t`550e8400-e29b-41d4-a716-446655440000`; }"
+validate_value s "{ f := ``; }"
+validate_value s "{ f := 1; }"
+validate_value s "{ f := 1.5; }"
+validate_value s "{ f := true; }"
+validate_value s "{ f := null; }"
+validate_value s "{ f := [\"550e8400-e29b-41d4-a716-446655440000\"]; }"
+validate_value s "{ f := (\"550e8400-e29b-41d4-a716-446655440000\", \"550e8400-e29b-41d4-a716-446655440000\"); }"
+validate_value s "{ f := { a := 1; }; }"

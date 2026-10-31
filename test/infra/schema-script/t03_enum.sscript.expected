@@ -1,0 +1,9 @@
+anvil-schema-run 1
+registry line=3 name=r how=load file="t.anvl" doc=ok result=ok diagnostics=0
+type line=4 how=find registry=r name="E" result=found kind=ANVIL_TYPE_ENUM size=none min=none max=none min_numeric=none max_numeric=none format=none values=3
+  label index=0 text="open"
+  label index=1 text="a\x00b"
+  label index=2 text="closed"
+type line=5 how=resolve registry=r name="F" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format="uuid" values=0
+steps 4
+status ok

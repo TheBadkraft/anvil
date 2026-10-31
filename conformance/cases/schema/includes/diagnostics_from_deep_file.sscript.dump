@@ -1,0 +1,8 @@
+anvil-schema-run 1
+registry line=10 name=r how=includes file="main.anvl" doc=ok result=ok diagnostics=2
+  diag index=0 code=2 name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE type="Bad" source="./a.anvl" message="type 'Bad' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=3 name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT type="Good" source="./a.anvl" message="type 'Good': 'size' is not a non-negative integer; treated as not declared"
+type line=11 how=find registry=r name="Bad" result=none
+type line=12 how=find registry=r name="Good" result=found kind=ANVIL_TYPE_STRING size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+steps 5
+status ok

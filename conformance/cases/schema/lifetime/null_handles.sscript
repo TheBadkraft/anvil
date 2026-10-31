@@ -1,0 +1,10 @@
+anvil-schema-script 1
+violations NULL
+validate NULL "gone.anvl"
+validate_value NULL "{ a := 1; }"
+validate_value NULL NULL
+field NULL "a"
+field NULL "a" "b"
+type find NULL "A"
+type resolve NULL "Numeric"
+type resolve NULL "A"

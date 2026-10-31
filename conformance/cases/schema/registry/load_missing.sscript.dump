@@ -1,0 +1,6 @@
+anvil-schema-run 1
+registry line=2 name=r how=load file="nope.anvl" doc=ANVIL_ERR_IO result=null diagnostics=0
+registry line=3 name=s how=includes file="nope.anvl" doc=ANVIL_ERR_IO result=ok diagnostics=0
+type line=4 how=find registry=r name="T" result=none
+steps 3
+status ok

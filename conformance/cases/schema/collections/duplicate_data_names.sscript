@@ -1,0 +1,11 @@
+anvil-schema-script 1
+# a repeated key is a parse error of the fragment (4001), not a violation
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; a := 2; }"
+validate_value s "{ a := 1; a := \"x\"; }"
+validate_value s "{ a := \"x\"; a := 1; }"
+validate_value s "{ z := 1; z := 2; }"

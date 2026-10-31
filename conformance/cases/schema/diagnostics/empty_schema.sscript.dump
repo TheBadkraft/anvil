@@ -1,0 +1,7 @@
+anvil-schema-run 1
+schema line=5 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=0
+validate_value line=6 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="a" message="field is not declared in the schema"
+validate_value line=7 schema=s doc=ok opts=allow_unknown result=pass count=0
+steps 4
+status ok

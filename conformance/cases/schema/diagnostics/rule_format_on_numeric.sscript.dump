@@ -1,0 +1,7 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="uuid" tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=pass count=0
+steps 3
+status ok

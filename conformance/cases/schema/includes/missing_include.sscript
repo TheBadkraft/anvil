@@ -1,0 +1,5 @@
+anvil-schema-script 1
+file "main.anvl"
+|#!aml
+|include "gone.anvl";
+registry r includes "main.anvl"

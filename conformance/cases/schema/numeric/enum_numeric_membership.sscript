@@ -1,0 +1,16 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|e := { type := enum; values := [1, 2.5, "3", 1e2]; };
+schema s load "s.anvl"
+validate_value s "{ e := 1; }"
+validate_value s "{ e := 1.0; }"
+validate_value s "{ e := 2.5; }"
+validate_value s "{ e := 2.50; }"
+validate_value s "{ e := 3; }"
+validate_value s "{ e := \"3\"; }"
+validate_value s "{ e := 1e2; }"
+validate_value s "{ e := 100; }"
+validate_value s "{ e := \"1e2\"; }"
+validate_value s "{ e := 01; }"

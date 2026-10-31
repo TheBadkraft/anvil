@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|a := { type := String; };
+schema s load "s.anvl"
+validate_value s "{ a := 1; }"
+violations s

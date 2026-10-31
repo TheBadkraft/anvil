@@ -1,0 +1,14 @@
+anvil-schema-script 1
+file "main.anvl"
+|#!aml
+|include "a.anvl";
+|include "m2.anvl";
+file "m2.anvl"
+|#!aml
+|include "a.anvl";
+file "a.anvl"
+|#!aml
+|@[types]
+|A := { type := String; size := 1; };
+registry r includes "main.anvl"
+type find r "A"

@@ -1,0 +1,10 @@
+anvil-schema-script 1
+# the source documents are disposed before the registries are read
+file "a.anvl"
+|#!aml
+|@[types]
+|T := { type := String; size := 4; };
+registry r load "a.anvl"
+registry s includes "a.anvl"
+type find r "T"
+type find s "T"

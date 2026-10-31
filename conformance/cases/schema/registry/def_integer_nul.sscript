@@ -1,0 +1,5 @@
+anvil-schema-script 1
+file "t.anvl" "#!aml\n@[types]\nT := { type := Numeric; integer := \"tr\x00ue\"; };\nAfter := { type := Bool; };\n"
+registry r load "t.anvl"
+type find r "T"
+type find r "After"

@@ -1,0 +1,10 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Array; min_items := 1; };
+|b := { type := Array; max_items := 1; };
+|c := { type := Array; min_items := 0; max_items := 0; };
+schema s load "s.anvl"
+validate_value s "{ a := [1]; b := [1]; c := [1]; }"
+validate_value s "{ a := [1, 2]; b := [1, 2]; c := [1, 2]; }"

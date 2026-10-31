@@ -646,6 +646,256 @@ its errors), `names` (statement names, duplicates), `collections` (arrays, tuple
 AMP dialect and what it refuses), `handles` (null, foreign and misused handles), `envelope` (King & Crucible shaped
 documents) and `flywire` (FlyWire shaped documents).
 
+## The schema script, version 1
+
+The type registry and the schema are the fourth contract of the corpus. A **schema script** (`anvil-schema-script 1`)
+holds a few ANVL files (types documents, schema documents, data documents) and a sequence of steps that load a type
+registry from them, resolve types, load a schema, read its rules back, and validate documents and values. Native's run
+of it (`anvil-schema-run 1`) is the result of every step: the registry diagnostics, the schema diagnostics, the type and
+rule accessors, and for each validation the verdict and every violation with its **code, field path, message and
+order**. An implementation of the type registry and the schema (anvil.js) runs the same scripts through its own
+implementation and must print the **same run, byte for byte**. Native is the spec. A change to the grammar or the run
+format bumps the number and regenerates the corpus. (FR-2610-anvl-001.)
+
+The surfaces are `include/anvil_type_registry.h` (the registry, type definitions, registry diagnostics),
+`include/anvil_schema.h` (the schema, validation, schema diagnostics, rule introspection), and, for the values a
+script validates, the reader (`include/anvil_flat.h`). Everything a step prints is the result of those calls. A script
+cannot do anything a C program cannot.
+
+### The script
+
+The lexical rules are **the writer script's**, unchanged: the same bytes, lines, comments, blanks, quoted strings and
+escapes (`\\ \" \n \r \t \xHH`; a raw byte below `0x20` in a string is a script error), `NULL`, the step number (the
+1-based line number), the exact header rule and the last-line rule. The **header line** is exactly
+`anvil-schema-script 1`. A **step** is a call name and its arguments. There is no `dialect` step, no `option` and no
+`let`: a step never aborts the run (the outcome of a load or a validation is printed, not raised), and every step runs.
+
+**Names.** A step that creates a registry or a schema gives it a name: `[A-Za-z_][A-Za-z0-9_]*`, not `NULL`. A name is
+bound **once** (binding it twice is a script error). A step that uses a registry or a schema names one bound by an
+earlier step, or is given the word `NULL` (the null handle, to reach each function's null behaviour). A name used before
+it is bound, or of the wrong kind (a schema where a registry is expected, or the reverse), is a script error. A load
+that yields no handle (`result=null`) still binds its name, to the null handle.
+
+**The files.** A script carries its own files, declared by `file` steps, so a case is one file. The files form one
+directory tree, and a document is loaded **as `anvil_load` loads the path `FILE` relative to that directory**: the
+extension is the dialect hint, `include "x";` resolves against the including file's own directory, a file reached by two
+includes is one document, and an include cycle, a missing file or a syntax error is the reader's error. (A port with no
+file system keeps the files in memory and resolves the same paths.) A file name is `[A-Za-z0-9_.-]` components separated
+by `/`, at most 200 bytes, with no empty component, no leading `/`, and no `.` or `..` component. Declaring a name twice is
+a script error. All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
+declared: it does not exist, and loading it is the reader's `ANVIL_ERR_IO`. The paths the run prints (the `source` of a
+registry diagnostic, and the document names inside a name-collision message) are `anvil_document_get_path`: the root
+document is the `FILE` of the step exactly as written, and an included document is its includer's directory (`.` when the
+includer's path has no directory), then `/`, then the include string, so `include "a.anvl";` in `b.anvl` is `./a.anvl`
+and the same include in `lib/b.anvl` is `lib/a.anvl`. They are never a path of the directory anvil-dump put the files in.
+anvil-dump writes the files to a private temporary directory, runs with it as the working directory, and removes it before
+it exits.
+
+```
+file "NAME" "content"          the content is the decoded quoted string (any bytes)
+file "NAME"                    followed by content lines:
+|first line of content
+|second line
+```
+
+A **content line** is a line whose first byte is `|`; its content is every byte after that `|` up to the end of the
+line, trailing blanks and a `\r` included, followed by one `\n`. The file is the concatenation of its content lines, and
+a block with no content line is an empty file. A block ends at the first line that does not start with `|` (a comment or
+a blank line ends it too). A `|` line anywhere else, or after the quoted form of `file`, is a script error. A content
+line may not contain a NUL byte (use the quoted form). A `file` step prints nothing.
+
+| step | arguments | native calls |
+|---|---|---|
+| `file` | *name* [*content*] | declares a file (above) |
+| `registry` | *R*, `load` \| `includes`, *file* | `anvil_load`, then `anvil_type_registry_load` or `anvil_type_registry_load_from_includes` |
+| `type` | `find` \| `resolve`, *registry* or `NULL`, *name* | `anvil_type_registry_find` or `anvil_type_resolve`, and the `anvil_type_def_get_*` accessors |
+| `schema` | *S*, `load`, *file* | `anvil_load`, `anvil_schema_load`, the document disposed, then the diagnostics and every rule read back |
+| `validate` | *schema* or `NULL`, *file* | `anvil_load`, `anvil_schema_validate`, the violations read |
+| `validate_value` | *schema* or `NULL`, *text* or `NULL`, *option*... | `anvil_parse_value_fragment`, `anvil_document_get_fragment_value`, `anvil_schema_validate_value`, the violations read |
+| `violations` | *schema* or `NULL` | `anvil_schema_get_violation_count` and the violation accessors |
+| `field` | *schema* or `NULL`, *name* [, *nested name*...] | `anvil_schema_find_field`, `anvil_schema_field_find_nested`, and the rule accessors |
+
+*R* and *S* are new names. A *file*, *name* and *text* is a quoted string (a *file* and a *name* may not contain `\x00`;
+*text* may). `type resolve` goes through `anvil_type_resolve`, which knows the native vocabulary (`Numeric`, `String`,
+`Bool`, `Object`, `Tuple`, `Array`, `Blob`, `enum`) even with the null registry, and falls back to the registry; `type
+find` is `anvil_type_registry_find` only. The *option*s of `validate_value` are the words `skip_required` and
+`allow_unknown` (each at most once, in either order), or the single word `no_opts`, which passes a NULL options pointer.
+With none of them the call passes a zeroed options struct with `size` set, which is `anvil_schema_validate`'s behaviour.
+The word `NULL` as the text passes the null value.
+
+**What a load does with a bad document.** A step that loads a document (`registry`, `schema`, `validate`) records how the
+load went (`doc=` below) and **goes on with the API call regardless**, with whatever `anvil_load` returned (a document
+with errors, or `NULL`): the library's behaviour for that input is the contract. A fragment that does not parse is the
+same: `anvil_document_get_fragment_value` is passed on as it returns.
+
+### The run
+
+`anvil-dump --schema-script <file>` prints, to stdout, ASCII with `\n` line endings, quoted strings written as in the
+reader dump (`"..."` with `\\ \" \n \r \t` and `\xHH` for every other byte below `0x20` or from `0x7f`; the text is
+length-delimited, so NUL bytes are ordinary):
+
+```
+anvil-schema-run 1
+<records, one per step except file, in execution order>
+steps N
+status ok
+```
+
+`steps N` counts every step, `file` included. `status ok` is always written (a script error prints nothing to stdout,
+exits 2 and is not part of the corpus). Every record starts with its **record name**, then `key=value` tokens separated by
+single spaces; a value is an integer, a word, or a quoted string. A record with **child lines** is followed by them, each
+indented two spaces more than its parent (the records of a step have no indent). A key is written even when its value is
+`none`.
+
+**`doc=D`** is how the step's document loaded: `ok` when `anvil_load` returned a document and `anvil_has_errors` is false,
+`null` when it returned `NULL`, and otherwise the name of the category of `anvil_get_error`: `ANVIL_ERR_IO`,
+`ANVIL_ERR_HEADER`, `ANVIL_ERR_INCLUDE`, `ANVIL_ERR_SYNTAX`, `ANVIL_ERR_RESOLVE`, `ANVIL_ERR_MEMORY`,
+`ANVIL_ERR_INVALID_ARGUMENT`. For `validate_value` it is the same for the fragment document
+(`anvil_parse_value_fragment`), and `none` for the word `NULL`.
+
+**A numeric value `V`** read as an `anvil_numeric_t` is written `i64:N` (integral, in range), `f64:0x` and 16 lower-case
+hex digits (the bits of the double, as in the reader dump), `ovf:integer` (integral and overflowed) or `ovf:float`. An
+absent constraint is `none`. A **`long long` constraint** is a decimal or `none`. A **bool** is `0` or `1`. An **optional
+text** (a type name, a format, a tag) is a quoted string, or `none` when its length is 0.
+
+**`registry`**
+
+```
+registry line=L name=R how=load|includes file="F" doc=D result=ok|null diagnostics=N
+  diag index=I code=C name=ANVIL_TYPE_DIAG_X type="T" source="S" message="M"     (N lines, in the registry's order)
+```
+
+`result=null` when the call returned `NULL` (then `diagnostics=0`). `type` is `anvil_type_diagnostic_get_name`, `source`
+is `_get_source`, `message` is `_get_message`, and `C` is the category as an integer.
+
+**`type`**
+
+```
+type line=L how=find|resolve registry=R|NULL name="N" result=none
+type line=L how=find|resolve registry=R|NULL name="N" result=found kind=ANVIL_TYPE_X size=V min=V max=V min_numeric=V max_numeric=V format=T values=N
+  label index=I text="..."                                                       (N lines)
+```
+
+`size`, `min` and `max` are the `long long` getters (`anvil_type_def_get_size`, `_get_min`, `_get_max`; `none` when they
+return false). `min_numeric` and `max_numeric` are `_get_min_numeric` and `_get_max_numeric`. `format` is
+`anvil_type_def_get_format`. `values` is the label count and each `label` is `anvil_type_def_get_value` (its exact
+length, NUL bytes included). `kind` is `ANVIL_TYPE_UNKNOWN`, `_NUMERIC`, `_STRING`, `_BOOL`, `_OBJECT`, `_TUPLE`, `_ARRAY`,
+`_ENUM` or `_BLOB`.
+
+**`schema`**
+
+```
+schema line=L name=S file="F" doc=D result=ok|null diagnostics=N fields=M
+  diag index=I code=C name=ANVIL_SCHEMA_DIAG_X type_code=C2 type_name=ANVIL_TYPE_DIAG_Y field="F" message="M"      (N lines)
+  <rule>                                                                                       (M top-level rules)
+```
+
+`result=null` when `anvil_schema_load` returned `NULL` (a document without `@[schema]`, or no document); then
+`diagnostics=0 fields=0`. The source document is **disposed before the schema is read**, so everything printed is
+independent of it. The `diag` lines are `anvil_schema_get_diagnostic(S, I)` in order; `type_code` and `type_name` are
+`anvil_schema_diagnostic_get_type_category` (`ANVIL_TYPE_DIAG_NONE`, 0, for every diagnostic that is not
+`ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`), `field` is `anvil_schema_diagnostic_get_field`, and `C` is the category as an integer.
+The rules are `anvil_schema_get_field(S, 0..M-1)`.
+
+**A rule** is written, with its role `field` for a top-level rule, `nested` for one reached by `get_nested` and `items`
+for the element rule of an Array, as
+
+```
+<role> name="N" kind=ANVIL_TYPE_X type=T required=B nullable=B integer=B size=V min=V max=V min_items=V max_items=V format=T tag=T values=N nested=N items=B extras=N
+  label index=I text="..."                  (values lines: anvil_schema_field_get_value)
+  extra index=I name="K"                    (extras lines: _get_extra_name), then that key's value tree, two spaces deeper
+  <rule>                                    (nested lines, role nested, in declaration order: _get_nested)
+  <rule>                                    (one line, role items, when items=1: _get_items)
+```
+
+in that order: the labels, the extras, the nested rules, the items rule. `type` is `anvil_schema_field_get_type_name` (the
+`type :=` as written). `size`, `min_items` and `max_items` are the `long long` getters, `min` and `max` the `_numeric`
+getters, `format` and `tag` the text getters. `kind` is the field's kind (`ANVIL_TYPE_UNKNOWN` when the type is absent or
+did not resolve). The accessors report the **effective** rule: what the field declared, with anything it did not declare
+filled in from its resolved `types.X`.
+
+**A value tree** (the value of an extra) is `value type=T ...` and, for a collection, the lines of its members two spaces
+deeper. `T` is `NULL`, `BOOL`, `NUMERIC`, `STRING`, `BLOB`, `BARE`, `ARRAY`, `TUPLE` or `OBJECT` (`anvil_value_get_type`);
+a value that is `NULL` (the null pointer) is written `value type=none`. The keys: `text="..."` is `anvil_value_get_text`
+(a string's text is the decoded one; every other scalar's text is its source span) for every scalar but a blob; a numeric
+also has `kind=integer|float overflow=0|1` and `i64=N` or `f64=0x...` as in the reader dump; a blob has `tag="..."`
+(`anvil_value_get_blob_tag`, empty if untagged) and `text="..."` (`anvil_value_get_bytes`); an array or tuple has
+`count=N` followed by its elements; an object has `count=N` followed, for each statement, by `stmt name="N"` and the
+statement's value tree two spaces deeper.
+
+**`validate`**
+
+```
+validate line=L schema=S|NULL file="F" doc=D result=pass|fail count=N
+  violation index=I code=C name=ANVIL_SCHEMA_ERR_X field="F" message="M"            (N lines)
+```
+
+`result` is what `anvil_schema_validate` returned, and `count` is `anvil_schema_get_violation_count` right after. The
+violations are read in order with `anvil_schema_get_violation`, `anvil_schema_violation_get_category`, `_get_field` (the
+**field path**: `a`, `links[2].target`, or empty) and `_get_message`. `C` is the category as an integer
+(`ANVIL_SCHEMA_ERR_NONE` is 0). With the null schema the result is `fail` and `count=0`.
+
+**`validate_value`**
+
+```
+validate_value line=L schema=S|NULL doc=D opts=default|null|skip_required|allow_unknown|skip_required+allow_unknown result=pass|fail count=N
+  violation ...                                                                      (N lines)
+```
+
+`opts` echoes the options: `null` for `no_opts`, `default` for a zeroed struct, else the words set, joined by `+` in the
+order shown. When the call returns `false` because the schema or the value is `NULL` (or the fragment gave no value), the
+previous violations are left untouched, so `count` and the lines are those of the **previous** validation of that schema
+(`count=0` if none).
+
+**`violations`**
+
+```
+violations line=L schema=S|NULL count=N
+  violation ...
+```
+
+reads the current violations again without validating, so a script can check that they persist until the next validation
+and that a failed call leaves them alone.
+
+**`field`**
+
+```
+field line=L schema=S|NULL path="a.b" depth=D result=none
+field line=L schema=S|NULL path="a.b" depth=D result=found
+  <rule>
+```
+
+`path` is the names joined by `.`, `depth` the number of names. The first name is looked up with `anvil_schema_find_field`,
+each further one with `anvil_schema_field_find_nested` on the result (a `NULL` stops it: `result=none`). The rule is written
+with role `field` for depth 1 and `nested` deeper.
+
+### The schema corpus
+
+`conformance/cases/schema/<area>/<name>.sscript` is a script and `<name>.sscript.dump` is native's run. The scripts are
+**generated** by `conformance/seed/gen_schema.py`, which writes scripts only; the runs are native's, written by
+`make update-conformance` and by nothing else. `make check-conformance` checks that native's run of every `.sscript`
+equals the committed `.dump`, and `make check-schema-gen` checks that the generator reproduces the committed scripts and
+writes nothing else (no dump, no other file).
+
+Areas (549 scripts): `registry` (type definitions of every kind, every constraint spelling and every registry diagnostic: size,
+min and max forms, formats, enum values, `type :=` forms, non-object statements, bases between types, bad documents), `resolve`
+(`anvil_type_resolve` and `find`, the native vocabulary, shadowing), `includes` (the `types.X` namespace: chains, fan-out, overrides,
+collisions, cycles, missing files, subdirectories), `diagnostics` (every schema diagnostic, including the registry's, their order,
+rules that are not objects, self-reference), `rules` (introspection of the effective rule: every kind, inherited and overridden
+constraints, nested rules, `field` lookups, extension keys of every value kind), `kinds` (every value form against every rule kind),
+`options` (`skip_required`, `allow_unknown`, `no_opts`, non-object and unparsable values), `numeric` (bounds, `integer`, the decimal
+forms, overflow, int32 and int64 edges), `strings` (`size` in bytes, enum membership, escapes, NUL), `format` (`iso8601_date`,
+`iso8601_datetime`, `uuid` over strings, bare words and other kinds), `blobs` (tags, payload size), `collections` (array counts and
+items, tuples, objects, nesting and paths, duplicate keys), `nullable`, `data` (whole data documents through `validate`), `lifetime`
+(violations persisting, null handles, failed loads), `flywire` (FlyWire's types file and schemas, int32 and int64 validation, the
+crosscheck boundaries, `repeated_key`) and `rivet` (Rivet's types file and kind schemas, valid and invalid tickets).
+
+Notes for a port: an empty object, an empty array, a one-element tuple and a repeated key are parse errors of the fragment (and of a
+document), so a script that validates `{ }` reports `doc=ANVIL_ERR_SYNTAX`; FlyWire's schema is loaded from a buffer with the
+repository root as the working directory, so the `flywire` cases keep the schema at the root of the file tree and its types file at
+`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`) on purpose: native
+misses an include cycle when the root is a bare file name (BR-2610-anvl-004), and the corpus does not pin that defect.
+
 ## Drift tables
 
 `conformance/drift-tables.txt` is generated by `scripts/gen-drift-tables.sh` from `include/*.h`, and
@@ -664,6 +914,7 @@ anvil-dump --fragment <file|->  a standalone value expression
 anvil-dump --writer-script <script>   run a writer script ("The writer script", above)
 anvil-dump --writer-output <script>   the same, printing only the output bytes
 anvil-dump --builder-script <script> [--emit-dir <dir>]   run a builder script ("The builder script", above)
+anvil-dump --schema-script <script>   run a schema script ("The schema script", above)
 ```
 
 Exit status `0` for any dump (including of an input that fails to parse), `2` for a usage or tool error.

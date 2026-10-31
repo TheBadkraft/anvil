@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+|T := { type := Numeric; values := [a]; };
+registry r load "a.anvl"
+type find r "T"

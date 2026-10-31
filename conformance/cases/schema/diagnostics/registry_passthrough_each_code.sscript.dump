@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=18 name=s file="s.anvl" doc=ok result=ok diagnostics=4 fields=4
+  diag index=0 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=2 type_name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE field="BadBase" message="type 'BadBase' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=3 type_name=ANVIL_TYPE_DIAG_MALFORMED_CONSTRAINT field="BadSize" message="type 'BadSize': 'size' is not a non-negative integer; treated as not declared"
+  diag index=2 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=4 type_name=ANVIL_TYPE_DIAG_MALFORMED_ENUM_VALUES field="BadValues" message="type 'BadValues': 'values' must be an array of labels"
+  diag index=3 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="b" message="field 'b': type 'types.BadBase' is neither a native type nor a known types.X"
+  field name="a" kind=ANVIL_TYPE_BOOL type="types.Ok" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_UNKNOWN type="types.BadBase" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="c" kind=ANVIL_TYPE_STRING type="types.BadSize" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="d" kind=ANVIL_TYPE_ENUM type="types.BadValues" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=19 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="b" message="the rule's declared type is unresolved; the value cannot be validated"
+steps 4
+status ok

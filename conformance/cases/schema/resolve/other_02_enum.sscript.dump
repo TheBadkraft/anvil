@@ -1,0 +1,4 @@
+anvil-schema-run 1
+type line=2 how=resolve registry=NULL name="Enum" result=none
+steps 1
+status ok

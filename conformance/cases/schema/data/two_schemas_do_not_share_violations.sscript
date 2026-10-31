@@ -1,0 +1,17 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|id := { type := Numeric; required := true; integer := true; min := 1; };
+|title := { type := String; required := true; size := 8; };
+|tags := { type := Array; max_items := 2; items := { type := String; size := 3; }; };
+|meta := { type := Object; fields := { k := { type := String; }; }; };
+file "bad.anvl"
+|#!aml
+|id := 0;
+schema a load "s.anvl"
+schema b load "s.anvl"
+validate a "bad.anvl"
+violations b
+validate b "bad.anvl"
+violations a

@@ -1,0 +1,11 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|links := { type := Array; min_items := 2; items := { type := Object; fields := { target := { type := String; required := true; }; }; }; };
+|owner := { type := Object; fields := { name := { type := String; required := true; nullable := true; }; }; };
+schema s load "s.anvl"
+validate_value s "{ links := 1; }"
+validate_value s "{ links := [ { target := \"a\"; }, { x := 2; }, { target := 1; x := 2; } ]; owner := { z := 1; }; }"
+validate_value s "{ links := [ { target := \"a\"; } ]; owner := { name := null; }; }"
+validate_value s "{ links := [ 5, { target := \"b\"; } ]; owner := { name := null; z := 1; }; }" allow_unknown

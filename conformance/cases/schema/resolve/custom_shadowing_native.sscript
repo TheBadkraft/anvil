@@ -1,0 +1,11 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|String := { type := Numeric; };
+|Numeric := { type := String; size := 2; };
+registry r load "t.anvl"
+type resolve r "String"
+type find r "String"
+type resolve r "Numeric"
+type find r "Numeric"

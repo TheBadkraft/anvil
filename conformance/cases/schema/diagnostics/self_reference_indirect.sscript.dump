@@ -1,0 +1,9 @@
+anvil-schema-run 1
+schema line=12 name=s file="s.anvl" doc=ok result=ok diagnostics=1 fields=1
+  diag index=0 code=5 name=ANVIL_SCHEMA_DIAG_SELF_REFERENCE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="root.b.a" message="field 'root.b.a': its type's 'fields' refer back to the type itself; not expanded"
+  field name="root" kind=ANVIL_TYPE_OBJECT type="types.A" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="b" kind=ANVIL_TYPE_OBJECT type="types.B" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+      nested name="a" kind=ANVIL_TYPE_OBJECT type="types.A" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=13 schema=s doc=ok opts=default result=pass count=0
+steps 4
+status ok

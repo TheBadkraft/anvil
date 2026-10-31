@@ -1,0 +1,3 @@
+anvil-schema-script 1
+registry r load "a.anvl"
+registry r load "a.anvl"

@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; mask := 1; fields := { a := { type := String; note := "n"; }; }; };
+|l := { type := Array; items := { type := String; cap := 3; }; };
+schema s load "s.anvl"

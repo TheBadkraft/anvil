@@ -1,0 +1,8 @@
+anvil-schema-run 1
+registry line=6 name=r how=load file="t.anvl" doc=ok result=ok diagnostics=0
+schema line=7 name=s file="t.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="T" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+field line=8 schema=s path="T" depth=1 result=found
+  field name="T" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+steps 4
+status ok

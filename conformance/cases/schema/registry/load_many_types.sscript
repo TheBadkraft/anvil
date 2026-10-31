@@ -1,0 +1,50 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+|T0 := { type := Numeric; min := 0; };
+|T1 := { type := Numeric; min := 1; };
+|T2 := { type := Numeric; min := 2; };
+|T3 := { type := Numeric; min := 3; };
+|T4 := { type := Numeric; min := 4; };
+|T5 := { type := Numeric; min := 5; };
+|T6 := { type := Numeric; min := 6; };
+|T7 := { type := Numeric; min := 7; };
+|T8 := { type := Numeric; min := 8; };
+|T9 := { type := Numeric; min := 9; };
+|T10 := { type := Numeric; min := 10; };
+|T11 := { type := Numeric; min := 11; };
+|T12 := { type := Numeric; min := 12; };
+|T13 := { type := Numeric; min := 13; };
+|T14 := { type := Numeric; min := 14; };
+|T15 := { type := Numeric; min := 15; };
+|T16 := { type := Numeric; min := 16; };
+|T17 := { type := Numeric; min := 17; };
+|T18 := { type := Numeric; min := 18; };
+|T19 := { type := Numeric; min := 19; };
+|T20 := { type := Numeric; min := 20; };
+|T21 := { type := Numeric; min := 21; };
+|T22 := { type := Numeric; min := 22; };
+|T23 := { type := Numeric; min := 23; };
+|T24 := { type := Numeric; min := 24; };
+|T25 := { type := Numeric; min := 25; };
+|T26 := { type := Numeric; min := 26; };
+|T27 := { type := Numeric; min := 27; };
+|T28 := { type := Numeric; min := 28; };
+|T29 := { type := Numeric; min := 29; };
+|T30 := { type := Numeric; min := 30; };
+|T31 := { type := Numeric; min := 31; };
+|T32 := { type := Numeric; min := 32; };
+|T33 := { type := Numeric; min := 33; };
+|T34 := { type := Numeric; min := 34; };
+|T35 := { type := Numeric; min := 35; };
+|T36 := { type := Numeric; min := 36; };
+|T37 := { type := Numeric; min := 37; };
+|T38 := { type := Numeric; min := 38; };
+|T39 := { type := Numeric; min := 39; };
+registry r load "a.anvl"
+type find r "T0"
+type find r "T1"
+type find r "T17"
+type find r "T39"
+type find r "T40"

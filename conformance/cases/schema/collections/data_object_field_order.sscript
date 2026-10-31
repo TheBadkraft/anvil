@@ -1,0 +1,12 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { type := Numeric; required := true; };
+|b := { type := Numeric; required := true; };
+|c := { type := Numeric; required := true; };
+|d := { type := Numeric; required := true; };
+|e := { type := Numeric; required := true; };
+schema s load "s.anvl"
+validate_value s "{ e := \"x\"; c := \"x\"; a := \"x\"; z := 1; y := 1; }"
+validate_value s "{ z := 1; }"

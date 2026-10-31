@@ -1,0 +1,3 @@
+anvil-schema-script 1
+type resolve NULL "Blob"
+type find NULL "Blob"

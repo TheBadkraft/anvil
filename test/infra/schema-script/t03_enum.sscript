@@ -1,0 +1,5 @@
+anvil-schema-script 1
+file "t.anvl" "#!aml\n@[types]\nE := { type := enum; values := [open, \"a\x00b\", closed]; };\nF := { type := String; format := uuid; };\n"
+registry r load "t.anvl"
+type find r "E"
+type resolve r "F"

@@ -1,0 +1,19 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|Dup := { type := String; };
+|BadBase := { type := Nope; };
+|BadSize := { type := String; size := x; };
+|BadValues := { type := enum; values := 3; };
+|Ok := { type := Bool; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|a := { type := types.Ok; };
+|b := { type := types.BadBase; };
+|c := { type := types.BadSize; };
+|d := { type := types.BadValues; };
+schema s load "s.anvl"
+validate_value s "{ a := true; b := 1; c := \"abcdef\"; d := x; }"

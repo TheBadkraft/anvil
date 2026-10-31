@@ -1,0 +1,44 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=2 fields=2
+  diag index=0 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="a" message="field 'a': type 'types.Nope' is neither a native type nor a known types.X"
+  diag index=1 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="b" message="field 'b': type 'Nope2' is neither a native type nor a known types.X"
+  field name="a" kind=ANVIL_TYPE_UNKNOWN type="types.Nope" required=1 nullable=1 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="b" kind=ANVIL_TYPE_UNKNOWN type="Nope2" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="zz" message="field is not declared in the schema"
+validate_value line=9 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="zz" message="field is not declared in the schema"
+validate_value line=10 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+validate_value line=11 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+validate_value line=12 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=13 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=14 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=15 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=1
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=16 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+  violation index=1 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="b" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=17 schema=s doc=ok opts=skip_required result=fail count=2
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+  violation index=1 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="b" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=18 schema=s doc=ok opts=allow_unknown result=fail count=2
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+  violation index=1 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="b" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=19 schema=s doc=ok opts=skip_required+allow_unknown result=fail count=2
+  violation index=0 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="a" message="the rule's declared type is unresolved; the value cannot be validated"
+  violation index=1 code=10 name=ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE field="b" message="the rule's declared type is unresolved; the value cannot be validated"
+validate_value line=20 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=21 schema=s doc=ok opts=skip_required result=fail count=1
+  violation index=0 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="z" message="field is not declared in the schema"
+validate_value line=22 schema=s doc=ok opts=allow_unknown result=fail count=1
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="a" message="required field is missing"
+validate_value line=23 schema=s doc=ok opts=skip_required+allow_unknown result=pass count=0
+steps 18
+status ok

@@ -1,0 +1,4 @@
+anvil-schema-script 1
+file "s.anvl" "#!aml\n@[schema]\na := { type := Blob; tag := \"pn\x00g\"; };\nb := { type := String; };\n"
+schema s load "s.anvl"
+validate_value s "{ a := 1; b := \"x\"; }"

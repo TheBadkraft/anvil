@@ -1,0 +1,27 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="img" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=4 min=none max=none min_items=none max_items=none format=none tag="png" values=0 nested=0 items=0 extras=2
+    extra index=0 name="hint"
+      value type=ARRAY count=4
+        value type=NUMERIC text="1" kind=integer overflow=0 i64=1
+        value type=STRING text="two"
+        value type=BLOB tag="t" text="xy"
+        value type=TUPLE count=2
+          value type=NUMERIC text="3" kind=integer overflow=0 i64=3
+          value type=NUMERIC text="4" kind=integer overflow=0 i64=4
+    extra index=1 name="meta"
+      value type=OBJECT count=2
+        stmt name="k"
+          value type=NUMERIC text="1e2" kind=float overflow=0 f64=0x4059000000000000
+        stmt name="z"
+          value type=NULL text="null"
+  field name="nick" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="uuid" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=3 name=ANVIL_SCHEMA_ERR_VALIDATION_SIZE field="img" message="field value exceeds the declared size"
+  violation index=1 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="nick" message="value does not match the declared format"
+validate_value line=9 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=8 name=ANVIL_SCHEMA_ERR_VALIDATION_TAG field="img" message="blob tag does not match the required tag"
+validate_value line=10 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="img" message="field value does not match the declared type"
+steps 5
+status ok

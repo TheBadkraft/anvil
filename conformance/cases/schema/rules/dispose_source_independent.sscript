@@ -1,0 +1,8 @@
+anvil-schema-script 1
+# the schema document is disposed before the rules are read
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; size := 3; extra := [1, 2]; };
+schema s load "s.anvl"
+validate_value s "{ f := \"abcd\"; }"

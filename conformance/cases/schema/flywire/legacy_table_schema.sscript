@@ -1,0 +1,12 @@
+anvil-schema-script 1
+# the pre-types file shape of FlyWire's vehicles fixture: not a schema document
+file "v.anvl"
+|#!aml
+|
+|TableSchema := {
+|    vehicle_id    := { type := int32 }
+|    vin           := { type := str, size := 17 }
+|    year          := { type := int32 }
+|}
+schema s load "v.anvl"
+registry r load "v.anvl"

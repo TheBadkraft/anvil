@@ -1,0 +1,8 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|o := { type := Object; fields := { d := { type := String; format := iso8601_date; }; }; };
+|l := { type := Array; items := { type := String; format := uuid; }; };
+schema s load "s.anvl"
+validate_value s "{ o := { d := \"2026-13-01\"; }; l := [ \"550e8400-e29b-41d4-a716-446655440000\", \"nope\" ]; }"

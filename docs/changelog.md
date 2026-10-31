@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
+  native-owned corpus that a second implementation (the schema phase of anvil.js) must reproduce byte for byte. A
+  versioned schema script (`anvil-schema-script 1`, specified in `conformance/FORMAT.md`) carries its own files (types,
+  schema and data documents, with includes) and steps that load a registry from a document or its includes, find and
+  resolve types, load a schema, validate documents and values (`skip_required`, `allow_unknown`) and read violations and
+  rules back. `anvil-dump --schema-script <file>` prints the run (`anvil-schema-run 1`): every registry and schema
+  diagnostic with its category, name and source, every type accessor, the whole effective rule tree of a schema, and for
+  each validation the verdict and every violation with its code, field path, message and order. 549 generated scripts
+  under `conformance/cases/schema/` (`conformance/seed/gen_schema.py`, scripts only; the runs are native's) cover the
+  registry, includes, diagnostics, numeric bounds and kinds, strings, formats, blobs and tags, collections, nullable,
+  options, whole data documents, and FlyWire-shaped and Rivet-shaped schemas. Hooked into `make check-conformance`,
+  `update-conformance` and `check-dump-valgrind`; `make check-schema-script` runs the tool tests and `make
+  check-schema-gen` proves the generator writes scripts only. No library or ABI change.
+
 - **Builder conformance corpus (FR-2610-anvl-conformance-004).** The document builder now has a native-owned corpus that
   a second implementation (the `AnvilBuilder` of anvil.js) must reproduce byte for byte, like the writer corpus. A
   versioned builder script (`anvil-builder-script 1`, specified in `conformance/FORMAT.md`) reuses the writer script's

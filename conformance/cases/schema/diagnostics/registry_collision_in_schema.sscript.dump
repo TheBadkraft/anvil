@@ -1,0 +1,9 @@
+anvil-schema-run 1
+schema line=16 name=s file="s.anvl" doc=ANVIL_ERR_RESOLVE result=ok diagnostics=1 fields=1
+  diag index=0 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=1 type_name=ANVIL_TYPE_DIAG_NAME_COLLISION field="T" message="type 'T' is defined in both './t1.anvl' and './t2.anvl'; the one in './t2.anvl' is used"
+  field name="a" kind=ANVIL_TYPE_NUMERIC type="types.T" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=17 schema=s doc=ok opts=default result=pass count=0
+validate_value line=18 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="a" message="field value does not match the declared type"
+steps 6
+status ok

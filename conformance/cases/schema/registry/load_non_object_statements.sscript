@@ -1,0 +1,15 @@
+anvil-schema-script 1
+file "a.anvl"
+|#!aml
+|@[types]
+|X := 5;
+|Y := [1, 2];
+|Z := "s";
+|T := { type := Bool; };
+|W := (1, 2);
+|V := null;
+registry r load "a.anvl"
+type find r "X"
+type find r "Y"
+type find r "T"
+type find r "V"

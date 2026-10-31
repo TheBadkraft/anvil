@@ -1,0 +1,29 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|a := { values := [x, y]; };
+|b := { type := String; values := [x, y]; };
+|c := { type := Numeric; values := [1, 2]; };
+schema s load "s.anvl"
+validate_value s "{ a := x; }"
+validate_value s "{ a := \"y\"; }"
+validate_value s "{ a := z; }"
+validate_value s "{ a := 1; }"
+validate_value s "{ a := 2; }"
+validate_value s "{ a := 3; }"
+validate_value s "{ a := `x`; }"
+validate_value s "{ b := x; }"
+validate_value s "{ b := \"y\"; }"
+validate_value s "{ b := z; }"
+validate_value s "{ b := 1; }"
+validate_value s "{ b := 2; }"
+validate_value s "{ b := 3; }"
+validate_value s "{ b := `x`; }"
+validate_value s "{ c := x; }"
+validate_value s "{ c := \"y\"; }"
+validate_value s "{ c := z; }"
+validate_value s "{ c := 1; }"
+validate_value s "{ c := 2; }"
+validate_value s "{ c := 3; }"
+validate_value s "{ c := `x`; }"

@@ -1,0 +1,6 @@
+anvil-schema-script 1
+type resolve NULL "Numeric"
+type resolve NULL "enum"
+type resolve NULL "Blob"
+type resolve NULL "VIN"
+type find NULL "Numeric"

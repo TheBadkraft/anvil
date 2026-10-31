@@ -1,0 +1,5 @@
+anvil-schema-run 1
+schema line=11 name=s file="v.anvl" doc=ANVIL_ERR_SYNTAX result=null diagnostics=0 fields=0
+registry line=12 name=r how=load file="v.anvl" doc=ANVIL_ERR_SYNTAX result=null diagnostics=0
+steps 3
+status ok

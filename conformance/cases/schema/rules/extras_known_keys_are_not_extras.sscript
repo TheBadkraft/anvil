@@ -1,0 +1,6 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := String; required := true; nullable := true; integer := false; size := 1; min := 1; max := 2; min_items := 1; max_items := 2; values := [a]; format := uuid; tag := t; items := { type := String; }; fields := { a := { type := String; }; }; mine := 1; };
+schema s load "s.anvl"

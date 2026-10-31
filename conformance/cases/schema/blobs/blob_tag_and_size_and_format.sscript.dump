@@ -1,0 +1,13 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="b" kind=ANVIL_TYPE_BLOB type="Blob" required=0 nullable=0 integer=0 size=36 min=none max=none min_items=none max_items=none format="uuid" tag="txt" values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=pass count=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="b" message="value does not match the declared format"
+validate_value line=9 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="b" message="value does not match the declared format"
+  violation index=1 code=8 name=ANVIL_SCHEMA_ERR_VALIDATION_TAG field="b" message="blob tag does not match the required tag"
+validate_value line=10 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=8 name=ANVIL_SCHEMA_ERR_VALIDATION_TAG field="b" message="blob tag does not match the required tag"
+steps 6
+status ok

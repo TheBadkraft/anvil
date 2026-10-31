@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-builder-script check-builder-gen check-builder-roundtrip check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-builder-script check-builder-gen check-builder-roundtrip check-schema-script check-schema-gen check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -277,9 +277,9 @@ check-numeric-fastpath:
 DUMP_BIN = build/tools/anvil-dump
 anvil-dump: $(DUMP_BIN)
 
-$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tools/builder-script.c tools/builder-script.h tools/script-common.c tools/script-common.h $(DEBUG_OBJS)
+$(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tools/builder-script.c tools/builder-script.h tools/schema-script.c tools/schema-script.h tools/script-common.c tools/script-common.h $(DEBUG_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/builder-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/builder-script.c tools/schema-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
 
 # Regenerates every expected dump and diffs it against the committed one; any difference fails.
 # ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).
@@ -291,6 +291,8 @@ check-conformance: $(DUMP_BIN) check-drift-tables
 	sh scripts/check-builder-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-builder-gen.sh
 	sh scripts/check-builder-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-schema-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-schema-gen.sh
 
 # The writer-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/writer-script/).
 check-writer-script: $(DUMP_BIN)
@@ -299,6 +301,14 @@ check-writer-script: $(DUMP_BIN)
 # The builder-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/builder-script/).
 check-builder-script: $(DUMP_BIN)
 	sh scripts/check-builder-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The schema-script mode of anvil-dump, against hand-written scripts and expected runs (test/infra/schema-script/).
+check-schema-script: $(DUMP_BIN)
+	sh scripts/check-schema-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
+
+# The schema corpus generator writes scripts only (native owns the dumps).
+check-schema-gen:
+	sh scripts/check-schema-gen.sh
 
 # The builder corpus generator writes scripts only (native owns the dumps).
 check-builder-gen:

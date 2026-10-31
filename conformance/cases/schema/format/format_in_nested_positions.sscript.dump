@@ -1,0 +1,11 @@
+anvil-schema-run 1
+schema line=7 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=2
+  field name="o" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="d" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=0 nested=0 items=0 extras=0
+  field name="l" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_STRING type="String" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="uuid" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=8 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="o.d" message="value does not match the declared format"
+  violation index=1 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="l[1]" message="value does not match the declared format"
+steps 3
+status ok

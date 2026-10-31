@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=14 name=s file="s.anvl" doc=ok result=ok diagnostics=1 fields=3
+  diag index=0 code=4 name=ANVIL_SCHEMA_DIAG_UNKNOWN_FORMAT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="x" message="field 'x': unknown format 'nonsense' (known: iso8601_date, iso8601_datetime, uuid); treated as not declared"
+  field name="d" kind=ANVIL_TYPE_STRING type="types.D" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=0 nested=0 items=0 extras=0
+  field name="u" kind=ANVIL_TYPE_STRING type="types.U" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=0 nested=0 items=0 extras=0
+  field name="x" kind=ANVIL_TYPE_STRING type="types.D" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format="iso8601_date" tag=none values=0 nested=0 items=0 extras=0
+validate_value line=15 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="x" message="value does not match the declared format"
+validate_value line=16 schema=s doc=ok opts=default result=fail count=3
+  violation index=0 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="d" message="value does not match the declared format"
+  violation index=1 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="u" message="value does not match the declared format"
+  violation index=2 code=9 name=ANVIL_SCHEMA_ERR_VALIDATION_FORMAT field="x" message="value does not match the declared format"
+steps 5
+status ok

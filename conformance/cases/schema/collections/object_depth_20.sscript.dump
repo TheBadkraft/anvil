@@ -1,0 +1,31 @@
+anvil-schema-run 1
+schema line=6 name=s file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
+  field name="x" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="y0" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+      nested name="y1" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+        nested name="y2" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+          nested name="y3" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+            nested name="y4" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+              nested name="y5" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                nested name="y6" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                  nested name="y7" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                    nested name="y8" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                      nested name="y9" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                        nested name="y10" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                          nested name="y11" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                            nested name="y12" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                              nested name="y13" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                nested name="y14" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                  nested name="y15" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                    nested name="y16" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                      nested name="y17" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                        nested name="y18" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+                                          nested name="y19" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=1 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+validate_value line=7 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="x.y0.y1.y2.y3.y4.y5.y6.y7.y8.y9.y10.y11.y12.y13.y14.y15.y16.y17.y18.y19" message="field value does not match the declared type"
+validate_value line=8 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=1 name=ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED field="x.y0.y1.y2.y3.y4.y5.y6.y7.y8.y9.y10.y11.y12.y13.y14.y15.y16.y17.y18.y19" message="required field is missing"
+  violation index=1 code=6 name=ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD field="x.y0.y1.y2.y3.y4.y5.y6.y7.y8.y9.y10.y11.y12.y13.y14.y15.y16.y17.y18.z" message="field is not declared in the schema"
+validate_value line=9 schema=s doc=ok opts=default result=pass count=0
+steps 5
+status ok

@@ -1,0 +1,27 @@
+anvil-schema-script 1
+# every value form against a object rule
+file "s.anvl"
+|#!aml
+|@[schema]
+|f := { type := Object; };
+schema s load "s.anvl"
+validate_value s "{ f := null; }"
+validate_value s "{ f := true; }"
+validate_value s "{ f := false; }"
+validate_value s "{ f := 1; }"
+validate_value s "{ f := -5; }"
+validate_value s "{ f := 1.5; }"
+validate_value s "{ f := 1e3; }"
+validate_value s "{ f := \"s\"; }"
+validate_value s "{ f := \"\"; }"
+validate_value s "{ f := word; }"
+validate_value s "{ f := `blob`; }"
+validate_value s "{ f := @png`xyz`; }"
+validate_value s "{ f := [1, 2]; }"
+validate_value s "{ f := (1, 2); }"
+validate_value s "{ f := { a := 1; }; }"
+validate_value s "{ f := { a := { b := 1; }; }; }"
+validate_value s "{ f := \"12\"; }"
+validate_value s "{ f := True; }"
+validate_value s "{ f := [\"a\", \"b\"]; }"
+validate_value s "{ f := \"\xc3\xa9\"; }"

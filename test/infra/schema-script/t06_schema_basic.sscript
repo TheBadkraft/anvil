@@ -1,0 +1,15 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|id := { type := Numeric; required := true; integer := true; min := 1; };
+|title := { type := String; size := 8; pooled := true; };
+|tags := { type := Array; max_items := 2; items := { type := String; }; };
+file "d.anvl"
+|#!aml
+|id := 0;
+|title := "much too long";
+|tags := [a, b, c, 4];
+|extra := 1;
+schema s load "s.anvl"
+validate s "d.anvl"

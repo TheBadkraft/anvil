@@ -1,0 +1,32 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|n := { type := Numeric; size := 2; };
+|e := { type := enum; values := [aaa, bb]; size := 2; };
+|u := { size := 2; };
+schema s load "s.anvl"
+validate_value s "{ n := 1; }"
+validate_value s "{ n := 123; }"
+validate_value s "{ n := 12.5; }"
+validate_value s "{ n := aaa; }"
+validate_value s "{ n := bb; }"
+validate_value s "{ n := \"xyz\"; }"
+validate_value s "{ n := `xyz`; }"
+validate_value s "{ n := true; }"
+validate_value s "{ e := 1; }"
+validate_value s "{ e := 123; }"
+validate_value s "{ e := 12.5; }"
+validate_value s "{ e := aaa; }"
+validate_value s "{ e := bb; }"
+validate_value s "{ e := \"xyz\"; }"
+validate_value s "{ e := `xyz`; }"
+validate_value s "{ e := true; }"
+validate_value s "{ u := 1; }"
+validate_value s "{ u := 123; }"
+validate_value s "{ u := 12.5; }"
+validate_value s "{ u := aaa; }"
+validate_value s "{ u := bb; }"
+validate_value s "{ u := \"xyz\"; }"
+validate_value s "{ u := `xyz`; }"
+validate_value s "{ u := true; }"

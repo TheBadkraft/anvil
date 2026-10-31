@@ -1,0 +1,7 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|l := { type := Array; items := { type := Blob; tag := t; }; };
+schema s load "s.anvl"
+validate_value s "{ l := [ @t`a`, `b`, @t`c`, 3 ]; }"

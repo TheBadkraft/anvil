@@ -1,0 +1,25 @@
+anvil-schema-run 1
+schema line=127 name=s file="schemas/e.schema.anvl" doc=ok result=ok diagnostics=0 fields=3
+  field name="p" kind=ANVIL_TYPE_ENUM type="types.Priority" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=4 nested=0 items=0 extras=0
+    label index=0 text="critical"
+    label index=1 text="high"
+    label index=2 text="normal"
+    label index=3 text="low"
+  field name="s" kind=ANVIL_TYPE_ENUM type="types.Severity" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=4 nested=0 items=0 extras=0
+    label index=0 text="critical"
+    label index=1 text="major"
+    label index=2 text="minor"
+    label index=3 text="trivial"
+  field name="l" kind=ANVIL_TYPE_ARRAY type="Array" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=1 extras=0
+    items name="" kind=ANVIL_TYPE_ENUM type="types.Priority" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=4 nested=0 items=0 extras=0
+      label index=0 text="critical"
+      label index=1 text="high"
+      label index=2 text="normal"
+      label index=3 text="low"
+validate_value line=128 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="l[2]" message="field value is not one of the declared values"
+validate_value line=129 schema=s doc=ok opts=default result=fail count=2
+  violation index=0 code=5 name=ANVIL_SCHEMA_ERR_VALIDATION_VALUES field="s" message="field value is not one of the declared values"
+  violation index=1 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="l[1]" message="field value does not match the declared type"
+steps 10
+status ok

@@ -1,0 +1,9 @@
+anvil-schema-script 1
+file "s.anvl"
+|#!aml
+|@[schema]
+|x := { type := Object; fields := { y0 := { type := Object; fields := { y1 := { type := Object; fields := { y2 := { type := Object; fields := { y3 := { type := Object; fields := { y4 := { type := Object; fields := { y5 := { type := Object; fields := { y6 := { type := Object; fields := { y7 := { type := Object; fields := { y8 := { type := Object; fields := { y9 := { type := Object; fields := { y10 := { type := Object; fields := { y11 := { type := Object; fields := { y12 := { type := Object; fields := { y13 := { type := Object; fields := { y14 := { type := Object; fields := { y15 := { type := Object; fields := { y16 := { type := Object; fields := { y17 := { type := Object; fields := { y18 := { type := Object; fields := { y19 := { type := Numeric; required := true; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; };
+schema s load "s.anvl"
+validate_value s "{ x := { y0 := { y1 := { y2 := { y3 := { y4 := { y5 := { y6 := { y7 := { y8 := { y9 := { y10 := { y11 := { y12 := { y13 := { y14 := { y15 := { y16 := { y17 := { y18 := { y19 := \"s\"; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }"
+validate_value s "{ x := { y0 := { y1 := { y2 := { y3 := { y4 := { y5 := { y6 := { y7 := { y8 := { y9 := { y10 := { y11 := { y12 := { y13 := { y14 := { y15 := { y16 := { y17 := { y18 := { z := 1; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }"
+validate_value s "{ x := { y0 := { y1 := { y2 := { y3 := { y4 := { y5 := { y6 := { y7 := { y8 := { y9 := { y10 := { y11 := { y12 := { y13 := { y14 := { y15 := { y16 := { y17 := { y18 := { y19 := 5; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }"

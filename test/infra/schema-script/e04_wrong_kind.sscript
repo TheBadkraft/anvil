@@ -1,0 +1,4 @@
+anvil-schema-script 1
+file "s.anvl" "#!aml\n@[schema]\n"
+schema s load "s.anvl"
+type find s "A"

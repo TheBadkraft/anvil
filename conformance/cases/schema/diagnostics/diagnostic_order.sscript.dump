@@ -1,0 +1,14 @@
+anvil-schema-run 1
+schema line=14 name=s file="s.anvl" doc=ok result=ok diagnostics=6 fields=3
+  diag index=0 code=7 name=ANVIL_SCHEMA_DIAG_TYPE_REGISTRY type_code=2 type_name=ANVIL_TYPE_DIAG_UNKNOWN_BASE_TYPE field="Bad" message="type 'Bad' has an unrecognized base type 'type := Nope'"
+  diag index=1 code=3 name=ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="z" message="'z' is not a field rule (expected a '{ ... }' object); skipped"
+  diag index=2 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="y" message="field 'y': type 'types.Typo' is neither a native type nor a known types.X"
+  diag index=3 code=6 name=ANVIL_SCHEMA_DIAG_CONFLICTING_CONSTRAINTS type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="x" message="field 'x': 'min' is greater than 'max'; no value can satisfy it"
+  diag index=4 code=1 name=ANVIL_SCHEMA_DIAG_UNKNOWN_TYPE type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="w.v" message="field 'w.v': type 'Nope' is neither a native type nor a known types.X"
+  diag index=5 code=3 name=ANVIL_SCHEMA_DIAG_RULE_NOT_OBJECT type_code=0 type_name=ANVIL_TYPE_DIAG_NONE field="w.u" message="'w.u' is not a field rule (expected a '{ ... }' object); skipped"
+  field name="y" kind=ANVIL_TYPE_UNKNOWN type="types.Typo" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="x" kind=ANVIL_TYPE_UNKNOWN type=none required=0 nullable=0 integer=0 size=none min=i64:3 max=i64:1 min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+  field name="w" kind=ANVIL_TYPE_OBJECT type="Object" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=1 items=0 extras=0
+    nested name="v" kind=ANVIL_TYPE_UNKNOWN type="Nope" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
+steps 3
+status ok

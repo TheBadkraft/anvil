@@ -1,0 +1,13 @@
+anvil-schema-script 1
+file "t.anvl"
+|#!aml
+|@[types]
+|T := { type := String; nullable := true; };
+file "s.anvl"
+|#!aml
+|include "t.anvl";
+|@[schema]
+|a := { type := types.T; };
+|b := { type := types.T; nullable := false; };
+schema s load "s.anvl"
+validate_value s "{ a := null; b := null; }"

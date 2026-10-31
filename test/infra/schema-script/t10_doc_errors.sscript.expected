@@ -1,0 +1,10 @@
+anvil-schema-run 1
+registry line=4 name=a how=load file="bad.anvl" doc=ANVIL_ERR_SYNTAX result=ok diagnostics=0
+registry line=5 name=b how=load file="plain.anvl" doc=ok result=null diagnostics=0
+registry line=6 name=c how=load file="missing.anvl" doc=ANVIL_ERR_IO result=null diagnostics=0
+schema line=7 name=d file="plain.anvl" doc=ok result=null diagnostics=0 fields=0
+schema line=8 name=e file="missing.anvl" doc=ANVIL_ERR_IO result=null diagnostics=0 fields=0
+validate line=9 schema=NULL file="plain.anvl" doc=ok result=fail count=0
+type line=10 how=find registry=a name="A" result=none
+steps 9
+status ok
