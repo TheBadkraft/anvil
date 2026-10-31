@@ -1,0 +1,9 @@
+anvil-schema-script 1
+# a bare root that includes ./itself (BR-2610-anvl-004)
+file "a.anvl"
+|#!aml
+|include "./a.anvl";
+|@[types]
+|A := { type := Bool; };
+registry r includes "a.anvl"
+type find r "A"

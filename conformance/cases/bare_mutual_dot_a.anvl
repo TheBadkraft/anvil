@@ -1,0 +1,2 @@
+include "./bare_mutual_dot_b.anvl";
+a := 1;

@@ -1,0 +1,12 @@
+anvil-dump 1
+mode document
+input-bytes 39
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=39
+  include decl-span=0-29 decl="include \"bare_diamond_d.anvl\"" path-span=8-29 path="\"bare_diamond_d.anvl\"" resolved=1
+  stmt kind=ASSIGN name="b" name-span=31-32 base="" base-span=none attrs=0
+    value type=NUMERIC span=36-37 text="1" kind=integer overflow=0 i64=1
+doc 1 path="./bare_diamond_d.anvl" dialect=AML bytes=8
+  stmt kind=ASSIGN name="d" name-span=0-1 base="" base-span=none attrs=0
+    value type=NUMERIC span=5-6 text="1" kind=integer overflow=0 i64=1

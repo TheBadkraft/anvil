@@ -14,6 +14,7 @@
 #include "anvil_flat.h"
 #include "anvil_types.h"
 #include "internal/source_registry.h"
+#include "errors.h"
 #include "testbit.h"
 // ----------------
 #include "../utilities/helpers.h"
@@ -22,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static void th(void) {
    (void)reset_context_spec_defaults(NULL);
@@ -2045,6 +2048,234 @@ static void test_anv67_asl_rejected_without_with_asl(void) {
 #endif
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV68-71 (BR-2610-anvl-io-001) - a root file that cannot be read reports the
+ * specific IO code's message through the public error API, not an empty one.
+ * The messages are unique per code, so equality with anvl_error_code_message
+ * identifies the code.
+ * ---------------------------------------------------------------------- */
+static void expect_io_message(anvil_document doc, anvl_err_code code, const char *tag) {
+   TestBit.is_not_null(doc, tag);
+   if (!doc) {
+      return;
+   }
+   TestBit.is_equal_int(ANVIL_ERR_IO, anvil_get_error(doc), tag);
+   anvil_error err = anvil_document_get_error(doc);
+   TestBit.is_not_null(err, tag);
+   if (err) {
+      char buf[128];
+      size_t n = anvil_error_get_message(err, buf, sizeof buf);
+      const char *want = anvl_error_code_message(code);
+      TestBit.is_equal_int((long long)strlen(want), (long long)n, tag);
+      TestBit.is_equal_int(0, strcmp(want, buf), tag);
+   }
+   anvil_dispose(doc);
+}
+
+static void test_anv68_missing_root_file_code(void) {
+   expect_io_message(anvil_load(fixture_path("anvil_nonexistent_file_xyz.anvl")),
+                     ANVL_ERR_IO_FILE_NOT_FOUND, "ANV68: a missing root reports FILE_NOT_FOUND");
+   expect_io_message(anvil_load("../../test/fixtures/no_such_dir/x.anvl"),
+                     ANVL_ERR_IO_FILE_NOT_FOUND, "ANV68: a missing directory reports FILE_NOT_FOUND");
+}
+
+static void test_anv69_directory_root_code(void) {
+   expect_io_message(anvil_load("../../test/fixtures"), ANVL_ERR_IO_FILE_READ,
+                     "ANV69: a directory as the root reports FILE_READ");
+}
+
+static void test_anv70_unreadable_root_code(void) {
+   if (geteuid() == 0) {
+      TestBit.is_true(true, "ANV70: skipped as root (permissions are not enforced)");
+      return;
+   }
+   char path[] = "/tmp/anvl_io001_XXXXXX";
+   int fd = mkstemp(path);
+   TestBit.is_true(fd >= 0, "ANV70: temp file created");
+   if (fd < 0) {
+      return;
+   }
+   close(fd);
+   chmod(path, 0);
+   expect_io_message(anvil_load(path), ANVL_ERR_IO_FILE_READ,
+                     "ANV70: a file without read permission reports FILE_READ");
+   unlink(path);
+}
+
+static void test_anv71_invalid_path_code(void) {
+   expect_io_message(anvil_load(NULL), ANVL_ERR_IO_INVALID_PATH,
+                     "ANV71: a NULL path reports INVALID_PATH");
+   expect_io_message(anvil_load(""), ANVL_ERR_IO_INVALID_PATH,
+                     "ANV71: an empty path reports INVALID_PATH");
+}
+/* ---------------------------------------------------------------------- *
+ * ANV72-75 (BR-2610-anvl-004) - document identity for include-cycle detection is
+ * the normalised path: a bare root name, "./name", "dir/../name" and "dir//name"
+ * spellings of one file are one document.
+ * ---------------------------------------------------------------------- */
+static void put_file(const char *dir, const char *name, const char *text) {
+   char path[512];
+   snprintf(path, sizeof path, "%s/%s", dir, name);
+   FILE *f = fopen(path, "wb");
+   if (f) {
+      fputs(text, f);
+      fclose(f);
+   }
+}
+
+// Loads `root` with the working directory set to a fresh temp directory holding `files`
+// (name, text pairs, NULL-terminated); returns the document, and restores the directory.
+typedef struct { const char *name; const char *text; } tmp_file;
+static anvil_document load_in_tmpdir(const tmp_file *files, const char *root, char *dir_out) {
+   char cwd[512];
+   if (!getcwd(cwd, sizeof cwd)) {
+      return NULL;
+   }
+   char dir[] = "/tmp/anvl_bare_XXXXXX";
+   if (!mkdtemp(dir)) {
+      return NULL;
+   }
+   char sub[600];
+   snprintf(sub, sizeof sub, "%s/sub", dir);
+   mkdir(sub, 0755);
+   for (const tmp_file *f = files; f->name; f++) {
+      put_file(dir, f->name, f->text);
+   }
+   if (chdir(dir) != 0) {
+      return NULL;
+   }
+   anvil_document doc = anvil_load(root);
+   (void)chdir(cwd);
+   strcpy(dir_out, dir);
+   return doc;
+}
+
+static void rm_tmpdir(const tmp_file *files, const char *dir) {
+   char path[640];
+   for (const tmp_file *f = files; f->name; f++) {
+      snprintf(path, sizeof path, "%s/%s", dir, f->name);
+      unlink(path);
+   }
+   snprintf(path, sizeof path, "%s/sub", dir);
+   rmdir(path);
+   rmdir(dir);
+}
+
+static void expect_cycle(const tmp_file *files, const char *root, const char *tag) {
+   char dir[64];
+   anvil_document doc = load_in_tmpdir(files, root, dir);
+   TestBit.is_not_null(doc, tag);
+   if (doc) {
+      TestBit.is_equal_int(ANVIL_ERR_INCLUDE, anvil_get_error(doc), tag);
+      anvil_error err = anvil_document_get_error(doc);
+      char buf[128] = "";
+      if (err) {
+         anvil_error_get_message(err, buf, sizeof buf);
+      }
+      TestBit.is_equal_int(0, strcmp(anvl_error_code_message(ANVL_ERR_INCLUDE_CYCLIC), buf), tag);
+      anvil_dispose(doc);
+   }
+   rm_tmpdir(files, dir);
+}
+
+static void test_anv72_bare_root_include_cycles(void) {
+   const tmp_file self[] = {{"s.anvl", "include \"s.anvl\";\nx := 1;\n"}, {NULL, NULL}};
+   expect_cycle(self, "s.anvl", "ANV72: a bare root that includes itself is a cycle");
+   const tmp_file mutual[] = {{"a.anvl", "include \"b.anvl\";\na := 1;\n"},
+                              {"b.anvl", "include \"a.anvl\";\nb := 1;\n"}, {NULL, NULL}};
+   expect_cycle(mutual, "a.anvl", "ANV72: a bare root in a mutual cycle");
+   expect_cycle(mutual, "./a.anvl", "ANV72: the same cycle from ./a.anvl");
+   const tmp_file three[] = {{"a.anvl", "include \"b.anvl\";\na := 1;\n"},
+                             {"b.anvl", "include \"c.anvl\";\nb := 1;\n"},
+                             {"c.anvl", "include \"a.anvl\";\nc := 1;\n"}, {NULL, NULL}};
+   expect_cycle(three, "a.anvl", "ANV72: a bare root in a three-document cycle");
+}
+
+static void test_anv73_other_spellings_are_the_same_document(void) {
+   const tmp_file dot_self[] = {{"s.anvl", "include \"./s.anvl\";\nx := 1;\n"}, {NULL, NULL}};
+   expect_cycle(dot_self, "s.anvl", "ANV73: bare root including ./itself");
+   const tmp_file dot_mutual[] = {{"a.anvl", "include \"./b.anvl\";\na := 1;\n"},
+                                  {"b.anvl", "include \"./a.anvl\";\nb := 1;\n"}, {NULL, NULL}};
+   expect_cycle(dot_mutual, "a.anvl", "ANV73: ./ spelling in a mutual cycle, bare root");
+   expect_cycle(dot_mutual, "sub/../a.anvl", "ANV73: a root spelled sub/../a.anvl");
+   const tmp_file up[] = {{"a.anvl", "include \"sub/../a.anvl\";\na := 1;\n"}, {NULL, NULL}};
+   expect_cycle(up, "a.anvl", "ANV73: include spelled sub/../a.anvl");
+   const tmp_file slashes[] = {{"a.anvl", "include \".//a.anvl\";\na := 1;\n"}, {NULL, NULL}};
+   expect_cycle(slashes, "a.anvl", "ANV73: include spelled .//a.anvl");
+}
+
+static void test_anv74_no_false_cycles(void) {
+   char dir[64];
+   // a diamond: root -> b, c; b -> d; c -> d
+   const tmp_file diamond[] = {{"r.anvl", "include \"b.anvl\";\ninclude \"c.anvl\";\nr := 1;\n"},
+                               {"b.anvl", "include \"d.anvl\";\nb := 1;\n"},
+                               {"c.anvl", "include \"d.anvl\";\nc := 1;\n"},
+                               {"d.anvl", "d := 1;\n"}, {NULL, NULL}};
+   anvil_document doc = load_in_tmpdir(diamond, "r.anvl", dir);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV74: a diamond under a bare root is no cycle");
+   anvil_dispose(doc);
+   rm_tmpdir(diamond, dir);
+   // the same file name in two directories is two documents
+   const tmp_file samename[] = {{"a.anvl", "include \"sub/a.anvl\";\nx := 1;\n"},
+                                {"sub/a.anvl", "y := 2;\n"}, {NULL, NULL}};
+   // (sub/a.anvl cannot be written by put_file's flat names, so build it here)
+   char cwd[512];
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV74: cwd");
+   char d2[] = "/tmp/anvl_bare_XXXXXX";
+   TestBit.is_true(mkdtemp(d2) != NULL, "ANV74: temp dir");
+   char sub[600];
+   snprintf(sub, sizeof sub, "%s/sub", d2);
+   mkdir(sub, 0755);
+   put_file(d2, "a.anvl", samename[0].text);
+   put_file(d2, "sub/a.anvl", samename[1].text);
+   TestBit.is_equal_int(0, chdir(d2), "ANV74: chdir");
+   doc = anvil_load("a.anvl");
+   (void)chdir(cwd);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV74: ./a.anvl and sub/a.anvl are two documents");
+   anvil_dispose(doc);
+   char p[640];
+   snprintf(p, sizeof p, "%s/sub/a.anvl", d2);
+   unlink(p);
+   snprintf(p, sizeof p, "%s/a.anvl", d2);
+   unlink(p);
+   // a parent-relative include of a different file is no cycle either: sub/a.anvl -> ../a.anvl
+   put_file(d2, "sub/a.anvl", "include \"../a.anvl\";\ny := 2;\n");
+   put_file(d2, "a.anvl", "x := 1;\n");
+   TestBit.is_equal_int(0, chdir(d2), "ANV74: chdir again");
+   doc = anvil_load("sub/a.anvl");
+   (void)chdir(cwd);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "ANV74: sub/a.anvl including ../a.anvl is no cycle");
+   anvil_dispose(doc);
+   snprintf(p, sizeof p, "%s/sub/a.anvl", d2);
+   unlink(p);
+   snprintf(p, sizeof p, "%s/a.anvl", d2);
+   unlink(p);
+   rmdir(sub);
+   rmdir(d2);
+}
+
+static void test_anv75_directory_part_cycles_unchanged(void) {
+   // with a directory part the cycle was already found; it still is
+   char cwd[512];
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV75: cwd");
+   char d[] = "/tmp/anvl_bare_XXXXXX";
+   TestBit.is_true(mkdtemp(d) != NULL, "ANV75: temp dir");
+   put_file(d, "a.anvl", "include \"b.anvl\";\na := 1;\n");
+   put_file(d, "b.anvl", "include \"a.anvl\";\nb := 1;\n");
+   char root[640];
+   snprintf(root, sizeof root, "%s/a.anvl", d);
+   anvil_document doc = anvil_load(root);
+   TestBit.is_true(doc != NULL, "ANV75: loaded");
+   if (doc) {
+      TestBit.is_equal_int(ANVIL_ERR_INCLUDE, anvil_get_error(doc), "ANV75: absolute root still a cycle");
+      anvil_dispose(doc);
+   }
+   unlink(root);
+   snprintf(root, sizeof root, "%s/b.anvl", d);
+   unlink(root);
+   rmdir(d);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -2155,6 +2386,15 @@ int main(void) {
                   test_anv66_script_enabled_reports_build_flag, th);
    TestBit.run_ex("ANV67_asl_rejected_without_with_asl", NULL,
                   test_anv67_asl_rejected_without_with_asl, th);
+   TestBit.run_ex("ANV68_missing_root_file_code", NULL, test_anv68_missing_root_file_code, th);
+   TestBit.run_ex("ANV69_directory_root_code", NULL, test_anv69_directory_root_code, th);
+   TestBit.run_ex("ANV70_unreadable_root_code", NULL, test_anv70_unreadable_root_code, th);
+   TestBit.run_ex("ANV71_invalid_path_code", NULL, test_anv71_invalid_path_code, th);
+   TestBit.run_ex("ANV72_bare_root_include_cycles", NULL, test_anv72_bare_root_include_cycles, th);
+   TestBit.run_ex("ANV73_other_spellings_are_the_same_document", NULL,
+                  test_anv73_other_spellings_are_the_same_document, th);
+   TestBit.run_ex("ANV74_no_false_cycles", NULL, test_anv74_no_false_cycles, th);
+   TestBit.run_ex("ANV75_directory_part_cycles_unchanged", NULL, test_anv75_directory_part_cycles_unchanged, th);
 
    return TestBit.report();
 }

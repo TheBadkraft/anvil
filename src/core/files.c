@@ -16,6 +16,8 @@
 #include "std.h"
 #include "types.h"
 #include "internal/files.h"
+#include <errno.h>
+#include <sys/stat.h>
 // -------------------------
 #include <sigma.core/allocator.h>
 
@@ -23,7 +25,7 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
                               anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
-   if (!path) {
+   if (!path || !path[0]) {
       // invalid path - set
       err_code = ANVL_ERR_IO_INVALID_PATH;
       goto error;
@@ -31,13 +33,34 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
 
    FILE *f = fopen(path, "rb");
    if (!f) {
-      err_code = ANVL_ERR_IO_FILE_NOT_FOUND;
+      // Only a name that does not exist is "not found"; a file that is there but cannot be
+      // opened (permissions, too many open files, ...) is a read failure.
+      err_code = (errno == ENOENT || errno == ENOTDIR) ? ANVL_ERR_IO_FILE_NOT_FOUND
+                                                       : ANVL_ERR_IO_FILE_READ;
       goto error;
    }
 
-   fseek(f, 0, SEEK_END);
-   long len = ftell(f);
-   fseek(f, 0, SEEK_SET);
+   // A directory opens for reading on POSIX but has no content to read.
+   struct stat st;
+   if (fstat(fileno(f), &st) != 0 || S_ISDIR(st.st_mode)) {
+      fclose(f);
+      err_code = ANVL_ERR_IO_FILE_READ;
+      goto error;
+   }
+
+   long len;
+   if (S_ISREG(st.st_mode)) {
+      len = (long)st.st_size; // the one fstat above also gives the size: no seeking needed
+   } else {
+      fseek(f, 0, SEEK_END);
+      len = ftell(f);
+      fseek(f, 0, SEEK_SET);
+   }
+   if (len < 0) {
+      fclose(f);
+      err_code = ANVL_ERR_IO_FILE_READ;
+      goto error;
+   }
 
    char *filebuff = Allocator.alloc((size_t)len + 1);
    if (!filebuff) {

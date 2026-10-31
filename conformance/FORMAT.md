@@ -109,9 +109,14 @@ line and column are those inside the included document, and the dump does not sa
 
 When a load fails, **nothing but the error is defined**: no tree is dumped, because the partial tree native
 leaves behind is an implementation artifact, not behaviour a port should copy. If native failed before it
-recorded anything (an unreadable file), one line `error code=0 name=ANVL_ERR_NONE ...` with the public
-category and an empty message is written (and no `dialect` line, see above). The corpus holds no such case,
-since an input is always an existing file; the line exists for completeness.
+recorded anything, one line `error code=0 name=ANVL_ERR_NONE ...` with the public category and an empty message
+is written (and no `dialect` line, see above). An unreadable root file no longer takes this path (BR-2610-anvl-io-001):
+native records the specific code, so a missing file is `error code=1002 name=ANVL_ERR_FILE_NOT_FOUND ... message="IO file
+not found"`, a directory or a file that cannot be opened is `code=1001 name=ANVL_ERR_FILE_READ` ("IO error reading source
+file"), and a NULL or empty path is `code=1003 name=ANVL_ERR_FILE_INVALID_PATH` ("IO invalid file path"), all with category
+`ANVIL_ERR_IO` and line and column 0. The corpus holds no such case, since an input is always an existing file; the lines
+exist for completeness. The same codes govern an `include` that names a directory: it is an include error, not an empty
+document.
 
 Two errors depend on the resolved include path (see **Includes**): an include whose joined path is 1024 bytes
 or longer is `error code=9002 name=ANVL_ERR_INVALID_ARGUMENT category=3` (an include category, not an argument
@@ -131,22 +136,27 @@ pre-order walk with the document numbered when it is first entered and an includ
 before its next sibling. It is not breadth-first: with `root` including `a` then `b`, `a` including `c`, and `b`
 including `d` then `c`, the numbering is `root 0, a 1, c 2, (c's own includes), b, d`, and `c` is not repeated under `b`
 (`coverage/includes/walk_root.anvl`; reverse the first two includes and the numbers change,
-`walk_root_reversed.anvl`). A document that is reached again (a diamond, a shared leaf, a cycle that native
-accepts) is not dumped again; the `include` record that reached it carries `resolved=<its first number>`, which may
+`walk_root_reversed.anvl`). A document that is reached again (a diamond, a shared leaf) is not dumped again; the `include` record that reached it carries `resolved=<its first number>`, which may
 be a smaller number than the current document's own. The `doc` records are then printed in number order.
 
 **What "the same document" means: identical bytes.** Native identifies a document by a hash of its source bytes
 (64-bit FNV-1a), not by its path. Two includes that name *different paths* with *byte-identical contents* (a
 copy of a file, an empty file named twice) resolve to the **same** document, which keeps the path of the first
-one reached (`coverage/includes/identical_copies.anvl`). An include of a file whose bytes equal the root's resolves to
-`doc 0` (`self_dot.anvl`). A port compares the bytes (a hash collision between different files is outside the
+one reached (`coverage/includes/identical_copies.anvl`). This is the rule for a document reached again that is **not** one of its
+own ancestors; an ancestor reached again is a cycle (below). A port compares the bytes (a hash collision between different files is outside the
 contract). Which of two spellings of one path is "first" is decided by the walk above.
 
-**Cycles.** An include that names, **by exactly the same joined path string**, a document still being loaded
-(one of its ancestors in the include chain) is `error code=4206` (`ANVL_ERR_INCLUDE_CYCLIC`) and the load fails
-(`self_exact.anvl`, `mutual_a.anvl`). The comparison is textual: `"./self.anvl"` against `"self.anvl"` is not
-the same string, so the include is accepted, the bytes are the same, and it resolves to the existing document
-(`self_dot.anvl`, `mutual_dot_a.anvl`: the dump then shows an include that resolves to a document with a smaller number).
+**Cycles.** An include that names a document still being loaded (one of its ancestors in the include chain) is
+`error code=4206` (`ANVL_ERR_INCLUDE_CYCLIC`) and the load fails. A document is identified here by its **normalised
+path**, the path native opens with `.` components and repeated slashes removed and `name/..` cancelled
+(`a.anvl`, `./a.anvl`, `.//a.anvl` and `d/../a.anvl` are one document; a leading `..` of a relative path is kept, and symbolic links
+are not followed: the normalisation is textual). So a root named with no directory part and the `./name` its includer composes
+are the same document, and a cycle through it is found (`bare_self.anvl`, `bare_mutual_a.anvl`, `bare_three_a.anvl` at the top of
+`cases/`; `self_exact.anvl`, `self_dot.anvl`, `mutual_a.anvl`, `mutual_dot_a.anvl` under `coverage/includes/`). Before
+BR-2610-anvl-004 the comparison was the exact joined string, which missed those cycles; `self_dot.anvl` and `mutual_dot_a.anvl`
+used to resolve to the existing document and are now cycle errors. Two different files with the same name in different
+directories are different documents, and a diamond is not a cycle. The `path` printed for an included document is unchanged: it is
+still the path as opened, not its normal form.
 
 ```
 doc 0 path="<root>" dialect=AML bytes=132
@@ -314,6 +324,8 @@ conformance/
 - An input is any file under `cases/` that is not a `.dump`. It is run from `cases/` by its relative path, so
   `include` resolves there. A `.frag` input is dumped with `--fragment`; the file extension of every other input
   is the dialect hint native uses (`.amp` for AMP).
+- An input directly under `cases/` (no group directory) is run with a **bare file name** as its root: the `bare_*.anvl`
+  inputs there are the include cycles through a bare root (BR-2610-anvl-004; `seed/gen_bare.py`).
 - Groups: `handmade` (written before the tool, TDD), `fixtures` (a verbatim copy of `test/fixtures`; the check
   fails if the two differ), `unit` (the inline inputs of the unit tests, extracted), `grammar` (generated
   from tables: numbers, strings and escapes, blobs, attributes, empty and one-element rules, statement
@@ -682,7 +694,9 @@ extension is the dialect hint, `include "x";` resolves against the including fil
 includes is one document, and an include cycle, a missing file or a syntax error is the reader's error. (A port with no
 file system keeps the files in memory and resolves the same paths.) A file name is `[A-Za-z0-9_.-]` components separated
 by `/`, at most 200 bytes, with no empty component, no leading `/`, and no `.` or `..` component. Declaring a name twice is
-a script error. All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
+a script error (`file declared twice`), and so is a name that conflicts with another file: one that is a directory prefix of
+another (`lib` after `lib/a.anvl`, or the reverse) cannot be both a file and a directory (`file name conflicts with another
+file`). All the files exist before the first step runs, wherever their `file` steps are. A step may name a file no `file` step
 declared: it does not exist, and loading it is the reader's `ANVIL_ERR_IO`. The paths the run prints (the `source` of a
 registry diagnostic, and the document names inside a name-collision message) are `anvil_document_get_path`: the root
 document is the `FILE` of the step exactly as written, and an included document is its includer's directory (`.` when the
@@ -707,7 +721,7 @@ line may not contain a NUL byte (use the quoted form). A `file` step prints noth
 | step | arguments | native calls |
 |---|---|---|
 | `file` | *name* [*content*] | declares a file (above) |
-| `registry` | *R*, `load` \| `includes`, *file* | `anvil_load`, then `anvil_type_registry_load` or `anvil_type_registry_load_from_includes` |
+| `registry` | *R*, `load` \| `includes`, *file* | `anvil_load`, then `anvil_type_registry_load` or `anvil_type_registry_load_from_includes` (which also merges the root's own `@[types]`, last, so they override the included ones: `root_types_override_include`) |
 | `type` | `find` \| `resolve`, *registry* or `NULL`, *name* | `anvil_type_registry_find` or `anvil_type_resolve`, and the `anvil_type_def_get_*` accessors |
 | `schema` | *S*, `load`, *file* | `anvil_load`, `anvil_schema_load`, the document disposed, then the diagnostics and every rule read back |
 | `validate` | *schema* or `NULL`, *file* | `anvil_load`, `anvil_schema_validate`, the violations read |
@@ -722,6 +736,9 @@ find` is `anvil_type_registry_find` only. The *option*s of `validate_value` are 
 `allow_unknown` (each at most once, in either order), or the single word `no_opts`, which passes a NULL options pointer.
 With none of them the call passes a zeroed options struct with `size` set, which is `anvil_schema_validate`'s behaviour.
 The word `NULL` as the text passes the null value.
+
+A step line has at most **16 tokens**: the call name and its arguments, so at most 15 arguments. A seventeenth token is a
+script error (`too many arguments`).
 
 **What a load does with a bad document.** A step that loads a document (`registry`, `schema`, `validate`) records how the
 load went (`doc=` below) and **goes on with the API call regardless**, with whatever `anvil_load` returned (a document
@@ -746,6 +763,11 @@ exits 2 and is not part of the corpus). Every record starts with its **record na
 single spaces; a value is an integer, a word, or a quoted string. A record with **child lines** is followed by them, each
 indented two spaces more than its parent (the records of a step have no indent). A key is written even when its value is
 `none`.
+
+The numeric values behind every `code=`, `type_code=` and `kind=` name in a run (violation, schema diagnostic, type
+diagnostic and type kind codes, and the reader's error categories) are in `conformance/drift-tables.txt`
+(`enum:anvil_schema_err_code`, `enum:anvil_schema_diag_code`, `enum:anvil_type_diag_code`, `enum:anvil_type_kind`,
+`enum:anvil_err_code`); this section does not repeat them, and `make check-conformance` fails when that file is stale.
 
 **`doc=D`** is how the step's document loaded: `ok` when `anvil_load` returned a document and `anvil_has_errors` is false,
 `null` when it returned `NULL`, and otherwise the name of the category of `anvil_get_error`: `ANVIL_ERR_IO`,
@@ -823,6 +845,11 @@ also has `kind=integer|float overflow=0|1` and `i64=N` or `f64=0x...` as in the 
 `count=N` followed by its elements; an object has `count=N` followed, for each statement, by `stmt name="N"` and the
 statement's value tree two spaces deeper.
 
+`text=` is the **source span** of a scalar, exactly as written, for every scalar but a string (decoded) and a blob (its
+bytes). That includes a numeric that overflowed: `1e400` is `value type=NUMERIC text="1e400" kind=float overflow=1`, and
+`99999999999999999999` is `kind=integer overflow=1`, in both cases with **neither `i64=` nor `f64=`**. A reader must not
+substitute infinity or a clamped number for the text.
+
 **`validate`**
 
 ```
@@ -893,8 +920,9 @@ crosscheck boundaries, `repeated_key`) and `rivet` (Rivet's types file and kind 
 Notes for a port: an empty object, an empty array, a one-element tuple and a repeated key are parse errors of the fragment (and of a
 document), so a script that validates `{ }` reports `doc=ANVIL_ERR_SYNTAX`; FlyWire's schema is loaded from a buffer with the
 repository root as the working directory, so the `flywire` cases keep the schema at the root of the file tree and its types file at
-`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`) on purpose: native
-misses an include cycle when the root is a bare file name (BR-2610-anvl-004), and the corpus does not pin that defect.
+`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`); native
+used to miss an include cycle when the root was a bare file name (BR-2610-anvl-004); it is found now, and `include_cycle_bare`,
+`self_include_bare`, `self_include_dot_bare`, `include_cycle_three_bare` and `include_cycle_dot_spelling` pin it.
 
 ## Drift tables
 

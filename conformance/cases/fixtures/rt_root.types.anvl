@@ -1,0 +1,12 @@
+#!aml
+include "rt_base.types.anvl";
+@[types]
+
+Id := {
+   type := Numeric;
+   max := 5;
+};
+
+Own := {
+   type := Bool;
+};

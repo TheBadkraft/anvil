@@ -194,12 +194,30 @@ case(INC, "collision_two_files", [("main.anvl", '#!aml\ninclude "a.anvl";\ninclu
 case(INC, "collision_override_chain", [("main.anvl", '#!aml\ninclude "a.anvl";\n'), ("a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Numeric; };\n'), ("b.anvl", T1)],
      ['registry r includes "main.anvl"', 'type find r "A"'])
 case(INC, "root_has_types", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nM := { type := Bool; };\n'), ("a.anvl", T1)],
-     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"', 'registry s load "main.anvl"', 'type find s "M"', 'type find s "A"'])
+     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"', 'registry s load "main.anvl"', 'type find s "M"', 'type find s "A"'],
+     desc="BR-2610-anvl-schema-005: the root's own @[types] are part of the registry load_from_includes builds (includes contribute A, the root contributes M); load sees only the root's own")
+case(INC, "root_types_override_include", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Numeric; max := 5; };\n'), ("a.anvl", TYPES + "A := { type := Numeric; max := 9; };\n")],
+     ['registry r includes "main.anvl"', 'type find r "A"'], desc="BR-2610-anvl-schema-005: the root's A overrides the included A, reported as a name collision")
+case(INC, "root_types_no_includes", [("main.anvl", T1)], ['registry r includes "main.anvl"', 'type find r "A"'], desc="BR-2610-anvl-schema-005: a root with @[types] and no includes yields its own types")
+case(INC, "root_types_through_chain", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nM := { type := Bool; };\n'), ("a.anvl", '#!aml\ninclude "b.anvl";\n'), ("b.anvl", T1)],
+     ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"'], desc="BR-2610-anvl-schema-005: the root's types alongside types reached through a document without @[types]")
 case(INC, "no_includes", [("main.anvl", "#!aml\nx := 1;\n")], ['registry r includes "main.anvl"', 'type find r "x"'])
 case(INC, "missing_include", [("main.anvl", '#!aml\ninclude "gone.anvl";\n')], ['registry r includes "main.anvl"'])
 case(INC, "include_cycle", [("d/a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')],
-     ['registry r includes "d/a.anvl"', 'type find r "A"', 'type find r "B"'], desc="the roots carry a directory part: a bare root name misses the cycle (BR-2610-anvl-004)")
-case(INC, "self_include", [("d/a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="a directory part in the root name: see BR-2610-anvl-004")
+     ['registry r includes "d/a.anvl"', 'type find r "A"', 'type find r "B"'], desc="the roots carry a directory part; include_cycle_bare is the same graph with bare root names")
+case(INC, "self_include", [("d/a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="a directory part in the root name; self_include_bare has none")
+# BR-2610-anvl-004: a bare root name is the same document as the "./name" its includer composes
+_AB = [("a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')]
+case(INC, "include_cycle_bare", _AB, ['registry r includes "a.anvl"', 'type find r "A"', 'type find r "B"'], desc="bare root names: the cycle is found (BR-2610-anvl-004)")
+case(INC, "include_cycle_bare_load", _AB, ['registry r load "a.anvl"', 'type find r "A"'], desc="bare root name through registry load (BR-2610-anvl-004)")
+case(INC, "self_include_bare", [("a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "a.anvl"', 'type find r "A"'], desc="a bare root that includes itself (BR-2610-anvl-004)")
+case(INC, "self_include_dot_bare", [("a.anvl", '#!aml\ninclude "./a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "a.anvl"', 'type find r "A"'], desc="a bare root that includes ./itself (BR-2610-anvl-004)")
+case(INC, "include_cycle_dot_spelling", [("d/a.anvl", '#!aml\ninclude "./b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "./a.anvl";\n@[types]\nB := { type := Bool; };\n')],
+     ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="./ spellings of the same documents (BR-2610-anvl-004)")
+case(INC, "include_cycle_three_bare", [("a.anvl", '#!aml\ninclude "b.anvl";\n'), ("b.anvl", '#!aml\ninclude "c.anvl";\n'), ("c.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nC := { type := Bool; };\n')],
+     ['registry r includes "a.anvl"', 'type find r "C"'], desc="a three-document cycle from a bare root (BR-2610-anvl-004)")
+case(INC, "diamond_bare", [("r.anvl", '#!aml\ninclude "b.anvl";\ninclude "c.anvl";\n'), ("b.anvl", '#!aml\ninclude "d.anvl";\n'), ("c.anvl", '#!aml\ninclude "d.anvl";\n'), ("d.anvl", T1)],
+     ['registry r includes "r.anvl"', 'type find r "A"'], desc="a diamond under a bare root is not a cycle (BR-2610-anvl-004)")
 case(INC, "subdirectories", [("main.anvl", '#!aml\ninclude "lib/a.anvl";\n'), ("lib/a.anvl", '#!aml\ninclude "sub/b.anvl";\n@[types]\nA := { type := Bool; };\nA2 := { type := Bool; };\n'), ("lib/sub/b.anvl", TYPES + "B := { type := Bool; };\nA2 := { type := String; };\n")],
      ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "A2"', 'type find r "B"'])
 case(INC, "parent_include", [("lib/a.anvl", '#!aml\ninclude "../t.anvl";\n'), ("t.anvl", T1)], ['registry r includes "lib/a.anvl"', 'type find r "A"'])
@@ -400,7 +418,8 @@ COMBOS = [("none", ""), ("min0", "min := 0;"), ("max10", "max := 10;"), ("min0_m
           ("min_tiny", "min := 5e-324;"), ("max_tiny_neg", "max := -5e-324;"), ("min_u64", "min := 18446744073709551615;"), ("min_bignum", "min := 123456789012345678901234567890;")]
 for cn, body in COMBOS:
     case(N, "range_" + cn, [("s.anvl", SCHEMA + "n := { type := Numeric; %s };\n" % body)], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in NUMS], desc=body)
-case(N, "integer_by_value_not_spelling", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["2", "2.0", "2.50", "1e+3", "1e-1", "1e2", "12e-1", "0.0", "-0.0", "1.0000000000000001", "9007199254740993.0", "1e400", "-2.0", "5e-324"]])
+case(N, "integer_by_value_not_spelling", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["2", "2.0", "2.50", "1e+3", "1e-1", "1e2", "12e-1", "0.0", "-0.0", "1.0000000000000001", "9007199254740993.0", "1e400", "-2.0", "5e-324", "-1e400", "1.5e999", "1e308", "99999999999999999999", "-99999999999999999999"]],
+     desc="BR-2610-anvl-schema-004: a decimal/exponent literal beyond double range (1e400) is not an integer and fails; a digits-only literal past int64 is whole and passes")
 case(N, "numbers_as_other_kinds", [("s.anvl", SCHEMA + "s := { type := String; };\nb := { type := Bool; };\ne := { type := enum; values := [1, 2.0, 1e1, 007]; };\n")],
      ['schema s load "s.anvl"'] + [vv("s", "{ %s := %s; }" % (f, v)) for f in "sbe" for v in ["1", "2.0", "1e1", "007", "2", "10", "true"]])
 case(N, "enum_numeric_membership", [("s.anvl", SCHEMA + "e := { type := enum; values := [1, 2.5, \"3\", 1e2]; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ e := %s; }" % v) for v in ["1", "1.0", "2.5", "2.50", "3", '"3"', "1e2", "100", '"1e2"', "01"]])

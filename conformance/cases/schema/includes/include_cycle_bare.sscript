@@ -1,0 +1,15 @@
+anvil-schema-script 1
+# bare root names: the cycle is found (BR-2610-anvl-004)
+file "a.anvl"
+|#!aml
+|include "b.anvl";
+|@[types]
+|A := { type := Bool; };
+file "b.anvl"
+|#!aml
+|include "a.anvl";
+|@[types]
+|B := { type := Bool; };
+registry r includes "a.anvl"
+type find r "A"
+type find r "B"

@@ -1651,6 +1651,15 @@ static void test_sch58_integer_is_value_based(void) {
       {"#!aml\nn := 1e-1;\n", false, "SCH58: 1e-1 is 0.1, fails"},
       {"#!aml\nn := 99999999999999999999;\n", true, "SCH58: an integer literal past int64 passes"},
       {"#!aml\nn := 0.5;\n", false, "SCH58: 0.5 fails"},
+      // BR-2610-anvl-schema-004: a decimal/exponent literal beyond double range has no finite value
+      // to be whole, so it is not an integer; a digits-only literal past int64 (above) still is.
+      {"#!aml\nn := 1e400;\n", false, "SCH58: 1e400 (overflowed float) fails"},
+      {"#!aml\nn := -1e400;\n", false, "SCH58: -1e400 fails"},
+      {"#!aml\nn := 1.5e999;\n", false, "SCH58: 1.5e999 fails"},
+      {"#!aml\nn := 1e+99999999999999999999;\n", false, "SCH58: an absurd exponent fails"},
+      {"#!aml\nn := 1e308;\n", true, "SCH58: 1e308 is finite and whole, passes"},
+      {"#!aml\nn := -1.7976931348623157e308;\n", true, "SCH58: the largest double magnitude is whole, passes"},
+      {"#!aml\nn := -99999999999999999999;\n", true, "SCH58: a negative integer literal past int64 passes"},
    };
    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
       anvil_schema schema; anvil_document sdoc, ddoc;
@@ -1668,6 +1677,37 @@ static void test_sch58_integer_is_value_based(void) {
       }
       nested_free(schema, sdoc, ddoc);
    }
+}
+
+static void test_sch58b_overflowed_float_is_independent_of_range(void) {
+   anvil_schema schema; anvil_document sdoc, ddoc;
+   const char *src = "#!aml\n@[schema]\nn := { type := Numeric; integer := true; min := 0; max := 10; };\n";
+   bool ok = nested_validate(src, "#!aml\nn := 1e400;\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH58b: 1e400 fails");
+      TestBit.is_equal_int(2, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH58b: the integer and the range check each report");
+   } else {
+      TestBit.is_not_null(schema, "SCH58b: schema loaded");
+   }
+   nested_free(schema, sdoc, ddoc);
+   // without integer := true an overflowed float is only a range matter
+   ok = nested_validate("#!aml\n@[schema]\nn := { type := Numeric; };\n", "#!aml\nn := 1e400;\n",
+                        &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_true(ok, "SCH58b: no integer rule, no violation");
+   }
+   nested_free(schema, sdoc, ddoc);
+   // inside an array of integers
+   ok = nested_validate("#!aml\n@[schema]\nids := { type := Array; items := { type := Numeric; integer := true; }; };\n",
+                        "#!aml\nids := [1, 1e400, 3];\n", &schema, &sdoc, &ddoc);
+   if (schema) {
+      TestBit.is_false(ok, "SCH58b: an overflowed float in an integer array fails");
+      TestBit.is_equal_int(1, (long long)anvil_schema_get_violation_count(schema),
+                           "SCH58b: only that element");
+      NESTED_PATH_IS(0, "ids[1]", ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "SCH58b: at ids[1]");
+   }
+   nested_free(schema, sdoc, ddoc);
 }
 
 static void test_sch59_integer_with_range_and_null(void) {
@@ -2926,6 +2966,8 @@ int main(void) {
 
    TestBit.run_ex("SCH58_INTEGER_IS_VALUE_BASED", NULL,
                   test_sch58_integer_is_value_based, th);
+   TestBit.run_ex("SCH58b_overflowed_float_is_independent_of_range", NULL,
+                  test_sch58b_overflowed_float_is_independent_of_range, th);
    TestBit.run_ex("SCH59_INTEGER_WITH_RANGE_AND_NULL", NULL,
                   test_sch59_integer_with_range_and_null, th);
    TestBit.run_ex("SCH60_INTEGER_INHERITED_FROM_TYPE", NULL,

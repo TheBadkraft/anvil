@@ -1,0 +1,18 @@
+anvil-schema-script 1
+# a diamond under a bare root is not a cycle (BR-2610-anvl-004)
+file "r.anvl"
+|#!aml
+|include "b.anvl";
+|include "c.anvl";
+file "b.anvl"
+|#!aml
+|include "d.anvl";
+file "c.anvl"
+|#!aml
+|include "d.anvl";
+file "d.anvl"
+|#!aml
+|@[types]
+|A := { type := String; size := 1; };
+registry r includes "r.anvl"
+type find r "A"

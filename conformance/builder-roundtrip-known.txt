@@ -1,2 +1,4 @@
 # Builder corpus outputs the native reader rejects: "<script> <emit-number> <ticket or reason>".
 include/path_05.bscript 1 harness:an-absolute-include-cannot-be-satisfied
+include/path_14.bscript 1 harness:an-include-naming-a-directory-cannot-be-satisfied-by-a-file
+include/path_15.bscript 1 harness:an-include-naming-a-directory-cannot-be-satisfied-by-a-file

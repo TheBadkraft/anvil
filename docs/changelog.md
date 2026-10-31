@@ -83,6 +83,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A root file that cannot be read now reports its specific error (BR-2610-anvl-io-001).** `anvil_load` of a missing or
+  unreadable file returned category `ANVIL_ERR_IO` with an empty message and no recorded error (code 0). It now records
+  the specific code and `anvil_error_get_message` returns its message: `ANVL_ERR_IO_FILE_NOT_FOUND` ("IO file not found")
+  for a name that does not exist, `ANVL_ERR_IO_FILE_READ` for a directory, a file that cannot be opened for reading
+  (permissions) or a failed read, and `ANVL_ERR_IO_INVALID_PATH` for a NULL or empty path. The category stays
+  `ANVIL_ERR_IO`; no code and no ABI is added. Side effect: an `include` that names a directory used to load as an empty
+  document and is now an include error, like any unreadable include.
+- **An include cycle through a bare root file name is found (BR-2610-anvl-004).** `anvil_load("a.anvl")` where `a.anvl`
+  and `b.anvl` include each other, or a file that includes itself, returned status ok, because the root kept its name as
+  given while its includer composed `./a.anvl`, and the cycle check compared the exact strings (the repeat was then
+  merged as a "diamond" by its content). A document is now identified by its normalised path (`.` components and
+  repeated slashes removed, `name/..` cancelled; textual, symbolic links are not followed), so `a.anvl`, `./a.anvl`,
+  `.//a.anvl` and `d/../a.anvl` are one document and the load fails with `ANVL_ERR_INCLUDE_CYCLIC` (4206), as it
+  already did for `./a.anvl` and `dir/a.anvl`. Behaviour change: an include spelled with `./` or `..` that loops back
+  was accepted before and is a cycle error now (`coverage/includes/self_dot`, `mutual_dot_a` and `mutual_dot_b` dumps
+  changed). The printed document paths do not change. Include-graph speed is unchanged (the normal form is a pointer
+  into the composed path in the usual case; no allocation). No ABI change.
+- **`integer := true` rejects an overflowed decimal or exponent literal (BR-2610-anvl-schema-004).** A value such as
+  `1e400` (a float literal beyond double range, which has no finite value and so is not a whole number) passed the
+  integer rule; it now fails with `ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH` ("value must be an integer"), like
+  `2.5`. A digits-only literal past int64 (`99999999999999999999`) is whole and still passes. Combined with `min` and
+  `max`, an overflowed float reports both the integer and the range violation. No ABI change.
+- **`anvil_type_registry_load_from_includes` includes the root document's own `@[types]` (BR-2610-anvl-schema-005).** The
+  header said a definition closer to `doc` overrides a deeper one, but the walk visited only the includes, so a root
+  that itself carried `@[types]` (for example a types file that includes a base types file) contributed nothing. The
+  root's own definitions are now merged last, so they win over every included one; a name declared in both is the usual
+  `NAME_COLLISION` diagnostic, with the root's definition used. A root without `@[types]` is unchanged, and no consumer
+  document of FlyWire or Rivet carries `@[types]` on the document it loads from. The header comment now says so. No ABI
+  change.
+
 - **The builder refuses the bases the reader would refuse (BR-2610-anvl-writer-004).** A base that loops back (a
   statement based on itself, `a` on `b` on `a`, `a` -> `b` -> `c` -> `a`) now fails `anvil_builder_write` and
   `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` (19), whether or not an include exists. A base

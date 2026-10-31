@@ -1,5 +1,6 @@
 anvil-schema-run 1
-registry line=16 name=r how=includes file="lib/b.anvl" doc=ANVIL_ERR_RESOLVE result=ok diagnostics=1
+registry line=16 name=r how=includes file="lib/b.anvl" doc=ANVIL_ERR_RESOLVE result=ok diagnostics=2
   diag index=0 code=1 name=ANVIL_TYPE_DIAG_NAME_COLLISION type="A" source="lib/sub/c.anvl" message="type 'A' is defined in both 'lib/a.anvl' and 'lib/sub/c.anvl'; the one in 'lib/sub/c.anvl' is used"
+  diag index=1 code=1 name=ANVIL_TYPE_DIAG_NAME_COLLISION type="A" source="lib/b.anvl" message="type 'A' is defined in both 'lib/sub/c.anvl' and 'lib/b.anvl'; the one in 'lib/b.anvl' is used"
 steps 4
 status ok

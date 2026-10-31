@@ -1,0 +1,14 @@
+anvil-schema-script 1
+# ./ spellings of the same documents (BR-2610-anvl-004)
+file "d/a.anvl"
+|#!aml
+|include "./b.anvl";
+|@[types]
+|A := { type := Bool; };
+file "d/b.anvl"
+|#!aml
+|include "./a.anvl";
+|@[types]
+|B := { type := Bool; };
+registry r includes "d/a.anvl"
+type find r "A"

@@ -1,5 +1,5 @@
 anvil-schema-script 1
-# the roots carry a directory part: a bare root name misses the cycle (BR-2610-anvl-004)
+# the roots carry a directory part; include_cycle_bare is the same graph with bare root names
 file "d/a.anvl"
 |#!aml
 |include "b.anvl";
