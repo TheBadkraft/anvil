@@ -222,6 +222,56 @@ class GreenRules(Base):
         self.assertEqual(commits[-1]["kind"], "GREEN")
 
 
+class SizeAndInputs(Base):
+    def test_green_with_a_large_product_diff_is_a_batch(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: mul]", {"src/lib.js": MUL_ONLY + "".join("// pad %d\n" % i for i in range(40))})
+        self.assertFails(b, "product diff of", "--max-green-lines", "30")
+
+    def test_green_within_the_size_limit_passes(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: mul]", {"src/lib.js": MUL_ONLY + "".join("// pad %d\n" % i for i in range(40))})
+        self.assertPasses(b, "--max-green-lines", "400")
+
+    def test_red_that_only_moves_a_vendored_pin_counts_as_changing_the_tests(self):
+        b = self.fx.commit("init", {
+            "package.json": json.dumps({"name": "fx", "scripts": {"test": "node --test test/*.test.js"}}),
+            "src/lib.js": "exports.add = (a, b) => a + b;\n",
+            "vendor/anvil/corpus.txt": "a\n",
+            "test/lib.test.js": TESTJS + case("corpus", "assert.strictEqual(require('fs').readFileSync(require('path').join(__dirname, '../vendor/anvil/corpus.txt'), 'utf8'), 'a\\n');")})
+        self.fx.commit("T-1: RED. the corpus moves", {"vendor/anvil/corpus.txt": "b\n"})
+        rec = self.assertPasses(b)
+        self.assertIn("vendored", " ".join(rec["notes"]))
+
+
+class CompatSuite(Base):
+    def compat_repo(self):
+        compat = ("const { spawnSync } = require('node:child_process');\n"
+                  "const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'test/compat/x.test.js'], { encoding: 'utf8' });\n"
+                  "process.exit(r.status === 0 ? 0 : 1);\n")
+        return self.fx.commit("init", {
+            "package.json": json.dumps({"name": "fx", "scripts": {"test": "node --test test/*.test.js", "compat": "node scripts/compat.js"}}),
+            "scripts/compat.js": compat,
+            "src/lib.js": "exports.add = (a, b) => a + b;\n",
+            "test/compat/x.test.js": "const test = require('node:test'); test('x', () => {});\n",
+            "test/lib.test.js": TESTJS + case("add", "assert.strictEqual(lib.add(1, 2), 3);")})
+
+    def test_a_red_in_the_compat_suite_is_seen(self):
+        b = self.compat_repo()
+        self.fx.commit("T-1: RED. x", {"test/compat/x.test.js": "const test = require('node:test'); test('x', () => { require('../src/lib.js').nope(); });\n"})
+        self.assertFails(b, "do not fail on an assertion")
+
+    def test_a_compat_assertion_failure_is_a_genuine_red(self):
+        b = self.compat_repo()
+        self.fx.commit("T-1: RED. x", {"test/compat/x.test.js": "const test = require('node:test'); test('x', () => { require('assert').strictEqual(1, 2); });\n"})
+        self.assertPasses(b)
+
+    def test_no_compat_skips_it(self):
+        b = self.compat_repo()
+        self.fx.commit("T-1: RED. x", {"test/compat/x.test.js": "const test = require('node:test'); test('x', () => { require('assert').strictEqual(1, 2); });\n"})
+        self.assertFails(b, "no test newly fails", "--no-compat")
+
+
 class PerfRules(Base):
     def gate(self, text):
         return {"bench/gate.json": text}

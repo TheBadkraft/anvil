@@ -34,10 +34,10 @@ import sys
 import tempfile
 import time
 
-ADAPTER_VERSION = "1"
+ADAPTER_VERSION = "3"
 HERE = os.path.dirname(os.path.abspath(__file__))
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-TAG = re.compile(r"^(?P<ticket>[A-Za-z0-9._/-]+): (?P<kind>RED|GREEN|PERF|REFACTOR)\.")
+TAG = re.compile(r"^(?P<ticket>[A-Za-z0-9._/-]+(?:,\s*[A-Za-z0-9._/-]+)*): (?P<kind>RED|GREEN|PERF|REFACTOR)\.")
 TESTS_TAG = re.compile(r"\[tests:\s*([^\]]*)\]")
 GATE_TAG = re.compile(r"\[gate:\s*([^\]\s]+)\s*\]")
 
@@ -152,6 +152,7 @@ class Adapter:
     name = "?"
     product = []
     tests = []
+    test_inputs = []  # product-side paths that are also test input (a vendored corpus): moving them can make a RED
 
     def run(self, work, opts):
         """-> {"ran": bool, "tests": {id: {s,k,m}}, "note": str}"""
@@ -159,19 +160,46 @@ class Adapter:
 
 
 class NodeAdapter(Adapter):
-    """anvil.js and other node:test repos: `npm test` with the check-tdd reporter."""
+    """anvil.js and other node:test repos: `npm test`, and `npm run compat` when package.json has it (anvil-node's own
+    tests run against anvil.js; `npm test` does not cover them). Events come from the check-tdd reporter, written
+    to a file by NODE_OPTIONS, so the inner `node --test` that the compat script spawns is captured too."""
     name = "node"
     product = ["src/", "node/", "js/", "vendor/anvil"]
     tests = ["test/"]
+    test_inputs = ["vendor/anvil"]
+
+    def _events(self, cmd, work, opts, root_strip, inner_tap=False):
+        reporter = os.path.join(HERE, "node-reporter.js")
+        fd, dest = tempfile.mkstemp(prefix="ctdd-ev-")
+        os.close(fd)
+        try:
+            # `--test-reporter=` after the files would be taken as a script argument, so it goes in NODE_OPTIONS
+            extra = "--test-reporter=%s --test-reporter-destination=%s" % (reporter, dest)
+            if inner_tap:  # a script that passes its own --test-reporter: node wants one destination per reporter
+                extra += " --test-reporter-destination=stdout"
+            env = dict(os.environ, NODE_OPTIONS=(os.environ.get("NODE_OPTIONS", "") + " " + extra).strip())
+            p = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=opts.run_timeout, env=env)
+            with open(dest) as f:
+                lines = f.read().splitlines()
+        finally:
+            os.unlink(dest)
+        tests = parse_node_events(lines, root=root_strip)
+        note = "" if tests else "%s produced no test events (exit %d): %s" % (" ".join(cmd), p.returncode, (p.stderr or p.stdout)[-300:].strip())
+        return tests, note
 
     def run(self, work, opts):
-        reporter = os.path.join(HERE, "node-reporter.js")
-        # `--test-reporter=` after the files would be taken as a script argument, so it goes in NODE_OPTIONS
-        env = dict(os.environ, NODE_OPTIONS=(os.environ.get("NODE_OPTIONS", "") + " --test-reporter=" + reporter).strip())
-        p = subprocess.run(["npm", "test", "--silent"], cwd=work, capture_output=True, text=True, timeout=opts.run_timeout, env=env)
-        tests = parse_node_events(p.stdout.splitlines(), root=os.path.realpath(work))
-        return {"ran": bool(tests), "tests": tests,
-                "note": "" if tests else "npm test produced no test events (exit %d): %s" % (p.returncode, (p.stderr or p.stdout)[-300:].strip())}
+        tests, note = self._events(["npm", "test", "--silent"], work, opts, os.path.realpath(work))
+        try:
+            with open(os.path.join(work, "package.json")) as f:
+                scripts = json.load(f).get("scripts", {})
+        except (OSError, ValueError):
+            scripts = {}
+        if tests and "compat" in scripts and not opts.no_compat:
+            ctests, cnote = self._events(["npm", "run", "compat", "--silent"], work, opts, "", inner_tap=True)
+            for tid, rec in ctests.items():
+                tests["compat:" + re.sub(r"^/[^ ]*?anvil-compat-[^/]+/", "", tid)] = rec
+            note = cnote
+        return {"ran": bool(tests), "tests": tests, "note": note}
 
 
 class NativeAdapter(Adapter):
@@ -236,8 +264,10 @@ def judge(kind, parent, cur, facts, state, opts):
         return reasons, notes, data
 
     if kind == "RED":
-        if not facts["test_files"]:
+        if not facts["test_files"] and not facts["input_files"]:
             reasons.append("RED changes no test file")
+        elif not facts["test_files"]:
+            notes.append("RED moves a vendored test input (%s), no test file" % ", ".join(facts["input_files"]))
         if not newfail:
             reasons.append("no test newly fails (all tests that passed or were new still pass)")
         bad = {t for t in newfail if ct[t].get("k") != "assertion"}
@@ -249,7 +279,7 @@ def judge(kind, parent, cur, facts, state, opts):
             notes.append("%d test(s) from the parent no longer run: %s" % (len(removed), summarize(removed)))
         if facts["product_lines"]:
             notes.append("product code changed (%d lines): stubs only?" % facts["product_lines"])
-        if newfail and not bad and facts["test_files"]:
+        if newfail and not bad:
             state["open_reds"].append({"sha": facts["sha"], "files": set(facts["test_files"]), "pending": set(newfail)})
 
     elif kind == "GREEN":
@@ -279,6 +309,8 @@ def judge(kind, parent, cur, facts, state, opts):
             data["flipped_beyond_named"] = len(extra)
             if extra:
                 reasons.append("batch: %d test(s) flipped beyond the named: %s" % (len(extra), summarize(extra)))
+        if facts["product_lines"] > opts.max_green_lines:
+            reasons.append("batch: product diff of %d lines (limit %d) for %d flipped test(s)" % (facts["product_lines"], opts.max_green_lines, len(flipped)))
         notes.append("flipped %d, product diff %d lines" % (len(flipped), facts["product_lines"]))
 
     elif kind == "PERF":
@@ -353,31 +385,33 @@ class Runner:
         subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", self.repo, self.work], check=True, capture_output=True)
         self.cloned = True
 
-    def _submodule_source(self):
+    def _submodule_source(self, sha):
         for c in (os.path.join(self.repo, ".git", "modules", "vendor", "anvil"), os.path.join(self.repo, "vendor", "anvil"),
                   os.path.join(os.path.dirname(self.repo), "anvil")):
-            if os.path.isdir(c):
+            if os.path.isdir(c) and subprocess.run(["git", "-C", c, "cat-file", "-e", sha + "^{commit}"], capture_output=True).returncode == 0:
                 return c
         return None
 
     def _populate_submodule(self, sha):
-        """vendor/anvil is a gitlink: fill it offline with `git archive` of the pinned commit."""
+        """vendor/anvil is a gitlink: fill it offline, as a shared clone (a real git checkout, as some tests read its history)."""
         out = git(self.work, "ls-tree", sha, "vendor/anvil", check=False).split()
         if len(out) < 3 or out[0] != "160000":
             return ""
-        src = self._submodule_source()
+        src = self._submodule_source(out[2])
         dest = os.path.join(self.work, "vendor", "anvil")
         os.makedirs(dest, exist_ok=True)
         if not src:
             return "vendor/anvil pin %s not available" % out[2][:7]
-        a = subprocess.run(["git", "-C", src, "archive", out[2]], capture_output=True)
-        if a.returncode != 0:
+        shutil.rmtree(dest, ignore_errors=True)
+        c = subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", src, dest], capture_output=True)
+        if c.returncode == 0:
+            c = subprocess.run(["git", "-C", dest, "checkout", "-q", "--detach", out[2]], capture_output=True)
+        if c.returncode != 0:
             return "vendor/anvil pin %s not found in %s" % (out[2][:7], src)
-        subprocess.run(["tar", "-x", "-C", dest], input=a.stdout, check=True)
         return ""
 
     def result(self, sha):
-        key = os.path.join(self.cache, "%s-v%s-%s.json" % (self.adapter.name, ADAPTER_VERSION, sha))
+        key = os.path.join(self.cache, "%s-v%s%s-%s.json" % (self.adapter.name, ADAPTER_VERSION, "-nc" if getattr(self.opts, "no_compat", False) else "", sha))
         if os.path.exists(key):
             self.hits += 1
             with open(key) as f:
@@ -413,6 +447,7 @@ def commit_facts(repo, adapter, sha, parent):
     base = parent if parent else git(repo, "hash-object", "-t", "tree", "/dev/null").strip()  # the empty tree
     files = [f for f in git(repo, "diff", "--name-only", "--no-renames", base, sha).splitlines() if f]
     test_files = [f for f in files if under(f, adapter.tests)]
+    input_files = [f for f in files if under(f, adapter.test_inputs)]
     product_files = [f for f in files if under(f, adapter.product)]
     lines = 0
     if product_files:
@@ -427,7 +462,7 @@ def commit_facts(repo, adapter, sha, parent):
         named += [n.strip() for n in m.group(1).split(",") if n.strip()]
     gm = GATE_TAG.search(msg)
     gate = {"path": gm.group(1) if gm else None, "exists": False, "verdict": None}
-    return {"sha": sha, "test_files": test_files, "product_files": product_files, "product_lines": lines,
+    return {"sha": sha, "test_files": test_files, "input_files": input_files, "product_files": product_files, "product_lines": lines,
             "named": named, "gate": gate, "subject": msg.splitlines()[0] if msg else ""}
 
 
@@ -458,8 +493,10 @@ def main(argv=None):
     ap.add_argument("--scratch", help="parent directory for the scratch clone (default: a fresh temp dir, removed afterwards)")
     ap.add_argument("--budget", type=int, default=0, help="stop starting new suite runs after this many seconds (exit 3; rerun resumes from the cache)")
     ap.add_argument("--run-timeout", type=int, default=900, help="per suite run, seconds")
+    ap.add_argument("--no-compat", action="store_true", help="node: skip `npm run compat` (anvil-node's tests against anvil.js)")
     ap.add_argument("--lenient-tests", action="store_true", help="a GREEN without [tests: ...] is a note, not a FAIL (for history that predates the syntax)")
     ap.add_argument("--batch-limit", type=int, default=10, help="GREEN with no [tests:] fails when more than this many tests flip")
+    ap.add_argument("--max-green-lines", type=int, default=150, help="a GREEN whose product diff is larger than this is a batch")
     ap.add_argument("--testbit", default=None, help="native: path of the testbit checkout (default: ../testbit beside the repo)")
     ap.add_argument("--gate-root", default=None, help="directory to look for [gate: path] records not committed to the repo")
     opts = ap.parse_args(argv)
