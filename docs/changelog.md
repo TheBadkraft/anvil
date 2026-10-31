@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.13.0-rc] — (2026-10-31)
+
+A minor release because behaviour changes: a root file that cannot be read now reports its specific IO code (1001, 1002, 1003), include cycles are found by normalised path, `integer` rejects an overflowed float literal, and `TypeRegistry` `fromIncludes` merges the root's own `@[types]`. The builder gains messages for codes 19 and 20 and refuses a missing base. The builder (915 cases) and schema (559 cases) conformance corpora ship for second implementations. No ABI change. Every artifact is built from this tag and reports `0.13.0-rc+<BUILD>`.
+
 ### Added
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
@@ -24,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolve types, load a schema, validate documents and values (`skip_required`, `allow_unknown`) and read violations and
   rules back. `anvil-dump --schema-script <file>` prints the run (`anvil-schema-run 1`): every registry and schema
   diagnostic with its category, name and source, every type accessor, the whole effective rule tree of a schema, and for
-  each validation the verdict and every violation with its code, field path, message and order. 549 generated scripts
+  each validation the verdict and every violation with its code, field path, message and order. 559 generated scripts
   under `conformance/cases/schema/` (`conformance/seed/gen_schema.py`, scripts only; the runs are native's) cover the
   registry, includes, diagnostics, numeric bounds and kinds, strings, formats, blobs and tags, collections, nullable,
   options, whole data documents, and FlyWire-shaped and Rivet-shaped schemas. Hooked into `make check-conformance`,
@@ -61,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the site (Bindings guide table, the two section intros and the feature table, download page "Previous builds" and
   previous-releases links, home page, sandbox, footers) now carries `*` and the word Unsupported, with one footnote:
   frozen at v0.11.0-rc, no longer updated, replaced by anvil.js; the v0.11.0-rc downloads stay available. No download
-  link or file changed. Not deployed yet.
+  link or file changed. Deployed.
 
 - Conformance: the builder corpus gains 23 scripts (cycles, missing bases with and without includes, foreign members)
   and `check-builder-roundtrip` now satisfies an include with a file that defines the bases the document does not

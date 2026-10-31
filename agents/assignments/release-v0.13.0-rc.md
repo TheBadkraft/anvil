@@ -101,7 +101,7 @@ Principal Engineer asks for once the release is staged.
 
 | Step | State |
 |---|---|
-| 1. Cut core `0.13.0-rc` | |
+| 1. Cut core `0.13.0-rc` | branch `release/v0.13.0-rc` cut; waiting for the merge and the tag |
 | 2. Pins on `release/v0.13.0-rc` | |
 | 3. Build twice | |
 | 4. Checks on the packaged files | |
