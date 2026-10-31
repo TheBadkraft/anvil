@@ -2107,6 +2107,8 @@ static void test_anv71_invalid_path_code(void) {
                      "ANV71: a NULL path reports INVALID_PATH");
    expect_io_message(anvil_load(""), ANVL_ERR_IO_INVALID_PATH,
                      "ANV71: an empty path reports INVALID_PATH");
+}
+/* ---------------------------------------------------------------------- *
  * ANV72-75 (BR-2610-anvl-004) - document identity for include-cycle detection is
  * the normalised path: a bare root name, "./name", "dir/../name" and "dir//name"
  * spellings of one file are one document.
