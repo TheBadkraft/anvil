@@ -10,10 +10,12 @@ no matter which one reads it. Pick the one that matches where your code runs.
 |---|---|---|
 | [Native library](Bindings-Guide.md#native-library) | Any C/C++ program (static or shared link) | Downloadable today |
 | [anvil.js](Bindings-Guide.md#javascript-anvil-js) | Node.js 18+ and any browser (plain JavaScript) | Downloadable today (reader and writer) |
-| [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | v0.11.0-rc, no further updates; replaced by anvil.js |
-| [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | v0.11.0-rc, no further updates; replaced by anvil.js |
+| [WebAssembly](Bindings-Guide.md#webassembly) | Browser, or any JS host | **Unsupported**\*: v0.11.0-rc, no further updates; replaced by anvil.js |
+| [Node.js](Bindings-Guide.md#nodejs) | Node.js (N-API) | **Unsupported**\*: v0.11.0-rc, no further updates; replaced by anvil.js |
 | [.NET](Bindings-Guide.md#net) | .NET 9+ (C#, or any CLR language) | Downloadable today |
 | [Python](Bindings-Guide.md#python) | CPython 3.11+ (ctypes) | Downloadable today |
+
+\* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.
 
 The current release is `v0.12.1-rc`, built from one source tag: the native library, anvil.js,
 .NET and Python. The Node.js and WebAssembly downloads are from `v0.11.0-rc`: they are frozen,
@@ -37,14 +39,14 @@ sanity check, not a compatibility contract to branch logic on.
 
 ### What each binding offers
 
-| | Node.js | WebAssembly | .NET | Python |
+| | Node.js\* (Unsupported) | WebAssembly\* (Unsupported) | .NET | Python |
 |---|---|---|---|---|
 | Parse, statements, values | yes | yes | yes | yes |
 | Attributes, raw and decoded | yes | yes | yes | yes |
 | Type registry and schema | yes | yes | yes | yes |
 | Writer and builder | yes | yes | yes | yes |
 
-Node.js and WebAssembly share one API. .NET and Python share another, with lazy navigation
+Node.js and WebAssembly share one API (both Unsupported\*, see the footnote above). .NET and Python share another, with lazy navigation
 instead of a one-call conversion, and each follows its own language's idiom.
 
 ## JavaScript (anvil.js)
@@ -176,6 +178,8 @@ Full C API reference: see the anvil repo's own `docs/language-reference.md` and
 
 ## WebAssembly
 
+\* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.
+
 **[Download anvil-wasm-v0.11.0-rc.tar.gz](/assets/downloads/anvil-wasm-v0.11.0-rc.tar.gz)** — the
 compiled module (`dist/anvil.wasm`, about 160 KB), its Emscripten glue (`dist/anvil.js`), a
 JS-facing wrapper (`lib/index.js`) with the same API as the Node binding below, and a prebuilt
@@ -299,6 +303,8 @@ reference. The differences are these:
   nothing after it is lost. Names, paths and identifiers reject an embedded NUL with a `RangeError`.
 
 ## Node.js
+
+\* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.
 
 **[Download anvil-node-v0.11.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-node-v0.11.0-rc-linux-x86_64.tar.gz)**
 — a prebuilt N-API addon (native addon, not a from-scratch JS parser) plus its JS-facing

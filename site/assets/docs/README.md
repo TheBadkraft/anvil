@@ -44,7 +44,7 @@ for the Node.js/WebAssembly/native-C equivalents of the snippet above.
   Schema are, and what's actually implemented.
 - **[AML Guide](AML-Guide.md)** — objects, arrays, tuples, attributes, inheritance, `$` VarRefs, blobs
 - **[AMP Guide](AMP-Guide.md)** — the restricted messaging dialect and what it forbids
-- **[Bindings](Bindings-Guide.md)** — native C library, anvil.js, .NET, Python (and the frozen Node.js and WebAssembly builds): usage guides and downloads
+- **[Bindings](Bindings-Guide.md)** — native C library, anvil.js, .NET, Python (and the Node.js and WebAssembly builds, **Unsupported**\*: frozen at v0.11.0-rc, replaced by anvil.js): usage guides and downloads
 
 ## Why not just JSON?
 
