@@ -1,14 +1,15 @@
 anvil-schema-script 1
-file "a.anvl"
+# the roots carry a directory part: a bare root name misses the cycle (BR-2610-anvl-004)
+file "d/a.anvl"
 |#!aml
 |include "b.anvl";
 |@[types]
 |A := { type := Bool; };
-file "b.anvl"
+file "d/b.anvl"
 |#!aml
 |include "a.anvl";
 |@[types]
 |B := { type := Bool; };
-registry r includes "a.anvl"
+registry r includes "d/a.anvl"
 type find r "A"
 type find r "B"

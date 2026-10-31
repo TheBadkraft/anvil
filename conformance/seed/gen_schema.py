@@ -197,9 +197,9 @@ case(INC, "root_has_types", [("main.anvl", '#!aml\ninclude "a.anvl";\n@[types]\n
      ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "M"', 'registry s load "main.anvl"', 'type find s "M"', 'type find s "A"'])
 case(INC, "no_includes", [("main.anvl", "#!aml\nx := 1;\n")], ['registry r includes "main.anvl"', 'type find r "x"'])
 case(INC, "missing_include", [("main.anvl", '#!aml\ninclude "gone.anvl";\n')], ['registry r includes "main.anvl"'])
-case(INC, "include_cycle", [("a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')],
-     ['registry r includes "a.anvl"', 'type find r "A"', 'type find r "B"'])
-case(INC, "self_include", [("a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "a.anvl"', 'type find r "A"'])
+case(INC, "include_cycle", [("d/a.anvl", '#!aml\ninclude "b.anvl";\n@[types]\nA := { type := Bool; };\n'), ("d/b.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nB := { type := Bool; };\n')],
+     ['registry r includes "d/a.anvl"', 'type find r "A"', 'type find r "B"'], desc="the roots carry a directory part: a bare root name misses the cycle (BR-2610-anvl-004)")
+case(INC, "self_include", [("d/a.anvl", '#!aml\ninclude "a.anvl";\n@[types]\nA := { type := Bool; };\n')], ['registry r includes "d/a.anvl"', 'type find r "A"'], desc="a directory part in the root name: see BR-2610-anvl-004")
 case(INC, "subdirectories", [("main.anvl", '#!aml\ninclude "lib/a.anvl";\n'), ("lib/a.anvl", '#!aml\ninclude "sub/b.anvl";\n@[types]\nA := { type := Bool; };\nA2 := { type := Bool; };\n'), ("lib/sub/b.anvl", TYPES + "B := { type := Bool; };\nA2 := { type := String; };\n")],
      ['registry r includes "main.anvl"', 'type find r "A"', 'type find r "A2"', 'type find r "B"'])
 case(INC, "parent_include", [("lib/a.anvl", '#!aml\ninclude "../t.anvl";\n'), ("t.anvl", T1)], ['registry r includes "lib/a.anvl"', 'type find r "A"'])

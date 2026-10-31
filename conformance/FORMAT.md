@@ -893,7 +893,8 @@ crosscheck boundaries, `repeated_key`) and `rivet` (Rivet's types file and kind 
 Notes for a port: an empty object, an empty array, a one-element tuple and a repeated key are parse errors of the fragment (and of a
 document), so a script that validates `{ }` reports `doc=ANVIL_ERR_SYNTAX`; FlyWire's schema is loaded from a buffer with the
 repository root as the working directory, so the `flywire` cases keep the schema at the root of the file tree and its types file at
-`schema-gen/postgres.types.anvl`.
+`schema-gen/postgres.types.anvl`. The `includes/include_cycle` and `self_include` cases name their roots with a directory part (`d/a.anvl`) on purpose: native
+misses an include cycle when the root is a bare file name (BR-2610-anvl-004), and the corpus does not pin that defect.
 
 ## Drift tables
 

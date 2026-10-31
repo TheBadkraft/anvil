@@ -1,6 +1,6 @@
 anvil-schema-run 1
-registry line=12 name=r how=includes file="a.anvl" doc=ok result=ok diagnostics=0
-type line=13 how=find registry=r name="A" result=none
-type line=14 how=find registry=r name="B" result=found kind=ANVIL_TYPE_BOOL size=none min=none max=none min_numeric=none max_numeric=none format=none values=0
+registry line=13 name=r how=includes file="d/a.anvl" doc=ANVIL_ERR_INCLUDE result=ok diagnostics=0
+type line=14 how=find registry=r name="A" result=none
+type line=15 how=find registry=r name="B" result=none
 steps 5
 status ok
