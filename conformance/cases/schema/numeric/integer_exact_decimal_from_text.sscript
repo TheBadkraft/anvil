@@ -1,0 +1,29 @@
+anvil-schema-script 1
+# BR-2610-anvl-schema-006: whole-ness is decided from the literal's text: a nonzero digit after the point (1e-999, 0.5e-400, 1.000001) fails; zero in any spelling, 1e3 and 1.0 pass
+file "s.anvl"
+|#!aml
+|@[schema]
+|n := { type := Numeric; integer := true; };
+schema s load "s.anvl"
+validate_value s "{ n := 1e-999; }"
+validate_value s "{ n := -1e-999; }"
+validate_value s "{ n := 0.5e-400; }"
+validate_value s "{ n := 1.000001; }"
+validate_value s "{ n := 1.0000000000000001; }"
+validate_value s "{ n := 1.5e-1; }"
+validate_value s "{ n := 12e-1; }"
+validate_value s "{ n := 1e-99999999999999999999; }"
+validate_value s "{ n := 0.0e-999; }"
+validate_value s "{ n := 0e5; }"
+validate_value s "{ n := 0e-999; }"
+validate_value s "{ n := 0.0; }"
+validate_value s "{ n := -0.0; }"
+validate_value s "{ n := 1e3; }"
+validate_value s "{ n := 1.0; }"
+validate_value s "{ n := 1.50e1; }"
+validate_value s "{ n := 100e-2; }"
+validate_value s "{ n := 1000e-3; }"
+validate_value s "{ n := 2.500e1; }"
+validate_value s "{ n := 1e400; }"
+validate_value s "{ n := 99999999999999999999; }"
+validate_value s "{ n := 9007199254740993.0; }"
