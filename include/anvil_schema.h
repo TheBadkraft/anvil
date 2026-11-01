@@ -81,6 +81,7 @@ typedef enum {
    ANVIL_SCHEMA_ERR_VALIDATION_TAG,           // a blob's @tag isn't the one the rule requires
    ANVIL_SCHEMA_ERR_VALIDATION_FORMAT,        // a string doesn't match the rule's `format`
    ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE, // a value is present for a rule whose `type` didn't resolve (fails closed)
+   ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING = 11,   // load: the document does not carry the @[schema] module attribute
 } anvil_schema_err_code;
 
 /**
@@ -108,6 +109,29 @@ typedef enum {
  * @[schema]. Dispose with anvil_schema_dispose once done.
  */
 anvil_schema anvil_schema_load(anvil_document doc);
+
+/**
+ * @brief anvil_schema_load, plus the reason when it returns NULL.
+ * @param doc As anvil_schema_load.
+ * @param out_err Optional (may be NULL). Set to ANVIL_SCHEMA_ERR_NONE when a schema is returned;
+ * to ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING when doc is NULL or does not carry @[schema]. A NULL
+ * return with ANVIL_SCHEMA_ERR_NONE means allocation failed. Thread-safe: the reason is returned,
+ * never stored.
+ * @return Exactly what anvil_schema_load(doc) returns.
+ */
+anvil_schema anvil_schema_load_ex(anvil_document doc, anvil_schema_err_code *out_err);
+
+/**
+ * @brief The enumerator's own name for a code, e.g. "ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING".
+ * Static storage, never NULL; a value that is not an enumerator reads "ANVIL_SCHEMA_ERR_UNNAMED".
+ */
+const char *anvil_schema_err_code_name(anvil_schema_err_code code);
+
+/**
+ * @brief A one-line description of a code. Static storage, never NULL; a value that is not an
+ * enumerator reads "Unknown error".
+ */
+const char *anvil_schema_err_code_message(anvil_schema_err_code code);
 
 /**
  * @brief Release a schema. Safe to call with NULL (no-op).

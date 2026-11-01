@@ -534,6 +534,25 @@ static void walk_includes(anvil_document doc, struct anvil_type_registry_t *reg,
    anvil_document_iterator_dispose(it);
 }
 
+// STUB (FR-2610-anvl-schema-009 RED)
+anvil_type_registry anvil_type_registry_load_ex(anvil_document doc, anvil_type_err_code *out_err) {
+   (void)doc;
+   if (out_err) {
+      *out_err = ANVIL_TYPE_ERR_NONE;
+   }
+   return NULL;
+}
+
+const char *anvil_type_err_code_name(anvil_type_err_code code) {
+   (void)code;
+   return "";
+}
+
+const char *anvil_type_err_code_message(anvil_type_err_code code) {
+   (void)code;
+   return "";
+}
+
 anvil_type_registry anvil_type_registry_load(anvil_document doc) {
    if (!doc || !anvil_document_find_attribute(doc, "types")) {
       return NULL; // @[types] has exactly one meaning — see notes/native-schema.md

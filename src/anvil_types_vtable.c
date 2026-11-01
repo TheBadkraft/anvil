@@ -14,6 +14,9 @@
 
 const anvil_type_registry_i TypeRegistry = {
    .load = anvil_type_registry_load,
+   .load_ex = anvil_type_registry_load_ex,
+   .err_code_name = anvil_type_err_code_name,
+   .err_code_message = anvil_type_err_code_message,
    .load_from_includes = anvil_type_registry_load_from_includes,
    .dispose = anvil_type_registry_dispose,
    .find = anvil_type_registry_find,

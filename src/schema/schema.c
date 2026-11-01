@@ -625,6 +625,25 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
    }
 }
 
+// STUB (FR-2610-anvl-schema-009 RED)
+anvil_schema anvil_schema_load_ex(anvil_document doc, anvil_schema_err_code *out_err) {
+   (void)doc;
+   if (out_err) {
+      *out_err = ANVIL_SCHEMA_ERR_NONE;
+   }
+   return NULL;
+}
+
+const char *anvil_schema_err_code_name(anvil_schema_err_code code) {
+   (void)code;
+   return "";
+}
+
+const char *anvil_schema_err_code_message(anvil_schema_err_code code) {
+   (void)code;
+   return "";
+}
+
 anvil_schema anvil_schema_load(anvil_document doc) {
    if (!doc || !anvil_document_find_attribute(doc, "schema")) {
       return NULL; // @[schema] marks a schema definition — declaring shape, never filling one
