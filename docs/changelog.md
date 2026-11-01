@@ -31,7 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `node` (anvil.js: `npm test` plus `npm run compat`, via the `node-reporter.js` test reporter) and `native`
   (each `test/unit/test_*.c` through its `make` target, parsed from testbit output). Its own tests,
   `scripts/tdd/test_check_tdd.py`, build tiny fixture repos with scripted commits (48 cases). Tooling only; no
-  product code changed.
+  product code changed. Later fixes: `[tests: ...]` is bracket-balanced (names may contain `@[schema]`); native
+  resolves testbit beside the repo, then `~/Projects/repos/testbit`, and exits 2 "testbit not found" instead of
+  reporting bogus results; `--make-var NAME=VALUE` (repeatable, e.g. `BUILD_NUM=500`; without it make takes the
+  commit count from the scratch clone); the cache key includes the testbit path and make variables.
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
   native-owned corpus that a second implementation (the schema phase of anvil.js) must reproduce byte for byte. A

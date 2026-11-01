@@ -25,6 +25,7 @@ Exit: 0 all PASS, 1 any FAIL, 2 usage or environment error, 3 incomplete (--budg
 results are cached per commit SHA).
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -34,11 +35,10 @@ import sys
 import tempfile
 import time
 
-ADAPTER_VERSION = "3"
+ADAPTER_VERSION = "4"
 HERE = os.path.dirname(os.path.abspath(__file__))
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 TAG = re.compile(r"^(?P<ticket>[A-Za-z0-9._/-]+(?:,\s*[A-Za-z0-9._/-]+)*): (?P<kind>RED|GREEN|PERF|REFACTOR)\.")
-TESTS_TAG = re.compile(r"\[tests:\s*([^\]]*)\]")
 GATE_TAG = re.compile(r"\[gate:\s*([^\]\s]+)\s*\]")
 
 
@@ -216,7 +216,7 @@ class NativeAdapter(Adapter):
         shutil.rmtree(os.path.join(unit, "bin"), ignore_errors=True)
         tests = {}
         for s in suites:
-            cmd = ["make", "-C", unit, "test_" + s, "TESTBIT=" + opts.testbit, "BUILD_NUM=0"]
+            cmd = native_make_cmd(unit, s, opts)
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=opts.run_timeout)
             tests.update(parse_testbit(p.stdout, s, p.returncode))
         return {"ran": True, "tests": tests, "note": ""}
@@ -234,19 +234,62 @@ def pick_adapter(repo, name):
 # the rules (pure: parent result, commit result, facts -> verdict)
 # ---------------------------------------------------------------------------------------------
 def parse_tests_tag(msg):
-    return []
+    """Names in every `[tests: a, b]` of the message. The tag ends at its matching `]`: brackets inside names
+    (`@[schema]`) nest. An unbalanced tag takes the rest of the line."""
+    names = []
+    for m in re.finditer(r"\[tests:", msg):
+        depth, i, body = 1, m.end(), []
+        while i < len(msg) and depth:
+            c = msg[i]
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    break
+            elif c == "\n" and depth:
+                break
+            body.append(c)
+            i += 1
+        parts, cur, d = [], [], 0
+        for c in "".join(body):
+            if c == "[":
+                d += 1
+            elif c == "]":
+                d -= 1
+            if c == "," and d <= 0:
+                parts.append("".join(cur))
+                cur = []
+            else:
+                cur.append(c)
+        parts.append("".join(cur))
+        names += [x.strip() for x in parts if x.strip()]
+    return names
 
 
 def resolve_testbit(repo, given, fallbacks=()):
+    """--testbit if given (it must exist), else ../testbit beside the repo, else the fallbacks; None if absent."""
+    if given:
+        return given if os.path.isdir(given) else None
+    for c in [os.path.join(os.path.dirname(repo), "testbit")] + list(fallbacks):
+        if os.path.isdir(c):
+            return c
     return None
 
 
 def native_make_cmd(unit, suite, opts):
-    return []
+    return ["make", "-C", unit, "test_" + suite, "TESTBIT=" + opts.testbit] + list(opts.make_var)
 
 
 def cache_key(adapter_name, sha, opts):
-    return ""
+    """Everything that changes what a run measures is in the key, so a bad-setup run cannot poison later ones."""
+    parts = [adapter_name, "v" + ADAPTER_VERSION]
+    if adapter_name == "native":
+        h = hashlib.sha1(("\0".join([os.path.realpath(opts.testbit or "")] + list(opts.make_var))).encode()).hexdigest()[:10]
+        parts.append("m" + h)
+    elif getattr(opts, "no_compat", False):
+        parts.append("nc")
+    return "-".join(parts) + "-" + sha
 
 
 def summarize(ids, cap=4):
@@ -427,7 +470,7 @@ class Runner:
         return ""
 
     def result(self, sha):
-        key = os.path.join(self.cache, "%s-v%s%s-%s.json" % (self.adapter.name, ADAPTER_VERSION, "-nc" if getattr(self.opts, "no_compat", False) else "", sha))
+        key = os.path.join(self.cache, cache_key(self.adapter.name, sha, self.opts) + ".json")
         if os.path.exists(key):
             self.hits += 1
             with open(key) as f:
@@ -474,8 +517,7 @@ def commit_facts(repo, adapter, sha, parent):
             lines = 1  # a gitlink or binary change
     msg = git(repo, "log", "-1", "--format=%B", sha)
     named = []
-    for m in TESTS_TAG.finditer(msg):
-        named += [n.strip() for n in m.group(1).split(",") if n.strip()]
+    named = parse_tests_tag(msg)
     gm = GATE_TAG.search(msg)
     gate = {"path": gm.group(1) if gm else None, "exists": False, "verdict": None}
     return {"sha": sha, "test_files": test_files, "input_files": input_files, "product_files": product_files, "product_lines": lines,
@@ -514,7 +556,7 @@ def main(argv=None):
     ap.add_argument("--batch-limit", type=int, default=10, help="GREEN with no [tests:] fails when more than this many tests flip")
     ap.add_argument("--max-green-lines", type=int, default=150, help="a GREEN whose product diff is larger than this is a batch")
     ap.add_argument("--make-var", action="append", default=[], metavar="NAME=VALUE", help="native: extra make variable, repeatable (e.g. BUILD_NUM=500)")
-    ap.add_argument("--testbit", default=None, help="native: path of the testbit checkout (default: ../testbit beside the repo)")
+    ap.add_argument("--testbit", default=None, help="native: testbit checkout (default: ../testbit beside the repo, then ~/Projects/repos/testbit; not found is an error)")
     ap.add_argument("--gate-root", default=None, help="directory to look for [gate: path] records not committed to the repo")
     opts = ap.parse_args(argv)
 
@@ -531,8 +573,12 @@ def main(argv=None):
     except (RuntimeError, SystemExit) as e:
         print("check-tdd: %s" % e, file=sys.stderr)
         return 2
-    if opts.testbit is None:
-        opts.testbit = os.path.join(os.path.dirname(repo), "testbit")
+    if adapter.name == "native":
+        opts.testbit = resolve_testbit(repo, opts.testbit, [os.path.expanduser("~/Projects/repos/testbit")])
+        if not opts.testbit:
+            print("check-tdd: testbit not found (looked beside the repo and in ~/Projects/repos/testbit); pass --testbit DIR", file=sys.stderr)
+            return 2
+        opts.testbit = os.path.realpath(opts.testbit)
     os.makedirs(opts.cache, exist_ok=True)
 
     scratch = tempfile.mkdtemp(prefix="check-tdd-", dir=opts.scratch)
