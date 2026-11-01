@@ -1710,6 +1710,43 @@ static void test_sch58b_overflowed_float_is_independent_of_range(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+/* SCH58c - BR-2610-anvl-schema-006: whole-ness is decided from the literal's text (exact decimal value), not
+ * from the parsed double, so an underflow to 0 (1e-999) or a rounding to a whole double is not "whole". */
+static void test_sch58c_integer_is_decided_from_the_text(void) {
+   static char big_exp[64];
+   snprintf(big_exp, sizeof big_exp, "#!aml\nn := 1e-%s;\n", "99999999999999999999999999");
+   const struct { const char *data; bool ok; const char *label; } cases[] = {
+      {"#!aml\nn := 1e-999;\n", false, "SCH58c: 1e-999 (underflows to 0) fails"},
+      {"#!aml\nn := -1e-999;\n", false, "SCH58c: -1e-999 fails"},
+      {"#!aml\nn := 0.5e-400;\n", false, "SCH58c: 0.5e-400 fails"},
+      {"#!aml\nn := 1.000001;\n", false, "SCH58c: 1.000001 fails"},
+      {"#!aml\nn := 1.0000000000000001;\n", false, "SCH58c: 1.0000000000000001 (rounds to 1.0) fails"},
+      {"#!aml\nn := 1.5e-1;\n", false, "SCH58c: 1.5e-1 fails"},
+      {"#!aml\nn := 12e-1;\n", false, "SCH58c: 12e-1 fails"},
+      {big_exp, false, "SCH58c: an absurd negative exponent fails"},
+      {"#!aml\nn := 0.0e-999;\n", true, "SCH58c: 0.0e-999 is zero, passes"},
+      {"#!aml\nn := 0e5;\n", true, "SCH58c: 0e5 is zero, passes"},
+      {"#!aml\nn := 0e-999;\n", true, "SCH58c: 0e-999 is zero, passes"},
+      {"#!aml\nn := 0.0;\n", true, "SCH58c: 0.0 passes"},
+      {"#!aml\nn := -0.0;\n", true, "SCH58c: -0.0 passes"},
+      {"#!aml\nn := 1e3;\n", true, "SCH58c: 1e3 passes"},
+      {"#!aml\nn := 1.0;\n", true, "SCH58c: 1.0 passes"},
+      {"#!aml\nn := 1.50e1;\n", true, "SCH58c: 1.50e1 is 15, passes"},
+      {"#!aml\nn := 100e-2;\n", true, "SCH58c: 100e-2 is 1, passes"},
+      {"#!aml\nn := 1000e-3;\n", true, "SCH58c: 1000e-3 is 1, passes"},
+      {"#!aml\nn := 2.500e1;\n", true, "SCH58c: 2.500e1 is 25, passes"},
+      {"#!aml\nn := 1e400;\n", false, "SCH58c: 1e400 still fails (overflowed)"},
+      {"#!aml\nn := 99999999999999999999;\n", true, "SCH58c: digits past int64 still pass"},
+      {"#!aml\nn := 9007199254740993.0;\n", true, "SCH58c: 9007199254740993.0 passes"},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      anvil_schema schema; anvil_document sdoc, ddoc;
+      bool ok = nested_validate(INT_SCHEMA, cases[i].data, &schema, &sdoc, &ddoc);
+      TestBit.is_true(schema != NULL && ok == cases[i].ok, cases[i].label);
+      nested_free(schema, sdoc, ddoc);
+   }
+}
+
 static void test_sch59_integer_with_range_and_null(void) {
    anvil_schema schema; anvil_document sdoc, ddoc;
    const char *src = "#!aml\n@[schema]\npriority := { type := Numeric; integer := true; min := 1; max := 4; };\n";
@@ -2968,6 +3005,8 @@ int main(void) {
                   test_sch58_integer_is_value_based, th);
    TestBit.run_ex("SCH58b_overflowed_float_is_independent_of_range", NULL,
                   test_sch58b_overflowed_float_is_independent_of_range, th);
+   TestBit.run_ex("SCH58c_integer_is_decided_from_the_text", NULL,
+                  test_sch58c_integer_is_decided_from_the_text, th);
    TestBit.run_ex("SCH59_INTEGER_WITH_RANGE_AND_NULL", NULL,
                   test_sch59_integer_with_range_and_null, th);
    TestBit.run_ex("SCH60_INTEGER_INHERITED_FROM_TYPE", NULL,
