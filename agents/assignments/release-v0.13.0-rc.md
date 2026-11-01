@@ -105,6 +105,6 @@ Principal Engineer asks for once the release is staged.
 | 2. Pins on `release/v0.13.0-rc` | done and merged: py `570a70d`, net `fb33a72`, anvil.js `92c159f` |
 | 3. Build twice | byte-identical (4 tarballs) |
 | 4. Checks on the packaged files | pass, incl. new installed-copy checks and FlyWire-shaped browser check (14 checks x chromium, firefox x esm, global) |
-| 5. Benchmarks | HOLD: native passes; anvil.js over gates beyond the accepted rows, BR-2610-anvl-js-004 |
-| 6. Stage | tarballs and SHA256SUMS staged; release notes and handoff not written while the hold stands |
+| 5. Benchmarks | done: native passes; anvil.js rows beyond gates accepted by the owner 2026-10-31 and backlogged (BR-2610-anvl-js-004, BR-2610-anvl-js-perf-001) |
+| 6. Stage | done in `~/release-staging/v0.13.0-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
 | 7. Deploy and live check | after the owner's go and the Technical Writer's deploy |
