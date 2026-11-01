@@ -107,4 +107,4 @@ Principal Engineer asks for once the release is staged.
 | 4. Checks on the packaged files | pass, incl. new installed-copy checks and FlyWire-shaped browser check (14 checks x chromium, firefox x esm, global) |
 | 5. Benchmarks | done: native passes; anvil.js rows beyond gates accepted by the owner 2026-10-31 and backlogged (BR-2610-anvl-js-004, BR-2610-anvl-js-perf-001) |
 | 6. Stage | done in `~/release-staging/v0.13.0-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
-| 7. Deploy and live check | after the owner's go and the Technical Writer's deploy |
+| 7. Deploy and live check | done 2026-10-31: site 3eb7dfe; live downloads match the staged sha256, grammar and version 0.13.0-rc+463 in all four, anvil.js install and corpora pass |
