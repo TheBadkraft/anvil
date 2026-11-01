@@ -192,6 +192,12 @@ includes (the same file reached via two different paths) are deduplicated by con
 re-parsed twice; include cycles are rejected. `$identifier` VarRefs (§4) resolve across the whole
 merged include graph, not just within one file.
 
+Two rules about the include path (changed in v0.13.0-rc). An `include` that names a **directory** is
+`ANVL_ERR_INCLUDE_FILE_NOT_FOUND` (4204); it used to load as an empty document. And a cycle is found by the
+**normalised** path: `a.anvl`, `./a.anvl` and `d/../a.anvl` are one document, so a document that includes itself
+(a cycle through a bare root file name, or an include spelled with `./` or `..` that loops back) is
+`ANVL_ERR_INCLUDE_CYCLIC` (4206). Before, those cycles were accepted.
+
 **`include` comes first.** The module header holds, in order, the shebang, then `include` declarations and module
 attributes; the first statement ends it. An `include` after any statement is
 `ANVL_ERR_INCLUDE_NOT_FIRST` (4201), reported at the line and column where the word `include` starts (category
@@ -260,10 +266,14 @@ gives a richer detail object (message text, line, column) beyond the stable cate
 
 The categories above are the public contract. Underneath, the reader records one specific code per reason, and
 `anvil_document_get_error` and the conformance dumps carry it. The codes below were made specific for the grammar
-rules in §3 to §7 (a rejected input keeps its category and place; only the code is sharper):
+rules in §3 to §7 (a rejected input keeps its category and place; only the code is sharper). The three IO codes are a
+behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code 0 and an empty message; the category is unchanged:
 
 | Code | Name | Reported for |
 |---|---|---|
+| 1001 | `ANVL_ERR_IO_FILE_READ` | loading a path that is a directory, or a file that cannot be read (category `ANVIL_ERR_IO`) |
+| 1002 | `ANVL_ERR_IO_FILE_NOT_FOUND` | loading a path that does not exist (category `ANVIL_ERR_IO`) |
+| 1003 | `ANVL_ERR_IO_INVALID_PATH` | loading an empty path (category `ANVIL_ERR_IO`) |
 | 2004 | `ANVL_ERR_PARSER_MULTIPLE_SHEBANG` | a second `#!` after an opening shebang |
 | 2005 | `ANVL_ERR_PARSER_SHEBANG_AFTER_STATEMENTS` | a `#!` with no opening shebang on the first line |
 | 2006 | `ANVL_ERR_PARSER_INVALID_VALUE_IN_ATTRIBUTE` | an attribute value that is an array, tuple, object or blob (starts with `[`, `(`, `{`, a backtick or `@`) |
@@ -283,6 +293,8 @@ rules in §3 to §7 (a rejected input keeps its category and place; only the cod
 | 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | a base that is not an object value (category `ANVIL_ERR_RESOLVE`) |
 | 4053 | `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` | a top-level name repeated (including across includes) |
 | 4201 | `ANVL_ERR_INCLUDE_NOT_FIRST` | `include` after a statement |
+| 4204 | `ANVL_ERR_INCLUDE_FILE_NOT_FOUND` | an `include` of a file that does not exist, or of a directory |
+| 4206 | `ANVL_ERR_INCLUDE_CYCLIC` | an include cycle, found by normalised path |
 | 5001 | `ANVL_ERR_PARSER_UNEXPECTED_CHAR` | a control character where a token belongs |
 
 **Reserved, never reported.** These codes are declared in `include/errors.h` and have names, but no input produces

@@ -127,7 +127,9 @@ text, not characters, and must be a non-negative integer: `"héllo"` is 5 charac
 `integer := true` requires a numeric value to be whole. It is judged by the number's *value*, not
 how it is written: `2`, `2.0` and `1e+3` pass, `2.5` and `1e-1` fail (with a `TYPE_MISMATCH`
 violation saying "value must be an integer"). A field referencing the type inherits it, and may
-override it with its own `integer := false`.
+override it with its own `integer := false`. A decimal or exponent literal beyond double range, such as `1e400`,
+is rejected as a `TYPE_MISMATCH` (changed in v0.13.0-rc); a digits-only literal past 64 bits is a whole number and
+still passes.
 
 *Runtime support: implemented (`anvil_type_def_get_size`/`get_min`/`get_max`, plus
 `anvil_type_def_get_min_numeric`/`get_max_numeric` for fractional and exponent bounds). Each
@@ -277,6 +279,9 @@ which file each name actually came from. Any name collision resolves last-write-
 reported (see Diagnostics below). An include cycle is a load error in the core
 (`ANVL_ERR_INCLUDE_CYCLIC`) and its bodies are never parsed, so a cyclic graph yields no
 definitions; the walk itself still terminates.*
+
+The bindings' `TypeRegistry` `fromIncludes` does the same and, since v0.13.0-rc, merges the **root document's own
+`@[types]` last**, so the root's definitions override included ones.
 
 ## Diagnostics
 

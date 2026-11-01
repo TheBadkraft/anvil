@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Site and docs for v0.13.0-rc.** The downloads page, the Bindings guide (anvil.js now covers the builder, types, schema and
+  `setIo`, with its documented differences and the backlogged small-document speed gaps), the public changelog, the language
+  reference (IO codes 1001-1003, include of a directory 4204, include cycles by normalised path 4206, builder codes 19 and 20)
+  and the types reference (`integer` rejects `1e400`, `fromIncludes` merges the root's `@[types]`) describe v0.13.0-rc. No
+  download or feature described there is missing.
+
 ---
 
 ## [v0.13.0-rc] — (2026-10-31)
