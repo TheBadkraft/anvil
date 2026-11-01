@@ -784,10 +784,13 @@ text** (a type name, a format, a tag) is a quoted string, or `none` when its len
 
 ```
 registry line=L name=R how=load|includes file="F" doc=D result=ok|null diagnostics=N
+  load_error code=C name=ANVIL_TYPE_ERR_X message="M"                            (only when result=null and how=load)
   diag index=I code=C name=ANVIL_TYPE_DIAG_X type="T" source="S" message="M"     (N lines, in the registry's order)
 ```
 
-`result=null` when the call returned `NULL` (then `diagnostics=0`). `type` is `anvil_type_diagnostic_get_name`, `source`
+`result=null` when the call returned `NULL` (then `diagnostics=0`). For `how=load` the `load_error` line follows, from
+`anvil_type_registry_load_ex` (`anvil_type_err_code`: 1 `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING`, the document has no
+`@[types]`) with `anvil_type_err_code_name` and `_message` (v0.13.1; before it a `NULL` carried no reason). `type` is `anvil_type_diagnostic_get_name`, `source`
 is `_get_source`, `message` is `_get_message`, and `C` is the category as an integer.
 
 **`type`**
@@ -808,12 +811,15 @@ length, NUL bytes included). `kind` is `ANVIL_TYPE_UNKNOWN`, `_NUMERIC`, `_STRIN
 
 ```
 schema line=L name=S file="F" doc=D result=ok|null diagnostics=N fields=M
+  load_error code=C name=ANVIL_SCHEMA_ERR_X message="M"                                        (only when result=null)
   diag index=I code=C name=ANVIL_SCHEMA_DIAG_X type_code=C2 type_name=ANVIL_TYPE_DIAG_Y field="F" message="M"      (N lines)
   <rule>                                                                                       (M top-level rules)
 ```
 
 `result=null` when `anvil_schema_load` returned `NULL` (a document without `@[schema]`, or no document); then
-`diagnostics=0 fields=0`. The source document is **disposed before the schema is read**, so everything printed is
+`diagnostics=0 fields=0`, and a `load_error` line follows, from `anvil_schema_load_ex` (`anvil_schema_err_code` 11
+`ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING`) with `anvil_schema_err_code_name` and `_message` (v0.13.1; before it a `NULL` carried
+no reason). The source document is **disposed before the schema is read**, so everything printed is
 independent of it. The `diag` lines are `anvil_schema_get_diagnostic(S, I)` in order; `type_code` and `type_name` are
 `anvil_schema_diagnostic_get_type_category` (`ANVIL_TYPE_DIAG_NONE`, 0, for every diagnostic that is not
 `ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`), `field` is `anvil_schema_diagnostic_get_field`, and `C` is the category as an integer.

@@ -1,5 +1,6 @@
 anvil-schema-run 1
 registry line=2 name=r how=load file="nope.anvl" doc=ANVIL_ERR_IO result=null diagnostics=0
+  load_error code=1 name=ANVIL_TYPE_ERR_ATTRIBUTE_MISSING message="The document does not carry the @[types] module attribute"
 registry line=3 name=s how=includes file="nope.anvl" doc=ANVIL_ERR_IO result=ok diagnostics=0
 type line=4 how=find registry=r name="T" result=none
 steps 3

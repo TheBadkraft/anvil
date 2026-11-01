@@ -1,5 +1,6 @@
 anvil-schema-run 1
 schema line=6 name=bad file="gone.anvl" doc=ANVIL_ERR_IO result=null diagnostics=0 fields=0
+  load_error code=11 name=ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING message="The document does not carry the @[schema] module attribute"
 schema line=7 name=good file="s.anvl" doc=ok result=ok diagnostics=0 fields=1
   field name="a" kind=ANVIL_TYPE_NUMERIC type="Numeric" required=0 nullable=0 integer=0 size=none min=none max=none min_items=none max_items=none format=none tag=none values=0 nested=0 items=0 extras=0
 validate_value line=8 schema=bad doc=ok opts=default result=fail count=0

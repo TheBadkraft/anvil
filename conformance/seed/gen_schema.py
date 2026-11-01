@@ -148,6 +148,9 @@ for i, v in enumerate(NUM_BOUNDS):
 
 # loads: where types come from
 case(R, "load_not_types", [("a.anvl", "#!aml\nx := 1;\n")], ['registry r load "a.anvl"', 'type find r "x"', 'registry s includes "a.anvl"', 'type find s "x"'])
+case(R, "load_error_attribute_missing", [("a.anvl", "#!aml\nx := 1;\n"), ("t.anvl", "#!aml\n@[types]\nVIN := { type := String; size := 17; };\n"), ("s.anvl", "#!aml\n@[schema]\nn := { type := Numeric; };\n")],
+     ['registry bad1 load "a.anvl"', 'registry good load "t.anvl"', 'registry bad2 load "missing.anvl"', 'registry bad3 load "s.anvl"', 'schema bad5 load "a.anvl"', 'schema bad4 load "t.anvl"', 'schema ok load "s.anvl"'],
+     desc="FR-2610-anvl-schema-009: a registry load without @[types] and a schema load without @[schema] report a specific load_error (a document that is the other kind, or a missing file, gets the same one); a good load prints none")
 case(R, "load_missing", [], ['registry r load "nope.anvl"', 'registry s includes "nope.anvl"', 'type find r "T"'])
 case(R, "load_syntax_error", [("a.anvl", TYPES + "T := { type := ;\n")], ['registry r load "a.anvl"', 'registry s includes "a.anvl"', 'type find r "T"'])
 case(R, "load_empty_doc", [("a.anvl", "")], ['registry r load "a.anvl"', 'registry s includes "a.anvl"'])
