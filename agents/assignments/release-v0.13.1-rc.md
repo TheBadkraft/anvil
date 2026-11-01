@@ -68,10 +68,10 @@ Steps 1 to 7 are as in `release-v0.13.0-rc.md`, with these changes:
 
 | Step | State |
 |---|---|
-| 1. Cut core `0.13.1-rc` | branch `release/v0.13.1-rc` cut; waiting for the merge and the tag |
-| 2. Pins on `release/v0.13.1-rc` | |
-| 3. Build twice | |
-| 4. Checks on the packaged files | |
-| 5. Benchmarks | |
-| 6. Stage | |
+| 1. Cut core `0.13.1-rc` | done; tag `v0.13.1-rc` on `964bbe8`, BUILD 479, pushed |
+| 2. Pins on `release/v0.13.1-rc` | done and merged: py `7590d33`, net `e22ba2a`, anvil.js `b7d2d26` |
+| 3. Build twice | byte-identical (4 tarballs) |
+| 4. Checks on the packaged files | pass, incl. the new installed-copy and browser checks (RED on the v0.13.0-rc package) |
+| 5. Benchmarks | done: native within 1.02x; no anvil.js row above 1.15x repeats; gaps carried over |
+| 6. Stage | done in `~/release-staging/v0.13.1-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
 | 7. Deploy and live check | after the owner's go and the Technical Writer's deploy |
