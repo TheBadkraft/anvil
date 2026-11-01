@@ -1,0 +1,20 @@
+anvil-schema-script 1
+# FR-2610-anvl-schema-009: a registry load without @[types] and a schema load without @[schema] report a specific load_error (a document that is the other kind, or a missing file, gets the same one); a good load prints none
+file "a.anvl"
+|#!aml
+|x := 1;
+file "t.anvl"
+|#!aml
+|@[types]
+|VIN := { type := String; size := 17; };
+file "s.anvl"
+|#!aml
+|@[schema]
+|n := { type := Numeric; };
+registry bad1 load "a.anvl"
+registry good load "t.anvl"
+registry bad2 load "missing.anvl"
+registry bad3 load "s.anvl"
+schema bad5 load "a.anvl"
+schema bad4 load "t.anvl"
+schema ok load "s.anvl"

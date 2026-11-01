@@ -54,6 +54,9 @@ typedef struct anvil_type_registry_i {
    size_t (*diagnostic_get_name)(anvil_type_diagnostic diag, char *buf, size_t buflen);
    size_t (*diagnostic_get_source)(anvil_type_diagnostic diag, char *buf, size_t buflen);
    size_t (*diagnostic_get_message)(anvil_type_diagnostic diag, char *buf, size_t buflen);
+   anvil_type_registry (*load_ex)(anvil_document doc, anvil_type_err_code *out_err);
+   const char *(*err_code_name)(anvil_type_err_code code);
+   const char *(*err_code_message)(anvil_type_err_code code);
 } anvil_type_registry_i;
 extern const anvil_type_registry_i TypeRegistry;
 

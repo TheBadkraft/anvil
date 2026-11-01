@@ -13,7 +13,8 @@ validate_value line=14 schema=s doc=ok opts=default result=fail count=1
   violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
 validate_value line=15 schema=s doc=ok opts=default result=pass count=0
 validate_value line=16 schema=s doc=ok opts=default result=pass count=0
-validate_value line=17 schema=s doc=ok opts=default result=pass count=0
+validate_value line=17 schema=s doc=ok opts=default result=fail count=1
+  violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"
 validate_value line=18 schema=s doc=ok opts=default result=pass count=0
 validate_value line=19 schema=s doc=ok opts=default result=fail count=1
   violation index=0 code=2 name=ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH field="n" message="value must be an integer"

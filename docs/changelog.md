@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Specific load errors for a missing `@[schema]` / `@[types]` (FR-2610-anvl-schema-009).** A document without
+  `@[schema]` made `anvil_schema_load` return NULL, and one without `@[types]` made `anvil_type_registry_load` return NULL,
+  with no reason in either case. New, additive functions return the reason: `anvil_schema_load_ex(doc, &err)` reports
+  `ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING` (11, after the last violation code), and `anvil_type_registry_load_ex(doc, &err)`
+  reports `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING` (1, in the new `anvil_type_err_code`). `anvil_schema_err_code_name` and
+  `_message`, and `anvil_type_err_code_name` and `_message`, give each code its name and a message. All six are in the
+  `Schema` and `TypeRegistry` vtables and exported. The reason is returned, never stored, so concurrent loads are
+  unaffected. `anvil_schema_load` and `anvil_type_registry_load` behave as before. The schema corpus dumps print a
+  `load_error` line after every `result=null` load.
+
+### Fixed
+
+- **`integer := true` decides whole-ness from the literal's text (BR-2610-anvl-schema-006).** A decimal literal that
+  underflowed to 0 (`1e-999`, `0.5e-400`) passed the integer rule, because it was judged by the parsed double. A literal
+  is now whole only if its exact decimal value has no nonzero digit after the point, read from the text in one bounded
+  pass (no allocation; an absurd exponent costs no more than the literal's length). `1e-999`, `0.5e-400`,
+  `1.000001` and `1.0000000000000001` (which rounds to 1.0) now fail with the usual "value must be an integer"
+  violation; zero in any spelling (`0.0e-999`, `0e5`), `1e3`, `1.0`, a digits-only literal past int64 and the
+  overflow rejection of `1e400` are unchanged. Behaviour change: a value that is not exactly whole but rounded to a whole
+  double (`1.0000000000000001`, `123456789012345678901.5`) used to pass and now fails.
+- **Error names match the enum identifiers (BR-2610-anvl-errors-002).** `anvl_error_code_name` spelled the three IO codes
+  `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH`. They are now `ANVL_ERR_IO_FILE_READ`,
+  `ANVL_ERR_IO_FILE_NOT_FOUND` and `ANVL_ERR_IO_INVALID_PATH`, the identifiers in `errors.h`. These were the only three
+  mismatches among 107 codes. The enum is unchanged; `make check-drift-tables` now fails if any name differs from its
+  identifier. Anything that matched the old strings (a log filter, a test) must change.
+
 ### Changed
 
 - **Site and docs for v0.13.0-rc.** The downloads page, the Bindings guide (anvil.js now covers the builder, types, schema and

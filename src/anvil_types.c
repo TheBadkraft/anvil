@@ -534,9 +534,33 @@ static void walk_includes(anvil_document doc, struct anvil_type_registry_t *reg,
    anvil_document_iterator_dispose(it);
 }
 
-anvil_type_registry anvil_type_registry_load(anvil_document doc) {
+const char *anvil_type_err_code_name(anvil_type_err_code code) {
+   switch (code) {
+   case ANVIL_TYPE_ERR_NONE: return "ANVIL_TYPE_ERR_NONE";
+   case ANVIL_TYPE_ERR_ATTRIBUTE_MISSING: return "ANVIL_TYPE_ERR_ATTRIBUTE_MISSING";
+   }
+   return "ANVIL_TYPE_ERR_UNNAMED";
+}
+
+const char *anvil_type_err_code_message(anvil_type_err_code code) {
+   switch (code) {
+   case ANVIL_TYPE_ERR_NONE: return "No error";
+   case ANVIL_TYPE_ERR_ATTRIBUTE_MISSING: return "The document does not carry the @[types] module attribute";
+   }
+   return "Unknown error";
+}
+
+anvil_type_registry anvil_type_registry_load(anvil_document doc) { return anvil_type_registry_load_ex(doc, NULL); }
+
+anvil_type_registry anvil_type_registry_load_ex(anvil_document doc, anvil_type_err_code *out_err) {
+   if (out_err) {
+      *out_err = ANVIL_TYPE_ERR_NONE;
+   }
    if (!doc || !anvil_document_find_attribute(doc, "types")) {
-      return NULL; // @[types] has exactly one meaning — see notes/native-schema.md
+      if (out_err) {
+         *out_err = ANVIL_TYPE_ERR_ATTRIBUTE_MISSING;
+      }
+      return NULL; // @[types] has exactly one meaning - see notes/native-schema.md
    }
    struct anvil_type_registry_t *reg = new_empty_registry();
    if (!reg) {
@@ -807,6 +831,10 @@ bool anvil_numeric_is_whole(anvil_value data) {
       // A decimal/exponent literal beyond double range (1e400) has no finite value to be whole, and
       // an infinity is not an integer (BR-2610-anvl-schema-004). Also what a non-number reads as.
       return false;
+   }
+   bool whole;
+   if (anvil_internal_numeric_text_is_whole(data, &whole)) {
+      return whole; // decided from the text: an underflow to 0 (1e-999) or a rounding to whole is not whole
    }
    double d = n.as_double;
    if (d >= 9223372036854775808.0 || d <= -9223372036854775808.0) {

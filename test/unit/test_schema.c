@@ -1710,6 +1710,43 @@ static void test_sch58b_overflowed_float_is_independent_of_range(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+/* SCH58c - BR-2610-anvl-schema-006: whole-ness is decided from the literal's text (exact decimal value), not
+ * from the parsed double, so an underflow to 0 (1e-999) or a rounding to a whole double is not "whole". */
+static void test_sch58c_integer_is_decided_from_the_text(void) {
+   static char big_exp[64];
+   snprintf(big_exp, sizeof big_exp, "#!aml\nn := 1e-%s;\n", "99999999999999999999999999");
+   const struct { const char *data; bool ok; const char *label; } cases[] = {
+      {"#!aml\nn := 1e-999;\n", false, "SCH58c: 1e-999 (underflows to 0) fails"},
+      {"#!aml\nn := -1e-999;\n", false, "SCH58c: -1e-999 fails"},
+      {"#!aml\nn := 0.5e-400;\n", false, "SCH58c: 0.5e-400 fails"},
+      {"#!aml\nn := 1.000001;\n", false, "SCH58c: 1.000001 fails"},
+      {"#!aml\nn := 1.0000000000000001;\n", false, "SCH58c: 1.0000000000000001 (rounds to 1.0) fails"},
+      {"#!aml\nn := 1.5e-1;\n", false, "SCH58c: 1.5e-1 fails"},
+      {"#!aml\nn := 12e-1;\n", false, "SCH58c: 12e-1 fails"},
+      {big_exp, false, "SCH58c: an absurd negative exponent fails"},
+      {"#!aml\nn := 0.0e-999;\n", true, "SCH58c: 0.0e-999 is zero, passes"},
+      {"#!aml\nn := 0e5;\n", true, "SCH58c: 0e5 is zero, passes"},
+      {"#!aml\nn := 0e-999;\n", true, "SCH58c: 0e-999 is zero, passes"},
+      {"#!aml\nn := 0.0;\n", true, "SCH58c: 0.0 passes"},
+      {"#!aml\nn := -0.0;\n", true, "SCH58c: -0.0 passes"},
+      {"#!aml\nn := 1e3;\n", true, "SCH58c: 1e3 passes"},
+      {"#!aml\nn := 1.0;\n", true, "SCH58c: 1.0 passes"},
+      {"#!aml\nn := 1.50e1;\n", true, "SCH58c: 1.50e1 is 15, passes"},
+      {"#!aml\nn := 100e-2;\n", true, "SCH58c: 100e-2 is 1, passes"},
+      {"#!aml\nn := 1000e-3;\n", true, "SCH58c: 1000e-3 is 1, passes"},
+      {"#!aml\nn := 2.500e1;\n", true, "SCH58c: 2.500e1 is 25, passes"},
+      {"#!aml\nn := 1e400;\n", false, "SCH58c: 1e400 still fails (overflowed)"},
+      {"#!aml\nn := 99999999999999999999;\n", true, "SCH58c: digits past int64 still pass"},
+      {"#!aml\nn := 9007199254740993.0;\n", true, "SCH58c: 9007199254740993.0 passes"},
+   };
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      anvil_schema schema; anvil_document sdoc, ddoc;
+      bool ok = nested_validate(INT_SCHEMA, cases[i].data, &schema, &sdoc, &ddoc);
+      TestBit.is_true(schema != NULL && ok == cases[i].ok, cases[i].label);
+      nested_free(schema, sdoc, ddoc);
+   }
+}
+
 static void test_sch59_integer_with_range_and_null(void) {
    anvil_schema schema; anvil_document sdoc, ddoc;
    const char *src = "#!aml\n@[schema]\npriority := { type := Numeric; integer := true; min := 1; max := 4; };\n";
@@ -2459,6 +2496,9 @@ static void test_sch82_schema_vtable_matches_flat_and_is_complete(void) {
       VT_MEMBER(anvil_schema_field_get_extra_count, Schema.field_get_extra_count),
       VT_MEMBER(anvil_schema_field_get_extra_name, Schema.field_get_extra_name),
       VT_MEMBER(anvil_schema_field_get_extra_value, Schema.field_get_extra_value),
+      VT_MEMBER(anvil_schema_load_ex, Schema.load_ex),
+      VT_MEMBER(anvil_schema_err_code_name, Schema.err_code_name),
+      VT_MEMBER(anvil_schema_err_code_message, Schema.err_code_message),
    };
    check_vtable_complete("../../include/anvil_schema.h", table, sizeof(table) / sizeof(table[0]),
                          "SCH82");
@@ -2853,6 +2893,62 @@ static void test_sch96_unresolved_value_form_and_later_resolution(void) {
    nested_free(schema, sdoc, ddoc);
 }
 
+/* SCH97 - FR-2610-anvl-schema-009: a document without @[schema] reports a specific load error. */
+static void test_sch97_load_without_schema_attribute_has_a_code(void) {
+   const char *plain = "#!aml\nn := 1;\n";
+   anvil_document doc = anvil_load_buffer(plain, strlen(plain));
+   anvil_schema_err_code err = ANVIL_SCHEMA_ERR_VALIDATION_SIZE; // anything but the expected value
+   anvil_schema s = anvil_schema_load_ex(doc, &err);
+   TestBit.is_null(s, "SCH97: no @[schema], no schema");
+   TestBit.is_equal_int(ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING, err, "SCH97: the specific code");
+   TestBit.is_equal_int(11, (long long)ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING, "SCH97: numbered 11, after the last violation code");
+   TestBit.is_null(anvil_schema_load_ex(doc, NULL), "SCH97: out_err is optional");
+   TestBit.is_null(anvil_schema_load(doc), "SCH97: anvil_schema_load still returns NULL");
+   anvil_dispose(doc);
+
+   err = ANVIL_SCHEMA_ERR_VALIDATION_SIZE;
+   TestBit.is_null(anvil_schema_load_ex(NULL, &err), "SCH97: NULL document, no schema");
+   TestBit.is_equal_int(ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING, err, "SCH97: NULL document reports the same code");
+
+   const char *good = "#!aml\n@[schema]\nn := { type := Numeric; };\n";
+   doc = anvil_load_buffer(good, strlen(good));
+   err = ANVIL_SCHEMA_ERR_VALIDATION_SIZE;
+   s = anvil_schema_load_ex(doc, &err);
+   TestBit.is_not_null(s, "SCH97: with @[schema] a schema is returned");
+   TestBit.is_equal_int(ANVIL_SCHEMA_ERR_NONE, err, "SCH97: and the code is NONE");
+   anvil_schema_dispose(s);
+   anvil_dispose(doc);
+}
+
+/* SCH98 - every public schema code has its own name (the enumerator's) and a message. */
+static void test_sch98_schema_error_codes_have_names_and_messages(void) {
+   const struct { anvil_schema_err_code code; const char *name; } names[] = {
+      {ANVIL_SCHEMA_ERR_NONE, "ANVIL_SCHEMA_ERR_NONE"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED, "ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_SIZE, "ANVIL_SCHEMA_ERR_VALIDATION_SIZE"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_RANGE, "ANVIL_SCHEMA_ERR_VALIDATION_RANGE"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_VALUES, "ANVIL_SCHEMA_ERR_VALIDATION_VALUES"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, "ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT, "ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_TAG, "ANVIL_SCHEMA_ERR_VALIDATION_TAG"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_FORMAT, "ANVIL_SCHEMA_ERR_VALIDATION_FORMAT"},
+      {ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE, "ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE"},
+      {ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING, "ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING"},
+   };
+   for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+      TestBit.is_true(strcmp(anvil_schema_err_code_name(names[i].code), names[i].name) == 0, names[i].name);
+      const char *msg = anvil_schema_err_code_message(names[i].code);
+      TestBit.is_true(msg && *msg && strcmp(msg, "Unknown error") != 0, names[i].name);
+   }
+   TestBit.is_true(strstr(anvil_schema_err_code_message(ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING), "@[schema]") != NULL,
+                   "SCH98: the message names the missing attribute");
+   TestBit.is_true(strcmp(anvil_schema_err_code_name((anvil_schema_err_code)999), "ANVIL_SCHEMA_ERR_UNNAMED") == 0,
+                   "SCH98: an unknown value has the placeholder name");
+   TestBit.is_true(strcmp(anvil_schema_err_code_message((anvil_schema_err_code)999), "Unknown error") == 0,
+                   "SCH98: and the placeholder message");
+}
+
 int main(void) {
    TestBit.run_ex("SCH01_valid_document", NULL, test_sch01_valid_document, th);
    TestBit.run_ex("SCH02_reject_non_schema_document", NULL,
@@ -2968,6 +3064,8 @@ int main(void) {
                   test_sch58_integer_is_value_based, th);
    TestBit.run_ex("SCH58b_overflowed_float_is_independent_of_range", NULL,
                   test_sch58b_overflowed_float_is_independent_of_range, th);
+   TestBit.run_ex("SCH58c_integer_is_decided_from_the_text", NULL,
+                  test_sch58c_integer_is_decided_from_the_text, th);
    TestBit.run_ex("SCH59_INTEGER_WITH_RANGE_AND_NULL", NULL,
                   test_sch59_integer_with_range_and_null, th);
    TestBit.run_ex("SCH60_INTEGER_INHERITED_FROM_TYPE", NULL,
@@ -3046,6 +3144,10 @@ int main(void) {
    TestBit.run_ex("SCH93_UNRESOLVED_NESTED_AND_ITEMS", NULL, test_sch93_unresolved_nested_and_items, th);
    TestBit.run_ex("SCH94_UNRESOLVED_NULL", NULL, test_sch94_unresolved_null_and_nullable, th);
    TestBit.run_ex("SCH95_UNRESOLVED_ABSENT_AND_OPTIONS", NULL, test_sch95_unresolved_absent_and_options, th);
+   TestBit.run_ex("SCH97_load_without_schema_attribute_has_a_code", NULL,
+                  test_sch97_load_without_schema_attribute_has_a_code, th);
+   TestBit.run_ex("SCH98_schema_error_codes_have_names_and_messages", NULL,
+                  test_sch98_schema_error_codes_have_names_and_messages, th);
    TestBit.run_ex("SCH96_UNRESOLVED_LATER_RESOLUTION", NULL, test_sch96_unresolved_value_form_and_later_resolution, th);
 
    return TestBit.report();

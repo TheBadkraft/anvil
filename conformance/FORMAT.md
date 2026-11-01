@@ -92,7 +92,7 @@ error code=5002 name=ANVL_ERR_PARSER_UNTERMINATED_STRING category=4 category-nam
 
 One line per error native recorded (native records the first one only, so in practice one). `code` is the
 internal `anvl_err_code` number (`include/errors.h`) and `name` is native's name for it
-(`anvl_error_code_name`; note it is native's table, which for `1003` says `ANVL_ERR_FILE_INVALID_PATH`).
+(`anvl_error_code_name`; since v0.13.1 it is the enum identifier, e.g. `ANVL_ERR_IO_INVALID_PATH` for `1003`).
 `category` is the public `anvil_err_code` (`include/anvil_types.h`): `0` OK, `1` IO, `2` HEADER, `3` INCLUDE,
 `4` SYNTAX, `5` RESOLVE, `6` MEMORY, `7` INVALID_ARGUMENT. `line` and `column` are 1-based as native reports
 them (`0` when there is none). `message` is native's message text, exactly.
@@ -111,9 +111,9 @@ When a load fails, **nothing but the error is defined**: no tree is dumped, beca
 leaves behind is an implementation artifact, not behaviour a port should copy. If native failed before it
 recorded anything, one line `error code=0 name=ANVL_ERR_NONE ...` with the public category and an empty message
 is written (and no `dialect` line, see above). An unreadable root file no longer takes this path (BR-2610-anvl-io-001):
-native records the specific code, so a missing file is `error code=1002 name=ANVL_ERR_FILE_NOT_FOUND ... message="IO file
-not found"`, a directory or a file that cannot be opened is `code=1001 name=ANVL_ERR_FILE_READ` ("IO error reading source
-file"), and a NULL or empty path is `code=1003 name=ANVL_ERR_FILE_INVALID_PATH` ("IO invalid file path"), all with category
+native records the specific code, so a missing file is `error code=1002 name=ANVL_ERR_IO_FILE_NOT_FOUND ... message="IO file
+not found"`, a directory or a file that cannot be opened is `code=1001 name=ANVL_ERR_IO_FILE_READ` ("IO error reading source
+file"), and a NULL or empty path is `code=1003 name=ANVL_ERR_IO_INVALID_PATH` ("IO invalid file path"), all with category
 `ANVIL_ERR_IO` and line and column 0. The corpus holds no such case, since an input is always an existing file; the lines
 exist for completeness. The same codes govern an `include` that names a directory: it is an include error, not an empty
 document.
@@ -784,10 +784,13 @@ text** (a type name, a format, a tag) is a quoted string, or `none` when its len
 
 ```
 registry line=L name=R how=load|includes file="F" doc=D result=ok|null diagnostics=N
+  load_error code=C name=ANVIL_TYPE_ERR_X message="M"                            (only when result=null and how=load)
   diag index=I code=C name=ANVIL_TYPE_DIAG_X type="T" source="S" message="M"     (N lines, in the registry's order)
 ```
 
-`result=null` when the call returned `NULL` (then `diagnostics=0`). `type` is `anvil_type_diagnostic_get_name`, `source`
+`result=null` when the call returned `NULL` (then `diagnostics=0`). For `how=load` the `load_error` line follows, from
+`anvil_type_registry_load_ex` (`anvil_type_err_code`: 1 `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING`, the document has no
+`@[types]`) with `anvil_type_err_code_name` and `_message` (v0.13.1; before it a `NULL` carried no reason). `type` is `anvil_type_diagnostic_get_name`, `source`
 is `_get_source`, `message` is `_get_message`, and `C` is the category as an integer.
 
 **`type`**
@@ -808,12 +811,15 @@ length, NUL bytes included). `kind` is `ANVIL_TYPE_UNKNOWN`, `_NUMERIC`, `_STRIN
 
 ```
 schema line=L name=S file="F" doc=D result=ok|null diagnostics=N fields=M
+  load_error code=C name=ANVIL_SCHEMA_ERR_X message="M"                                        (only when result=null)
   diag index=I code=C name=ANVIL_SCHEMA_DIAG_X type_code=C2 type_name=ANVIL_TYPE_DIAG_Y field="F" message="M"      (N lines)
   <rule>                                                                                       (M top-level rules)
 ```
 
 `result=null` when `anvil_schema_load` returned `NULL` (a document without `@[schema]`, or no document); then
-`diagnostics=0 fields=0`. The source document is **disposed before the schema is read**, so everything printed is
+`diagnostics=0 fields=0`, and a `load_error` line follows, from `anvil_schema_load_ex` (`anvil_schema_err_code` 11
+`ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING`) with `anvil_schema_err_code_name` and `_message` (v0.13.1; before it a `NULL` carried
+no reason). The source document is **disposed before the schema is read**, so everything printed is
 independent of it. The `diag` lines are `anvil_schema_get_diagnostic(S, I)` in order; `type_code` and `type_name` are
 `anvil_schema_diagnostic_get_type_category` (`ANVIL_TYPE_DIAG_NONE`, 0, for every diagnostic that is not
 `ANVIL_SCHEMA_DIAG_TYPE_REGISTRY`), `field` is `anvil_schema_diagnostic_get_field`, and `C` is the category as an integer.

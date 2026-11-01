@@ -74,6 +74,9 @@ typedef struct anvil_schema_i {
    size_t (*field_get_extra_count)(anvil_schema_field field);
    size_t (*field_get_extra_name)(anvil_schema_field field, size_t index, char *buf, size_t buflen);
    anvil_value (*field_get_extra_value)(anvil_schema_field field, size_t index);
+   anvil_schema (*load_ex)(anvil_document doc, anvil_schema_err_code *out_err);
+   const char *(*err_code_name)(anvil_schema_err_code code);
+   const char *(*err_code_message)(anvil_schema_err_code code);
 } anvil_schema_i;
 extern const anvil_schema_i Schema;
 

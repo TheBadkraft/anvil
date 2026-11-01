@@ -148,6 +148,9 @@ for i, v in enumerate(NUM_BOUNDS):
 
 # loads: where types come from
 case(R, "load_not_types", [("a.anvl", "#!aml\nx := 1;\n")], ['registry r load "a.anvl"', 'type find r "x"', 'registry s includes "a.anvl"', 'type find s "x"'])
+case(R, "load_error_attribute_missing", [("a.anvl", "#!aml\nx := 1;\n"), ("t.anvl", "#!aml\n@[types]\nVIN := { type := String; size := 17; };\n"), ("s.anvl", "#!aml\n@[schema]\nn := { type := Numeric; };\n")],
+     ['registry bad1 load "a.anvl"', 'registry good load "t.anvl"', 'registry bad2 load "missing.anvl"', 'registry bad3 load "s.anvl"', 'schema bad5 load "a.anvl"', 'schema bad4 load "t.anvl"', 'schema ok load "s.anvl"'],
+     desc="FR-2610-anvl-schema-009: a registry load without @[types] and a schema load without @[schema] report a specific load_error (a document that is the other kind, or a missing file, gets the same one); a good load prints none")
 case(R, "load_missing", [], ['registry r load "nope.anvl"', 'registry s includes "nope.anvl"', 'type find r "T"'])
 case(R, "load_syntax_error", [("a.anvl", TYPES + "T := { type := ;\n")], ['registry r load "a.anvl"', 'registry s includes "a.anvl"', 'type find r "T"'])
 case(R, "load_empty_doc", [("a.anvl", "")], ['registry r load "a.anvl"', 'registry s includes "a.anvl"'])
@@ -420,6 +423,8 @@ for cn, body in COMBOS:
     case(N, "range_" + cn, [("s.anvl", SCHEMA + "n := { type := Numeric; %s };\n" % body)], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in NUMS], desc=body)
 case(N, "integer_by_value_not_spelling", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["2", "2.0", "2.50", "1e+3", "1e-1", "1e2", "12e-1", "0.0", "-0.0", "1.0000000000000001", "9007199254740993.0", "1e400", "-2.0", "5e-324", "-1e400", "1.5e999", "1e308", "99999999999999999999", "-99999999999999999999"]],
      desc="BR-2610-anvl-schema-004: a decimal/exponent literal beyond double range (1e400) is not an integer and fails; a digits-only literal past int64 is whole and passes")
+case(N, "integer_exact_decimal_from_text", [("s.anvl", SCHEMA + "n := { type := Numeric; integer := true; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ n := %s; }" % v) for v in ["1e-999", "-1e-999", "0.5e-400", "1.000001", "1.0000000000000001", "1.5e-1", "12e-1", "1e-99999999999999999999", "0.0e-999", "0e5", "0e-999", "0.0", "-0.0", "1e3", "1.0", "1.50e1", "100e-2", "1000e-3", "2.500e1", "1e400", "99999999999999999999", "9007199254740993.0"]],
+     desc="BR-2610-anvl-schema-006: whole-ness is decided from the literal's text: a nonzero digit after the point (1e-999, 0.5e-400, 1.000001) fails; zero in any spelling, 1e3 and 1.0 pass")
 case(N, "numbers_as_other_kinds", [("s.anvl", SCHEMA + "s := { type := String; };\nb := { type := Bool; };\ne := { type := enum; values := [1, 2.0, 1e1, 007]; };\n")],
      ['schema s load "s.anvl"'] + [vv("s", "{ %s := %s; }" % (f, v)) for f in "sbe" for v in ["1", "2.0", "1e1", "007", "2", "10", "true"]])
 case(N, "enum_numeric_membership", [("s.anvl", SCHEMA + "e := { type := enum; values := [1, 2.5, \"3\", 1e2]; };\n")], ['schema s load "s.anvl"'] + [vv("s", "{ e := %s; }" % v) for v in ["1", "1.0", "2.5", "2.50", "3", '"3"', "1e2", "100", '"1e2"', "01"]])

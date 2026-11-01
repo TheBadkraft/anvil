@@ -877,3 +877,83 @@ module_document anvil_internal_document_root(anvil_document doc) {
 anvl_value anvil_internal_document_fragment(anvil_document doc) {
    return doc ? doc->fragment_value : NULL;
 }
+
+/* Whether a plain decimal NUMERIC literal (-?digits[.digits][(e|E)[+-]digits]) is a whole number, decided from
+ * its text alone (BR-2610-anvl-schema-006): its exact decimal value has no nonzero digit after the point. One
+ * bounded pass over the literal, no allocation; the exponent saturates, so no input costs more than its length.
+ * Returns false (and leaves *whole alone) for anything that is not a plain decimal, which the caller decides. */
+bool anvil_internal_numeric_text_is_whole(anvil_value val, bool *whole) {
+   anvl_value v = deref_varref((anvl_value)val);
+   if (!v || v->type != ANVL_VALUE_NUMERIC || !whole) {
+      return false;
+   }
+   const char *t = v->text.start;
+   size_t len = (size_t)Source.slice_length(v->text);
+   if (!t || len == 0) {
+      return false;
+   }
+   const int64_t cap = (int64_t)1 << 50; // exponent saturation; far beyond any literal length
+   size_t i = 0, digits = 0, last_nz = 0, frac = 0; // digits seen; 1-based index of the last nonzero one
+   bool after_point = false, any = false;
+   if (t[i] == '-' || t[i] == '+') {
+      i++;
+   }
+   for (; i < len; i++) {
+      char c = t[i];
+      if (c >= '0' && c <= '9') {
+         digits++;
+         any = true;
+         if (c != '0') {
+            last_nz = digits;
+         }
+         if (after_point) {
+            frac++;
+         }
+      } else if (c == '.' && !after_point) {
+         after_point = true;
+      } else {
+         break;
+      }
+   }
+   if (!any) {
+      return false;
+   }
+   int64_t exp = 0;
+   if (i < len) {
+      if (t[i] != 'e' && t[i] != 'E') {
+         return false;
+      }
+      i++;
+      bool neg = false;
+      if (i < len && (t[i] == '+' || t[i] == '-')) {
+         neg = t[i] == '-';
+         i++;
+      }
+      if (i >= len) {
+         return false;
+      }
+      for (; i < len; i++) {
+         if (t[i] < '0' || t[i] > '9') {
+            return false;
+         }
+         if (exp < cap) {
+            exp = exp * 10 + (t[i] - '0');
+         }
+      }
+      if (exp > cap) {
+         exp = cap;
+      }
+      if (neg) {
+         exp = -exp;
+      }
+   }
+   if (last_nz == 0) {
+      *whole = true; // zero, whatever its spelling
+      return true;
+   }
+   // value = digits * 10^(exp - frac); whole when the shift is non-negative or only trailing zeros move past the point
+   int64_t shift = exp - (int64_t)frac;
+   int64_t trailing_zeros = (int64_t)(digits - last_nz);
+   *whole = shift >= -trailing_zeros;
+   return true;
+}

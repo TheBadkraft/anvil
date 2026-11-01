@@ -14,6 +14,9 @@
 
 const anvil_schema_i Schema = {
    .load = anvil_schema_load,
+   .load_ex = anvil_schema_load_ex,
+   .err_code_name = anvil_schema_err_code_name,
+   .err_code_message = anvil_schema_err_code_message,
    .dispose = anvil_schema_dispose,
    .validate = anvil_schema_validate,
    .validate_value = anvil_schema_validate_value,

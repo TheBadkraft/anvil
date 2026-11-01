@@ -1086,6 +1086,9 @@ static void test_typ34_type_registry_vtable_matches_flat_and_is_complete(void) {
       VT_MEMBER(anvil_type_diagnostic_get_name, TypeRegistry.diagnostic_get_name),
       VT_MEMBER(anvil_type_diagnostic_get_source, TypeRegistry.diagnostic_get_source),
       VT_MEMBER(anvil_type_diagnostic_get_message, TypeRegistry.diagnostic_get_message),
+      VT_MEMBER(anvil_type_registry_load_ex, TypeRegistry.load_ex),
+      VT_MEMBER(anvil_type_err_code_name, TypeRegistry.err_code_name),
+      VT_MEMBER(anvil_type_err_code_message, TypeRegistry.err_code_message),
    };
    check_vtable_complete("../../include/anvil_type_registry.h", table,
                          sizeof(table) / sizeof(table[0]), "TYP34");
@@ -1261,6 +1264,48 @@ static void test_typ40_root_without_types_is_unchanged(void) {
    }
 }
 
+/* TYP41 - FR-2610-anvl-schema-009: a document without @[types] reports a specific load error. */
+static void test_typ41_load_without_types_attribute_has_a_code(void) {
+   const char *plain = "#!aml\nn := 1;\n";
+   anvil_document doc = anvil_load_buffer(plain, strlen(plain));
+   anvil_type_err_code err = (anvil_type_err_code)99;
+   anvil_type_registry reg = anvil_type_registry_load_ex(doc, &err);
+   TestBit.is_null(reg, "TYP41: no @[types], no registry");
+   TestBit.is_equal_int(ANVIL_TYPE_ERR_ATTRIBUTE_MISSING, err, "TYP41: the specific code");
+   TestBit.is_equal_int(1, (long long)ANVIL_TYPE_ERR_ATTRIBUTE_MISSING, "TYP41: numbered 1");
+   TestBit.is_null(anvil_type_registry_load_ex(doc, NULL), "TYP41: out_err is optional");
+   TestBit.is_null(anvil_type_registry_load(doc), "TYP41: anvil_type_registry_load still returns NULL");
+   anvil_dispose(doc);
+
+   err = (anvil_type_err_code)99;
+   TestBit.is_null(anvil_type_registry_load_ex(NULL, &err), "TYP41: NULL document, no registry");
+   TestBit.is_equal_int(ANVIL_TYPE_ERR_ATTRIBUTE_MISSING, err, "TYP41: NULL document reports the same code");
+
+   const char *good = "#!aml\n@[types]\nVIN := { type := String; size := 17; };\n";
+   doc = anvil_load_buffer(good, strlen(good));
+   err = (anvil_type_err_code)99;
+   reg = anvil_type_registry_load_ex(doc, &err);
+   TestBit.is_not_null(reg, "TYP41: with @[types] a registry is returned");
+   TestBit.is_equal_int(ANVIL_TYPE_ERR_NONE, err, "TYP41: and the code is NONE");
+   anvil_type_registry_dispose(reg);
+   anvil_dispose(doc);
+}
+
+/* TYP42 - every public type-registry load code has its own name and a message. */
+static void test_typ42_type_error_codes_have_names_and_messages(void) {
+   TestBit.is_true(strcmp(anvil_type_err_code_name(ANVIL_TYPE_ERR_NONE), "ANVIL_TYPE_ERR_NONE") == 0, "TYP42: NONE name");
+   TestBit.is_true(strcmp(anvil_type_err_code_name(ANVIL_TYPE_ERR_ATTRIBUTE_MISSING), "ANVIL_TYPE_ERR_ATTRIBUTE_MISSING") == 0,
+                   "TYP42: ATTRIBUTE_MISSING name");
+   const char *m0 = anvil_type_err_code_message(ANVIL_TYPE_ERR_NONE);
+   const char *m1 = anvil_type_err_code_message(ANVIL_TYPE_ERR_ATTRIBUTE_MISSING);
+   TestBit.is_true(m0 && *m0 && strcmp(m0, "Unknown error") != 0, "TYP42: NONE message");
+   TestBit.is_true(m1 && *m1 && strstr(m1, "@[types]") != NULL, "TYP42: the message names the missing attribute");
+   TestBit.is_true(strcmp(anvil_type_err_code_name((anvil_type_err_code)99), "ANVIL_TYPE_ERR_UNNAMED") == 0,
+                   "TYP42: an unknown value has the placeholder name");
+   TestBit.is_true(strcmp(anvil_type_err_code_message((anvil_type_err_code)99), "Unknown error") == 0,
+                   "TYP42: and the placeholder message");
+}
+
 int main(void) {
    TestBit.run_ex("TYP01_load_and_find", NULL, test_typ01_load_and_find, th);
    TestBit.run_ex("TYP02_reject_non_types_document", NULL,
@@ -1323,6 +1368,10 @@ int main(void) {
    TestBit.run_ex("TYP38_root_types_are_included", NULL, test_typ38_root_types_are_included, th);
    TestBit.run_ex("TYP39_root_types_without_includes", NULL, test_typ39_root_types_without_includes, th);
    TestBit.run_ex("TYP40_root_without_types_is_unchanged", NULL, test_typ40_root_without_types_is_unchanged, th);
+   TestBit.run_ex("TYP41_load_without_types_attribute_has_a_code", NULL,
+                  test_typ41_load_without_types_attribute_has_a_code, th);
+   TestBit.run_ex("TYP42_type_error_codes_have_names_and_messages", NULL,
+                  test_typ42_type_error_codes_have_names_and_messages, th);
 
    return TestBit.report();
 }

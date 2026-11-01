@@ -252,6 +252,38 @@ typedef enum {
 } anvil_type_diag_code;
 
 /**
+ * @brief Why a registry could not be loaded - this API's own set, independent of errors.h and of
+ * the diagnostic categories above. Only ever appended to.
+ */
+typedef enum {
+   ANVIL_TYPE_ERR_NONE = 0,
+   ANVIL_TYPE_ERR_ATTRIBUTE_MISSING, // the document does not carry the @[types] module attribute
+} anvil_type_err_code;
+
+/**
+ * @brief anvil_type_registry_load, plus the reason when it returns NULL.
+ * @param doc As anvil_type_registry_load.
+ * @param out_err Optional (may be NULL). Set to ANVIL_TYPE_ERR_NONE when a registry is returned;
+ * to ANVIL_TYPE_ERR_ATTRIBUTE_MISSING when doc is NULL or does not carry @[types]. A NULL return
+ * with ANVIL_TYPE_ERR_NONE means allocation failed. Thread-safe: the reason is returned, never
+ * stored.
+ * @return Exactly what anvil_type_registry_load(doc) returns.
+ */
+anvil_type_registry anvil_type_registry_load_ex(anvil_document doc, anvil_type_err_code *out_err);
+
+/**
+ * @brief The enumerator's own name for a code, e.g. "ANVIL_TYPE_ERR_ATTRIBUTE_MISSING".
+ * Static storage, never NULL; a value that is not an enumerator reads "ANVIL_TYPE_ERR_UNNAMED".
+ */
+const char *anvil_type_err_code_name(anvil_type_err_code code);
+
+/**
+ * @brief A one-line description of a code. Static storage, never NULL; a value that is not an
+ * enumerator reads "Unknown error".
+ */
+const char *anvil_type_err_code_message(anvil_type_err_code code);
+
+/**
  * @brief How many diagnostics loading this registry produced, in the order they were found.
  * @param reg The registry to read. NULL returns 0.
  */

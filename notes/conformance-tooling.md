@@ -17,8 +17,9 @@ Format and usage: `conformance/FORMAT.md`, `conformance/fuzz/README.md`.
 
 - **No statement span.** `anvl_statement_t.span` is never set. The dump carries the spans of the name, base,
   attributes and values, and no statement span or text. If a statement span is wanted, it is a native change first.
-- **Error name table.** `anvl_error_code_name(ANVL_ERR_IO_INVALID_PATH)` is `ANVL_ERR_FILE_INVALID_PATH`. The dump prints
-  native's name; the drift table has the enum name. A port copies the dump.
+- **Error name table.** *Fixed in v0.13.1 (BR-2610-anvl-errors-002).* The IO names were `ANVL_ERR_FILE_READ`,
+  `_FILE_NOT_FOUND` and `_FILE_INVALID_PATH`; every name string is now its enum identifier (`ANVL_ERR_IO_FILE_READ`,
+  `_IO_FILE_NOT_FOUND`, `_IO_INVALID_PATH`), and `check-drift-tables` enforces it.
 - **BR-2610-anvl-001.** `include "."` and `include ""` reach `malloc` with a negative size in `files_load` (valgrind) and
   report `ANVL_ERR_MEMORY_ALLOC_FAILED` as an include error. Those two inputs are left out of the corpus on purpose.
 - Newlines directly after `:=` are rejected ("Expected content"); whitespace rules are in the corpus, not written down.

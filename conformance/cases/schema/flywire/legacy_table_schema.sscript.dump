@@ -1,5 +1,7 @@
 anvil-schema-run 1
 schema line=11 name=s file="v.anvl" doc=ANVIL_ERR_SYNTAX result=null diagnostics=0 fields=0
+  load_error code=11 name=ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING message="The document does not carry the @[schema] module attribute"
 registry line=12 name=r how=load file="v.anvl" doc=ANVIL_ERR_SYNTAX result=null diagnostics=0
+  load_error code=1 name=ANVIL_TYPE_ERR_ATTRIBUTE_MISSING message="The document does not carry the @[types] module attribute"
 steps 3
 status ok
