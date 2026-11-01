@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.13.1-rc] — (2026-10-31)
+
+A patch release with two behaviour changes: the error name strings of the three IO codes now equal their `errors.h` identifiers, and `integer := true` decides whole-ness from the literal's text (`1e-999` and `1.0000000000000001` now fail). It also adds the additive `anvil_schema_load_ex` and `anvil_type_registry_load_ex`, which report why a load failed (171 exports). Every artifact is built from this tag and reports `0.13.1-rc+<BUILD>`.
+
 ### Added
 
 - **Specific load errors for a missing `@[schema]` / `@[types]` (FR-2610-anvl-schema-009).** A document without
