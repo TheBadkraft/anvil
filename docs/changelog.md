@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Error names match the enum identifiers (BR-2610-anvl-errors-002).** `anvl_error_code_name` spelled the three IO codes
+  `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH`. They are now `ANVL_ERR_IO_FILE_READ`,
+  `ANVL_ERR_IO_FILE_NOT_FOUND` and `ANVL_ERR_IO_INVALID_PATH`, the identifiers in `errors.h`. These were the only three
+  mismatches among 107 codes. The enum is unchanged; `make check-drift-tables` now fails if any name differs from its
+  identifier. Anything that matched the old strings (a log filter, a test) must change.
+
 ---
 
 ## [v0.13.0-rc] — (2026-10-31)
