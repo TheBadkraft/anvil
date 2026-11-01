@@ -38,8 +38,8 @@ assert.strictEqual(a.parse('#!aml\nname := "David";\n').get('name').asString(), 
 })().catch((e) => { console.error(e); process.exit(1); });
 JS
 cat > "$work/proj/esm.mjs" <<'JS'
-import anvl, { parse, parseRawValue, lastError, getVersion, implementation, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo } from 'anvil.js';
-const names = { parse, parseRawValue, lastError, getVersion, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo };
+import anvl, { parse, parseRawValue, lastError, getVersion, implementation, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo, SchemaErrorCode, TypeErrorCode } from 'anvil.js';
+const names = { parse, parseRawValue, lastError, getVersion, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo, SchemaErrorCode, TypeErrorCode };
 for (const [k, v] of Object.entries(names)) if (typeof v === 'undefined') { console.error('missing named export ' + k); process.exit(1); }
 if (implementation !== 'anvil.js' || anvl.implementation !== 'anvil.js' || anvl.AnvilWriter !== AnvilWriter || anvl.AnvilBuilder !== AnvilBuilder || anvl.Schema !== Schema || anvl.setIo !== setIo) process.exit(1);
 if (typeof Schema !== 'function' || typeof TypeRegistry !== 'function' || typeof AnvilBuilder.create !== 'function') { console.error('Schema/TypeRegistry/AnvilBuilder are not usable'); process.exit(1); }
@@ -58,6 +58,16 @@ console.log(`PASS js: lastError() for a duplicate key is code ${e.code} (${e.nam
 assert.strictEqual(a.Schema.loadFile('/nonexistent-anvl-release-check/missing.anvl'), null);
 const m = a.lastError(); assert.strictEqual(m.code, 1002, 'lastError().code for a missing file'); assert.ok(m.message && m.message.length > 0, 'message');
 console.log(`PASS js: lastError() for a missing file is code ${m.code} (${m.name})`);
+assert.strictEqual(m.name, 'ANVL_ERR_IO_FILE_NOT_FOUND', 'IO name equals the identifier');
+assert.strictEqual(a.Schema.load('#!aml\nx := 1;\n'), null);
+const sm = a.lastError(); assert.strictEqual(sm.code, 11); assert.strictEqual(sm.name, 'ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING');
+assert.strictEqual(a.TypeRegistry.load('#!aml\nx := 1;\n'), null);
+const tm = a.lastError(); assert.strictEqual(tm.code, 1); assert.strictEqual(tm.name, 'ANVIL_TYPE_ERR_ATTRIBUTE_MISSING');
+assert.strictEqual(a.SchemaErrorCode.ATTRIBUTE_MISSING, 11); assert.strictEqual(a.TypeErrorCode.ATTRIBUTE_MISSING, 1);
+const isch = a.Schema.load('#!aml\n@[schema]\nn { integer := true; };\n');
+assert.strictEqual(isch.validate('#!aml\nn := 1e-999;\n').valid, false, 'integer rejects 1e-999');
+assert.strictEqual(isch.validate('#!aml\nn := 1e3;\n').valid, true, 'integer accepts 1e3');
+console.log('PASS js: IO name ANVL_ERR_IO_FILE_NOT_FOUND, Schema.load without @[schema] is code 11, TypeRegistry.load without @[types] is code 1, integer rejects 1e-999 and accepts 1e3');
 const w = a.AnvilWriter.create(a.AnvilDialect.AMP);
 const text = w.statement('utid').blob('utid', 'u-1').statement('seq').value(9007199254740991)
   .statement('payload').beginTuple().value(1).string('a"b\\c\n').bare('ok').blob('t', 'x := 1;').endTuple().finish();

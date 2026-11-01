@@ -33,6 +33,8 @@ const snippet = `   check('FlyWire-shaped: assets schema (types through setIo), 
       try {
          const schema = anvl.Schema.load(${schema});
          eq(schema === null, false, 'schema loads');
+         eq(anvl.Schema.load('#!aml\\nx := 1;\\n'), null, 'no @[schema]'); eq(anvl.lastError().code, anvl.SchemaErrorCode.ATTRIBUTE_MISSING, 'schema code 11');
+         eq(anvl.TypeRegistry.load('#!aml\\nx := 1;\\n'), null, 'no @[types]'); eq(anvl.lastError().code, anvl.TypeErrorCode.ATTRIBUTE_MISSING, 'types code 1');
          eq(schema.fields.length, 12, 'twelve fields');
          const row = (vin, status) => { const b = anvl.AnvilBuilder.create(anvl.AnvilDialect.AML);
             b.add('asset_id', b.value(7)); b.add('asset_type', b.value(2)); b.add('vin_serial', b.string(vin)); b.add('make', b.string('Ford'));
