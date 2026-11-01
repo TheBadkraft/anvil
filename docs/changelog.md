@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Specific load errors for a missing `@[schema]` / `@[types]` (FR-2610-anvl-schema-009).** A document without
+  `@[schema]` made `anvil_schema_load` return NULL, and one without `@[types]` made `anvil_type_registry_load` return NULL,
+  with no reason in either case. New, additive functions return the reason: `anvil_schema_load_ex(doc, &err)` reports
+  `ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING` (11, after the last violation code), and `anvil_type_registry_load_ex(doc, &err)`
+  reports `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING` (1, in the new `anvil_type_err_code`). `anvil_schema_err_code_name` and
+  `_message`, and `anvil_type_err_code_name` and `_message`, give each code its name and a message. All six are in the
+  `Schema` and `TypeRegistry` vtables and exported. The reason is returned, never stored, so concurrent loads are
+  unaffected. `anvil_schema_load` and `anvil_type_registry_load` behave as before. The schema corpus dumps print a
+  `load_error` line after every `result=null` load.
+
 ### Fixed
 
 - **`integer := true` decides whole-ness from the literal's text (BR-2610-anvl-schema-006).** A decimal literal that

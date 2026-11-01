@@ -625,27 +625,60 @@ static void build_rule(anvil_value obj_val, anvil_type_registry types,
    }
 }
 
-// STUB (FR-2610-anvl-schema-009 RED)
-anvil_schema anvil_schema_load_ex(anvil_document doc, anvil_schema_err_code *out_err) {
-   (void)doc;
-   if (out_err) {
-      *out_err = ANVIL_SCHEMA_ERR_NONE;
-   }
-   return NULL;
-}
+static const struct { anvil_schema_err_code code; const char *name; const char *message; } schema_err_table[] = {
+   {ANVIL_SCHEMA_ERR_NONE, "ANVIL_SCHEMA_ERR_NONE", "No error"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED, "ANVIL_SCHEMA_ERR_VALIDATION_REQUIRED",
+    "A required field is absent"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH, "ANVIL_SCHEMA_ERR_VALIDATION_TYPE_MISMATCH",
+    "A field's value does not match its declared type"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_SIZE, "ANVIL_SCHEMA_ERR_VALIDATION_SIZE",
+    "A field's value exceeds its declared size"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_RANGE, "ANVIL_SCHEMA_ERR_VALIDATION_RANGE",
+    "A numeric field's value is outside its declared min/max range"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_VALUES, "ANVIL_SCHEMA_ERR_VALIDATION_VALUES",
+    "A field's value is not one of its declared values"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD, "ANVIL_SCHEMA_ERR_VALIDATION_UNKNOWN_FIELD",
+    "A data field is not declared in the schema"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT, "ANVIL_SCHEMA_ERR_VALIDATION_ITEM_COUNT",
+    "An array has fewer than min_items or more than max_items elements"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_TAG, "ANVIL_SCHEMA_ERR_VALIDATION_TAG",
+    "A blob's tag is not the one the rule requires"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_FORMAT, "ANVIL_SCHEMA_ERR_VALIDATION_FORMAT",
+    "A string does not match the rule's format"},
+   {ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE, "ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE",
+    "A value is present for a rule whose type did not resolve"},
+   {ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING, "ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING",
+    "The document does not carry the @[schema] module attribute"},
+};
 
 const char *anvil_schema_err_code_name(anvil_schema_err_code code) {
-   (void)code;
-   return "";
+   for (size_t i = 0; i < sizeof(schema_err_table) / sizeof(schema_err_table[0]); i++) {
+      if (schema_err_table[i].code == code) {
+         return schema_err_table[i].name;
+      }
+   }
+   return "ANVIL_SCHEMA_ERR_UNNAMED";
 }
 
 const char *anvil_schema_err_code_message(anvil_schema_err_code code) {
-   (void)code;
-   return "";
+   for (size_t i = 0; i < sizeof(schema_err_table) / sizeof(schema_err_table[0]); i++) {
+      if (schema_err_table[i].code == code) {
+         return schema_err_table[i].message;
+      }
+   }
+   return "Unknown error";
 }
 
-anvil_schema anvil_schema_load(anvil_document doc) {
+anvil_schema anvil_schema_load(anvil_document doc) { return anvil_schema_load_ex(doc, NULL); }
+
+anvil_schema anvil_schema_load_ex(anvil_document doc, anvil_schema_err_code *out_err) {
+   if (out_err) {
+      *out_err = ANVIL_SCHEMA_ERR_NONE;
+   }
    if (!doc || !anvil_document_find_attribute(doc, "schema")) {
+      if (out_err) {
+         *out_err = ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING;
+      }
       return NULL; // @[schema] marks a schema definition — declaring shape, never filling one
    }
 

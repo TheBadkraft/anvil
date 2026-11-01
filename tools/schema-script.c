@@ -702,6 +702,7 @@ static const char *violation_name(anvil_schema_err_code c) {
    case ANVIL_SCHEMA_ERR_VALIDATION_TAG: return "ANVIL_SCHEMA_ERR_VALIDATION_TAG";
    case ANVIL_SCHEMA_ERR_VALIDATION_FORMAT: return "ANVIL_SCHEMA_ERR_VALIDATION_FORMAT";
    case ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE: return "ANVIL_SCHEMA_ERR_VALIDATION_UNRESOLVED_TYPE";
+   case ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING: return "ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING";
    }
    return "ANVIL_SCHEMA_ERR_UNNAMED";
 }
@@ -947,13 +948,20 @@ static void run_steps(const step *steps, size_t count, const handle_table *handl
          bool includes = strcmp(a[1].bytes, "includes") == 0;
          anvil_document doc = anvil_load(a[2].bytes);
          const char *state = doc_state(doc);
-         anvil_type_registry reg = includes ? anvil_type_registry_load_from_includes(doc) : anvil_type_registry_load(doc);
+         anvil_type_err_code load_err = ANVIL_TYPE_ERR_NONE;
+         anvil_type_registry reg = includes ? anvil_type_registry_load_from_includes(doc) : anvil_type_registry_load_ex(doc, &load_err);
          anvil_dispose(doc);
          values[st->slot[0]] = reg;
          size_t nd = anvil_type_registry_get_diagnostic_count(reg);
          printf("registry line=%zu name=%s how=%s", st->line, a[0].bytes, a[1].bytes);
          put_q("file", a[2].bytes, a[2].len);
          printf(" doc=%s result=%s diagnostics=%zu\n", state, reg ? "ok" : "null", nd);
+         if (!reg && !includes) {
+            printf("  load_error code=%d name=%s", (int)load_err, anvil_type_err_code_name(load_err));
+            const char *lm = anvil_type_err_code_message(load_err);
+            put_q("message", lm, strlen(lm));
+            putchar('\n');
+         }
          for (size_t d = 0; d < nd; d++) {
             anvil_type_diagnostic diag = anvil_type_registry_get_diagnostic(reg, d);
             anvil_type_diag_code code = anvil_type_diagnostic_get_category(diag);
@@ -987,7 +995,8 @@ static void run_steps(const step *steps, size_t count, const handle_table *handl
       case V_SCHEMA: {
          anvil_document doc = anvil_load(a[2].bytes);
          const char *state = doc_state(doc);
-         anvil_schema schema = anvil_schema_load(doc);
+         anvil_schema_err_code load_err = ANVIL_SCHEMA_ERR_NONE;
+         anvil_schema schema = anvil_schema_load_ex(doc, &load_err);
          anvil_dispose(doc);
          values[st->slot[0]] = schema;
          size_t nd = anvil_schema_get_diagnostic_count(schema);
@@ -995,6 +1004,12 @@ static void run_steps(const step *steps, size_t count, const handle_table *handl
          printf("schema line=%zu name=%s", st->line, a[0].bytes);
          put_q("file", a[2].bytes, a[2].len);
          printf(" doc=%s result=%s diagnostics=%zu fields=%zu\n", state, schema ? "ok" : "null", nd, nf);
+         if (!schema) {
+            printf("  load_error code=%d name=%s", (int)load_err, anvil_schema_err_code_name(load_err));
+            const char *lm = anvil_schema_err_code_message(load_err);
+            put_q("message", lm, strlen(lm));
+            putchar('\n');
+         }
          for (size_t d = 0; d < nd; d++) {
             anvil_schema_diagnostic diag = anvil_schema_get_diagnostic(schema, d);
             anvil_schema_diag_code code = anvil_schema_diagnostic_get_category(diag);

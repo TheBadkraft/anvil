@@ -534,28 +534,33 @@ static void walk_includes(anvil_document doc, struct anvil_type_registry_t *reg,
    anvil_document_iterator_dispose(it);
 }
 
-// STUB (FR-2610-anvl-schema-009 RED)
-anvil_type_registry anvil_type_registry_load_ex(anvil_document doc, anvil_type_err_code *out_err) {
-   (void)doc;
-   if (out_err) {
-      *out_err = ANVIL_TYPE_ERR_NONE;
-   }
-   return NULL;
-}
-
 const char *anvil_type_err_code_name(anvil_type_err_code code) {
-   (void)code;
-   return "";
+   switch (code) {
+   case ANVIL_TYPE_ERR_NONE: return "ANVIL_TYPE_ERR_NONE";
+   case ANVIL_TYPE_ERR_ATTRIBUTE_MISSING: return "ANVIL_TYPE_ERR_ATTRIBUTE_MISSING";
+   }
+   return "ANVIL_TYPE_ERR_UNNAMED";
 }
 
 const char *anvil_type_err_code_message(anvil_type_err_code code) {
-   (void)code;
-   return "";
+   switch (code) {
+   case ANVIL_TYPE_ERR_NONE: return "No error";
+   case ANVIL_TYPE_ERR_ATTRIBUTE_MISSING: return "The document does not carry the @[types] module attribute";
+   }
+   return "Unknown error";
 }
 
-anvil_type_registry anvil_type_registry_load(anvil_document doc) {
+anvil_type_registry anvil_type_registry_load(anvil_document doc) { return anvil_type_registry_load_ex(doc, NULL); }
+
+anvil_type_registry anvil_type_registry_load_ex(anvil_document doc, anvil_type_err_code *out_err) {
+   if (out_err) {
+      *out_err = ANVIL_TYPE_ERR_NONE;
+   }
    if (!doc || !anvil_document_find_attribute(doc, "types")) {
-      return NULL; // @[types] has exactly one meaning — see notes/native-schema.md
+      if (out_err) {
+         *out_err = ANVIL_TYPE_ERR_ATTRIBUTE_MISSING;
+      }
+      return NULL; // @[types] has exactly one meaning - see notes/native-schema.md
    }
    struct anvil_type_registry_t *reg = new_empty_registry();
    if (!reg) {
