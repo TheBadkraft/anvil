@@ -447,6 +447,82 @@ class NativeParser(unittest.TestCase):
         self.assertEqual(ct.parse_testbit("", "s", 0), {})
 
 
+class TestsTag(unittest.TestCase):
+    def test_brackets_inside_names(self):
+        msg = "T-1: GREEN. x [tests: a @[schema] b, c @[types]: d] tail\n\nbody"
+        self.assertEqual(ct.parse_tests_tag(msg), ["a @[schema] b", "c @[types]: d"])
+
+    def test_plain_and_repeated_and_absent(self):
+        self.assertEqual(ct.parse_tests_tag("x [tests: a, b]"), ["a", "b"])
+        self.assertEqual(ct.parse_tests_tag("x [tests: a]\n\n[tests: b]"), ["a", "b"])
+        self.assertEqual(ct.parse_tests_tag("no tag [here]"), [])
+
+    def test_unbalanced_tag_takes_the_rest(self):
+        self.assertEqual(ct.parse_tests_tag("x [tests: a @[schema b"), ["a @[schema b"])
+
+
+class GreenWithBrackets(Base):
+    def test_green_naming_a_test_with_brackets_passes(self):
+        b = self.fx.base()
+        self.fx.commit("T-1: RED. brackets", {
+            "src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = () => 0;\n",
+            "test/mul.test.js": TESTJS + case("doc without @[schema] sets 11", "assert.strictEqual(lib.mul(2, 3), 6);")
+            + case("doc with @[types] ok", "assert.strictEqual(lib.mul(2, 4), 8);")})
+        self.fx.commit("T-1: GREEN. mul [tests: doc without @[schema] sets 11, doc with @[types] ok]",
+                       {"src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = (a, b) => a * b;\n"})
+        rc, commits, _ = self.check(b)
+        self.assertEqual([c["status"] for c in commits], ["PASS", "PASS"], commits)
+
+
+class NativeSetup(Base):
+    def test_testbit_resolution_order(self):
+        d = tempfile.mkdtemp(prefix="ctdd-tb-")
+        self.addCleanup(shutil.rmtree, d, True)
+        repo = os.path.join(d, "wt", "repo")
+        os.makedirs(repo)
+        fb = os.path.join(d, "fallback")
+        os.makedirs(fb)
+        given = os.path.join(d, "given")
+        os.makedirs(given)
+        self.assertEqual(ct.resolve_testbit(repo, given, [fb]), given)
+        self.assertEqual(ct.resolve_testbit(repo, None, [fb]), fb)
+        sib = os.path.join(d, "wt", "testbit")
+        os.makedirs(sib)
+        self.assertEqual(ct.resolve_testbit(repo, None, [fb]), sib)
+        self.assertIsNone(ct.resolve_testbit(repo, os.path.join(d, "nope"), [fb]))
+        shutil.rmtree(sib)
+        shutil.rmtree(fb)
+        self.assertIsNone(ct.resolve_testbit(repo, None, [fb]))
+
+    def test_missing_testbit_is_a_loud_error_not_a_result(self):
+        d = tempfile.mkdtemp(prefix="ctdd-nat-")
+        self.addCleanup(shutil.rmtree, d, True)
+        repo = os.path.join(d, "r")
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        fx.commit("init", {"test/unit/test_a.c": "int main(void){return 0;}\n"})
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            rc = ct.main([fx.dir, "HEAD~0..HEAD", "--adapter", "native", "--testbit", os.path.join(d, "none"), "--cache", self.cache])
+        self.assertEqual(rc, 2)
+        self.assertIn("testbit not found", err.getvalue())
+
+    def test_make_command_carries_testbit_and_vars(self):
+        class O: testbit = "/tb"; make_var = ["BUILD_NUM=500", "X=1"]
+        cmd = ct.native_make_cmd("/u", "header", O)
+        self.assertEqual(cmd[:4], ["make", "-C", "/u", "test_header"])
+        self.assertEqual(cmd[4:], ["TESTBIT=/tb", "BUILD_NUM=500", "X=1"])
+
+    def test_cache_key_covers_testbit_and_vars(self):
+        class A: testbit = "/tb"; make_var = []; no_compat = False
+        class B: testbit = "/other"; make_var = []; no_compat = False
+        class C: testbit = "/tb"; make_var = ["BUILD_NUM=5"]; no_compat = False
+        k = {ct.cache_key("native", "abc", o) for o in (A, B, C)}
+        self.assertEqual(len(k), 3)
+        self.assertTrue(all("abc" in x for x in k))
+        self.assertNotEqual(ct.cache_key("native", "abc", A), ct.cache_key("node", "abc", A))
+
+
 class GateRecord(unittest.TestCase):
     def test_forms(self):
         self.assertEqual(ct.read_gate('{"before": "fail", "after": "pass"}'), "fail->pass")

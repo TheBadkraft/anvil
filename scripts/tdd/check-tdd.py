@@ -233,6 +233,22 @@ def pick_adapter(repo, name):
 # ---------------------------------------------------------------------------------------------
 # the rules (pure: parent result, commit result, facts -> verdict)
 # ---------------------------------------------------------------------------------------------
+def parse_tests_tag(msg):
+    return []
+
+
+def resolve_testbit(repo, given, fallbacks=()):
+    return None
+
+
+def native_make_cmd(unit, suite, opts):
+    return []
+
+
+def cache_key(adapter_name, sha, opts):
+    return ""
+
+
 def summarize(ids, cap=4):
     ids = sorted(ids)
     s = "; ".join(i if len(i) < 90 else i[:87] + "..." for i in ids[:cap])
@@ -497,6 +513,7 @@ def main(argv=None):
     ap.add_argument("--lenient-tests", action="store_true", help="a GREEN without [tests: ...] is a note, not a FAIL (for history that predates the syntax)")
     ap.add_argument("--batch-limit", type=int, default=10, help="GREEN with no [tests:] fails when more than this many tests flip")
     ap.add_argument("--max-green-lines", type=int, default=150, help="a GREEN whose product diff is larger than this is a batch")
+    ap.add_argument("--make-var", action="append", default=[], metavar="NAME=VALUE", help="native: extra make variable, repeatable (e.g. BUILD_NUM=500)")
     ap.add_argument("--testbit", default=None, help="native: path of the testbit checkout (default: ../testbit beside the repo)")
     ap.add_argument("--gate-root", default=None, help="directory to look for [gate: path] records not committed to the repo")
     opts = ap.parse_args(argv)
