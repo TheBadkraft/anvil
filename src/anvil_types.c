@@ -808,6 +808,10 @@ bool anvil_numeric_is_whole(anvil_value data) {
       // an infinity is not an integer (BR-2610-anvl-schema-004). Also what a non-number reads as.
       return false;
    }
+   bool whole;
+   if (anvil_internal_numeric_text_is_whole(data, &whole)) {
+      return whole; // decided from the text: an underflow to 0 (1e-999) or a rounding to whole is not whole
+   }
    double d = n.as_double;
    if (d >= 9223372036854775808.0 || d <= -9223372036854775808.0) {
       return true; // at or beyond 2^63 a double has no fractional bits left
