@@ -262,6 +262,40 @@ static void test_reg10_error_tables_are_complete(void) {
                    "REG10: a genuinely unknown code still reads \"Unknown error\" (defensive)");
 }
 
+/* REG11 - every code's name string is its enum identifier, spelled exactly (BR-2610-anvl-errors-002). */
+static void test_reg11_error_names_are_the_identifiers(void) {
+   FILE *f = fopen("../../include/errors.h", "rb");
+   TestBit.is_not_null(f, "REG11: errors.h readable");
+   if (!f) {
+      return;
+   }
+   char line[256];
+   int checked = 0;
+   bool in_enum = false;
+   while (fgets(line, sizeof(line), f)) {
+      if (strstr(line, "typedef enum")) {
+         in_enum = true;
+      }
+      if (in_enum && strstr(line, "} anvl_err_code;")) {
+         break;
+      }
+      char name[96];
+      unsigned long value;
+      const char *p = strstr(line, "ANVL_ERR_");
+      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+         const char *nm = anvl_error_code_name((anvl_err_code)value);
+         bool ok = nm && strcmp(nm, name) == 0;
+         if (!ok) {
+            printf("    REG11: %s (%lu) is named \"%s\"\n", name, value, nm ? nm : "(null)");
+         }
+         TestBit.is_true(ok, name);
+         checked++;
+      }
+   }
+   fclose(f);
+   TestBit.is_true(checked > 90, "REG11: the header scan found the whole enum");
+}
+
 int main(void) {
    TestBit.run_ex("REG00_registry_starts_empty", NULL, test_reg00_registry_starts_empty, NULL);
    TestBit.run_ex("REG01_add_and_find", NULL, test_reg01_add_and_find, NULL);
@@ -277,6 +311,8 @@ int main(void) {
                   test_reg09_ownerless_source_is_handled_cleanly, NULL);
 
    TestBit.run_ex("REG10_error_tables_are_complete", NULL, test_reg10_error_tables_are_complete, NULL);
+   TestBit.run_ex("REG11_error_names_are_the_identifiers", NULL,
+                  test_reg11_error_names_are_the_identifiers, NULL);
 
    return TestBit.report();
 }
