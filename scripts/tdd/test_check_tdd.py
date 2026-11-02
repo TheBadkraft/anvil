@@ -579,7 +579,16 @@ class PickAdapter(unittest.TestCase):
             f.write("{}")
         self.assertEqual(ct.pick_adapter(self.d, "auto", ["scripts/x.js"]).name, "node")
 
-    def test_explicit_name_wins(self):
+    def test_an_explicit_name_that_matches_the_detection_is_accepted(self):
+        self.assertEqual(ct.pick_adapter(self.d, "native", ["src/a.c"]).name, "native")
+
+    def test_an_explicit_name_that_contradicts_the_detection_is_refused(self):
+        with self.assertRaises(SystemExit) as cm:
+            ct.pick_adapter(self.d, "python", ["src/a.c"])
+        self.assertIn("contradicts", str(cm.exception))
+
+    def test_an_explicit_name_is_accepted_when_nothing_can_be_detected(self):
+        os.rmdir(os.path.join(self.d, "test", "unit"))
         self.assertEqual(ct.pick_adapter(self.d, "python", ["src/a.c"]).name, "python")
 
 
@@ -664,6 +673,58 @@ class PythonSuite(PyBase):
         self.fx.commit("T-1: RED. mul", {"scripts/lib.py": STUB_MUL, "scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
         rc, commits, s = self.check(b)
         self.assertEqual((s.get("adapter"), [c["status"] for c in commits]), ("python", ["PASS"]), commits)
+
+
+class AccidentClass(Base):
+    """A careless but honest run must not produce a wrong PASS."""
+
+    def test_a_contradicting_adapter_is_exit_2_not_a_verdict(self):
+        b = self.fx.base()
+        self.fx.commit("speed up add", {"src/lib.js": "exports.add = (a, b) => b + a;\n"})
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc, commits, _ = self.check(b, "--adapter", "python")
+        self.assertEqual((rc, commits), (2, []))
+        self.assertIn("contradicts", err.getvalue())
+
+    def test_first_parent_is_recorded_in_the_options(self):
+        b = self.fx.base()
+        head = self.fx.commit("T-1: REFACTOR. add", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+        self.check(b, "--first-parent")
+        common = self.fx.run("rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+        with open(os.path.join(common, "check-tdd", "pass", head + ".json")) as f:
+            self.assertIs(json.load(f)["options"].get("first_parent"), True)
+
+    def many_red(self, n):
+        cases = "".join(case("t%d" % i, "assert.strictEqual(lib.mul(2, 3), 6);") for i in range(n))
+        b = self.fx.base()
+        self.fx.commit("T-1: RED. many", {"src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = () => 0;\n", "test/many.test.js": TESTJS + cases})
+        return b
+
+    def test_naming_a_test_file_still_counts_every_flipped_test_against_the_batch_limit(self):
+        b = self.many_red(11)
+        self.fx.commit("T-1: GREEN. mul [tests: test/many.test.js]", {"src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = (a, b) => a * b;\n"})
+        self.assertFails(b, "batch: 11 tests flipped at once")
+
+    def test_ten_flips_named_by_file_are_within_the_limit(self):
+        b = self.many_red(10)
+        self.fx.commit("T-1: GREEN. mul [tests: test/many.test.js]", {"src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = (a, b) => a * b;\n"})
+        self.assertPasses(b)
+
+    def test_a_red_that_renames_a_test_still_failing_from_an_open_red_weakens_it(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: RED. rename", {"test/ops.test.js": TESTJS + case("mul2", "assert.strictEqual(lib.mul(2, 3), 6);") + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);")})
+        self.assertFails(b, "weakens an open RED")
+
+    def test_a_red_that_removes_a_failing_test_of_an_open_red_weakens_it(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: RED. drop", {"test/ops.test.js": TESTJS + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);"), "test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
+        self.assertFails(b, "weakens an open RED")
+
+    def test_a_red_that_adds_a_failing_test_beside_an_open_red_is_fine(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: RED. more", {"test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
+        self.assertPasses(b)
 
 
 class ExactTestNames(Base):
@@ -752,7 +813,7 @@ class PassRecordOptions(Base):
         b, head = self.good_chain()
         self.check(b, "--lenient-tests", "--batch-limit", "30", "--max-green-lines", "400")
         rec = self.record(head)
-        self.assertEqual(rec and rec.get("options"), {"lenient_tests": True, "batch_limit": 30, "max_green_lines": 400, "no_compat": False})
+        self.assertEqual(rec and rec.get("options"), {"lenient_tests": True, "batch_limit": 30, "max_green_lines": 400, "no_compat": False, "first_parent": False})
 
     def test_a_failing_run_removes_the_pass_record_of_that_head(self):
         b = red_then(self.fx)
