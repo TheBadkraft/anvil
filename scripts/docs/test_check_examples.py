@@ -562,6 +562,37 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(r.at(n)[0], "PASS", r.out + r.proc.stderr)
         self.assertEqual(r.at(c)[0], "PASS", r.out + r.proc.stderr)
 
+    def test_http_download_names_itself_because_the_site_refuses_python_urllib(self):
+        import http.server
+        import threading
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if "urllib" in (self.headers.get("User-Agent") or ""):
+                    self.send_response(403)
+                    self.end_headers()
+                    return
+                with open(JS_TGZ, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        try:
+            d = Doc()
+            n = d.block("js", "require('anvil.js');")
+            r = run_check(d, js=False, extra=["--js", "http://127.0.0.1:%d/anvil.js-v0.13.1-rc.tar.gz" % srv.server_address[1]])
+        finally:
+            srv.shutdown()
+        self.assertEqual(r.at(n)[0], "PASS", r.out + r.proc.stderr)
+
     def test_summary_line_counts_each_status(self):
         d = Doc()
         d.block("js", "console.log(1);")
