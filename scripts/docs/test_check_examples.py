@@ -285,7 +285,7 @@ class DocumentTests(unittest.TestCase):
 
     def test_fragment_marker_skips_with_reason(self):
         d = Doc()
-        n = d.block("anvl", "this is not a document", "fragment")
+        n = d.block("anvl", "this is not a document", "fragment prose, not a document")
         r = run_check(d)
         st = r.at(n)
         self.assertEqual(st[0], "SKIP", r.out)
@@ -561,6 +561,97 @@ class OtherLanguageTests(unittest.TestCase):
         self.assertIn("not executable", st[2])
 
 
+class ReviewTests(unittest.TestCase):
+    """Verification findings: language labels, fragment reasons, bad error markers, HTML pages."""
+
+    def test_python3_and_py3_labels_are_python(self):
+        d = Doc()
+        a = d.block("python3", "import anvil\nassert anvil.version() == 'fake-1'")
+        b = d.block("py3", "import anvil\nraise RuntimeError('nope')")
+        r = run_check(d, py=PY_DIR)
+        self.assertEqual(r.at(a)[0], "PASS", r.out)
+        self.assertEqual(r.at(b)[0], "FAIL", r.out)
+
+    def test_unsupported_executable_language_is_a_skip_that_strict_fails(self):
+        for lang in ("ts", "typescript", "cpp", "c++", "jsx", "java"):
+            d = Doc()
+            n = d.block(lang, "let x = 1;")
+            loose = run_check(d)
+            strict = run_check(d, strict=True)
+            self.assertEqual(loose.at(n)[0], "SKIP", lang + loose.out)
+            self.assertIn("unsupported executable language", loose.at(n)[2])
+            self.assertEqual(loose.exit, 0, lang)
+            self.assertEqual(strict.exit, 1, lang + strict.out)
+
+    def test_json_and_text_stay_non_executable_under_strict(self):
+        d = Doc()
+        a = d.block("json", "{}")
+        b = d.block("text", "plain")
+        r = run_check(d, strict=True)
+        self.assertEqual(r.at(a)[0], "SKIP", r.out)
+        self.assertIn("not executable", r.at(a)[2])
+        self.assertEqual(r.at(b)[0], "SKIP", r.out)
+        self.assertEqual(r.exit, 0, r.out)
+
+    def test_fragment_without_a_reason_fails(self):
+        d = Doc()
+        n = d.block("anvl", "x := 1;", "fragment")
+        r = run_check(d)
+        st = r.at(n)
+        self.assertEqual(st[0], "FAIL", r.out)
+        self.assertIn("reason", st[2])
+
+    def test_summary_prints_the_fragment_count(self):
+        d = Doc()
+        d.block("anvl", "x", "fragment one")
+        d.block("js", "y", "fragment two")
+        d.block("anvl", "#!aml\nx := 1;")
+        r = run_check(d)
+        self.assertIn("(2 fragments)", r.out)
+
+    def test_list_fragments_prints_file_line_and_reason(self):
+        d = Doc()
+        n = d.block("js", "y", "fragment needs the caller's buffer")
+        r = run_check(d, extra=["--list-fragments"])
+        self.assertIn("FRAGMENT docs/t.md:%d js - needs the caller's buffer" % n, r.out)
+
+    def test_error_marker_on_a_non_document_fails(self):
+        d = Doc()
+        a = d.block("js", "throw new Error('x');", "error 4052")
+        b = d.block("c", "int x = 1;", "error 4052")
+        c = d.block("python", "raise RuntimeError('x')", "error 4052")
+        r = run_check(d, py=PY_DIR)
+        for n in (a, b, c):
+            st = r.at(n)
+            self.assertEqual(st[0], "FAIL", r.out)
+            self.assertIn("documents", st[2])
+
+    def test_html_pre_code_blocks_are_scanned_with_markers_and_entities(self):
+        html = ("<html><body>\n"
+                "<pre><code>#!aml\nx := 5.;</code></pre>\n"
+                "<!-- example: error 5009 -->\n"
+                "<pre><code>#!aml\nx := 5.;</code></pre>\n"
+                "<pre><code class=\"language-js\">const a = 1 &lt; 2;\nif (!a) throw new Error('lt');</code></pre>\n"
+                "<!-- example: lang sh -->\n"
+                "<pre><code>npm install x &amp;&amp; echo ok</code></pre>\n"
+                "<!-- example: fragment shown only -->\n"
+                "<pre><code>&lt;script src=\"x.js\"&gt;&lt;/script&gt;</code></pre>\n"
+                "</body></html>\n")
+        r = run_check(None, files={"site/page.html": html})
+        self.assertEqual(r.at(2, "site/page.html")[0], "FAIL", r.out)
+        self.assertEqual(r.at(5, "site/page.html")[0], "PASS", r.out)
+        self.assertEqual(r.at(7, "site/page.html")[0], "PASS", r.out)
+        self.assertEqual(r.at(10, "site/page.html")[0], "SKIP", r.out)
+        self.assertEqual(r.at(12, "site/page.html")[0], "SKIP", r.out)
+
+    def test_default_scan_covers_html_pages_in_site_only(self):
+        html = "<pre><code>#!aml\nx := 5.;</code></pre>\n"
+        r = run_check(None, files={"site/a.html": html, "site/sub/b.html": html, "other/c.html": html})
+        self.assertIn(("site/a.html", 1), r.results)
+        self.assertNotIn(("site/sub/b.html", 1), r.results)
+        self.assertNotIn(("other/c.html", 1), r.results)
+
+
 class CommandLineTests(unittest.TestCase):
     def test_exit_is_nonzero_on_a_fail(self):
         d = Doc()
@@ -585,7 +676,7 @@ class CommandLineTests(unittest.TestCase):
 
     def test_strict_does_not_fail_on_marked_fragments_or_shell(self):
         d = Doc()
-        d.block("anvl", "nothing", "fragment")
+        d.block("anvl", "nothing", "fragment illustration only")
         d.block("sh", "ls")
         r = run_check(d, strict=True)
         self.assertEqual(r.exit, 0, r.out)
