@@ -111,8 +111,8 @@ class Result:
     """status is PASS, FAIL or SKIP. `needs` marks a SKIP caused by a missing package or toolchain
     (--strict turns it into a failure). `stdout` is what a run printed, for a following output block."""
 
-    def __init__(self, status, reason="", needs=False, stdout=None):
-        self.status, self.reason, self.needs, self.stdout = status, reason, needs, stdout
+    def __init__(self, status, reason="", needs=False, stdout=None, fragment=None):
+        self.status, self.reason, self.needs, self.stdout, self.fragment = status, reason, needs, stdout, fragment
 
 
 def passed(stdout=None):
@@ -329,9 +329,14 @@ def check_sample(s, state, ctx):
     marks, err = check_markers(s)
     if err:
         return failed(err)
-    if "fragment" in marks:
-        return skipped("marked fragment" + (": " + " ".join(marks["fragment"]) if marks["fragment"] else ": not run"))
     kind = classify(s.lang)
+    if "error" in marks and kind != "doc":
+        return failed("bad marker: 'error' applies to documents only, and this is a %s sample" % (s.lang or "(none)"))
+    if "fragment" in marks:
+        if not marks["fragment"]:
+            return failed("a fragment marker needs a reason: <!-- example: fragment why it is not run -->")
+        why = " ".join(marks["fragment"])
+        return Result("SKIP", "marked fragment: " + why, fragment=why)
     if "output" in marks:
         return check_output(s, state)
     prefix, files, doc_text = "", {}, None
@@ -616,6 +621,7 @@ def main(argv=None):
     ap.add_argument("--py", help="the anvil.py package (directory, tarball or URL)")
     ap.add_argument("--net", help="the anvil.net package (directory, tarball or URL)")
     ap.add_argument("--strict", action="store_true", help="a sample skipped for a missing package or toolchain fails the run")
+    ap.add_argument("--list-fragments", action="store_true", help="list every fragment marker with its file, line and reason")
     ap.add_argument("--scratch", help="scratch directory (default: a temporary one, removed on exit)")
     opts = ap.parse_args(argv)
     root = os.path.abspath(opts.root)
@@ -630,15 +636,20 @@ def main(argv=None):
                       py=package_dir(opts.py, "--py", scratch), net=package_dir(opts.net, "--net", scratch))
         counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
         needs_skips = 0
+        fragments = []
         for path in find_markdown(root, opts.paths):
             rel = os.path.relpath(path, root).replace(os.sep, "/")
             for s, res in check_file(path, rel, ctx):
                 counts[res.status] += 1
+                if res.fragment:
+                    fragments.append("FRAGMENT %s:%d %s - %s" % (s.file, s.line, s.lang or "(none)", res.fragment))
                 if res.status == "SKIP" and res.needs:
                     needs_skips += 1
                 label = s.lang or "(none)" if not s.orphan else "marker"
                 print("%s %s:%d %s%s" % (res.status, s.file, s.line, label, " - " + res.reason if res.reason else ""))
-        print("check-examples: %d passed, %d failed, %d skipped" % (counts["PASS"], counts["FAIL"], counts["SKIP"]))
+        if opts.list_fragments:
+            print("\n".join(fragments))
+        print("check-examples: %d passed, %d failed, %d skipped (%d fragments)" % (counts["PASS"], counts["FAIL"], counts["SKIP"], len(fragments)))
         return 1 if counts["FAIL"] or (opts.strict and needs_skips) else 0
     finally:
         if own:
