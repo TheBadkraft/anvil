@@ -1,6 +1,6 @@
-anvil-dump 1
+anvil-dump 2
 mode document
 input-bytes 20
 status error
 dialect AML
-error code=3100 name=ANVL_ERR_PARSER_UNEXPECTED_TOKEN category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=1 message="Unexpected token"
+error code=3100 name=ANVL_ERR_PARSER_UNEXPECTED_TOKEN category=4 category-name=ANVIL_ERR_SYNTAX line=3 column=1 source="" message="Unexpected token"

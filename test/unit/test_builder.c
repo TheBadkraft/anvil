@@ -630,6 +630,7 @@ static void test_b13_vtable_matches_flat(void) {
    TestBit.is_true(Builder.find == anvil_builder_find, "B13: find");
    TestBit.is_true(Builder.write == anvil_builder_write, "B13: write");
    TestBit.is_true(Builder.emit == anvil_builder_emit, "B13: emit");
+   TestBit.is_true(Builder.set_block == anvil_builder_set_block, "B13: set_block");
 }
 
 /* ---------------------------------------------------------------------- *
@@ -961,6 +962,210 @@ static void test_b21_base_checks_are_linear(void) {
 
 }
 
+/* ---------------------------------------------------------------------- *
+ * B22-B25 (BR-2611-anvl-writer-001) - the anonymous, read-only block form
+ * `name [: base] [@[attributes]] { ... };`
+ * ---------------------------------------------------------------------- */
+static anvil_node object_with(anvil_builder b, const char *field, int64_t v) {
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, field, anvil_builder_int(b, v));
+   return o;
+}
+
+static void test_b22_block_form_emit(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member base = ADD(b, "base", object_with(b, "z", 0));
+   (void)base;
+   anvil_member p = ADD(b, "point", object_with(b, "x", 1));
+   TestBit.is_true(anvil_builder_set_block(b, p, true), "B22: set_block");
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_builder_get_error(b), "B22: set_block succeeded");
+   anvil_member d = ADD(b, "d", object_with(b, "y", 2));
+   anvil_builder_set_block(b, d, true);
+   anvil_builder_set_base(b, d, "base");
+   anvil_builder_member_attribute(b, d, "k", "1");
+   anvil_builder_member_attribute_string(b, d, "s", "v w", 3);
+   anvil_member e = ADD(b, "e", object_with(b, "q", 3));
+   anvil_builder_set_base(b, e, "base");
+   anvil_node outer = anvil_builder_object(b);
+   anvil_member inner = anvil_builder_add(b, outer, "inner", object_with(b, "w", 4));
+   anvil_builder_set_block(b, inner, true);
+   anvil_builder_add(b, outer, "after", anvil_builder_int(b, 5));
+   ADD(b, "outer", outer);
+   expect_emit(b,
+               "#!aml\n\n"
+               "base := {\n"
+               "   z := 0;\n"
+               "};\n"
+               "point {\n"
+               "   x := 1;\n"
+               "};\n"
+               "d : base @[k=1, s=\"v w\"] {\n"
+               "   y := 2;\n"
+               "};\n"
+               "e : base := {\n"
+               "   q := 3;\n"
+               "};\n"
+               "outer := {\n"
+               "   inner {\n"
+               "      w := 4;\n"
+               "   };\n"
+               "   after := 5;\n"
+               "};\n",
+               "B22: block form beside the usual form, with base and attributes, top level and nested");
+
+   // switching it off restores the usual form; the option can be set before the base and attributes
+   TestBit.is_true(anvil_builder_set_block(b, p, false), "B22: set_block false");
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_true(text && strstr(text, "point := {") != NULL && strstr(text, "point {") == NULL,
+                   "B22: false restores 'name := {'");
+   anvil_builder_dispose(b);
+
+   // write() into a writer gives the same text
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member q = ADD(b, "q", object_with(b, "x", 1));
+   anvil_builder_set_block(b, q, true);
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_builder_write(b, w), "B22: write");
+   anvil_writer_finish(w);
+   const char *wtext = anvil_writer_data(w, NULL);
+   TestBit.is_equal_str("#!aml\n\nq {\n   x := 1;\n};\n", wtext ? wtext : "(none)", "B22: write gives the block form too");
+   anvil_writer_dispose(w);
+   anvil_builder_dispose(b);
+}
+
+static void test_b23_set_block_errors(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member scalar = ADD(b, "s", anvil_builder_int(b, 1));
+   TestBit.is_false(anvil_builder_set_block(b, scalar, true), "B23: a scalar value");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT, anvil_builder_get_error(b), "B23: BLOCK_REQUIRES_OBJECT");
+   anvil_node arr = anvil_builder_array(b);
+   anvil_builder_append(b, arr, anvil_builder_int(b, 1));
+   anvil_member array_member = ADD(b, "a", arr);
+   TestBit.is_false(anvil_builder_set_block(b, array_member, true), "B23: an array value");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT, anvil_builder_get_error(b), "B23: arrays too");
+   TestBit.is_true(anvil_builder_set_block(b, scalar, false), "B23: turning it off is always fine");
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_builder_get_error(b), "B23: and succeeds");
+   TestBit.is_false(anvil_builder_set_block(b, NULL, true), "B23: a NULL member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(b), "B23: INVALID_ARGUMENT");
+   TestBit.is_false(anvil_builder_set_block(NULL, scalar, true), "B23: a NULL builder");
+   anvil_builder other = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member foreign = ADD(other, "o", object_with(other, "x", 1));
+   TestBit.is_false(anvil_builder_set_block(b, foreign, true), "B23: another builder's member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INVALID_ARGUMENT, anvil_builder_get_error(b), "B23: foreign is INVALID_ARGUMENT");
+   anvil_builder_dispose(other);
+   anvil_builder_dispose(b);
+
+   b = anvil_builder_new(ANVIL_WRITER_AMP);
+   anvil_member m = ADD(b, "s", anvil_builder_int(b, 1));
+   TestBit.is_false(anvil_builder_set_block(b, m, true), "B23: AMP");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_DIALECT, anvil_builder_get_error(b), "B23: AMP is DIALECT");
+   anvil_builder_dispose(b);
+}
+
+static void test_b24_a_block_form_member_cannot_be_a_base(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM;
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member blk = ADD(b, "blk", object_with(b, "f", 1));
+   anvil_builder_set_block(b, blk, true);
+   anvil_member d = ADD(b, "d", object_with(b, "g", 2));
+   TestBit.is_true(anvil_builder_set_base(b, d, "blk"), "B24: set_base itself accepts it");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: emit refuses a block-form base");
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: BASE_IS_BLOCK_FORM");
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_false(anvil_builder_write(b, w), "B24: write refuses it too, before writing anything");
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: write reports it");
+   size_t written = 0;
+   anvil_writer_finish(w);
+   anvil_writer_data(w, &written);
+   TestBit.is_equal_int(7, (long long)written, "B24: nothing but the shebang was written");
+   anvil_writer_dispose(w);
+   // the builder is unchanged: turning the option off makes the document legal
+   anvil_builder_set_block(b, blk, false);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B24: with block form off, the base is an ordinary object");
+   anvil_builder_set_block(b, blk, true);
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: and refused again with it on");
+   // the base moves away: fine
+   anvil_builder_set_base(b, d, "other");
+   ADD(b, "other", object_with(b, "h", 3));
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B24: a base that is an ordinary object");
+   anvil_builder_dispose(b);
+
+   // a block-form member may itself have a base; a nested member's base is looked up at the top level
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "base", object_with(b, "z", 0));
+   anvil_member blk2 = ADD(b, "blk", object_with(b, "f", 1));
+   anvil_builder_set_block(b, blk2, true);
+   anvil_builder_set_base(b, blk2, "base");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B24: a block-form member with an ordinary base");
+   anvil_node outer = anvil_builder_object(b);
+   anvil_member nested = anvil_builder_add(b, outer, "n", object_with(b, "g", 2));
+   anvil_builder_set_base(b, nested, "blk");
+   ADD(b, "outer", outer);
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: a nested member whose base is a top-level block form");
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: refused as well");
+   anvil_builder_dispose(b);
+
+   // an include does not excuse it: the builder holds the member, so it knows
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder_include(b, "x.anvl");
+   anvil_member blk3 = ADD(b, "blk", object_with(b, "f", 1));
+   anvil_builder_set_block(b, blk3, true);
+   anvil_member d3 = ADD(b, "d", object_with(b, "g", 2));
+   anvil_builder_set_base(b, d3, "blk");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: not excused by an include");
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: BASE_IS_BLOCK_FORM with an include");
+   anvil_builder_dispose(b);
+
+   // a member never attached to the tree is checked too
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member blk4 = ADD(b, "blk", object_with(b, "f", 1));
+   anvil_builder_set_block(b, blk4, true);
+   anvil_node loose = anvil_builder_object(b);
+   anvil_member lm = anvil_builder_add(b, loose, "n", object_with(b, "g", 2));
+   anvil_builder_set_base(b, lm, "blk");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: a detached object's member with a block-form base");
+   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: refused");
+   anvil_builder_dispose(b);
+
+   // the block must have a scalar-free object value to be a base target at all: a scalar base is still
+   // INHERITANCE_REQUIRES_OBJECT, as before
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "n", anvil_builder_int(b, 1));
+   anvil_member d5 = ADD(b, "d", object_with(b, "g", 2));
+   anvil_builder_set_base(b, d5, "n");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: a scalar base");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, anvil_builder_get_error(b), "B24: unchanged");
+   anvil_builder_dispose(b);
+}
+
+static void test_b25_block_form_in_a_chain_and_a_cycle(void) {
+   // a -> b (block) -> c: a's base is a block, whatever b's own base is
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "c", object_with(b, "z", 0));
+   anvil_member bm = ADD(b, "b", object_with(b, "y", 1));
+   anvil_builder_set_block(b, bm, true);
+   anvil_builder_set_base(b, bm, "c");
+   anvil_member am = ADD(b, "a", object_with(b, "x", 2));
+   anvil_builder_set_base(b, am, "b");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B25: a chain through a block-form member");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, anvil_builder_get_error(b), "B25: BASE_IS_BLOCK_FORM");
+   anvil_builder_dispose(b);
+
+   // two blocks on each other: the first thing the reader finds wrong is a block as a base
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member p = ADD(b, "p", object_with(b, "x", 1));
+   anvil_member q = ADD(b, "q", object_with(b, "y", 2));
+   anvil_builder_set_block(b, p, true);
+   anvil_builder_set_block(b, q, true);
+   anvil_builder_set_base(b, p, "q");
+   anvil_builder_set_base(b, q, "p");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B25: two block forms on each other");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, anvil_builder_get_error(b),
+                        "B25: reported as BASE_IS_BLOCK_FORM, not as a cycle");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -983,5 +1188,9 @@ int main(void) {
    TestBit.run_ex("B19_missing_base", NULL, test_b19_missing_base, th);
    TestBit.run_ex("B20_foreign_member", NULL, test_b20_foreign_member, th);
    TestBit.run_ex("B21_base_checks_are_linear", NULL, test_b21_base_checks_are_linear, th);
+   TestBit.run_ex("B22_block_form_emit", NULL, test_b22_block_form_emit, th);
+   TestBit.run_ex("B23_set_block_errors", NULL, test_b23_set_block_errors, th);
+   TestBit.run_ex("B24_a_block_form_member_cannot_be_a_base", NULL, test_b24_a_block_form_member_cannot_be_a_base, th);
+   TestBit.run_ex("B25_block_form_in_a_chain_and_a_cycle", NULL, test_b25_block_form_in_a_chain_and_a_cycle, th);
    return TestBit.report();
 }

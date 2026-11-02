@@ -740,6 +740,7 @@ static void test_w16_vtable_matches_flat(void) {
    TestBit.is_true(Writer.end_object == anvil_writer_end_object, "W16: end_object");
    TestBit.is_true(Writer.finish == anvil_writer_finish, "W16: finish");
    TestBit.is_true(Writer.data == anvil_writer_data, "W16: data");
+   TestBit.is_true(Writer.statement_block == anvil_writer_statement_block, "W16: statement_block");
 }
 
 /* ---------------------------------------------------------------------- *
@@ -1075,6 +1076,276 @@ static void test_w19_nameset_survives_growth(void) {
    wg_nameset_free(&set);
 }
 
+/* ---------------------------------------------------------------------- *
+ * W23-W27 (BR-2611-anvl-writer-001) - the anonymous, read-only block form
+ * `name [: base] [@[attributes]] { ... };`
+ * ---------------------------------------------------------------------- */
+static void test_w23_block_form_output(void) {
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_writer_statement_block(w, "point", NULL), "W23: statement_block");
+   TestBit.is_true(anvil_writer_begin_object(w), "W23: begin_object");
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   expect_text(w,
+               "#!aml\n\n"
+               "point {\n"
+               "   x := 1;\n"
+               "};\n",
+               "W23: the block form, no ':='");
+
+   // a base (an inheritable object), attributes, both; the next statement is the usual form
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "base", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "z", NULL);
+   anvil_writer_int(w, 0);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "d", "base");
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "e", NULL);
+   anvil_writer_attribute(w, "a", "1");
+   anvil_writer_attribute(w, "b", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "y", NULL);
+   anvil_writer_string(w, "s", 1);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "f", "base");
+   anvil_writer_attribute_string(w, "k", "v w", 3);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "q", NULL);
+   anvil_writer_bool(w, true);
+   anvil_writer_end_object(w);
+   anvil_writer_statement(w, "g", "base");
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "w", NULL);
+   anvil_writer_null(w);
+   anvil_writer_end_object(w);
+   expect_text(w,
+               "#!aml\n\n"
+               "base := {\n"
+               "   z := 0;\n"
+               "};\n"
+               "d : base {\n"
+               "   x := 1;\n"
+               "};\n"
+               "e @[a=1, b] {\n"
+               "   y := \"s\";\n"
+               "};\n"
+               "f : base @[k=\"v w\"] {\n"
+               "   q := true;\n"
+               "};\n"
+               "g : base := {\n"
+               "   w := null;\n"
+               "};\n",
+               "W23: base, attributes, both, and the usual form beside them");
+
+   // inside an object, and a block inside a block
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "outer", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement_block(w, "inner", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement_block(w, "deep", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_end_object(w);
+   anvil_writer_statement(w, "after", NULL);
+   anvil_writer_int(w, 2);
+   anvil_writer_end_object(w);
+   expect_text(w,
+               "#!aml\n\n"
+               "outer := {\n"
+               "   inner {\n"
+               "      deep {\n"
+               "         x := 1;\n"
+               "      };\n"
+               "   };\n"
+               "   after := 2;\n"
+               "};\n",
+               "W23: block forms nested in an object and in each other");
+
+   // an object that is an array element is not a statement: unchanged
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement_block(w, "list", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "a", NULL);
+   anvil_writer_begin_array(w);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "k", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_end_array(w);
+   anvil_writer_end_object(w);
+   expect_text(w,
+               "#!aml\n\n"
+               "list {\n"
+               "   a := [\n"
+               "      {\n"
+               "         k := 1;\n"
+               "      }\n"
+               "   ];\n"
+               "};\n",
+               "W23: an array of objects inside a block");
+}
+
+static bool block_then_null(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_null(w); }
+static bool block_then_bool(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_bool(w, true); }
+static bool block_then_numeric(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_numeric(w, "1.5"); }
+static bool block_then_int(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_int(w, 1); }
+static bool block_then_double(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_double(w, 1.5); }
+static bool block_then_string(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_string(w, "s", 1); }
+static bool block_then_bare(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_bare(w, "word"); }
+static bool block_then_blob(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_blob(w, "t", "x", 1); }
+static bool block_then_varref(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_varref(w, "n"); }
+static bool block_then_array(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_begin_array(w); }
+static bool block_then_tuple(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_begin_tuple(w); }
+static bool block_with_base_then_int(anvil_writer w) {
+   return anvil_writer_statement(w, "base", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "z", NULL) &&
+          anvil_writer_int(w, 0) && anvil_writer_end_object(w) && anvil_writer_statement_block(w, "b", "base") &&
+          anvil_writer_int(w, 1);
+}
+static bool block_empty_object(anvil_writer w) {
+   return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_begin_object(w) && anvil_writer_end_object(w);
+}
+static bool block_unfinished(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_finish(w); }
+static bool block_twice(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL) && anvil_writer_statement_block(w, "c", NULL); }
+static bool block_in_array(anvil_writer w) {
+   return anvil_writer_statement(w, "a", NULL) && anvil_writer_begin_array(w) && anvil_writer_statement_block(w, "b", NULL);
+}
+static bool block_bad_name(anvil_writer w) { return anvil_writer_statement_block(w, "1x", NULL); }
+static bool block_reserved_name(anvil_writer w) { return anvil_writer_statement_block(w, "null", NULL); }
+static bool block_bad_base(anvil_writer w) { return anvil_writer_statement_block(w, "b", "1x"); }
+static bool block_null_name(anvil_writer w) { return anvil_writer_statement_block(w, NULL, NULL); }
+static bool block_after_finish(anvil_writer w) { return anvil_writer_finish(w) && anvil_writer_statement_block(w, "b", NULL); }
+static bool block_in_amp(anvil_writer w) { return anvil_writer_statement_block(w, "b", NULL); }
+static bool block_in_amp_with_base(anvil_writer w) { return anvil_writer_statement_block(w, "b", "c"); }
+
+static void test_w24_block_form_value_and_dialect_rules(void) {
+   const anvil_writer_err_code need = ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT;
+   expect_error(ANVIL_WRITER_AML, block_then_null, need, "W24: a null value");
+   expect_error(ANVIL_WRITER_AML, block_then_bool, need, "W24: a bool value");
+   expect_error(ANVIL_WRITER_AML, block_then_numeric, need, "W24: a numeric value");
+   expect_error(ANVIL_WRITER_AML, block_then_int, need, "W24: an int value");
+   expect_error(ANVIL_WRITER_AML, block_then_double, need, "W24: a double value");
+   expect_error(ANVIL_WRITER_AML, block_then_string, need, "W24: a string value");
+   expect_error(ANVIL_WRITER_AML, block_then_bare, need, "W24: a bare value");
+   expect_error(ANVIL_WRITER_AML, block_then_blob, need, "W24: a blob value");
+   expect_error(ANVIL_WRITER_AML, block_then_varref, need, "W24: a varref value");
+   expect_error(ANVIL_WRITER_AML, block_then_array, need, "W24: an array value");
+   expect_error(ANVIL_WRITER_AML, block_then_tuple, need, "W24: a tuple value");
+   expect_error(ANVIL_WRITER_AML, block_with_base_then_int, need, "W24: a scalar value on a block with a base");
+   expect_error(ANVIL_WRITER_AML, block_empty_object, ANVIL_WRITER_ERR_EMPTY_COLLECTION, "W24: an empty object");
+   expect_error(ANVIL_WRITER_AML, block_unfinished, ANVIL_WRITER_ERR_UNFINISHED, "W24: finish before the value");
+   expect_error(ANVIL_WRITER_AML, block_twice, ANVIL_WRITER_ERR_STATE, "W24: a second statement before the value");
+   expect_error(ANVIL_WRITER_AML, block_in_array, ANVIL_WRITER_ERR_STATE, "W24: not legal inside an array");
+   expect_error(ANVIL_WRITER_AML, block_bad_name, ANVIL_WRITER_ERR_INVALID_IDENTIFIER, "W24: an invalid name");
+   expect_error(ANVIL_WRITER_AML, block_reserved_name, ANVIL_WRITER_ERR_RESERVED_WORD, "W24: a reserved name");
+   expect_error(ANVIL_WRITER_AML, block_bad_base, ANVIL_WRITER_ERR_INVALID_IDENTIFIER, "W24: an invalid base");
+   expect_error(ANVIL_WRITER_AML, block_null_name, ANVIL_WRITER_ERR_INVALID_ARGUMENT, "W24: a NULL name");
+   expect_error(ANVIL_WRITER_AML, block_after_finish, ANVIL_WRITER_ERR_STATE, "W24: after finish");
+   expect_error(ANVIL_WRITER_AMP, block_in_amp, ANVIL_WRITER_ERR_DIALECT, "W24: AMP forbids the block form");
+   expect_error(ANVIL_WRITER_AMP, block_in_amp_with_base, ANVIL_WRITER_ERR_DIALECT, "W24: AMP, with a base");
+   TestBit.is_false(anvil_writer_statement_block(NULL, "b", NULL), "W24: a NULL writer");
+}
+
+static bool base_is_block(anvil_writer w) {
+   return anvil_writer_statement_block(w, "blk", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "f", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_statement(w, "d", "blk");
+}
+static bool block_base_is_block(anvil_writer w) {
+   return anvil_writer_statement_block(w, "blk", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "f", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_statement_block(w, "d", "blk");
+}
+static bool nested_base_is_block(anvil_writer w) {
+   return anvil_writer_statement_block(w, "blk", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "f", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_statement(w, "o", NULL) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "blk");
+}
+static bool nested_block_base_is_block(anvil_writer w) {
+   return anvil_writer_statement_block(w, "blk", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "f", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_statement(w, "o", NULL) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement_block(w, "d", "blk");
+}
+
+static void test_w25_a_block_form_statement_cannot_be_a_base(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM;
+   expect_error(ANVIL_WRITER_AML, base_is_block, code, "W25: statement with a block-form base");
+   expect_error(ANVIL_WRITER_AML, block_base_is_block, code, "W25: block-form statement with a block-form base");
+   expect_error(ANVIL_WRITER_AML, nested_base_is_block, code, "W25: a nested statement's base is a top-level block");
+   expect_error(ANVIL_WRITER_AML, nested_block_base_is_block, code, "W25: a nested block's base is a top-level block");
+
+   // an ordinary object is a fine base, also for a block; a block declared later is not seen by a streaming writer
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "d", "later");
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "later", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "y", NULL);
+   anvil_writer_int(w, 2);
+   anvil_writer_end_object(w);
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_writer_get_error(w), "W25: a forward base is not the writer's to see");
+   anvil_writer_dispose(w);
+
+   // a block nested in an object is not a top-level name, so it is not a base candidate here either
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "o", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement_block(w, "inner", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_end_object(w);
+   anvil_writer_statement(w, "d", "inner");
+   TestBit.is_equal_int(ANVIL_WRITER_OK, anvil_writer_get_error(w), "W25: only top-level block names are refused");
+   anvil_writer_dispose(w);
+}
+
+static bool block_dup_top(anvil_writer w) {
+   return anvil_writer_statement_block(w, "a", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "x", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w) && anvil_writer_statement(w, "a", NULL);
+}
+static bool dup_then_block_top(anvil_writer w) {
+   return anvil_writer_statement(w, "a", NULL) && anvil_writer_int(w, 1) && anvil_writer_statement_block(w, "a", NULL);
+}
+static bool block_dup_field(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "a", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_statement_block(w, "a", NULL);
+}
+static bool block_attribute_dup_key(anvil_writer w) {
+   return anvil_writer_statement_block(w, "a", NULL) && anvil_writer_attribute(w, "k", "1") && anvil_writer_attribute(w, "k", "2");
+}
+static bool block_attribute_after_value(anvil_writer w) {
+   return anvil_writer_statement_block(w, "a", NULL) && anvil_writer_begin_object(w) && anvil_writer_attribute(w, "k", "1");
+}
+
+static void test_w26_block_form_names_and_attributes(void) {
+   expect_error(ANVIL_WRITER_AML, block_dup_top, ANVIL_WRITER_ERR_DUPLICATE_NAME, "W26: a block name is a top-level name");
+   expect_error(ANVIL_WRITER_AML, dup_then_block_top, ANVIL_WRITER_ERR_DUPLICATE_NAME, "W26: a block repeating a name");
+   expect_error(ANVIL_WRITER_AML, block_dup_field, ANVIL_WRITER_ERR_DUPLICATE_FIELD, "W26: a block repeating a field");
+   expect_error(ANVIL_WRITER_AML, block_attribute_dup_key, ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY, "W26: an attribute key twice");
+   expect_error(ANVIL_WRITER_AML, block_attribute_after_value, ANVIL_WRITER_ERR_STATE, "W26: an attribute after the value starts");
+}
+
+static void test_w27_block_form_error_messages(void) {
+   const char *a = anvil_writer_error_message(ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT);
+   const char *b = anvil_writer_error_message(ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM);
+   TestBit.is_true(a && strcmp(a, "unknown error") != 0 && strstr(a, "object") != NULL, "W27: BLOCK_REQUIRES_OBJECT says object");
+   TestBit.is_true(b && strcmp(b, "unknown error") != 0 && strstr(b, "block") != NULL, "W27: BASE_IS_BLOCK_FORM says block");
+   TestBit.is_true(a && b && strcmp(a, b) != 0, "W27: the two messages differ");
+   TestBit.is_equal_int(21, ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT, "W27: the new codes follow MISSING_BASE");
+   TestBit.is_equal_int(22, ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, "W27: and are numbered in order");
+}
+
 int main(void) {
    TestBit.run_ex("W01_lifecycle", NULL, test_w01_lifecycle, th);
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
@@ -1100,5 +1371,10 @@ int main(void) {
    TestBit.run_ex("W20_duplicate_fields", NULL, test_w20_duplicate_fields, th);
    TestBit.run_ex("W21_duplicate_attribute_keys", NULL, test_w21_duplicate_attribute_keys, th);
    TestBit.run_ex("W22_keyword_names", NULL, test_w22_keyword_names, th);
+   TestBit.run_ex("W23_block_form_output", NULL, test_w23_block_form_output, th);
+   TestBit.run_ex("W24_block_form_value_and_dialect_rules", NULL, test_w24_block_form_value_and_dialect_rules, th);
+   TestBit.run_ex("W25_a_block_form_statement_cannot_be_a_base", NULL, test_w25_a_block_form_statement_cannot_be_a_base, th);
+   TestBit.run_ex("W26_block_form_names_and_attributes", NULL, test_w26_block_form_names_and_attributes, th);
+   TestBit.run_ex("W27_block_form_error_messages", NULL, test_w27_block_form_error_messages, th);
    return TestBit.report();
 }

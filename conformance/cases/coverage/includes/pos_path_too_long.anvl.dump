@@ -1,0 +1,6 @@
+anvil-dump 2
+mode document
+input-bytes 1128
+status error
+dialect AML
+error code=9002 name=ANVL_ERR_INVALID_ARGUMENT category=3 category-name=ANVIL_ERR_INCLUDE line=2 column=4 source="" message="Invalid argument"

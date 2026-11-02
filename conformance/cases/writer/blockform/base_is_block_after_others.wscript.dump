@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=12 code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM call="statement \"d\" \"blk\"" message="a base cannot be a block-form statement (it is read-only)"
+steps 11
+status error code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM
+output none

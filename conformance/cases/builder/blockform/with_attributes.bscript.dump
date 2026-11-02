@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=64 text="#!aml\n\nblk @[env=production, flag, note=\"a, b\"] {\n   k := 1;\n};\n"
+steps 10
+status ok

@@ -1,0 +1,17 @@
+anvil-builder-script 1
+# a nested block form has a base looked up among the top-level names
+dialect AML
+let ob_v = int 1
+let ob = object
+add ob "k" ob_v
+let mb = add NULL "base" ob
+let v = int 1
+let inner = object
+add inner "x" v
+let outer = object
+let im = add outer "inner" inner
+set_block im true
+set_base im "base"
+member_attribute im "k" "v"
+add NULL "outer" outer
+emit

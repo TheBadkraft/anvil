@@ -34,7 +34,8 @@ if os.path.exists(out_dir) and not force:
 ERRS = ["OK", "INVALID_ARGUMENT", "MEMORY", "STATE", "DIALECT", "INVALID_IDENTIFIER", "RESERVED_WORD",
         "INVALID_NUMERIC", "INVALID_BARE", "INVALID_BLOB", "INVALID_ATTRIBUTE_VALUE", "INVALID_INCLUDE_PATH",
         "EMPTY_COLLECTION", "INHERITANCE_REQUIRES_OBJECT", "UNFINISHED", "DUPLICATE_NAME", "DEPTH_EXCEEDED",
-        "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY", "INHERITANCE_CYCLE", "MISSING_BASE"]
+        "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY", "INHERITANCE_CYCLE", "MISSING_BASE", "BLOCK_REQUIRES_OBJECT",
+        "BASE_IS_BLOCK_FORM"]
 def ename(i): return "ANVIL_WRITER_OK" if i == 0 else "ANVIL_WRITER_ERR_" + ERRS[i]
 src = open(os.path.join(root, "src", "writer", "writer.c")).read()
 MSG = {}
@@ -73,7 +74,7 @@ class Tup:
 class Obj:
     def __init__(s, *fields): s.fields = list(fields)   # Stmt objects
 class Stmt:
-    def __init__(s, name, value, base=None, attrs=()): s.name, s.value, s.base, s.attrs = name, value, base, list(attrs)
+    def __init__(s, name, value, base=None, attrs=(), block=False): s.name, s.value, s.base, s.attrs, s.block = name, value, base, list(attrs), block
     # attrs: (key, None) flag | (key, "raw") | (key, ("q", bytes))
 
 def Null(): return Sc("null", "null")
@@ -114,7 +115,7 @@ def steps_of(v):
         return r + ["end_object"]
     raise TypeError(v)
 def stmt_steps(st):
-    r = ["statement %s %s" % (q(st.name), A(st.base))]
+    r = ["%s %s %s" % ("statement_block" if st.block else "statement", q(st.name), A(st.base))]
     for k, val in st.attrs:
         if val is None: r.append("attribute %s NULL" % q(k))
         elif isinstance(val, tuple): r.append("attribute_string %s %s" % (q(k), q(val[1])))
@@ -151,7 +152,7 @@ def render_attrs(attrs):
 def render_stmt(st, level):
     o = ind(level) + st.name.encode()
     if st.base: o += b" : " + st.base.encode()
-    return o + render_attrs(st.attrs) + b" := " + render_val(st.value, level) + b";\n"
+    return o + render_attrs(st.attrs) + (b" " if st.block else b" := ") + render_val(st.value, level) + b";\n"
 
 # ---- cases ---------------------------------------------------------------------------------------------------
 cases = []   # (area, name, script_text, dump_text, output_or_None, includes)
@@ -221,9 +222,9 @@ for d in ("AML", "AMP"):
 raw(L, "get_error_ok", "AML", ["get_error", "finish", "get_error"], lambda n: (
     ["get_error code=0 name=ANVIL_WRITER_OK"] * 2, 4, 0, HDR["AML"]))
 # error_message for every code and out-of-range values
-steps = ["error_message %d" % c for c in list(range(0, 21)) + [100, -1, -2147483648, 2147483647]]
+steps = ["error_message %d" % c for c in list(range(0, 23)) + [100, -1, -2147483648, 2147483647]]
 raw(L, "error_message_all", "AML", steps, lambda n: (
-    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 21)) + [100, -1, -2147483648, 2147483647]],
+    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 23)) + [100, -1, -2147483648, 2147483647]],
     len(steps) + 1, 0, None), desc="every code, and values outside the enum (no finish: no output)")
 # invalid dialect: the writer is NULL
 for dv in (2, 7, -1, 255):
@@ -700,6 +701,87 @@ err(K, "response_nested_tuple", "AMP", ['statement "result" NULL', "begin_tuple"
 err(K, "payload_backtick", "AMP", ['statement "payload" NULL', 'blob "table" "[(`)]"'], E("INVALID_BLOB"))
 err(K, "bad_utid_tag", "AMP", ['statement "utid" NULL', 'blob "u-id" "x"'], E("INVALID_BLOB"))
 err(K, "dup_seq", "AMP", ['statement "seq" NULL', "int 1", 'statement "seq" NULL'], E("DUPLICATE_NAME"))
+
+# ================================================================ block form (BR-2611-anvl-writer-001)
+# `name [: base] [@[attributes]] { ... };`: the anonymous, read-only form. statement_block takes the place of statement;
+# its value must be an object; a top-level block cannot be a base (the reader's 4052).
+BF = "blockform"
+def BS(n, v, **k): return Stmt(n, v, block=True, **k)
+doc(BF, "simple", "AML", [BS("point", Obj(S1("x", Int(1))))], desc="point { x := 1; };")
+doc(BF, "fields", "AML", [BS("p", Obj(S1("a", Int(1)), S1("b", Str("x")), S1("c", Arr(Int(1), Int(2))), S1("d", Tup(Int(1), Int(2))), S1("e", Null()),
+                                      S1("f", Blob("t", "x")), S1("g", Bare("w")), S1("h", Dbl(0.5)), S1("i", Bool(True))))])
+doc(BF, "names", "AML", [BS(n, Obj(S1("x", Int(1)))) for n in ("a", "A", "_", "_a", "a1", "a_b", "camelCase", "x" * 100)])
+doc(BF, "two", "AML", [BS("a", Obj(S1("x", Int(1)))), BS("b", Obj(S1("x", Int(2))))])
+doc(BF, "mixed_with_assign", "AML", [S1("a", Obj(S1("x", Int(1)))), BS("b", Obj(S1("y", Int(2)))), S1("c", Int(3)), BS("d", Obj(S1("z", Int(4))))])
+doc(BF, "with_base", "AML", [S1("base", Obj(S1("z", Int(0)))), BS("d", Obj(S1("x", Int(1))), base="base")], desc="d : base { x := 1; };")
+doc(BF, "base_chain", "AML", [S1("a", Obj(S1("x", Int(1)))), S1("b", Obj(S1("y", Int(2))), base="a"), BS("c", Obj(S1("z", Int(3))), base="b")])
+doc(BF, "assign_based_on_assign_beside_block", "AML", [BS("blk", Obj(S1("f", Int(1)))), S1("base", Obj(S1("x", Int(1)))), S1("d", Obj(S1("y", Int(2))), base="base")])
+doc(BF, "attr_flag", "AML", [BS("p", Obj(S1("x", Int(1))), attrs=[("k", None)])])
+doc(BF, "attr_value", "AML", [BS("p", Obj(S1("x", Int(1))), attrs=[("env", "production")])])
+doc(BF, "attrs_several", "AML", [BS("p", Obj(S1("x", Int(1))), attrs=[("a", "1"), ("b", None), ("c", ("q", b"v w"))])])
+doc(BF, "attr_string_special", "AML", [BS("p", Obj(S1("x", Int(1))), attrs=[("note", ("q", b"a, b] c = d"))])])
+doc(BF, "attr_range_and_quoted", "AML", [BS("p", Obj(S1("x", Int(1))), attrs=[("r", "1..5"), ("s", '"x"')])])
+doc(BF, "base_and_attrs", "AML", [S1("base", Obj(S1("z", Int(0)))), BS("d", Obj(S1("x", Int(1))), base="base", attrs=[("k", "v"), ("f", None)])])
+doc(BF, "module_header", "AML", [BS("p", Obj(S1("x", Int(1))))], header=b"@[doc]\n", pre=['attribute "doc" NULL'])
+doc(BF, "include_header", "AML", [BS("p", Obj(S1("x", Int(1))))], header=b'include "inc.anvl";\n@[v=1]\n', pre=['include "inc.anvl"', 'attribute "v" "1"'])
+doc(BF, "nested_in_object", "AML", [S1("o", Obj(BS("inner", Obj(S1("x", Int(1)))), S1("after", Int(2))))])
+doc(BF, "nested_first_and_last", "AML", [S1("o", Obj(S1("a", Int(1)), BS("b", Obj(S1("x", Int(1)))), S1("c", Int(2)), BS("d", Obj(S1("y", Int(3))))))])
+doc(BF, "block_in_block", "AML", [BS("outer", Obj(BS("inner", Obj(S1("x", Int(1))))))])
+doc(BF, "block_in_block_deep", "AML", [BS("a", Obj(BS("b", Obj(BS("c", Obj(BS("d", Obj(S1("x", Int(1)))))))))), S1("after", Int(1))])
+doc(BF, "block_in_assign_in_block", "AML", [BS("a", Obj(S1("b", Obj(BS("c", Obj(S1("x", Int(1))))))))])
+doc(BF, "nested_with_base_and_attrs", "AML", [S1("base", Obj(S1("z", Int(0)))), S1("o", Obj(BS("inner", Obj(S1("x", Int(1))), base="base", attrs=[("k", "v")])))],
+    desc="a nested block may have a base and attributes; the base is looked up among the top-level names")
+doc(BF, "array_of_objects_inside", "AML", [BS("p", Obj(S1("a", Arr(Obj(S1("k", Int(1))), Obj(S1("k", Int(2)))))))])
+doc(BF, "object_field_inside", "AML", [BS("p", Obj(S1("o", Obj(S1("q", Int(1))))))])
+doc(BF, "same_name_in_block_and_assign", "AML", [BS("a", Obj(S1("x", Int(1)))), S1("b", Obj(S1("a", Int(2))))], desc="a field may reuse a top-level block name")
+doc(BF, "many_300", "AML", [BS("b%d" % i, Obj(S1("x", Int(i)))) for i in range(300)])
+doc(BF, "wide_300", "AML", [BS("w", Obj(*[S1("f%d" % i, Int(i)) for i in range(300)]))])
+v = Obj(S1("x", Int(1)))
+for i in range(100): v = Obj(BS("n", v)) if i % 2 == 0 else Obj(S1("n", v))
+doc(BF, "deep_alternating_100", "AML", [S1("a", v)])
+doc(BF, "block_declared_after_assign_base_use", "AML", [S1("d", Obj(S1("x", Int(1))), base="later_assign"), S1("later_assign", Obj(S1("y", Int(2)))), BS("blk", Obj(S1("z", Int(3))))])
+# steps of the value: each one a different non-object value
+for nm, steps in (("null", ["null"]), ("bool", ["bool true"]), ("numeric", ['numeric "1.5"']), ("int", ["int 1"]), ("double", ["double 1.5"]),
+                  ("string", ['string "s"']), ("bare", ['bare "w"']), ("blob", ['blob "t" "x"']), ("varref", ['varref "n"']),
+                  ("array", ["begin_array"]), ("tuple", ["begin_tuple"])):
+    err(BF, "value_" + nm, "AML", ['statement_block "b" NULL'] + steps, E("BLOCK_REQUIRES_OBJECT"), desc="a block-form statement takes an object")
+err(BF, "value_int_with_base", "AML", ['statement "base" NULL', "begin_object", 'statement "z" NULL', "int 0", "end_object", 'statement_block "b" "base"', "int 1"], E("BLOCK_REQUIRES_OBJECT"))
+err(BF, "value_nested_int", "AML", ['statement "o" NULL', "begin_object", 'statement_block "b" NULL', "int 1"], E("BLOCK_REQUIRES_OBJECT"))
+err(BF, "value_invalid_text_first", "AML", ['statement_block "b" NULL', 'numeric "abc"'], E("INVALID_NUMERIC"), desc="the value text is checked before the form")
+err(BF, "empty_object", "AML", ['statement_block "b" NULL', "begin_object", "end_object"], E("EMPTY_COLLECTION"))
+err(BF, "unfinished", "AML", ['statement_block "b" NULL', "finish"], E("UNFINISHED"))
+err(BF, "unfinished_object", "AML", ['statement_block "b" NULL', "begin_object", 'statement "x" NULL', "int 1", "finish"], E("UNFINISHED"))
+err(BF, "twice", "AML", ['statement_block "b" NULL', 'statement_block "c" NULL'], E("STATE"))
+err(BF, "then_statement", "AML", ['statement_block "b" NULL', 'statement "c" NULL'], E("STATE"))
+err(BF, "statement_then_block", "AML", ['statement "a" NULL', 'statement_block "c" NULL'], E("STATE"))
+err(BF, "in_array", "AML", ['statement "a" NULL', "begin_array", 'statement_block "b" NULL'], E("STATE"))
+err(BF, "in_tuple", "AML", ['statement "a" NULL', "begin_tuple", 'statement_block "b" NULL'], E("STATE"))
+err(BF, "after_finish", "AML", ["finish", 'statement_block "b" NULL'], E("STATE"))
+err(BF, "amp", "AMP", ['statement_block "b" NULL'], E("DIALECT"))
+err(BF, "amp_with_base", "AMP", ['statement_block "b" "c"'], E("DIALECT"))
+err(BF, "amp_bad_name_still_dialect", "AMP", ['statement_block "1" NULL'], E("DIALECT"), desc="the dialect is checked before the arguments")
+for i, n in enumerate(["", "1a", "a-b", "a.b", "a b", "a:b", "@a", "$a", "caf\u00e9", "a\n", " a"]):
+    err(BF, "bad_name_%02d" % i, "AML", ["statement_block %s NULL" % q(n)], E("INVALID_IDENTIFIER"), desc="name %s" % dq(n))
+for w in ("true", "false", "null", "include", "import", "vars"):
+    err(BF, "reserved_name_" + w, "AML", ["statement_block %s NULL" % q(w)], E("RESERVED_WORD"))
+    err(BF, "reserved_base_" + w, "AML", ['statement_block "a" %s' % q(w)], E("RESERVED_WORD"))
+err(BF, "name_null", "AML", ["statement_block NULL NULL"], E("INVALID_ARGUMENT"))
+err(BF, "bad_base", "AML", ['statement_block "a" "1b"'], E("INVALID_IDENTIFIER"))
+err(BF, "empty_base", "AML", ['statement_block "a" ""'], E("INVALID_IDENTIFIER"))
+err(BF, "dup_top_after_block", "AML", ['statement_block "a" NULL', "begin_object", 'statement "x" NULL', "int 1", "end_object", 'statement "a" NULL'], E("DUPLICATE_NAME"))
+err(BF, "dup_top_block_after_assign", "AML", ['statement "a" NULL', "int 1", 'statement_block "a" NULL'], E("DUPLICATE_NAME"))
+err(BF, "dup_top_block_twice", "AML", ['statement_block "a" NULL', "begin_object", 'statement "x" NULL', "int 1", "end_object", 'statement_block "a" NULL'], E("DUPLICATE_NAME"))
+err(BF, "dup_field_block_after_assign", "AML", ['statement "o" NULL', "begin_object", 'statement "a" NULL', "int 1", 'statement_block "a" NULL'], E("DUPLICATE_FIELD"))
+err(BF, "dup_field_in_block", "AML", ['statement_block "o" NULL', "begin_object", 'statement "a" NULL', "int 1", 'statement "a" NULL'], E("DUPLICATE_FIELD"))
+err(BF, "dup_attr_key", "AML", ['statement_block "a" NULL', 'attribute "k" "1"', 'attribute "k" "2"'], E("DUPLICATE_ATTRIBUTE_KEY"))
+err(BF, "attr_after_value", "AML", ['statement_block "a" NULL', "begin_object", 'attribute "k" NULL'], E("STATE"))
+err(BF, "attr_bad_value", "AML", ['statement_block "a" NULL', 'attribute "k" "a,b"'], E("INVALID_ATTRIBUTE_VALUE"))
+BLK = ['statement_block "blk" NULL', "begin_object", 'statement "f" NULL', "int 1", "end_object"]
+err(BF, "base_is_block", "AML", BLK + ['statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"), desc="the reader rejects a block as a base (4052)")
+err(BF, "block_base_is_block", "AML", BLK + ['statement_block "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
+err(BF, "nested_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"), desc="a base is looked up among the top-level names, at any depth")
+err(BF, "nested_block_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement_block "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
+err(BF, "base_is_block_after_others", "AML", ['statement "a" NULL', "int 1"] + BLK + ['statement "b" NULL', "int 2", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
 
 # ---- write the scripts (never a dump) ---------------------------------------------------------------------------
 seen = set()

@@ -1096,6 +1096,114 @@ static void test_rt14_anonymous_block_base(void) {
    anvil_builder_dispose(b);
 }
 
+// RT15 (BR-2611-anvl-writer-001): the block form `name [: base] [@[attrs]] { ... };` the writer and the builder emit
+// loads through the reader, and it is the reader's anonymous form: it cannot be a base (4052).
+static anvil_document load_text(const char *text, size_t len) {
+   anvil_document doc = anvil_load_buffer(text, len);
+   if (doc && anvil_has_errors(doc)) {
+      char message[256] = {0};
+      anvil_error_get_message(anvil_document_get_error(doc), message, sizeof message);
+      fprintf(stderr, "[RT15] reader rejected: %s\n%s\n", message, text);
+   }
+   return doc;
+}
+
+static void test_rt15_block_form_round_trip(void) {
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement(w, "base", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "z", NULL);
+   anvil_writer_int(w, 0);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "point", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   anvil_writer_statement_block(w, "d", "base");
+   anvil_writer_attribute(w, "env", "production");
+   anvil_writer_attribute_string(w, "label", "a, b", 4);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "y", NULL);
+   anvil_writer_int(w, 2);
+   anvil_writer_statement_block(w, "inner", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "deep", NULL);
+   anvil_writer_bare(w, "word");
+   anvil_writer_end_object(w);
+   anvil_writer_end_object(w);
+   anvil_document doc = load_from(w, "RT15");
+   TestBit.is_not_null(doc, "RT15: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_false(anvil_has_errors(doc), "RT15: no errors");
+   anvil_statement point = anvil_document_find_statement(doc, "point");
+   TestBit.is_not_null(point, "RT15: point found");
+   anvil_value pv = point ? anvil_statement_get_value(point) : NULL;
+   TestBit.is_true(pv && anvil_value_get_type(pv) == ANVIL_VALUE_OBJECT && anvil_value_get_count(pv) == 1,
+                   "RT15: the block form is an object with its field");
+   anvil_statement d = anvil_document_find_statement(doc, "d");
+   TestBit.is_not_null(d, "RT15: d found");
+   if (d) {
+      anvil_value dv = anvil_statement_get_value(d);
+      TestBit.is_true(dv && anvil_value_get_count(dv) == 3, "RT15: own fields (y, inner) and the inherited z");
+      TestBit.is_equal_int(2, (long long)anvil_statement_get_attribute_count(d), "RT15: both attributes read back");
+      TestBit.is_not_null(anvil_statement_find_attribute(d, "env"), "RT15: env");
+   }
+   anvil_dispose(doc);
+
+   // it is the anonymous form for the reader: a block as a base is refused (4052)
+   const char bad[] = "#!aml\n\npoint {\n   x := 1;\n};\nd : point := {\n   y := 2;\n};\n";
+   doc = anvil_load_buffer(bad, sizeof bad - 1);
+   TestBit.is_true(doc && anvil_has_errors(doc) && anvil_get_error(doc) == ANVIL_ERR_RESOLVE,
+                   "RT15: the reader refuses a block form as a base");
+   anvil_dispose(doc);
+   // the same document through the writer: refused before it can be emitted
+   w = anvil_writer_new(ANVIL_WRITER_AML);
+   anvil_writer_statement_block(w, "point", NULL);
+   anvil_writer_begin_object(w);
+   anvil_writer_statement(w, "x", NULL);
+   anvil_writer_int(w, 1);
+   anvil_writer_end_object(w);
+   TestBit.is_false(anvil_writer_statement(w, "d", "point"), "RT15: the writer refuses what the reader refuses");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, anvil_writer_get_error(w), "RT15: with its own code");
+   anvil_writer_dispose(w);
+}
+
+static void test_rt15_builder_block_form_round_trip(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node bo = anvil_builder_object(b);
+   anvil_builder_add(b, bo, "z", anvil_builder_int(b, 0));
+   anvil_builder_add(b, NULL, "base", bo);
+   anvil_node po = anvil_builder_object(b);
+   anvil_builder_add(b, po, "x", anvil_builder_int(b, 1));
+   anvil_member pm = anvil_builder_add(b, NULL, "point", po);
+   anvil_builder_set_block(b, pm, true);
+   anvil_node dobj = anvil_builder_object(b);
+   anvil_builder_add(b, dobj, "y", anvil_builder_int(b, 2));
+   anvil_member dm = anvil_builder_add(b, NULL, "d", dobj);
+   anvil_builder_set_block(b, dm, true);
+   anvil_builder_set_base(b, dm, "base");
+   anvil_builder_member_attribute(b, dm, "env", "production");
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_not_null(text, "RT15: builder emit");
+   anvil_document doc = text ? load_text(text, len) : NULL;
+   TestBit.is_true(doc && !anvil_has_errors(doc), "RT15: the builder's block forms load");
+   anvil_statement d = doc ? anvil_document_find_statement(doc, "d") : NULL;
+   TestBit.is_true(d && anvil_statement_get_attribute_count(d) == 1, "RT15: attribute on a builder block form");
+   anvil_dispose(doc);
+   // a block as a base: the builder refuses what the reader refuses
+   anvil_node eo = anvil_builder_object(b);
+   anvil_builder_add(b, eo, "w", anvil_builder_int(b, 3));
+   anvil_member em = anvil_builder_add(b, NULL, "e", eo);
+   anvil_builder_set_base(b, em, "point");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "RT15: the builder refuses a block form as a base");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, anvil_builder_get_error(b), "RT15: BASE_IS_BLOCK_FORM");
+   anvil_builder_dispose(b);
+}
+
 // RT14, attribute values: whatever the builder takes as an attribute value loads.
 static void test_rt14_builder_attribute_values(void) {
    sweep_state = UINT64_C(0xA24BAED4963EE407);
@@ -1210,6 +1318,8 @@ int main(void) {
    TestBit.run_ex("RT14_builder_bases", NULL, test_rt14_builder_bases, th);
    TestBit.run_ex("RT14_anonymous_block_base", NULL, test_rt14_anonymous_block_base, th);
    TestBit.run_ex("RT14_builder_attribute_values", NULL, test_rt14_builder_attribute_values, th);
+   TestBit.run_ex("RT15_block_form_round_trip", NULL, test_rt15_block_form_round_trip, th);
+   TestBit.run_ex("RT15_builder_block_form_round_trip", NULL, test_rt15_builder_block_form_round_trip, th);
    TestBit.run_ex("RT11_accepted_candidates_read_back", NULL, test_rt11_accepted_candidates_read_back,
                   th);
    TestBit.run_ex("RT_LITERAL_PREFIXED_BARE_WORDS", NULL, test_rt_literal_prefixed_bare_words, th);

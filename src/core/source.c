@@ -616,7 +616,10 @@ static anvl_result source_set_error(anvl_source src, anvl_err_code code, usize l
       goto error;
    }
 
-   return anvl_error_set(doc->context->errors, code, line, column, file, out_err_code);
+   // The error's file is always the document that owns this source (the `file` argument is not
+   // a path: the parser passes a message there).
+   (void)file;
+   return anvl_error_set(doc->context->errors, code, line, column, doc->filepath, out_err_code);
 
 error:
    if (out_err_code) {

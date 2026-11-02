@@ -39,7 +39,8 @@
 // a hard error, full stop").
 // Line and column (both 1-based, counted from the start of the file, the way the parser reports
 // them) of a pointer into one of the context's source buffers. False if it points into none.
-static bool locate_in_sources(module_context ctx, const char *p, usize *line, usize *col) {
+static bool locate_in_sources(module_context ctx, const char *p, usize *line, usize *col,
+                              const char **file) {
    for (usize d = 0, n = List.size(ctx->docs); d < n; d++) {
       module_document doc = NULL;
       List.get(ctx->docs, d, (object *)&doc);
@@ -62,6 +63,9 @@ static bool locate_in_sources(module_context ctx, const char *p, usize *line, us
       }
       *line = l;
       *col = c;
+      if (file) {
+         *file = doc->filepath;
+      }
       return true;
    }
    return false;
@@ -71,7 +75,7 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
    if (!ctx->identifiers) {
       ctx->identifiers = Map.new(ANVL_CTX_DEFAULT_MAP_CAP);
       if (!ctx->identifiers) {
-         anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, __FILE__, NULL);
+         anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
          *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
          return ANVL_RES_ERR;
       }
@@ -99,11 +103,12 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
          if (Map.has(ctx->identifiers, stmt->name.start, name_len)) {
             // Report the SECOND occurrence (this statement), and name the first one's line.
             usize line = 0, col = 0, first_line = 0, first_col = 0;
-            (void)locate_in_sources(ctx, stmt->name.start, &line, &col);
+            const char *file = NULL;
+            (void)locate_in_sources(ctx, stmt->name.start, &line, &col, &file);
             addr first = 0;
             Map.get(ctx->identifiers, stmt->name.start, name_len, &first);
             bool have_first = first &&
-               locate_in_sources(ctx, ((anvl_statement)first)->name.start, &first_line, &first_col);
+               locate_in_sources(ctx, ((anvl_statement)first)->name.start, &first_line, &first_col, NULL);
             char msg[256];
             if (have_first) {
                snprintf(msg, sizeof(msg),
@@ -114,7 +119,7 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
                         (int)(name_len > 100 ? 100 : name_len), stmt->name.start);
             }
             anvl_error_set_message(ctx->errors, ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER, line, col,
-                                   __FILE__, msg, NULL);
+                                   file, msg, NULL);
             *out_err_code = ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER;
             return ANVL_RES_ERR;
          }
@@ -146,13 +151,13 @@ static anvl_result validate_bases(module_context ctx, anvl_err_code *out_err_cod
 
       addr val = 0;
       if (!Map.get(ctx->identifiers, stmt->base.start, base_len, &val)) {
-         anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_MISSING_BASE, 0, 0, __FILE__, NULL);
+         anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_MISSING_BASE, 0, 0, NULL, NULL);
          *out_err_code = ANVL_ERR_RESOLVER_MISSING_BASE;
          return ANVL_RES_ERR;
       }
       anvl_statement base_stmt = (anvl_statement)val;
       if (base_stmt->kind == ANVL_STMT_OBJECT_BLOCK) {
-         anvl_error_set(ctx->errors, ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS, 0, 0, __FILE__,
+         anvl_error_set(ctx->errors, ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS, 0, 0, NULL,
                         NULL);
          *out_err_code = ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS;
          return ANVL_RES_ERR;
@@ -162,8 +167,9 @@ static anvl_result validate_bases(module_context ctx, anvl_err_code *out_err_cod
       // at the base name in the deriving statement.
       if (!base_stmt->value || base_stmt->value->type != ANVL_VALUE_OBJECT) {
          usize line = 0, col = 0;
-         (void)locate_in_sources(ctx, stmt->base.start, &line, &col);
-         anvl_error_set(ctx->errors, ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT, line, col, __FILE__,
+         const char *file = NULL;
+         (void)locate_in_sources(ctx, stmt->base.start, &line, &col, &file);
+         anvl_error_set(ctx->errors, ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT, line, col, file,
                         NULL);
          *out_err_code = ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT;
          return ANVL_RES_ERR;
@@ -263,7 +269,7 @@ static anvl_result merge_inherited_fields(module_context ctx, anvl_statement stm
       current_base = ancestor->base;
    }
 
-   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, __FILE__, NULL);
+   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, NULL, NULL);
    *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
    return ANVL_RES_ERR;
 }

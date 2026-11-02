@@ -140,6 +140,8 @@ static void test_vt07_error_matches_flat(void) {
                    "VT07: Error.get_line is anvil_error_get_line");
    TestBit.is_true(Error.get_column == anvil_error_get_column,
                    "VT07: Error.get_column is anvil_error_get_column");
+   TestBit.is_true(Error.get_source == anvil_error_get_source,
+                   "VT07: Error.get_source is anvil_error_get_source");
 }
 /* ---------------------------------------------------------------------- *
  * VT06 — every Attribute vtable field is pointer-identical to its flat
@@ -251,6 +253,7 @@ const struct vt_entry VT_TABLE[] = { // automatic: vtable members are not consta
    VT_MEMBER(anvil_error_get_message, Error.get_message),
    VT_MEMBER(anvil_error_get_line, Error.get_line),
    VT_MEMBER(anvil_error_get_column, Error.get_column),
+   VT_MEMBER(anvil_error_get_source, Error.get_source),
    VT_MEMBER(anvil_document_find_statement, Document.find_statement),
    VT_MEMBER(anvil_document_get_statements, Document.get_statements),
    VT_MEMBER(anvil_statement_iterator_next, StatementIterator.next),

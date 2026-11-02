@@ -205,7 +205,7 @@ typedef struct anvl_err_state_t {
    const char *message;
    usize line;
    usize column;
-   const char *file;
+   const char *file; // owned copy of the path of the document the error is in; NULL when unknown
    char *detail; // owned: set when the message is built for this one error (e.g. it names an
                  // identifier); `message` then points at it. NULL for a table message.
 } anvl_err_state_t;

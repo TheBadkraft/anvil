@@ -28,6 +28,8 @@
  *       anvil_writer_statement(w, "host", NULL);                         *
  *       anvil_writer_bare(w, "localhost");                               *
  *    anvil_writer_end_object(w);                                         *
+ *    // anvil_writer_statement_block(w, "ro", NULL) + begin_object ...   *
+ *    //   gives the anonymous, read-only form  ro { ... };               *
  *    anvil_writer_finish(w);                                             *
  *    const char *text = anvil_writer_data(w, &len);                      *
  *    anvil_writer_dispose(w);                                            *
@@ -94,8 +96,9 @@ bool anvil_writer_include(anvil_writer w, const char *path);
 /* ---- statements -------------------------------------------------------- */
 
 /**
- * @brief Begin a statement at the top level or inside an object. Always emitted as
- * `name := value;`. Complete it with one value call.
+ * @brief Begin a statement at the top level or inside an object. Emitted as
+ * `name := value;` (for the block form `name { ... };` see anvil_writer_statement_block).
+ * Complete it with one value call.
  * A top-level name may only be declared once (the reader's resolver rejects a repeat), so a repeat
  * fails with ANVIL_WRITER_ERR_DUPLICATE_NAME; a name repeated inside one object fails with
  * ANVIL_WRITER_ERR_DUPLICATE_FIELD (the reader rejects both). The writer can't see names pulled in by
@@ -104,6 +107,17 @@ bool anvil_writer_include(anvil_writer w, const char *path);
  * (identifier, not reserved), or NULL. A base requires an object value; AML only.
  */
 bool anvil_writer_statement(anvil_writer w, const char *name, const char *base);
+
+/**
+ * @brief Begin a block-form statement at the top level or inside an object: the anonymous, read-only
+ * form `name [: base] [@[attributes]] { ... };`. Complete it with anvil_writer_begin_object and
+ * anvil_writer_end_object; any other value fails with ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT. AML only
+ * (ANVIL_WRITER_ERR_DIALECT in AMP). Names, attributes and the base follow anvil_writer_statement. A
+ * block-form statement cannot itself be a base: the reader rejects that (4052), so the writer refuses a
+ * base that names a block-form statement already written at the top level with
+ * ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM. (A base declared later, or by an included file, is not seen here.)
+ */
+bool anvil_writer_statement_block(anvil_writer w, const char *name, const char *base);
 
 /* ---- scalar values ----------------------------------------------------- */
 

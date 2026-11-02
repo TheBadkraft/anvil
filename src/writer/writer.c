@@ -56,8 +56,10 @@ struct anvil_writer_t {
    bool header_attrs; // a module attribute has been written (an include must come before it)
    bool stmt_open;    // a statement name is written and its value is pending
    bool stmt_base;    // that statement declared an inheritance base
+   bool stmt_block;   // that statement is block form (`name { ... };`): its value must be an object
    bool attrs_open;   // that statement's `@[` group is written but not yet closed
    wg_nameset names;  // top-level statement names so far
+   wg_nameset block_names; // the top-level names written in block form (a block cannot be a base)
    wg_nameset stmt_keys;   // attribute keys of the open statement so far
    wg_nameset module_keys; // module attribute keys so far
 };
@@ -116,6 +118,10 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "inheritance cycle: a statement's base chain loops back to itself";
    case ANVIL_WRITER_ERR_MISSING_BASE:
       return "base names no member of the document and no include could supply it";
+   case ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT:
+      return "a block-form statement must have an object value";
+   case ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM:
+      return "a base cannot be a block-form statement (it is read-only)";
    }
    return "unknown error";
 }
@@ -205,6 +211,7 @@ void anvil_writer_dispose(anvil_writer w) {
    }
    free(w->stack);
    wg_nameset_free(&w->names);
+   wg_nameset_free(&w->block_names);
    wg_nameset_free(&w->stmt_keys);
    wg_nameset_free(&w->module_keys);
    free(w);
@@ -307,11 +314,12 @@ bool anvil_writer_include(anvil_writer w, const char *path) {
 /* ----------------------------------------------------------------------- *
  * Statements
  * ----------------------------------------------------------------------- */
-bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) {
+// `block` selects the block form `name { ... };` (BR-2611-anvl-writer-001), which AMP does not have.
+static bool statement_begin(anvil_writer w, const char *name, const char *base, bool block) {
    if (!ready(w)) {
       return false;
    }
-   if (base && w->dialect == ANVIL_WRITER_AMP) {
+   if ((base || block) && w->dialect == ANVIL_WRITER_AMP) {
       return fail(w, ANVIL_WRITER_ERR_DIALECT);
    }
    bool in_object_or_top = w->depth == 0 || w->stack[w->depth - 1].kind == FRAME_OBJECT;
@@ -321,6 +329,10 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
    if (!check(w, wg_check_name(name)) || (base && !check(w, wg_check_name(base)))) {
       return false;
    }
+   // A base names a top-level statement, and the reader rejects a block-form one there (4052).
+   if (base && wg_nameset_get(&w->block_names, base)) {
+      return fail(w, ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM);
+   }
    if (w->depth == 0) {
       int added = wg_nameset_add(&w->names, name);
       if (added < 0) {
@@ -328,6 +340,9 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
       }
       if (added == 0) {
          return fail(w, ANVIL_WRITER_ERR_DUPLICATE_NAME);
+      }
+      if (block && wg_nameset_put(&w->block_names, name, 1) < 0) {
+         return fail(w, ANVIL_WRITER_ERR_MEMORY);
       }
    } else {
       // a field repeated within one object (the reader rejects it, at any depth)
@@ -354,8 +369,17 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
    }
    w->stmt_open = true;
    w->stmt_base = base != NULL;
+   w->stmt_block = block;
    w->attrs_open = false;
    return true;
+}
+
+bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) {
+   return w && statement_begin(w, name, base, false);
+}
+
+bool anvil_writer_statement_block(anvil_writer w, const char *name, const char *base) {
+   return w && statement_begin(w, name, base, true);
 }
 
 /* ----------------------------------------------------------------------- *
@@ -397,13 +421,19 @@ static bool value_prelude(anvil_writer w, bool is_object, bool is_collection, bo
    if (is_object && w->dialect == ANVIL_WRITER_AMP) {
       return fail(w, ANVIL_WRITER_ERR_DIALECT);
    }
+   if (w->stmt_block && !is_object) {
+      return fail(w, ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT);
+   }
    if (w->stmt_base && !is_object) {
       return fail(w, ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT);
    }
-   if ((w->attrs_open && !put_char(w, ANVL_TOK_RBRACKET)) || !puts_(w, " " ANVL_TOK_ASSIGN " ")) {
+   // the block form has no ':=': `name { ... };`
+   if ((w->attrs_open && !put_char(w, ANVL_TOK_RBRACKET)) ||
+       !puts_(w, w->stmt_block ? " " : " " ANVL_TOK_ASSIGN " ")) {
       return false;
    }
    w->stmt_open = false;
+   w->stmt_block = false;
    w->attrs_open = false;
    *owns_stmt = true;
    return true;

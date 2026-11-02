@@ -68,6 +68,8 @@ typedef enum {
    ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY,     // an attribute key given twice on one statement, or twice in the module header
    ANVIL_WRITER_ERR_INHERITANCE_CYCLE,           // the builder's base chains loop back (a statement based on itself, a -> b -> a)
    ANVIL_WRITER_ERR_MISSING_BASE,                // a builder base names no top-level member and the document includes nothing that could supply it
+   ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT,       // a block-form statement (name { ... };) must have an object value
+   ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM,          // a statement's base is a block-form statement, which is read-only and cannot be a base (the reader's 4052)
 } anvil_writer_err_code;
 
 #ifdef __cplusplus

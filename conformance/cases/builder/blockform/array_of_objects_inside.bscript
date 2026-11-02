@@ -1,0 +1,16 @@
+anvil-builder-script 1
+dialect AML
+let a = array
+let o1 = object
+let k1 = int 1
+add o1 "k" k1
+let o2 = object
+let k2 = int 2
+add o2 "k" k2
+append a o1
+append a o2
+let p = object
+add p "list" a
+let pm = add NULL "p" p
+set_block pm true
+emit

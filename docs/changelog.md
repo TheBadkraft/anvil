@@ -32,6 +32,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tool does not run (`ts`, `cpp`, `jsx`, ...) is a skip that `--strict` fails. 67 tests
   (`python3 scripts/docs/test_check_examples.py`). The Technical Writer runs it before every publication.
 
+- **FR-2611-anvl-errors-001.** An error now says which document it occurred in. `anvil_error_get_source(error, buf, buflen)`
+  (and `Error.get_source` in the vtable) gives the path the document was opened by (the including document's directory, a `/`, and
+  the include string as written, not normalised), and is empty for an error in the root document. The line and column of an error
+  were already positions inside the included document; now the document is named. It covers syntax and header errors, include
+  errors (the document that holds the `include`), an included document's own load error (an invalid shebang), and resolve
+  errors that have a position (a duplicate name, a base that is not an object). Same buffer-sizing convention as
+  `anvil_error_get_message`. Additive: no existing function, struct or code changed. `anvil-dump` prints it as `source="..."`
+  on every error record (path relative to the root's directory, `""` for the root), and the dump format is now version 2: the
+  first line of every reader dump says `anvil-dump 2`, and `conformance/FORMAT.md` has the new field and the rule for which
+  document an error belongs to. New reader cases: an error two include levels down, a missing include inside an include, a
+  cycle, and resolve errors in an included document.
+- **BR-2611-anvl-writer-001.** The writer and the builder can emit the anonymous, read-only block form
+  `name [: base] [@[attributes]] { ... };`. `anvil_writer_statement_block(writer, name, base)` starts such a statement (its value
+  must be an object, so `anvil_writer_begin_object` follows; any other value is the new `ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT`;
+  AML only), and `anvil_builder_set_block(builder, member, block)` marks a builder statement as block form (an object value is
+  required, `false` restores `name := { ... };`). Both are in the vtables (`Writer.statement_block`, `Builder.set_block`),
+  appended after the existing fields, so the existing layout is unchanged. A block-form statement is read-only and cannot be a
+  base: the reader rejects it with 4052, so the builder now refuses to emit or write a document where a statement's base names a
+  block-form member (new `ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM`, also when the builder holds an include, since the member is
+  known), and the streaming writer refuses a base that names a block-form statement it has already written. Attributes and a
+  base on a block-form statement are allowed, as the reader allows them. Writer and builder corpus: a `blockform` area for each,
+  every successful output loads through the reader. The script grammars gain one verb each (`statement_block`, `set_block`).
+
 ### Fixed
 
 - **FR-2611-anvl-docs-001 (docs).** The first run of the example check over the current docs found and fixed:
@@ -46,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and is corrected; the download page's C# and Python samples read a `config.anvl` they never showed. The getting-started and
   schema C fragments and the Bindings guide's schema samples now run, with the files they read shown.
 
+- **BR-2611-anvl-errors-001.** An include error is reported at the `include` statement that caused it, not at line 1, column 1
+  of the root: a missing file (4204), a cycle (4206) and a path of 1024 bytes or more (9002) are at the line and column of the
+  `include` keyword, in the document that contains it (so a missing include inside an included document is positioned in that
+  document, and a cycle in the document that closes it). Two includes on one line have different columns; columns count bytes.
+  The `include after statements` (4201) and AMP (4202) errors were already positioned at their keyword. An included document that
+  fails to load for its own content (an invalid shebang) keeps its line 1, column 1, now inside that document.
 - **BR-2611-anvl-docs-001, BR-2611-anvl-docs-002 (docs).** The language reference's String row now lists the five resolved
   escapes (`\n \t \r \" \\`), says any other backslash sequence is kept as written (both characters), that there is no `\u` or `\x`,
   that `"a\"` does not parse, and that strings are byte-length-delimited and carry any bytes. The AML guide's Inheritance

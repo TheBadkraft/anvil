@@ -1,0 +1,19 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let oc_v = int 1
+let oc = object
+add oc "k" oc_v
+let mc = add NULL "c" oc
+let ob_v = int 1
+let ob = object
+add ob "k" ob_v
+let mb = add NULL "b" ob
+let oa_v = int 1
+let oa = object
+add oa "k" oa_v
+let ma = add NULL "a" oa
+set_block mb true
+set_base mb "c"
+set_base ma "b"
+emit

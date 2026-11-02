@@ -59,6 +59,7 @@ typedef struct anvil_builder_i {
    anvil_member (*find)(anvil_builder b, anvil_node object, const char *name);
    bool (*write)(anvil_builder b, anvil_writer w);
    const char *(*emit)(anvil_builder b, size_t *length);
+   bool (*set_block)(anvil_builder b, anvil_member member, bool block);
 } anvil_builder_i;
 extern const anvil_builder_i Builder;
 

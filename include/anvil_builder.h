@@ -107,6 +107,15 @@ anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *n
 /** @brief Declare an inheritance base. The statement's value must be an object. AML only. A member
  * handle of another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT, as for the node handles. */
 bool anvil_builder_set_base(anvil_builder b, anvil_member member, const char *base);
+/**
+ * @brief Mark a statement as block form: emitted as `name [: base] [@[attributes]] { ... };`, the
+ * anonymous, read-only form, instead of `name := { ... };`. The statement's value must be an object
+ * (ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT); AML only. `block` false restores the default form. A
+ * block-form statement cannot be a base: emit and write refuse a document where some member's base
+ * names a top-level block-form member with ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM (the reader rejects it,
+ * 4052), whether or not the builder holds an include, since the member is known.
+ */
+bool anvil_builder_set_block(anvil_builder b, anvil_member member, bool block);
 /** @brief Statement attribute; same rules as anvil_writer_attribute. AML only. A member handle of
  * another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT. */
 bool anvil_builder_member_attribute(anvil_builder b, anvil_member member, const char *key, const char *value);
@@ -124,7 +133,8 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  * On failure the writer's error is also reported by anvil_builder_get_error.
  * Before anything is written, the bases are checked across every member the builder created,
  * including members never attached to the tree. A base names a top-level member, in this order:
- *  - the member it names must be an object (ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT);
+ *  - the member it names must be an object (ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT), and not a
+ *    block-form member (ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM);
  *  - it must exist (ANVIL_WRITER_ERR_MISSING_BASE) - unless the builder holds an include (even one
  *    added after the base was set), because the included file may declare it, so the builder
  *    cannot know and accepts it as before;

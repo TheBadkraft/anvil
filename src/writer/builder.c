@@ -70,6 +70,7 @@ struct anvil_node_t {
 struct anvil_member_t {
    char *name;
    char *base;
+   bool block; // emitted as the block form `name { ... };`, which cannot be a base
    attr_list attrs;
    struct anvil_node_t *value;
 };
@@ -564,6 +565,17 @@ bool anvil_builder_set_base(anvil_builder b, anvil_member m, const char *base) {
    return outcome(b, ANVIL_WRITER_OK);
 }
 
+bool anvil_builder_set_block(anvil_builder b, anvil_member m, bool block) {
+   if (!member_ready(b, m)) {
+      return false;
+   }
+   if (block && m->value->kind != NODE_OBJECT) {
+      return outcome(b, ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT);
+   }
+   m->block = block;
+   return outcome(b, ANVIL_WRITER_OK);
+}
+
 bool anvil_builder_member_attribute(anvil_builder b, anvil_member m, const char *key, const char *value) {
    if (!member_ready(b, m)) {
       return false;
@@ -622,7 +634,7 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
 static bool emit_node(anvil_writer w, const struct anvil_node_t *n);
 
 static bool emit_member(anvil_writer w, const struct anvil_member_t *m) {
-   if (!anvil_writer_statement(w, m->name, m->base)) {
+   if (!(m->block ? anvil_writer_statement_block(w, m->name, m->base) : anvil_writer_statement(w, m->name, m->base))) {
       return false;
    }
    for (size_t i = 0; i < m->attrs.count; i++) {
@@ -713,9 +725,9 @@ static anvil_writer_err_code check_depth(anvil_builder b) {
 }
 
 // A member's base that names a top-level member of this builder must name an object, as the
-// reader requires (4020). The builder only writes `name := { ... }`, never the anonymous block
-// form `name { ... }` (4052), so an object is the one thing a base can legally be. A base the
-// builder does not hold (one from an include) is left to the reader.
+// reader requires (4020), and not a block-form one: the anonymous form `name { ... }` is read-only
+// and cannot be a base (4052; BR-2611-anvl-writer-001). A base the builder does not hold (one from
+// an include) is left to the reader.
 static bool has_include(const struct anvil_builder_t *b) {
    for (size_t i = 0; i < b->header_count; i++) {
       if (b->header[i].is_include) {
@@ -727,7 +739,7 @@ static bool has_include(const struct anvil_builder_t *b) {
 
 // BR-2610-anvl-writer-002 and -004: what the reader would refuse about the bases, across every member the builder
 // created (attached or not). A base names a top-level member of this document. In this order:
-//  - the member it names must be an object (INHERITANCE_REQUIRES_OBJECT);
+//  - the member it names must be an object (INHERITANCE_REQUIRES_OBJECT), and not block form (BASE_IS_BLOCK_FORM);
 //  - it must exist, unless the builder holds an include, which may supply it (MISSING_BASE);
 //  - the chain of top-level members' bases must not loop (INHERITANCE_CYCLE).
 static anvil_writer_err_code check_bases(anvil_builder b) {
@@ -760,6 +772,8 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
          missing = missing || !includes;
       } else if (b->members[last_at - 1]->value->kind != NODE_OBJECT) {
          result = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      } else if (b->members[last_at - 1]->block) {
+         result = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM; // the reader rejects a block form as a base (4052)
       } else if (b->members[last_at - 1]->base) {
          chain = true;
       }
@@ -781,6 +795,8 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
          missing = missing || !includes;
       } else if (b->members[at - 1]->value->kind != NODE_OBJECT) {
          result = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
+      } else if (b->members[at - 1]->block) {
+         result = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM;
       }
    }
    if (result != ANVIL_WRITER_OK) {

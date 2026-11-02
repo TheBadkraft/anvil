@@ -103,6 +103,7 @@ typedef struct anvil_error_i {
    size_t (*get_message)(anvil_error err, char *buf, size_t buflen);
    size_t (*get_line)(anvil_error err);
    size_t (*get_column)(anvil_error err);
+   size_t (*get_source)(anvil_error err, char *buf, size_t buflen);
 } anvil_error_i;
 extern const anvil_error_i Error;
 

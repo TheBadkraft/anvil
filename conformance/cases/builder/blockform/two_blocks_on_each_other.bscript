@@ -1,0 +1,17 @@
+anvil-builder-script 1
+# reported as BASE_IS_BLOCK_FORM, not as a cycle
+option on-error continue
+dialect AML
+let op_v = int 1
+let op = object
+add op "k" op_v
+let mp = add NULL "p" op
+let oq_v = int 1
+let oq = object
+add oq "k" oq_v
+let mq = add NULL "q" oq
+set_block mp true
+set_block mq true
+set_base mp "q"
+set_base mq "p"
+emit

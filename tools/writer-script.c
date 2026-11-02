@@ -29,7 +29,7 @@ typedef struct {
    int argc;
 } step;
 
-enum { V_DIALECT, V_OPTION, V_GET_ERROR, V_ERROR_MESSAGE, V_ATTRIBUTE, V_ATTRIBUTE_STRING, V_INCLUDE, V_STATEMENT,
+enum { V_DIALECT, V_OPTION, V_GET_ERROR, V_ERROR_MESSAGE, V_ATTRIBUTE, V_ATTRIBUTE_STRING, V_INCLUDE, V_STATEMENT, V_STATEMENT_BLOCK,
        V_NULL, V_BOOL, V_NUMERIC, V_INT, V_DOUBLE, V_STRING, V_BARE, V_BLOB, V_VARREF, V_BEGIN_ARRAY, V_END_ARRAY,
        V_BEGIN_TUPLE, V_END_TUPLE, V_BEGIN_OBJECT, V_END_OBJECT, V_FINISH, V_DATA, V_COUNT };
 
@@ -48,6 +48,7 @@ static const struct {
    [V_ATTRIBUTE_STRING] = {"attribute_string", "PSI", 2},
    [V_INCLUDE] = {"include", "P", 1},
    [V_STATEMENT] = {"statement", "PP", 2},
+   [V_STATEMENT_BLOCK] = {"statement_block", "PP", 2},
    [V_NULL] = {"null", "", 0},
    [V_BOOL] = {"bool", "B", 1},
    [V_NUMERIC] = {"numeric", "P", 1},
@@ -352,6 +353,7 @@ int writer_script_run(const char *path, bool output_only) {
          break;
       case V_INCLUDE: ok = anvil_writer_include(w, ptr_of(st, 0)); break;
       case V_STATEMENT: ok = anvil_writer_statement(w, ptr_of(st, 0), ptr_of(st, 1)); break;
+      case V_STATEMENT_BLOCK: ok = anvil_writer_statement_block(w, ptr_of(st, 0), ptr_of(st, 1)); break;
       case V_NULL: ok = anvil_writer_null(w); break;
       case V_BOOL: ok = anvil_writer_bool(w, strcmp(st->args[0].bytes, "true") == 0); break;
       case V_NUMERIC: ok = anvil_writer_numeric(w, ptr_of(st, 0)); break;

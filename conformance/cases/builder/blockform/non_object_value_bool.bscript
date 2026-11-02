@@ -1,0 +1,9 @@
+anvil-builder-script 1
+# a block-form statement takes an object
+option on-error continue
+dialect AML
+let v = bool true
+let m = add NULL "n" v
+set_block m true
+get_error
+emit

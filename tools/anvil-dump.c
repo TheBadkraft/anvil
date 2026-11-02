@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DUMP_FORMAT_VERSION 1
+#define DUMP_FORMAT_VERSION 2
 
 /* ---------------------------------------------------------------------- *
  * Primitive writers
@@ -373,19 +373,21 @@ static void collect_docs(doc_set *set, module_document d) {
 
 // A document's path as the dump shows it: "<root>" for the root, otherwise relative to the root's
 // directory when it lies under it (so the dump does not depend on where the corpus is checked out).
-static void put_doc_path(module_document d, module_document root) {
-   if (d == root) {
-      fputs("\"<root>\"", stdout);
-      return;
-   }
-   const char *p = d->filepath ? d->filepath : "";
-   const char *rp = root->filepath ? root->filepath : "";
+static void put_path_below(const char *p, const char *rp) {
    const char *slash = strrchr(rp, '/');
    size_t dirlen = slash ? (size_t)(slash - rp) + 1 : 0;
    if (dirlen && strncmp(p, rp, dirlen) == 0) {
       p += dirlen;
    }
    dump_put_quoted(p, strlen(p));
+}
+
+static void put_doc_path(module_document d, module_document root) {
+   if (d == root) {
+      fputs("\"<root>\"", stdout);
+      return;
+   }
+   put_path_below(d->filepath ? d->filepath : "", root->filepath ? root->filepath : "");
 }
 
 static void dump_document(const doc_set *set, size_t index) {
@@ -439,7 +441,25 @@ static void dump_document(const doc_set *set, size_t index) {
  * Errors
  * ---------------------------------------------------------------------- */
 
-static void dump_errors(anvil_document doc, module_context ctx) {
+// The source of the error as the public accessor reports it (the path native opened, "" for the root),
+// shown the way a document path is: relative to the root's directory.
+static void put_error_source(anvil_error pub, const char *root_path) {
+   size_t need = anvil_error_get_source(pub, NULL, 0);
+   char *buf = malloc(need + 1);
+   if (!buf) {
+      dump_put_quoted("", 0);
+      return;
+   }
+   anvil_error_get_source(pub, buf, need + 1);
+   if (need == 0) {
+      dump_put_quoted("", 0);
+   } else {
+      put_path_below(buf, root_path);
+   }
+   free(buf);
+}
+
+static void dump_errors(anvil_document doc, module_context ctx, const char *root_path) {
    anvil_err_code cat = anvil_get_error(doc);
    usize n = ctx && ctx->errors ? List.size(ctx->errors) : 0;
    for (usize i = 0; i < n; i++) {
@@ -447,9 +467,11 @@ static void dump_errors(anvil_document doc, module_context ctx) {
       if (!e) {
          continue;
       }
-      printf("error code=%d name=%s category=%d category-name=%s line=%zu column=%zu message=",
+      printf("error code=%d name=%s category=%d category-name=%s line=%zu column=%zu source=",
              (int)e->code, anvl_error_code_name(e->code), (int)cat, category_name(cat),
              (size_t)e->line, (size_t)e->column);
+      put_error_source(anvil_document_get_error(doc), root_path);
+      fputs(" message=", stdout);
       const char *m = e->message ? e->message : "";
       dump_put_quoted(m, strlen(m));
       putchar('\n');
@@ -457,8 +479,10 @@ static void dump_errors(anvil_document doc, module_context ctx) {
    if (n == 0) {
       // the load failed before anything was recorded internally (an unreadable file, say)
       anvil_error pub = anvil_document_get_error(doc);
-      printf("error code=0 name=ANVL_ERR_NONE category=%d category-name=%s line=%zu column=%zu message=",
+      printf("error code=0 name=ANVL_ERR_NONE category=%d category-name=%s line=%zu column=%zu source=",
              (int)cat, category_name(cat), anvil_error_get_line(pub), anvil_error_get_column(pub));
+      put_error_source(pub, root_path);
+      fputs(" message=", stdout);
       size_t need = anvil_error_get_message(pub, NULL, 0);
       char *buf = malloc(need + 1);
       if (buf) {
@@ -544,7 +568,7 @@ static int dump_one(const char *path, bool fragment) {
       printf("dialect %s\n", dialect_name(root->source->dialect));
    }
    if (failed) {
-      dump_errors(doc, ctx);
+      dump_errors(doc, ctx, root && root->filepath ? root->filepath : "");
    } else if (fragment) {
       dump_value(anvil_internal_document_fragment(doc), 0);
    } else {

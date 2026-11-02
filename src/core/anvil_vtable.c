@@ -71,6 +71,7 @@ const anvil_error_i Error = {
    .get_message = anvil_error_get_message,
    .get_line = anvil_error_get_line,
    .get_column = anvil_error_get_column,
+   .get_source = anvil_error_get_source,
 };
 
 const anvil_value_i Value = {
