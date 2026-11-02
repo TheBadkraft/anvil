@@ -682,6 +682,20 @@ class ExactTestNames(Base):
         self.fx.commit("T-1: GREEN. mul [tests: test/ops.test.js > mul]", {"src/lib.js": MUL_ONLY})
         self.assertPasses(b)
 
+    def test_a_test_name_with_commas_is_one_name(self):
+        b = self.fx.base()
+        self.fx.commit("T-1: RED. long names", {
+            "src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = () => 0;\n",
+            "test/ops.test.js": TESTJS + case("mul, then add, twice", "assert.strictEqual(lib.mul(2, 3), 6);") + case("plain", "assert.strictEqual(lib.mul(1, 3), 3);")})
+        self.fx.commit("T-1: GREEN. mul [tests: mul, then add, twice, plain]", {"src/lib.js": "exports.add = (a, b) => a + b;\nexports.mul = (a, b) => a * b;\n"})
+        rc, rec = self.last(b)
+        self.assertEqual((rec["status"], rec["data"]["flipped"]), ("PASS", 2), rec)
+
+    def test_a_comma_name_that_matches_no_test_is_reported_whole(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: mul, nothing, here]", {"src/lib.js": MUL_ONLY})
+        self.assertFails(b, "named test(s) did not flip: nothing, here")
+
     def test_a_tag_in_the_body_counts_once(self):
         b = red_then(self.fx)
         self.fx.commit("T-1: GREEN. mul", {"src/lib.js": MUL_ONLY}, body="[tests: mul]\n[tests: mul]")
