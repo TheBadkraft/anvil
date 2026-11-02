@@ -62,6 +62,33 @@ class MergeTargets(unittest.TestCase):
             self.assertEqual(self.targets(c), [], c)
 
 
+class MergeTargetsMoreSlips(unittest.TestCase):
+    def targets(self, command, cwd="/w"):
+        return hook.merge_targets(command, cwd)
+
+    def test_wrapper_options_with_values_are_skipped(self):
+        for c in ("sudo -u bob git merge feat/x", "timeout -s KILL 5 git merge feat/x", "timeout 5 git merge feat/x",
+                  "env -u X git merge feat/x", "env -i git merge feat/x", "taskset -c 0,1 git merge feat/x",
+                  "taskset 0x1 git merge feat/x", "nice -n 5 git merge feat/x", "ionice -c 2 -n 4 git merge feat/x",
+                  "chrt 10 git merge feat/x", "systemd-run --user -p MemoryMax=1G -- git merge feat/x"):
+            self.assertEqual(self.targets(c), [("/w", "feat/x")], c)
+
+    def test_a_branch_made_in_the_same_command_is_followed_to_its_start(self):
+        for c in ("git branch tmp feat/x; git merge tmp", "git tag t feat/x && git merge t", "git checkout -b tmp feat/x && git merge tmp",
+                  "git switch -c tmp feat/x; git merge tmp"):
+            self.assertIn(("/w", "feat/x"), self.targets(c), c)
+
+    def test_a_computed_ref_is_an_unknown_target(self):
+        for c in ("git merge $(git rev-parse feat/x)", "git merge `git rev-parse feat/x`", 'git merge "$(cat ref)"',
+                  "git pull origin $(echo feat/x)"):
+            self.assertTrue([t for t in self.targets(c) if len(t) == 3 and t[2] == "unknown"], c)
+        self.assertEqual([t for t in self.targets('git merge -m "$(date)" feat/x') if len(t) == 3], [])
+
+    def test_a_computed_directory_does_not_hide_the_merge(self):
+        self.assertIn(("/w", "feat/x"), self.targets('cd "$(git rev-parse --show-toplevel)" && git merge feat/x'))
+        self.assertIn(("/w", "feat/x"), self.targets('git -C "$(pwd)" merge feat/x'))
+
+
 class MergeTargetsSlips(unittest.TestCase):
     """The plausible slips: a wrapper word, a shell string, a substitution, --git-dir, a pull."""
 
@@ -155,7 +182,7 @@ class Decision(unittest.TestCase):
         d = os.path.join(self.common, "check-tdd", "pass")
         os.makedirs(d, exist_ok=True)
         rec = {"head": sha, "result": "pass", "base": self.init,
-               "options": {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}}
+               "options": {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False, "first_parent": False}, "adapter": "python"}
         rec.update(over)
         with open(os.path.join(d, sha + ".json"), "w") as f:
             json.dump(rec, f)
@@ -242,8 +269,52 @@ class Decision(unittest.TestCase):
         self.record(base=self.init)
         self.assertEqual(self.decide("git merge feat/x")[0], "allow")
 
-    def test_a_record_made_with_loosened_options_is_refused(self):
+    def test_a_first_parent_record_is_refused(self):
         good = {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}
+        self.record(options=dict(good, first_parent=True))
+        v, out, _ = self.decide("git merge feat/x")
+        self.assertEqual(v, "deny")
+        self.assertIn("first_parent", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.record(options=good)  # an older checker did not record it
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+
+    def test_a_record_for_the_wrong_adapter_is_refused(self):
+        self.sh("checkout", "-q", "-b", "feat/node", "main")
+        with open(os.path.join(self.repo, "package.json"), "w") as f:
+            f.write("{}")
+        self.sh("add", "package.json")
+        self.sh("commit", "-q", "-m", "pkg")
+        node_sha = self.sh("rev-parse", "HEAD")
+        self.sh("checkout", "-q", "main")
+        self.record(node_sha, adapter="python")
+        v, out, _ = self.decide("git merge feat/node")
+        self.assertEqual(v, "deny")
+        self.assertIn("adapter", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.record(node_sha, adapter="node")
+        self.assertEqual(self.decide("git merge feat/node")[0], "allow")
+
+    def test_any_name_at_the_tip_of_a_guarded_branch_is_guarded(self):
+        self.sh("branch", "tmp", self.sha)
+        self.sh("update-ref", "refs/remotes/origin/zzz", self.sha)
+        for c in ("git merge tmp", "git merge origin/zzz", "git merge refs/heads/tmp"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        for c in ("git merge main", "git merge HEAD", "git merge release/v1", "git merge docs/x"):
+            self.assertEqual(self.decide(c)[0], "allow", c)
+
+    def test_a_branch_made_in_the_same_command_does_not_hide_the_tip(self):
+        for c in ("git branch tmp feat/x; git merge tmp", "git checkout -b tmp feat/x && git merge tmp"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+
+    def test_a_computed_ref_is_refused_with_the_instruction_to_pass_it_explicitly(self):
+        for c in ("git merge $(git rev-parse feat/x)", "git merge `git rev-parse feat/x`", "git pull origin $(echo feat/x)"):
+            v, out, _ = self.decide(c)
+            self.assertEqual(v, "deny", c)
+            self.assertIn("pass the ref explicitly", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.record()
+        self.assertEqual(self.decide('git merge -m "$(date)" feat/x')[0], "allow")
+
+    def test_a_record_made_with_loosened_options_is_refused(self):
+        good = {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False, "first_parent": False}
         for bad in ({"lenient_tests": True}, {"batch_limit": 11}, {"max_green_lines": 151}, {"no_compat": True}):
             self.record(options=dict(good, **bad))
             v, out, _ = self.decide("git merge feat/x")
