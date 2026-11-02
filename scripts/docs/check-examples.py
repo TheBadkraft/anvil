@@ -5,6 +5,7 @@
                       [--strict] [--scratch DIR] [paths...]
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -167,12 +168,71 @@ def write_files(directory, files):
 # ---------------------------------------------------------------------------------------------
 # documents: anvil-dump and anvil.js must agree
 # ---------------------------------------------------------------------------------------------
+JS_PARSE = """const fs = require('fs');
+const anvl = require(process.argv[2]);
+const d = anvl.parse(fs.readFileSync(process.argv[3], 'utf8'));
+if (d) { console.log(JSON.stringify({ ok: true })); }
+else { const e = anvl.lastError() || {}; console.log(JSON.stringify({ ok: false, code: e.code, name: e.name, message: e.message, line: e.line, column: e.column })); }
+"""
+
+
+def native_parse(ctx, directory, fname):
+    rc, out, err = run_cmd([ctx.dump, fname], directory, ctx.env)
+    st = re.search(r"^status (ok|error)$", out, re.M)
+    if rc != 0 or not st:
+        return None, "anvil-dump failed (exit %s): %s" % (rc, tail_text(err or out))
+    if st.group(1) == "ok":
+        return {"ok": True}, None
+    e = re.search(r"^error code=(\d+) name=(\S+)", out, re.M)
+    m = re.search(r'message="((?:[^"\\]|\\.)*)"', out)
+    lc = re.search(r"line=(\d+) column=(\d+)", out)
+    return {"ok": False, "code": int(e.group(1)) if e else 0, "name": e.group(2) if e else "", "message": m.group(1) if m else "",
+            "line": int(lc.group(1)) if lc else 0}, None
+
+
+def js_parse(ctx, directory, fname):
+    helper = os.path.join(ctx.scratch, "js-parse.js")
+    if not os.path.exists(helper):
+        with open(helper, "w") as f:
+            f.write(JS_PARSE)
+    rc, out, err = run_cmd(["node", helper, os.path.join(ctx.js_env(), "node_modules", "anvil.js"), fname], directory, ctx.env)
+    try:
+        return json.loads(out.strip().splitlines()[-1]), None
+    except (ValueError, IndexError):
+        return None, "anvil.js parse helper failed (exit %s): %s" % (rc, tail_text(err or out))
+
+
+def describe(r):
+    return "accepted" if r["ok"] else "rejected %s %s" % (r.get("code"), r.get("name") or "")
+
+
 def check_document(s, text, files, ctx, expected):
     if not ctx.dump:
         return skipped("no --dump (an anvil-dump built from the native tag)", needs=True)
     if not ctx.js:
         return skipped("no --js (the anvil.js package)", needs=True)
-    return failed("not implemented: documents")
+    directory = ctx.sample_dir()
+    write_files(directory, files)
+    fname = "sample.amp" if s.lang == "amp" else "sample.anvl"
+    write_files(directory, {fname: text})
+    nat, e1 = native_parse(ctx, directory, fname)
+    if e1:
+        return failed(e1)
+    js, e2 = js_parse(ctx, directory, fname)
+    if e2:
+        return failed(e2)
+    if nat["ok"] != js["ok"] or (not nat["ok"] and nat["code"] != js["code"]):
+        return failed("native and anvil.js disagree: native %s, anvil.js %s" % (describe(nat), describe(js)))
+    if nat["ok"]:
+        if expected is None:
+            return passed()
+        return failed("accepted by native and anvil.js, but the marker expects error %d" % expected)
+    where = "%s at line %s: %s" % (describe(nat), nat.get("line"), nat.get("message"))
+    if expected is None:
+        return failed("rejected: " + where)
+    if expected == nat["code"]:
+        return passed()
+    return failed("rejected with %s, but the marker expects error %d (%s)" % (nat["code"], expected, where))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -209,6 +269,16 @@ def check_markers(s):
     return found, None
 
 
+def check_output(s, state):
+    """An output block must equal, up to the final newline, what the sample before it printed."""
+    if state["stdout"] is None:
+        return failed("output block, but no preceding sample printed anything")
+    want, got = s.text.rstrip("\n"), state["stdout"].replace("\r\n", "\n").rstrip("\n")
+    if want == got:
+        return passed()
+    return failed("output differs: the block says %r, the run printed %r" % (tail_text(want, 200), tail_text(got, 200)))
+
+
 def check_sample(s, state, ctx):
     if s.orphan:
         return failed("example marker '%s' is not followed by a code fence" % " ".join([s.markers[0][0]] + s.markers[0][1]))
@@ -219,7 +289,7 @@ def check_sample(s, state, ctx):
         return skipped("marked fragment: not run")
     kind = classify(s.lang)
     if "output" in marks:
-        return failed("output blocks are not implemented")
+        return check_output(s, state)
     prefix, files = "", {}
     for name in marks.get("uses", []):
         su = state["setups"].get(name)
@@ -236,6 +306,7 @@ def check_sample(s, state, ctx):
     expected = int(marks["error"][0]) if "error" in marks else None
     text = prefix + s.text
     res = handler(s, text, files, ctx, expected)
+    state["stdout"] = res.stdout
     for name in marks.get("setup", []):
         own = {name: s.text} if kind == "doc" else {}
         state["setups"][name] = Setup(name, "doc" if kind == "doc" else "code", s.lang, text if kind != "doc" else "", dict(files, **own))
