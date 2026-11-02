@@ -291,6 +291,14 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(st[0], "SKIP", r.out)
         self.assertIn("fragment", st[2])
 
+    def test_fragment_marker_takes_a_reason_that_is_reported(self):
+        d = Doc()
+        n = d.block("js", "anvil.parse('x');", "fragment anvil-node is not part of this check")
+        r = run_check(d)
+        st = r.at(n)
+        self.assertEqual(st[0], "SKIP", r.out)
+        self.assertIn("anvil-node is not part of this check", st[2])
+
     def test_unknown_marker_fails(self):
         d = Doc()
         n = d.block("anvl", "x := 1;", "frobnicate")
@@ -368,6 +376,23 @@ class JsTests(unittest.TestCase):
         r = run_check(d)
         self.assertEqual(r.at(a)[0], "PASS", r.out)
         self.assertEqual(r.at(b)[0], "PASS", r.out)
+
+    def test_js_uses_a_document_setup_gets_anvl_and_doc(self):
+        d = Doc()
+        a = d.block("anvl", "#!aml\nfoo := 7;", "setup one")
+        b = d.block("js", "if (doc.get('foo').asInt() !== 7) throw new Error('wrong value');\nif (typeof anvl.parse !== 'function') throw new Error('no anvl');", "uses one")
+        r = run_check(d)
+        self.assertEqual(r.at(a)[0], "PASS", r.out)
+        self.assertEqual(r.at(b)[0], "PASS", r.out + r.proc.stderr)
+
+    def test_js_sample_that_contradicts_its_document_setup_fails(self):
+        d = Doc()
+        d.block("anvl", "#!aml\nfoo := 7;", "setup one")
+        b = d.block("js", "if (doc.get('foo').asInt() !== 8) throw new Error('wrong value');", "uses one")
+        r = run_check(d)
+        st = r.at(b)
+        self.assertEqual(st[0], "FAIL", r.out)
+        self.assertIn("wrong value", st[2])
 
     def test_js_without_uses_does_not_see_earlier_samples(self):
         d = Doc()
