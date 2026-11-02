@@ -418,6 +418,80 @@ def check_c(s, text, files, ctx, expected):
 HANDLERS["c"] = check_c
 
 
+def check_py(s, text, files, ctx, expected):
+    if not ctx.py:
+        return skipped("no --py (the anvil.py package)", needs=True)
+    pkg = None
+    for dp, dn, fn in os.walk(ctx.py):
+        if os.path.basename(dp) == "anvil" and "__init__.py" in fn:
+            pkg = os.path.dirname(dp)
+            break
+    if pkg is None:
+        return failed("the anvil.py package has no anvil/__init__.py")
+    ctx.env["PYTHONPATH"] = pkg
+    ctx.env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return run_code(ctx, ctx.sample_dir(), [sys.executable, "sample.py"], files, "sample.py", text, "python")
+
+
+NET_PROJECT = """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net%s.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>sample</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Anvil.Net"><HintPath>%s</HintPath></Reference>
+  </ItemGroup>
+</Project>
+"""
+
+
+def check_net(s, text, files, ctx, expected):
+    if not ctx.net:
+        return skipped("no --net (the anvil.net package)", needs=True)
+    dotnet = shutil.which("dotnet")
+    if dotnet is None:
+        return skipped("no dotnet SDK on this machine", needs=True)
+    dll = None
+    for dp, dn, fn in os.walk(ctx.net):
+        if "Anvil.Net.dll" in fn:
+            dll = os.path.join(dp, "Anvil.Net.dll")
+    if dll is None:
+        return failed("the anvil.net package has no Anvil.Net.dll")
+    env = dict(ctx.env)
+    home = env["HOME"]
+    env.update({"DOTNET_CLI_HOME": home, "NUGET_PACKAGES": os.path.join(home, ".nuget"), "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+                "DOTNET_NOLOGO": "1", "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1", "MSBUILDDISABLENODEREUSE": "1"})
+    rc, ver, err = run_cmd([dotnet, "--version"], ctx.scratch, env)
+    if rc != 0:
+        return failed("dotnet --version failed: " + tail_text(err or ver))
+    directory = ctx.sample_dir()
+    write_files(directory, files)
+    write_files(directory, {"sample.csproj": NET_PROJECT % (ver.strip().split(".")[0], dll), "Program.cs": text})
+    rc, out, err = run_cmd([dotnet, "build", "-c", "Release", "-o", "out", "--nologo", "-v", "q", "-nodeReuse:false",
+                            "-p:UseSharedCompilation=false"], directory, env, timeout=300)
+    if rc != 0:
+        return failed("dotnet build failed: " + tail_text(out or err))
+    for f in os.listdir(os.path.dirname(dll)):
+        if f.endswith(".so"):
+            shutil.copy(os.path.join(os.path.dirname(dll), f), os.path.join(directory, "out", f))
+    rc, out, err = run_cmd([dotnet, os.path.join("out", "sample.dll")], directory, env)
+    if rc != 0:
+        return failed("dotnet exited %s: %s" % (rc if rc is not None else "(timeout)", tail_text(err or out)))
+    return passed(stdout=out)
+
+
+def check_other(s, text, files, ctx, expected):
+    return skipped("language '%s' is not executable" % (s.lang or "(none)"))
+
+
+HANDLERS["py"] = check_py
+HANDLERS["net"] = check_net
+HANDLERS["other"] = check_other
+
+
 def check_js(s, text, files, ctx, expected):
     if not ctx.js:
         return skipped("no --js (the anvil.js package)", needs=True)
