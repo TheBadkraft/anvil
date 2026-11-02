@@ -41,6 +41,7 @@
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil-v0.13.1-rc-linux-x86_64.tar.gz">Download</a>
       </div>
+      <!-- example: lang sh -->
       <pre><code>tar -xzf anvil-v0.13.1-rc-linux-x86_64.tar.gz
 gcc your_program.c -I anvil-v0.13.1-rc-linux-x86_64/include \
     -L anvil-v0.13.1-rc-linux-x86_64/lib -lanvil -o your_program</code></pre>
@@ -66,7 +67,9 @@ gcc your_program.c -I anvil-v0.13.1-rc-linux-x86_64/include \
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil.js-v0.13.1-rc.tar.gz">Download</a>
       </div>
+      <!-- example: lang sh -->
       <pre><code>npm install ./anvil.js-v0.13.1-rc.tar.gz</code></pre>
+      <!-- example: lang js -->
       <pre><code>import { parse, AnvilWriter, AnvilBuilder, TypeRegistry, Schema, AnvilDialect } from 'anvil.js';   // or: const anvl = require('anvil.js')
 const doc = parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1
@@ -88,7 +91,17 @@ w.statement('foo').value(1).finish(); // writes foo := 1;</code></pre>
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil-net-v0.13.1-rc-linux-x64.tar.gz">Download</a>
       </div>
-      <pre><code>using var doc = AnvilDocument.Load("config.anvl");
+      <p style="margin-top: 12px;">Given a <code>config.anvl</code> like this:</p>
+      <!-- example: setup config.anvl -->
+      <pre><code>server := {
+    host := localhost;
+    port := 8080;
+};</code></pre>
+      <!-- example: uses config.anvl -->
+      <!-- example: lang csharp -->
+      <pre><code>using Anvil.Net;
+
+using var doc = AnvilDocument.Load("config.anvl");
 var server = doc.FindValue("server");
 server["port"].AsInt(); // 8080</code></pre>
     </div>
@@ -104,9 +117,14 @@ server["port"].AsInt(); // 8080</code></pre>
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil-py-v0.13.1-rc-linux-x64.tar.gz">Download</a>
       </div>
+      <!-- example: lang sh -->
       <pre><code>tar -xzf anvil-py-v0.13.1-rc-linux-x64.tar.gz
 export PYTHONPATH="$PWD/anvil-py-v0.13.1-rc-linux-x64/src:$PYTHONPATH"</code></pre>
-      <pre><code>with AnvilDocument.load("config.anvl") as doc:
+      <!-- example: uses config.anvl -->
+      <!-- example: lang python -->
+      <pre><code>from anvil import AnvilDocument
+
+with AnvilDocument.load("config.anvl") as doc:
     server = doc.find_value("server")
     server["port"].as_int()  # 8080</code></pre>
     </div>
@@ -130,11 +148,13 @@ export PYTHONPATH="$PWD/anvil-py-v0.13.1-rc-linux-x64/src:$PYTHONPATH"</code></p
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil-wasm-v0.11.0-rc.tar.gz">Download</a>
       </div>
+      <!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
       <pre><code>const anvil = require('anvil-wasm');
 await anvil.ready();
 const doc = anvil.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1</code></pre>
       <p style="margin-top: 12px;">In a browser, without a bundler:</p>
+      <!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
       <pre><code>&lt;script src="/vendor/anvil/anvil.browser.js"&gt;&lt;/script&gt;
 &lt;script&gt;
   // anvil.wasm is fetched from next to the script; say where it is otherwise:
@@ -155,6 +175,8 @@ doc.get('foo').asInt(); // 1</code></pre>
         </div>
         <a class="btn secondary" href="/assets/downloads/anvil-node-v0.11.0-rc-linux-x86_64.tar.gz">Download</a>
       </div>
+      <!-- example: alias anvil-node -->
+      <!-- example: lang js -->
       <pre><code>const anvil = require('anvil-node');
 const doc = anvil.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1</code></pre>

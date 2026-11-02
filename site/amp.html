@@ -62,29 +62,31 @@
       AMP's bet is different: put the guarantee <em>in</em> the grammar, not in a compiled schema
       or an unenforced convention. A document that opens with <code>#!amp</code> is restricted
       before a single statement is read — the parser rejects the constructs below outright, the
-      instant it sees them, with a dedicated error code each:
+      instant it sees them. An object, a VarRef, an attribute or inheritance stops the parser at
+      the first token AMP has no grammar for (<code>3100</code>); a non-scalar element inside
+      an array or tuple has its own code (<code>4401</code>):
     </p>
     <table>
       <tr><th>Construct</th><th>Error code</th></tr>
       <tr>
         <td>Objects (<code>{ ... }</code>) anywhere in value position</td>
-        <td><code>AMP_OBJECT_FORBIDDEN</code></td>
+        <td><code>3100 ANVL_ERR_PARSER_UNEXPECTED_TOKEN</code></td>
       </tr>
       <tr>
         <td><code>$</code> VarRef, in any position</td>
-        <td><code>AMP_VARREF_FORBIDDEN</code></td>
+        <td><code>3100 ANVL_ERR_PARSER_UNEXPECTED_TOKEN</code></td>
       </tr>
       <tr>
         <td>Attributes (<code>@[...]</code>), module-level or per-statement</td>
-        <td><code>AMP_ATTRIBUTE_FORBIDDEN</code></td>
+        <td><code>3100 ANVL_ERR_PARSER_UNEXPECTED_TOKEN</code></td>
       </tr>
       <tr>
         <td>Inheritance (<code>Child : Base := ...</code>)</td>
-        <td><code>AMP_INHERITANCE_FORBIDDEN</code></td>
+        <td><code>3100 ANVL_ERR_PARSER_UNEXPECTED_TOKEN</code></td>
       </tr>
       <tr>
         <td>A non-scalar element inside an array or tuple — no nesting, ever</td>
-        <td><code>AMP_ARRAY_ELEMENT_NOT_SCALAR</code></td>
+        <td><code>4401 ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR</code></td>
       </tr>
     </table>
     <p>
@@ -104,10 +106,15 @@ raw    := `payload bytes`;</code></pre>
       And the same restrictions, rejected the instant the parser sees them — not silently
       dropped, not a warning, a hard parse error:
     </p>
+    <!-- example: error 3100 -->
     <pre><code>#!amp
-bad := { x := 1; };   // AMP_OBJECT_FORBIDDEN
-bad := $foo;           // AMP_VARREF_FORBIDDEN
-bad := [[1, 2]];        // AMP_ARRAY_ELEMENT_NOT_SCALAR</code></pre>
+bad := { x := 1; };   // an object: 3100</code></pre>
+    <!-- example: error 3100 -->
+    <pre><code>#!amp
+bad := $foo;          // a VarRef: 3100</code></pre>
+    <!-- example: error 4401 -->
+    <pre><code>#!amp
+bad := [[1, 2]];      // a nested element: 4401</code></pre>
 
     <h2>Why the distinction matters</h2>
     <p>
