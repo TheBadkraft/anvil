@@ -6,6 +6,7 @@ The Principal Engineer merges branches into main after the Verification Engineer
 complete, all-PASS run leaves <git-common-dir>/check-tdd/pass/<sha>.json. This hook refuses `git merge <ref>` when ref
 is a guarded branch and no such record exists for the exact sha. See merge_decision() for the override.
 """
+import importlib.util
 import json
 import os
 import re
@@ -14,7 +15,10 @@ import subprocess
 import sys
 
 SEPARATORS = r"\|\||&&|[;&|\n()]"
-GUARDED = re.compile(r"^(?:refs/heads/|refs/remotes/origin/|origin/)?(?:feat|fix|tools|perf|chore)/")
+GUARDED = re.compile(r"^(?:refs/)?(?:heads/|remotes/[^/]+/|[^/]+/)?(?:feat|fix|tools|perf|chore)/")
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
+KEYWORDS = {"{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!"}
+WRAPPERS = {"env", "command", "exec", "time", "nohup", "sudo", "setsid", "builtin", "nice", "ionice", "timeout", "stdbuf"}
 ABORTING = {"--abort", "--continue", "--quit"}
 VALUE_OPTIONS = {"-m", "-F", "-s", "-X", "--message", "--file", "--strategy", "--strategy-option", "--into-name"}
 GIT_VALUE_OPTIONS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
@@ -59,50 +63,115 @@ def _join(base, path):
     return os.path.normpath(os.path.join(base, os.path.expanduser(path)))
 
 
-def merge_targets(command, cwd):
-    """[(directory, ref)] for every ref named by a `git merge` in the command, following `cd <dir> &&` and
-    `git -C <dir>`. Merge options and their values are skipped, and --abort/--continue/--quit name nothing."""
+def _sibling(name):
+    """Load a sibling hook file, for the substitution scanner both hooks share."""
+    try:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        spec = importlib.util.spec_from_file_location("sibling_" + re.sub(r"\W", "_", name), path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception as e:
+        print("check-tdd hook: cannot load %s (%s); substitutions in commands are not followed" % (name, e), file=sys.stderr)
+        return None
+
+
+_MEMCAP = _sibling("require-memcap.py")
+
+
+def substitutions(text):
+    return _MEMCAP.substitutions(text) if _MEMCAP else []
+
+
+def _words(seg):
+    try:
+        return shlex.split(seg.strip())
+    except ValueError:
+        return []
+
+
+def _strip(words):
+    """Drop what comes before the command: assignments, shell keywords, wrapper words and their options."""
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w) or w in KEYWORDS:
+            i += 1
+        elif w.rsplit("/", 1)[-1] in WRAPPERS:
+            i += 1
+            while i < len(words) and (words[i].startswith("-") or re.match(r"^[0-9][0-9,.:smh-]*$", words[i])):
+                i += 1
+        else:
+            break
+    return words[i:]
+
+
+def _git_global_options(words, here):
+    """(directory, index of the subcommand) after git's global options (-C, --git-dir, --work-tree, -c ...)."""
+    d, j = here, 1
+    while j < len(words) and words[j].startswith("-"):
+        w = words[j]
+        if w == "-C" and j + 1 < len(words):
+            d, j = _join(d, words[j + 1]), j + 2
+        elif w.split("=", 1)[0] in ("--git-dir", "--work-tree"):
+            value, j = (w.split("=", 1)[1], j + 1) if "=" in w else (words[j + 1] if j + 1 < len(words) else "", j + 2)
+            d = _join(d, value if w.startswith("--work-tree") or os.path.basename(value.rstrip("/")) != ".git" else os.path.dirname(value.rstrip("/")))
+        else:
+            j += 2 if w in GIT_VALUE_OPTIONS else 1
+    return d, j
+
+
+def _positionals(args):
+    out, k = [], 0
+    while k < len(args):
+        if args[k] in VALUE_OPTIONS:
+            k += 2
+        elif args[k].startswith("-"):
+            k += 1
+        else:
+            out.append(args[k])
+            k += 1
+    return out
+
+
+def merge_targets(command, cwd, depth=0):
+    """[(directory, ref)] for every ref a `git merge` names, and [(directory, "<remote>/<branch>", "pull")] for a
+    `git pull`, in the command and in what it runs: `cd <dir> &&`, `git -C <dir>`, `--git-dir`, wrapper words,
+    `bash -c`/`eval` strings, `$( )` and backticks. --abort/--continue/--quit name nothing."""
     out, here = [], cwd
+    if depth > 4:
+        return out
+    for inner in substitutions(command):
+        out += merge_targets(inner, here, depth + 1)
     for seg in split_segments(command):
-        try:
-            words = shlex.split(seg.strip())
-        except ValueError:
-            continue
-        while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
-            words = words[1:]
+        words = _strip(_words(seg))
         if not words:
             continue
-        if words[0] == "cd" and len(words) > 1:
+        name = words[0].rsplit("/", 1)[-1]
+        if name == "cd" and len(words) > 1:
             here = _join(here, words[1])
-            continue
-        if words[0] != "git":
-            continue
-        d, j = here, 1
-        while j < len(words) and words[j].startswith("-"):
-            if words[j] == "-C" and j + 1 < len(words):
-                d = _join(d, words[j + 1])
-                j += 2
-            else:
-                j += 2 if words[j] in GIT_VALUE_OPTIONS else 1
-        if j >= len(words) or words[j] != "merge":
-            continue
-        args = words[j + 1:]
-        if ABORTING & set(args):
-            continue
-        k = 0
-        while k < len(args):
-            if args[k] in VALUE_OPTIONS:
-                k += 2
-            elif args[k].startswith("-"):
-                k += 1
-            else:
-                out.append((d, args[k]))
-                k += 1
+        elif name in SHELLS or name == "eval":
+            strings = [words[k + 1] for k, a in enumerate(words[1:-1], 1) if a.startswith("-") and not a.startswith("--") and "c" in a] if name in SHELLS else [" ".join(words[1:])]
+            for s in strings:
+                out += merge_targets(s, here, depth + 1)
+        elif name == "git":
+            d, j = _git_global_options(words, here)
+            sub, args = (words[j], words[j + 1:]) if j < len(words) else ("", [])
+            if sub == "merge" and not ABORTING & set(args):
+                out += [(d, a) for a in _positionals(args)]
+            elif sub == "pull":
+                pos = _positionals(args)
+                for spec in pos[1:]:
+                    src = spec.split(":", 1)[0].lstrip("+")
+                    if src:
+                        out.append((d, src if pos[0] == "." else "%s/%s" % (pos[0], src), "pull"))
     return out
 
 
 def is_guarded(ref):
-    return bool(GUARDED.match(ref))
+    """A feat/, fix/, tools/, perf/ or chore/ branch, however it is spelled: bare, heads/..., refs/heads/...,
+    <remote>/..., refs/remotes/<remote>/.... Not a tag."""
+    return not ref.startswith("refs/tags/") and bool(GUARDED.match(ref))
 
 
 def git_out(directory, *args):
@@ -125,7 +194,8 @@ def merge_decision(command, cwd):
     <git-common-dir>/check-tdd/override/<sha> lets one merge through: only the Principal Engineer creates it,
     and only on the owner's explicit words. A ref that does not resolve is git's to refuse, not ours."""
     notes = []
-    for d, ref in merge_targets(command, cwd):
+    for target in merge_targets(command, cwd):
+        d, ref = target[0], target[1]
         if not is_guarded(ref) or not os.path.isdir(d):
             continue
         sha = git_out(d, "rev-parse", "--verify", "-q", ref + "^{commit}")
@@ -160,8 +230,6 @@ def main():
             return 0
         if not isinstance(command, str):
             raise TypeError("command is %s" % type(command).__name__)
-        if "merge" not in command:
-            return 0
         res = merge_decision(command, data.get("cwd") or os.getcwd())
     except Exception as e:  # onFailure is `continue`: a broken guard must not block work
         print("check-tdd hook error (allowing): %s: %s" % (type(e).__name__, e), file=sys.stderr)
