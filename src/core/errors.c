@@ -343,7 +343,18 @@ static anvl_result error_set_impl(list target, anvl_err_code code, usize line, u
    }
    new_error->line = line;
    new_error->column = column;
-   new_error->file = file;
+   if (file) {
+      // The path of the document the error is in, copied: the document may be disposed before
+      // the error is read (a failed child is), and `file` is only borrowed for this call.
+      size_t flen = strlen(file);
+      char *copy = Allocator.alloc(flen + 1);
+      if (!copy) {
+         err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         goto error;
+      }
+      memcpy(copy, file, flen + 1);
+      new_error->file = copy;
+   }
 
    if (List.append(target, new_error) != 0) {
       err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
@@ -373,6 +384,7 @@ anvl_result anvl_error_set_message(list target, anvl_err_code code, usize line, 
 void anvl_error_dispose(anvl_error err) {
    if (err) {
       Allocator.dispose(err->detail);
+      Allocator.dispose((char *)err->file);
       Allocator.dispose(err);
    }
 }
