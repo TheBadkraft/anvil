@@ -3,6 +3,31 @@
 
     check-examples.py [--root DIR] [--dump anvil-dump] [--core PKG] [--js PKG] [--py PKG] [--net PKG]
                       [--strict] [--scratch DIR] [paths...]
+
+Scans docs/**/*.md and site/assets/docs/**/*.md under --root (or the paths given) and prints one line per
+sample: `PASS|FAIL|SKIP <file>:<line> <language> [- reason]`, then a summary. Exit 1 on any FAIL; with
+--strict also on a SKIP caused by a missing package or toolchain. A package is a directory, a tarball or a URL.
+
+  anvl, aml, amp, unlabelled   a document: anvil-dump (--dump, built from the native tag) and anvil.js (--js)
+                               must both accept it, or both reject it with the same code
+  js                           run with node against the anvil.js package, installed in a scratch dir
+  c                            compiled and linked against --core (include/ and lib/libanvil.a) and run
+  python, csharp               run against --py and --net when the toolchain is there; otherwise SKIP with a reason
+  anything else (sh, xml, ...) SKIP: not executable
+
+A sample is marked by HTML comments right before its fence (blank lines may lie between):
+
+  <!-- example: fragment -->        not runnable alone: SKIP
+  <!-- example: error 4052 -->      an intentionally invalid document: both parsers must reject it with this code
+  <!-- example: setup NAME -->      checked as usual, and kept as NAME. A document is written as the file NAME in
+                                   the directory of every sample that `uses` it (so an include finds it); code
+                                   is prepended to every sample that `uses` it
+  <!-- example: uses NAME... -->   see setup
+  <!-- example: output -->         the block must equal, up to the final newline, what the sample before it printed
+
+A C sample that has no main() is assembled: its #include lines are hoisted, its function definitions go to file
+level and its other lines run inside a generated main(). The anvil headers and <stdio.h> <stdlib.h> <string.h>
+<stdint.h> <stdbool.h> are always included. A sample with no marker that fails is a FAIL.
 """
 import argparse
 import json
@@ -11,7 +36,9 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import urllib.request
 
 MARKER = re.compile(r"^\s*<!--\s*example:\s*(.*?)\s*-->\s*$")
 FENCE = re.compile(r"^(\s*)(`{3,}|~{3,})\s*([^\s`]*)")
@@ -516,12 +543,32 @@ def find_markdown(root, paths):
     return found
 
 
-def package_dir(arg, flag):
+def package_dir(arg, flag, scratch):
+    """A package argument is a directory, a tarball, or an http(s):// or file:// URL of a tarball (the live
+    downloads of a docs-only deploy). A tarball is unpacked in the scratch dir; the result is the package's
+    top directory."""
     if arg is None:
         return None
-    if not os.path.isdir(arg):
-        raise SystemExit("check-examples: %s %s is not a directory" % (flag, arg))
-    return os.path.abspath(arg)
+    path = arg
+    if re.match(r"^(https?|file)://", arg):
+        dest = os.path.join(scratch, "download")
+        os.makedirs(dest, exist_ok=True)
+        path = os.path.join(dest, os.path.basename(arg.split("?")[0]))
+        try:
+            with urllib.request.urlopen(arg, timeout=120) as r, open(path, "wb") as f:
+                shutil.copyfileobj(r, f)
+        except OSError as e:
+            raise SystemExit("check-examples: cannot fetch %s %s: %s" % (flag, arg, e))
+    if os.path.isdir(path):
+        return os.path.abspath(path)
+    if os.path.isfile(path) and re.search(r"\.(tar\.gz|tgz|tar)$", path):
+        dest = os.path.join(scratch, "pkg" + flag.lstrip("-"))
+        os.makedirs(dest)
+        with tarfile.open(path) as t:
+            t.extractall(dest, filter="data")
+        top = os.listdir(dest)
+        return os.path.join(dest, top[0]) if len(top) == 1 and os.path.isdir(os.path.join(dest, top[0])) else dest
+    raise SystemExit("check-examples: %s %s is not a directory, a tarball or a URL" % (flag, arg))
 
 
 def main(argv=None):
@@ -529,10 +576,10 @@ def main(argv=None):
     ap.add_argument("paths", nargs="*", help="markdown files or directories (default: docs/ and site/assets/docs/ under --root)")
     ap.add_argument("--root", default=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
     ap.add_argument("--dump", help="an anvil-dump binary built from the native tag being published")
-    ap.add_argument("--core", help="the core package (directory)")
-    ap.add_argument("--js", help="the anvil.js package (directory)")
-    ap.add_argument("--py", help="the anvil.py package (directory)")
-    ap.add_argument("--net", help="the anvil.net package (directory)")
+    ap.add_argument("--core", help="the core package (directory, tarball or URL)")
+    ap.add_argument("--js", help="the anvil.js package (directory, tarball or URL)")
+    ap.add_argument("--py", help="the anvil.py package (directory, tarball or URL)")
+    ap.add_argument("--net", help="the anvil.net package (directory, tarball or URL)")
     ap.add_argument("--strict", action="store_true", help="a sample skipped for a missing package or toolchain fails the run")
     ap.add_argument("--scratch", help="scratch directory (default: a temporary one, removed on exit)")
     opts = ap.parse_args(argv)
@@ -544,8 +591,8 @@ def main(argv=None):
         dump = os.path.abspath(opts.dump) if opts.dump else None
         if dump and not os.access(dump, os.X_OK):
             raise SystemExit("check-examples: --dump %s is not an executable" % opts.dump)
-        ctx = Context(scratch, dump=dump, js=package_dir(opts.js, "--js"), core=package_dir(opts.core, "--core"),
-                      py=package_dir(opts.py, "--py"), net=package_dir(opts.net, "--net"))
+        ctx = Context(scratch, dump=dump, js=package_dir(opts.js, "--js", scratch), core=package_dir(opts.core, "--core", scratch),
+                      py=package_dir(opts.py, "--py", scratch), net=package_dir(opts.net, "--net", scratch))
         counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
         needs_skips = 0
         for path in find_markdown(root, opts.paths):
