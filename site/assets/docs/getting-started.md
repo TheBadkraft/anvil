@@ -49,10 +49,17 @@ yourself" — an easy mistake to make once, since an empty parse never reports a
 
 ## 3. Loading a Document
 
-Two ways in, otherwise identical:
+Two ways in, otherwise identical. Given a `config.anvl` file:
 
-<!-- example: fragment needs a config.anvl file and a source buffer -->
+<!-- example: setup config.anvl -->
+```anvl
+#!aml
+name := David;
+```
+
+<!-- example: uses config.anvl -->
 ```c
+const char *source = "#!aml\nname := David;\n";
 anvil_document from_file   = anvil_load("config.anvl");
 anvil_document from_buffer = anvil_load_buffer(source, strlen(source));
 ```
@@ -61,7 +68,13 @@ A **failed** parse still gives you a real, usable handle — `anvil_load`/`anvil
 return `NULL` for the one truly foundational failure (the handle itself couldn't be allocated).
 Check `anvil_has_errors`, and read the detail with `anvil_document_get_error`:
 
-<!-- example: fragment needs a document that failed to parse -->
+<!-- example: setup bad-doc -->
+```c
+const char *bad = "#!aml\nname David;\n";   // the ':=' is missing
+anvil_document doc = anvil_load_buffer(bad, strlen(bad));
+```
+
+<!-- example: uses bad-doc -->
 ```c
 if (anvil_has_errors(doc)) {
    anvil_error err = anvil_document_get_error(doc);
@@ -229,8 +242,10 @@ attribute a document or statement carries.
 the value itself, use the value handle: `anvil_attribute_get_value_handle(attr)` returns an
 `anvil_value` (or NULL for a flag attribute), so the ordinary value calls apply:
 
-<!-- example: fragment needs an attribute handle and a buffer -->
+<!-- example: uses config -->
 ```c
+anvil_attribute attr = anvil_document_find_attribute(doc, "env");
+char buf[32] = {0};
 anvil_value v = anvil_attribute_get_value_handle(attr);
 if (v) {
    anvil_value_get_type(v);    // ANVIL_VALUE_STRING for "done", BARE for production, NUMERIC for 42, ...
@@ -247,8 +262,19 @@ A value that isn't a single scalar (`@[range=1..5]`) reads as a BARE value of it
 graph) — useful any time you need to reach into what a document pulled in, the same iterator
 shape as statements:
 
-<!-- example: fragment needs a document that includes another -->
+For example, a document that includes `base.anvl`:
+
+<!-- example: setup base.anvl -->
+```anvl
+#!aml
+base_name := common;
+```
+
+<!-- example: uses base.anvl -->
 ```c
+const char *src = "#!aml\ninclude \"base.anvl\";\nmain := 1;\n";
+anvil_document doc = anvil_load_buffer(src, strlen(src));
+
 anvil_document_iterator it = anvil_document_get_includes(doc);
 anvil_document includeed = NULL;
 while (anvil_document_iterator_next(it, &includeed)) {

@@ -85,7 +85,25 @@ makes possible. AnvilSchema is just the first proof.
 A schema is an ordinary `.anvl` document that carries the `@[schema]` module attribute. Every
 top-level statement in it is one field rule, without exception:
 
-<!-- example: fragment includes a types file that is not part of the example -->
+Given a types file, `common.types.anvl`:
+
+<!-- example: setup common.types.anvl -->
+```anvl
+#!aml
+@[types]
+
+Person := {
+   type := Object;
+   fields := {
+      id   := { type := Numeric; required := true; };
+      name := { type := String; size := 40; };
+   };
+};
+```
+
+the schema includes it:
+
+<!-- example: uses common.types.anvl -->
 ```anvl
 #!aml
 include "common.types.anvl";          // a @[types] file: its types become types.<Name>
