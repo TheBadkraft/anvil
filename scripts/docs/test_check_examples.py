@@ -426,6 +426,17 @@ class JsTests(unittest.TestCase):
         self.assertEqual(st[0], "FAIL", r.out)
         self.assertIn("output differs", st[2])
 
+    def test_output_difference_names_the_first_differing_line_with_its_spaces(self):
+        d = Doc()
+        d.block("js", "console.log('a');\nconsole.log('    b');")
+        b = d.block("", "a\n  b", "output")
+        r = run_check(d)
+        st = r.at(b)
+        self.assertEqual(st[0], "FAIL", r.out)
+        self.assertIn("line 2", st[2])
+        self.assertIn("'  b'", st[2])
+        self.assertIn("'    b'", st[2])
+
     def test_output_marker_without_a_preceding_run_fails(self):
         d = Doc()
         b = d.block("", "a", "output")
