@@ -183,7 +183,18 @@ class PythonAdapter(Adapter):
         return path.startswith(".claude/hooks/") or path.endswith((".py", ".js"))
 
     def run(self, work, opts):
-        return {"ran": False, "tests": {}, "note": "python adapter not implemented"}
+        fd, dest = tempfile.mkstemp(prefix="ctdd-py-")
+        os.close(fd)
+        try:
+            p = subprocess.run([sys.executable, os.path.join(HERE, "python-runner.py"), work, dest],
+                               capture_output=True, text=True, timeout=opts.run_timeout)
+            with open(dest) as f:
+                recs = [json.loads(ln) for ln in f.read().splitlines() if ln.strip()]
+        finally:
+            os.unlink(dest)
+        tests = {r["id"]: {k: v for k, v in (("s", r["s"]), ("k", r["k"]), ("m", r["m"])) if v} for r in recs}
+        note = "" if tests else "no scripts/**/test_*.py ran (exit %d): %s" % (p.returncode, (p.stderr or p.stdout)[-300:].strip())
+        return {"ran": bool(tests), "tests": tests, "note": note}
 
 
 class NodeAdapter(Adapter):
