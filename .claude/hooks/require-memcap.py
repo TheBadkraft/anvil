@@ -3,15 +3,31 @@
 
 Agents run inside VS Code's process group. Twice (a 28 GB fuzzer, a 26 GB node profile) one
 uncapped command was OOM-killed and took VS Code and every agent with it. This hook refuses a
-Bash command that starts node, python3, npm, npx, make or dotnet on a script or target unless
-the command line carries `systemd-run ... -p MemoryMax=...` (agents/STANDARDS.md section 8).
-Small inline checks (node -e/-p, python3 -c) and version queries stay allowed.
+Bash command that starts node, python3, npm, npx, make or dotnet on a script or target, or runs
+a shell script (`bash x.sh`, `./x.sh`: heavy work hides in scripts), unless that very command is
+wrapped by `systemd-run ... -p MemoryMax=...` (agents/STANDARDS.md section 8). Only a
+`-p MemoryMax=` or `--property=MemoryMax=` counts, not any text that mentions it.
+Small inline checks (node -e/-p, python3 -c, bash -n) and version queries stay allowed. There
+is no allowlist of light scripts: run one under the cap, as the others.
+It is a guardrail against a slip, not a security boundary: aliases, `eval "$x"` and `source`
+are out of scope.
 """
 import json, re, shlex, sys
 
 HEAVY = {"node", "nodejs", "python", "python3", "npm", "npx", "make", "dotnet"}
-WRAPPERS = {"taskset", "nice", "ionice", "timeout", "env", "exec", "time", "command", "stdbuf", "sudo", "nohup", "setsid", "builtin"}
+WRAPPERS = {"taskset", "nice", "ionice", "timeout", "env", "exec", "time", "command", "stdbuf", "sudo", "nohup", "setsid", "builtin", "chrt"}
 SAFE_FLAGS = {"-", "-e", "-p", "-c", "--eval", "--print", "-v", "-V", "--version", "-h", "--help", "-n", "-q"}
+# Options of a wrapper that take a value, and how many bare positionals it takes (timeout DURATION, taskset MASK,
+# chrt PRIORITY): `sudo -u bob node x.js` runs node, not `bob`.
+WRAPPER_VALUE_OPTIONS = {"sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "-r", "-t"},
+                         "timeout": {"-s", "-k", "--signal", "--kill-after"}, "env": {"-u", "-C", "-S", "--unset", "--chdir"},
+                         "nice": {"-n"}, "ionice": {"-c", "-n", "-p", "-P", "-u"}, "taskset": {"-c"}, "stdbuf": {"-i", "-o", "-e"}}
+WRAPPER_POSITIONALS = {"timeout": 1, "taskset": 1, "chrt": 1, "nice": 1}
+POSITIONAL = re.compile(r"^(0x[0-9a-fA-F]+|[0-9][0-9,.:smhd-]*)$")
+SYSTEMD_RUN_VALUE_OPTIONS = {"-p", "-E", "-u", "-G", "-M", "-H", "-t", "--property", "--setenv", "--unit", "--description",
+                             "--slice", "--working-directory", "--uid", "--gid", "--nice", "--machine", "--host"}
+SAFE_SHELL_FLAGS = {"-n", "--version", "--help", "-h", "-s"}
+SHELL_VALUE_OPTIONS = {"-o", "-O", "+O", "--rcfile", "--init-file"}
 
 
 SEPARATORS = r"\|\||&&|[;&|\n()]"
@@ -117,6 +133,63 @@ def _words(seg):
         return seg.split()
 
 
+def skip_wrapper(words, i):
+    """Index of the command after the wrapper at words[i] and its options (with their values)."""
+    name = words[i].rsplit("/", 1)[-1]
+    values, positional = WRAPPER_VALUE_OPTIONS.get(name, set()), WRAPPER_POSITIONALS.get(name, 0)
+    i += 1
+    while i < len(words):
+        w = words[i]
+        if w == "--":
+            return i + 1
+        if w.startswith("-") and len(w) > 1:
+            i += 2 if w in values else 1
+            if name == "taskset" and w == "-c":
+                positional = 0  # the CPU list was the value; there is no mask
+        elif positional and POSITIONAL.match(w):
+            positional -= 1
+            i += 1
+        else:
+            break
+    return i
+
+
+def systemd_run_command(words, i):
+    """Index of the command a `systemd-run` at words[i] runs: after `--`, else after its options and their values."""
+    j = i + 1
+    while j < len(words) and words[j] != "--" and words[j].startswith("-"):
+        j += 2 if words[j] in SYSTEMD_RUN_VALUE_OPTIONS else 1
+    return j + 1 if j < len(words) and words[j] == "--" else j
+
+
+def caps_memory(options):
+    """Only `-p MemoryMax=...`, `-pMemoryMax=...`, `--property MemoryMax=...` or `--property=MemoryMax=...` caps: a
+    description or any other text that mentions MemoryMax does not."""
+    for k, w in enumerate(options):
+        if re.match(r"^(?:-p|--property=)MemoryMax=", w):
+            return True
+        if w in ("-p", "--property") and k + 1 < len(options) and options[k + 1].startswith("MemoryMax="):
+            return True
+    return False
+
+
+def runs_script(base, args):
+    """A shell started on a script file (`bash x.sh`, `sh -e x.sh`) or a script run directly (`./x.sh`)."""
+    if base in SHELLS:
+        if SAFE_SHELL_FLAGS & set(args) or any(a.startswith("-") and not a.startswith("--") and "c" in a for a in args):
+            return False
+        k = 0
+        while k < len(args):
+            if args[k] in SHELL_VALUE_OPTIONS:
+                k += 2
+            elif args[k].startswith(("-", "+")):
+                k += 1
+            else:
+                return True
+        return False
+    return base.endswith(".sh")
+
+
 def simple_command(words, depth):
     """Yield (name, args) of the command a simple command runs, after assignments, keywords and wrappers.
     A `systemd-run ... -p MemoryMax=...` wrapper in this very command caps it: nothing is yielded."""
@@ -127,16 +200,12 @@ def simple_command(words, depth):
         if ASSIGNMENT.match(w) or w in KEYWORDS:
             i += 1
         elif base == "systemd-run":
-            rest = words[i + 1:]
-            own = rest[:rest.index("--")] if "--" in rest else rest
-            if any("MemoryMax" in x for x in own):
+            end = systemd_run_command(words, i)
+            if caps_memory(words[i + 1:end]):
                 return
-            i += 1 + (len(own) + 1 if "--" in rest else len(rest))
+            i = end
         elif base in WRAPPERS:
-            i += 1
-            # skip the wrapper's own options and numeric args (taskset -c 6,7 / timeout 60)
-            while i < len(words) and (words[i].startswith("-") or re.match(r"^[0-9][0-9,.:smh-]*$", words[i])):
-                i += 1
+            i = skip_wrapper(words, i)
         else:
             args = words[i + 1:]
             yield base, args
@@ -188,6 +257,8 @@ def commands(command, depth=0):
 def heavy_use(command):
     for base, args in commands(command):
         if HEAVY_NAME.match(base) and args and args[0] not in SAFE_FLAGS:
+            return base
+        if runs_script(base, args):
             return base
     return None
 
