@@ -555,7 +555,8 @@ def package_dir(arg, flag, scratch):
         os.makedirs(dest, exist_ok=True)
         path = os.path.join(dest, os.path.basename(arg.split("?")[0]))
         try:
-            with urllib.request.urlopen(arg, timeout=120) as r, open(path, "wb") as f:
+            req = urllib.request.Request(arg, headers={"User-Agent": "anvil-check-examples/1"})  # the site refuses Python-urllib
+            with urllib.request.urlopen(req, timeout=120) as r, open(path, "wb") as f:
                 shutil.copyfileobj(r, f)
         except OSError as e:
             raise SystemExit("check-examples: cannot fetch %s %s: %s" % (flag, arg, e))
