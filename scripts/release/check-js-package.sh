@@ -38,11 +38,12 @@ assert.strictEqual(a.parse('#!aml\nname := "David";\n').get('name').asString(), 
 })().catch((e) => { console.error(e); process.exit(1); });
 JS
 cat > "$work/proj/esm.mjs" <<'JS'
-import anvl, { parse, parseRawValue, lastError, getVersion, implementation, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError } from 'anvil.js';
-const names = { parse, parseRawValue, lastError, getVersion, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError };
+import anvl, { parse, parseRawValue, lastError, getVersion, implementation, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo, SchemaErrorCode, TypeErrorCode } from 'anvil.js';
+const names = { parse, parseRawValue, lastError, getVersion, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo, SchemaErrorCode, TypeErrorCode };
 for (const [k, v] of Object.entries(names)) if (typeof v === 'undefined') { console.error('missing named export ' + k); process.exit(1); }
-if (implementation !== 'anvil.js' || anvl.implementation !== 'anvil.js' || anvl.AnvilWriter !== AnvilWriter) process.exit(1);
-console.log('PASS js: ESM named imports (parse, AnvilWriter, AnvilDialect, WriterErrorCode, AnvilWriterError, ...) and the default import work');
+if (implementation !== 'anvil.js' || anvl.implementation !== 'anvil.js' || anvl.AnvilWriter !== AnvilWriter || anvl.AnvilBuilder !== AnvilBuilder || anvl.Schema !== Schema || anvl.setIo !== setIo) process.exit(1);
+if (typeof Schema !== 'function' || typeof TypeRegistry !== 'function' || typeof AnvilBuilder.create !== 'function') { console.error('Schema/TypeRegistry/AnvilBuilder are not usable'); process.exit(1); }
+console.log('PASS js: ESM named imports (parse, AnvilWriter, AnvilBuilder, AnvilNode, AnvilMember, TypeRegistry, Schema, setIo, ...) and the default import work');
 JS
 node "$work/proj/esm.mjs" || fail "ESM named imports from the installed package"
 node -e "const e=require('anvil.js/package.json').exports['.']; if(!e.import||!/index\.mjs$/.test(e.import)||!e.require) process.exit(1)" || fail "package.json exports lacks the import (node/index.mjs) and require conditions"
@@ -54,6 +55,19 @@ assert.strictEqual(a.parse('#!aml\no := { x := 1; x := 2; };\n'), null);
 const e = a.lastError();
 assert.strictEqual(e.code, 4001, 'lastError().code'); assert.strictEqual(typeof e.name, 'string'); assert.ok(e.line >= 1 && e.column >= 1);
 console.log(`PASS js: lastError() for a duplicate key is code ${e.code} (${e.name})`);
+assert.strictEqual(a.Schema.loadFile('/nonexistent-anvl-release-check/missing.anvl'), null);
+const m = a.lastError(); assert.strictEqual(m.code, 1002, 'lastError().code for a missing file'); assert.ok(m.message && m.message.length > 0, 'message');
+console.log(`PASS js: lastError() for a missing file is code ${m.code} (${m.name})`);
+assert.strictEqual(m.name, 'ANVL_ERR_IO_FILE_NOT_FOUND', 'IO name equals the identifier');
+assert.strictEqual(a.Schema.load('#!aml\nx := 1;\n'), null);
+const sm = a.lastError(); assert.strictEqual(sm.code, 11); assert.strictEqual(sm.name, 'ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING');
+assert.strictEqual(a.TypeRegistry.load('#!aml\nx := 1;\n'), null);
+const tm = a.lastError(); assert.strictEqual(tm.code, 1); assert.strictEqual(tm.name, 'ANVIL_TYPE_ERR_ATTRIBUTE_MISSING');
+assert.strictEqual(a.SchemaErrorCode.ATTRIBUTE_MISSING, 11); assert.strictEqual(a.TypeErrorCode.ATTRIBUTE_MISSING, 1);
+const isch = a.Schema.load('#!aml\n@[schema]\nn { integer := true; };\n');
+assert.strictEqual(isch.validate('#!aml\nn := 1e-999;\n').valid, false, 'integer rejects 1e-999');
+assert.strictEqual(isch.validate('#!aml\nn := 1e3;\n').valid, true, 'integer accepts 1e3');
+console.log('PASS js: IO name ANVL_ERR_IO_FILE_NOT_FOUND, Schema.load without @[schema] is code 11, TypeRegistry.load without @[types] is code 1, integer rejects 1e-999 and accepts 1e3');
 const w = a.AnvilWriter.create(a.AnvilDialect.AMP);
 const text = w.statement('utid').blob('utid', 'u-1').statement('seq').value(9007199254740991)
   .statement('payload').beginTuple().value(1).string('a"b\\c\n').bare('ok').blob('t', 'x := 1;').endTuple().finish();
@@ -70,10 +84,10 @@ git -C "$repo" archive "$commit" js scripts/conformance.js | tar -x -C "$work/co
 ntag=${tag:-v$(node -p "require('$pkg/BUILD_INFO.json').version")}
 mkdir -p "$work/conf/vendor/anvil" && git -C "$core" archive "$ntag" conformance | tar -x -C "$work/conf/vendor/anvil"
 # the reader corpus: cases/writer (.wscript) and cases/builder (.bscript) are other contracts with their own drivers
-total=$(find "$work/conf/vendor/anvil/conformance/cases" -path '*/cases/writer' -prune -o -path '*/cases/builder' -prune -o -type f ! -name '*.dump' -print | wc -l)
+total=$(find "$work/conf/vendor/anvil/conformance/cases" -path '*/cases/writer' -prune -o -path '*/cases/builder' -prune -o -path '*/cases/schema' -prune -o -type f ! -name '*.dump' -print | wc -l)
 # the expected size comes from the core tag's own tree, with the same exclusions, not from a number kept here
-expected=$(git -C "$core" ls-tree -r -z --name-only "$ntag" -- conformance/cases | tr '\0' '\n' | grep -v -e '^conformance/cases/writer/' -e '^conformance/cases/builder/' -e '\.dump$' | wc -l)
-[ "$expected" -gt 0 ] && [ "$total" -eq "$expected" ] || fail "reader corpus size $total != $expected in the core tag $ntag (cases/writer and cases/builder excluded)"
+expected=$(git -C "$core" ls-tree -r -z --name-only "$ntag" -- conformance/cases | tr '\0' '\n' | grep -v -e '^conformance/cases/writer/' -e '^conformance/cases/builder/' -e '^conformance/cases/schema/' -e '\.dump$' | wc -l)
+[ "$expected" -gt 0 ] && [ "$total" -eq "$expected" ] || fail "reader corpus size $total != $expected in the core tag $ntag (cases/writer, cases/builder and cases/schema excluded)"
 out=$(cd "$work/conf" && node scripts/conformance.js 2>&1) || { echo "$out" | tail -8; fail "conformance through the installed copy"; }
 echo "$out" | grep -q "^conformance (all): $total/$total passed, 0 failed" || { echo "$out"; fail "conformance count != corpus size $total"; }
 echo "PASS js: conformance through the installed copy: $total/$total"
@@ -84,3 +98,13 @@ wtotal=$(find "$work/conf/vendor/anvil/conformance/cases/writer" -type f -name '
 wout=$(cd "$work/conf" && node scripts/writer-conformance.js 2>&1) || { echo "$wout" | tail -8; fail "writer corpus through the installed copy"; }
 echo "$wout" | grep -q "^writer corpus: .* = $wtotal; 0 differ, 0 unlisted, 0 bad list entries" || { echo "$wout" | tail -3; fail "writer corpus count != $wtotal"; }
 echo "PASS js: writer corpus through the installed copy: $(echo "$wout" | tail -1 | sed 's/^writer corpus: //')"
+# the builder and schema corpora through the installed copy
+git -C "$repo" archive "$commit" test/builder-c-api-only.json test/schema-c-api-only.json scripts/builder-conformance.js scripts/schema-conformance.js | tar -x -C "$work/conf" || fail "no builder/schema driver at $commit"
+btotal=$(find "$work/conf/vendor/anvil/conformance/cases/builder" -type f -name '*.bscript' | wc -l)
+bout=$(cd "$work/conf" && node scripts/builder-conformance.js 2>&1) || { echo "$bout" | tail -8; fail "builder corpus through the installed copy"; }
+echo "$bout" | grep -q "^builder corpus: .* = $btotal; 0 differ, 0 unlisted, 0 bad list entries" || { echo "$bout" | tail -3; fail "builder corpus count != $btotal"; }
+echo "PASS js: builder corpus through the installed copy: $(echo "$bout" | tail -1 | sed 's/^builder corpus: //')"
+stotal=$(find "$work/conf/vendor/anvil/conformance/cases/schema" -type f -name '*.sscript' | wc -l)
+sout=$(cd "$work/conf" && node scripts/schema-conformance.js 2>&1) || { echo "$sout" | tail -8; fail "schema corpus through the installed copy"; }
+echo "$sout" | grep -q "^schema corpus: $stotal match native byte for byte of $stotal; 0 differ, 0 script errors, 0 bad list entries" || { echo "$sout" | tail -3; fail "schema corpus count != $stotal"; }
+echo "PASS js: schema corpus through the installed copy: $(echo "$sout" | tail -1 | sed 's/^schema corpus: //')"
