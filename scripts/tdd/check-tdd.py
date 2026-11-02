@@ -584,10 +584,45 @@ def resolve_gate(repo, sha, gate, gate_root):
         gate["verdict"] = read_gate(text)
 
 
+CHECKER_VERSION = "2"
+
+
+def pass_dir(repo):
+    """<git-common-dir>/check-tdd/pass: shared by every worktree of the repo, outside the working tree."""
+    common = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+    return os.path.join(common, "check-tdd", "pass")
+
+
+def has_pass(repo, ref):
+    """0 if a pass record exists for the commit `ref` names, else 1. Reads no suite and no history."""
+    try:
+        sha = git(repo, "rev-parse", "--verify", "-q", ref + "^{commit}").strip()
+        return 0 if sha and os.path.isfile(os.path.join(pass_dir(repo), sha + ".json")) else 1
+    except RuntimeError:
+        return 1
+
+
+def write_pass_record(repo, base_sha, head_sha, opts, adapter, count):
+    try:
+        commit = subprocess.run(["git", "-C", HERE, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or "unknown"
+    except OSError:
+        commit = "unknown"
+    rec = {"head": head_sha, "base": base_sha, "range": opts.range, "adapter": adapter.name, "checker_version": CHECKER_VERSION,
+           "checker_commit": commit, "date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "commits": count, "result": "pass"}
+    d = pass_dir(repo)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, head_sha + ".json.tmp"), "w") as f:
+        json.dump(rec, f, indent=1)
+    os.replace(os.path.join(d, head_sha + ".json.tmp"), os.path.join(d, head_sha + ".json"))
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["--has-pass"]:
-        return 1  # stub
+        if len(argv) != 3:
+            print("usage: check-tdd.py --has-pass <repo> <sha>", file=sys.stderr)
+            return 2
+        return has_pass(os.path.realpath(argv[1]), argv[2])
     ap = argparse.ArgumentParser(prog="check-tdd", description="Mechanical checker of the strict-TDD protocol (STANDARDS section 3).")
     ap.add_argument("repo")
     ap.add_argument("range", help="<base>..<head>: the commits reachable from head and not from base")
@@ -683,7 +718,11 @@ def main(argv=None):
               dict(summary, inc="; INCOMPLETE (budget reached, rerun)" if incomplete else ""))
     if fails:
         return 1
-    return 3 if incomplete else 0
+    if incomplete:
+        return 3
+    if records:
+        write_pass_record(repo, base_sha, git(repo, "rev-parse", head + "^{commit}").strip(), opts, adapter, len(records))
+    return 0
 
 
 if __name__ == "__main__":
