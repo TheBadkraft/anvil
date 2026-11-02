@@ -204,6 +204,56 @@ class Decision(unittest.TestCase):
             cwd = "/" if "-C" in c or "cd " in c else self.repo
             self.assertEqual(self.decide(c, cwd)[0], "deny", c)
 
+    def test_a_sha_or_a_tag_at_the_tip_of_a_guarded_branch_is_guarded(self):
+        self.sh("tag", "v-tip", self.sha)
+        for c in ("git merge %s" % self.sha, "git merge %s" % self.sha[:10], "git merge v-tip"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        self.assertEqual(self.decide("git merge %s" % self.sh("rev-parse", "release/v1"))[0], "allow")
+        self.assertEqual(self.decide("git merge %s" % self.init)[0], "allow")
+
+    def test_other_remotes_and_spellings_resolve_to_the_branch(self):
+        self.sh("update-ref", "refs/remotes/upstream/feat/x", self.sha)
+        for c in ("git merge upstream/feat/x", "git merge heads/feat/x", "git merge refs/remotes/upstream/feat/x"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+
+    def test_plausible_slips_are_denied(self):
+        for c in ("env A=1 git merge feat/x", "sudo git merge feat/x", "/usr/bin/git merge feat/x", "! git merge feat/x",
+                  "if true; then git merge feat/x; fi", 'bash -c "git merge feat/x"', 'eval "git merge feat/x"',
+                  'echo "$(git merge feat/x)"', "x=`git merge feat/x`", 'git "merge" feat/x', "git m\\erge feat/x"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        self.assertEqual(self.decide("git --git-dir=%s/.git merge feat/x" % self.repo, "/")[0], "deny")
+
+    def test_a_pull_of_a_guarded_branch_is_guarded(self):
+        for c in ("git pull . feat/x", "git pull origin fix/r", "git pull --no-rebase . feat/x"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        v, out, _ = self.decide("git pull origin feat/never-fetched")
+        self.assertEqual(v, "deny")
+        self.assertIn("fetch", out["hookSpecificOutput"]["permissionDecisionReason"])
+        for c in ("git pull origin main", "git pull", "git pull . release/v1", "git pull origin release/v1"):
+            self.assertEqual(self.decide(c)[0], "allow", c)
+
+    def test_a_record_must_cover_what_the_merge_brings_in(self):
+        self.record(base=self.sha)  # a HEAD~1..HEAD run: the branch's other commits were never checked
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(base=self.sh("rev-parse", "fix/r"))
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(base=None)
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(base=self.init)
+        self.assertEqual(self.decide("git merge feat/x")[0], "allow")
+
+    def test_a_record_made_with_loosened_options_is_refused(self):
+        good = {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}
+        for bad in ({"lenient_tests": True}, {"batch_limit": 11}, {"max_green_lines": 151}, {"no_compat": True}):
+            self.record(options=dict(good, **bad))
+            v, out, _ = self.decide("git merge feat/x")
+            self.assertEqual(v, "deny", bad)
+            self.assertIn("options", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.record(options=None)
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(options=dict(good, batch_limit=5, max_green_lines=100))
+        self.assertEqual(self.decide("git merge feat/x")[0], "allow")
+
     def test_a_quoted_mention_is_not_a_merge(self):
         for c in ('grep -E "a|git merge feat/x" notes.md', 'echo "git merge feat/x"', "git log feat/x", "ls"):
             self.assertEqual(self.decide(c)[0], "allow", c)
