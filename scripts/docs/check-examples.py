@@ -33,6 +33,7 @@ level and its other lines run inside a generated main(). The anvil headers and <
 <stdint.h> <stdbool.h> are always included. A sample with no marker that fails is a FAIL.
 """
 import argparse
+import html
 import json
 import os
 import re
@@ -52,6 +53,9 @@ class Sample:
 
     def __init__(self, file, line, lang, text, markers, orphan=False):
         self.file, self.line, self.lang, self.text, self.markers, self.orphan = file, line, lang, text, markers, orphan
+        for kind, args in markers:  # `lang NAME` overrides the label (a <pre><code> block has none)
+            if kind == "lang" and len(args) == 1:
+                self.lang = args[0]
 
 
 def parse_marker(body):
@@ -127,7 +131,7 @@ def skipped(reason, needs=False):
     return Result("SKIP", reason, needs=needs)
 
 
-KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None), "alias": (1, None)}
+KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None), "alias": (1, None), "lang": (1, 1)}
 DOC_LANGS = {"anvl", "aml", "amp", ""}
 JS_LANGS = {"js", "javascript", "mjs", "node"}
 PY_LANGS = {"python", "python3", "py", "py3"}
@@ -368,7 +372,7 @@ def check_sample(s, state, ctx):
 
 def check_file(path, rel, ctx):
     with open(path, encoding="utf-8") as f:
-        samples = extract_samples(rel, f.read())
+        samples = (extract_html_samples if path.endswith(".html") else extract_samples)(rel, f.read())
     state = {"setups": {}, "stdout": None}
     out = []
     for s in samples:
@@ -572,6 +576,9 @@ HANDLERS["doc"] = lambda s, text, files, ctx, expected: check_document(s, text, 
 def find_markdown(root, paths):
     targets = [os.path.join(root, "docs"), os.path.join(root, "site", "assets", "docs")] if not paths else paths
     found = []
+    if not paths:  # the site's pages: site/*.html, not below
+        site = os.path.join(root, "site")
+        found.extend(os.path.join(site, f) for f in sorted(os.listdir(site)) if f.endswith(".html")) if os.path.isdir(site) else None
     for t in targets:
         if os.path.isfile(t):
             found.append(t)
@@ -609,6 +616,32 @@ def package_dir(arg, flag, scratch):
         top = os.listdir(dest)
         return os.path.join(dest, top[0]) if len(top) == 1 and os.path.isdir(os.path.join(dest, top[0])) else dest
     raise SystemExit("check-examples: %s %s is not a directory, a tarball or a URL" % (flag, arg))
+
+
+HTML_TOKEN = re.compile(r"<!--\s*example:\s*(.*?)\s*-->|<pre[^>]*>\s*<code([^>]*)>(.*?)</code>\s*</pre>", re.S)
+
+
+def extract_html_samples(path, text):
+    """The <pre><code> blocks of an HTML page, as samples. The label is the code element's `language-x` class, if any;
+    the markers are the `<!-- example: ... -->` comments right before the <pre>, as in markdown."""
+    out, pending, last_end = [], [], 0
+    for m in HTML_TOKEN.finditer(text):
+        line = text.count("\n", 0, m.start()) + 1
+        if m.group(1) is not None:
+            if pending and text[last_end:m.start()].strip():
+                out.extend(Sample(path, pl, "", "", [mk], orphan=True) for pl, mk in pending)
+                pending = []
+            pending.append((line, parse_marker(m.group(1))))
+        else:
+            if pending and text[last_end:m.start()].strip():
+                out.extend(Sample(path, pl, "", "", [mk], orphan=True) for pl, mk in pending)
+                pending = []
+            cls = re.search(r"language-([\w+#-]+)", m.group(2))
+            out.append(Sample(path, line, cls.group(1) if cls else "", html.unescape(m.group(3)) + "\n", [mk for _, mk in pending]))
+            pending = []
+        last_end = m.end()
+    out.extend(Sample(path, pl, "", "", [mk], orphan=True) for pl, mk in pending)
+    return out
 
 
 def main(argv=None):
