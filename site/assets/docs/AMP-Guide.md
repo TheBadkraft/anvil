@@ -31,31 +31,68 @@ value-position restriction on `vars`/`include`/`import`.
 ## Forbidden — hard parse errors, not silently ignored
 
 AMP isn't AML-minus-features by convention; each of these is actively
-rejected the instant the parser sees it, with a dedicated error code:
+rejected the instant the parser sees it. AMP has no grammar for them, so the parser
+stops at the first token it can't place and reports
+`ANVL_ERR_PARSER_UNEXPECTED_TOKEN` (3100); there is no dedicated code per construct.
 
-| Construct | Error code |
+| Construct | Rejected with |
 |---|---|
-| Objects (`{ ... }`) anywhere in value position | `AMP_OBJECT_FORBIDDEN` |
-| `$` VarRef, in any position | `AMP_VARREF_FORBIDDEN` |
-| Attributes (`@[...]`), module-level or per-statement | `AMP_ATTRIBUTE_FORBIDDEN` |
-| Inheritance (`Child : Base := ...`) | `AMP_INHERITANCE_FORBIDDEN` |
+| Objects (`{ ... }`) in value position | 3100 `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` |
+| `$` VarRef | 3100 `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` |
+| Attributes (`@[...]`), module-level or per-statement | 3100 `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` |
+| Inheritance (`Child : Base := ...`) | 3100 `ANVL_ERR_PARSER_UNEXPECTED_TOKEN` |
 
+Each of these documents is rejected with 3100 (the parser stops at the first error, so each is its
+own document):
+
+<!-- example: error 3100 -->
 ```anvl
 #!amp
-bad := { x := 1; };   // AMP_OBJECT_FORBIDDEN
-bad := $foo;          // AMP_VARREF_FORBIDDEN
+bad := { x := 1; };   // an object
+```
+
+<!-- example: error 3100 -->
+```anvl
+#!amp
+bad := $foo;          // a VarRef
+```
+
+<!-- example: error 3100 -->
+```anvl
+#!amp
+@[doc_level]          // an attribute
+ok := 1;
+```
+
+<!-- example: error 3100 -->
+```anvl
+#!amp
+Child : Base := 1;    // inheritance
 ```
 
 ## Scalar-only collections — no nesting, ever
 
 An AML array or tuple can contain anything, including other arrays and
-objects. AMP's cannot — every element must itself be a scalar (or a blob).
+objects. AMP's cannot — every element must itself be a scalar (or a blob). A
+collection element that is not is `ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR` (4401),
+including an object inside a tuple or an array:
 
+<!-- example: error 4401 -->
 ```anvl
 #!amp
-bad := [[1, 2]];          // AMP_ARRAY_ELEMENT_NOT_SCALAR
-bad := [(1, 2)];          // AMP_ARRAY_ELEMENT_NOT_SCALAR
-bad := (1, { x := 2; });  // AMP_OBJECT_FORBIDDEN (object takes precedence over the generic "not scalar" code)
+bad := [[1, 2]];
+```
+
+<!-- example: error 4401 -->
+```anvl
+#!amp
+bad := [(1, 2)];
+```
+
+<!-- example: error 4401 -->
+```anvl
+#!amp
+bad := (1, { x := 2; });
 ```
 
 ## Why the distinction matters

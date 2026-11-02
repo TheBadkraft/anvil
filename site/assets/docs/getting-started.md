@@ -49,9 +49,17 @@ yourself" — an easy mistake to make once, since an empty parse never reports a
 
 ## 3. Loading a Document
 
-Two ways in, otherwise identical:
+Two ways in, otherwise identical. Given a `config.anvl` file:
 
+<!-- example: setup config.anvl -->
+```anvl
+#!aml
+name := David;
+```
+
+<!-- example: uses config.anvl -->
 ```c
+const char *source = "#!aml\nname := David;\n";
 anvil_document from_file   = anvil_load("config.anvl");
 anvil_document from_buffer = anvil_load_buffer(source, strlen(source));
 ```
@@ -60,6 +68,13 @@ A **failed** parse still gives you a real, usable handle — `anvil_load`/`anvil
 return `NULL` for the one truly foundational failure (the handle itself couldn't be allocated).
 Check `anvil_has_errors`, and read the detail with `anvil_document_get_error`:
 
+<!-- example: setup bad-doc -->
+```c
+const char *bad = "#!aml\nname David;\n";   // the ':=' is missing
+anvil_document doc = anvil_load_buffer(bad, strlen(bad));
+```
+
+<!-- example: uses bad-doc -->
 ```c
 if (anvil_has_errors(doc)) {
    anvil_error err = anvil_document_get_error(doc);
@@ -77,6 +92,7 @@ full category table.
 
 The examples below assume this document, loaded once:
 
+<!-- example: setup config -->
 ```c
 const char *config =
    "#!aml\n"
@@ -93,6 +109,7 @@ anvil_document doc = anvil_load_buffer(config, strlen(config));
 `anvil_document_get_statements` returns a heapless iterator over a document's own top-level
 statements, in declaration order:
 
+<!-- example: uses config -->
 ```c
 anvil_statement_iterator it = anvil_document_get_statements(doc);
 anvil_statement stmt = NULL;
@@ -104,6 +121,7 @@ while (anvil_statement_iterator_next(it, &stmt)) {
 anvil_statement_iterator_dispose(it);
 ```
 
+<!-- example: output -->
 ```
 statement: host
 statement: port
@@ -123,6 +141,7 @@ view, which resolves a string's escape sequences (`anvil_value_get_numeric` read
 arrays and tuples are indexed via `anvil_value_get_count`/`anvil_value_get_element`; objects are
 walked the same way `anvil_statement`s are (`anvil_value_get_count`/`anvil_value_get_statement`):
 
+<!-- example: setup print_value -->
 ```c
 void print_value(anvil_value val, int depth) {
    switch (anvil_value_get_type(val)) {
@@ -152,16 +171,32 @@ void print_value(anvil_value val, int depth) {
 }
 ```
 
-Running that over `config`'s three statements:
+Call it on each of `config`'s three statements:
 
+<!-- example: uses config print_value -->
+```c
+anvil_statement_iterator it = anvil_document_get_statements(doc);
+anvil_statement stmt = NULL;
+while (anvil_statement_iterator_next(it, &stmt)) {
+   char name[64] = {0};
+   anvil_statement_get_name(stmt, name, sizeof(name));
+   printf("%s:\n", name);
+   print_value(anvil_statement_get_value(stmt), 1);
+}
+anvil_statement_iterator_dispose(it);
+```
+
+It prints:
+
+<!-- example: output -->
 ```
 host:
   localhost
 port:
   8080
 tags:
-  alpha
-  beta
+    alpha
+    beta
 ```
 
 A resolved `$identifier` VarRef needs no special case here — `anvil_value_get_type` reports
@@ -171,6 +206,7 @@ whatever the reference resolved *to*, transparently (see `language-reference.md`
 
 When you know what you want, skip the walk:
 
+<!-- example: uses config -->
 ```c
 anvil_statement port = anvil_document_find_statement(doc, "port");
 if (port) {
@@ -185,6 +221,7 @@ if (port) {
 Module-level attributes (in the document header) and statement-level ones (`@[...]` on an
 individual statement) are read the same shape of way, just off a different handle:
 
+<!-- example: uses config -->
 ```c
 anvil_attribute env = anvil_document_find_attribute(doc, "env");
 if (env) {
@@ -205,7 +242,10 @@ attribute a document or statement carries.
 the value itself, use the value handle: `anvil_attribute_get_value_handle(attr)` returns an
 `anvil_value` (or NULL for a flag attribute), so the ordinary value calls apply:
 
+<!-- example: uses config -->
 ```c
+anvil_attribute attr = anvil_document_find_attribute(doc, "env");
+char buf[32] = {0};
 anvil_value v = anvil_attribute_get_value_handle(attr);
 if (v) {
    anvil_value_get_type(v);    // ANVIL_VALUE_STRING for "done", BARE for production, NUMERIC for 42, ...
@@ -222,7 +262,19 @@ A value that isn't a single scalar (`@[range=1..5]`) reads as a BARE value of it
 graph) — useful any time you need to reach into what a document pulled in, the same iterator
 shape as statements:
 
+For example, a document that includes `base.anvl`:
+
+<!-- example: setup base.anvl -->
+```anvl
+#!aml
+base_name := common;
+```
+
+<!-- example: uses base.anvl -->
 ```c
+const char *src = "#!aml\ninclude \"base.anvl\";\nmain := 1;\n";
+anvil_document doc = anvil_load_buffer(src, strlen(src));
+
 anvil_document_iterator it = anvil_document_get_includes(doc);
 anvil_document includeed = NULL;
 while (anvil_document_iterator_next(it, &includeed)) {

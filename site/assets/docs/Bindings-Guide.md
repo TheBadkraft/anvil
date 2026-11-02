@@ -128,6 +128,8 @@ and on `require('anvil.js')`, so you can compare against the names instead of th
 
 ```js
 import { Schema, TypeRegistry, SchemaErrorCode, TypeErrorCode, lastError } from 'anvil.js';
+
+const text = '#!aml\nname := "widget";\n';   // a document without @[schema]
 if (Schema.load(text) === null && lastError().code === SchemaErrorCode.ATTRIBUTE_MISSING) { /* no @[schema] */ }
 ```
 
@@ -140,6 +142,7 @@ found, which is the include error 4204. It applies to `parse`, `TypeRegistry.fro
 no async form and no caching; `setIo(null)` removes the reader (in Node, the file system is the default again). Fetch
 what the document includes first, put it in a map, and install it:
 
+<!-- example: fragment browser code (fetch and top-level await) -->
 ```js
 const files = new Map();
 files.set('./schema-gen/assets.types.anvl', await (await fetch('/schema-gen/assets.types.anvl')).text());
@@ -243,6 +246,8 @@ What the headers cover:
 ```c
 #include "anvil_flat.h"
 
+const char *source = "#!aml\nhost := localhost;\n";
+size_t source_len = strlen(source);
 anvil_document doc = anvil_load_buffer(source, source_len);
 if (anvil_has_errors(doc)) {
     anvil_error err = anvil_document_get_error(doc);
@@ -289,6 +294,7 @@ the core reader, the type registry, AnvilSchema and the writer and builder.
 npm install ./anvil-wasm-v0.11.0-rc.tar.gz
 ```
 
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 const anvil = require('anvil-wasm');
 ```
@@ -320,6 +326,7 @@ Load the prebuilt bundle with a `<script>` tag. It needs no bundler and no `requ
 worker can cache it. By default `ready()` fetches it from **next to the script**: serve both files
 from one directory, or say where the `.wasm` is:
 
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 await anvl.ready({ wasmUrl: '/assets/anvil.wasm' });
 // or Emscripten's own hook, called with 'anvil.wasm' and the script's directory:
@@ -336,6 +343,7 @@ needs it, and without it Emscripten falls back to a slower path.
 
 **Service worker.** To start offline, precache both files from the same URLs the page uses:
 
+<!-- example: fragment service-worker code -->
 ```js
 // sw.js
 const ASSETS = ['/vendor/anvil/anvil.browser.js', '/vendor/anvil/anvil.wasm'];
@@ -354,6 +362,7 @@ reinstall a new build of the same version, delete `node_modules/anvil-wasm` firs
 Instantiating a WASM module takes a moment, so you pay that cost once, explicitly, before doing
 anything else:
 
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 const anvil = require('anvil-wasm');
 
@@ -382,6 +391,7 @@ reference. The differences are these:
   `loadFile` and `fromIncludesFile` resolve includes beside the file; the text loaders (`load`,
   `fromIncludes`) resolve them against the filesystem root, `/`.
 
+  <!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
   ```js
   anvil.writeFile('/schemas/types.anvl', typesText);
   const schema = anvil.Schema.loadFile('/schemas/asset.anvl');
@@ -421,6 +431,8 @@ npm does not refresh a `file:` or tarball dependency whose version has not chang
 reinstall a new build of the same version, delete `node_modules/anvil-node` first, then install;
 otherwise npm keeps the old copy.
 
+<!-- example: setup node-doc -->
+<!-- example: alias anvil-node -->
 ```js
 const anvil = require('anvil-node');
 
@@ -429,6 +441,8 @@ const doc = anvil.parse('#!aml\nserver := { host := "localhost"; port := 8080; }
 
 `parse()` never throws on a syntax error — it returns `null` instead. Always check the result:
 
+<!-- example: uses node-doc -->
+<!-- example: alias anvil-node -->
 ```js
 if (!doc) {
   const err = anvil.lastError();
@@ -505,7 +519,10 @@ error at every depth, fragments included: for `5.`, `-5.`, `5.e3`, `1e`, `1e+` a
 An `AnvlStatement` has `name`, `value` (an `AnvlNode`), `attributes` and `findAttribute(key)`. Each
 attribute has two readings of the same text:
 
+<!-- example: alias anvil-node -->
 ```js
+const anvil = require('anvil-node');
+
 const doc = anvil.parse('#!aml\n@[version="1.2"]\nticket @[type=bug, urgent] := { id := 7; };\n');
 
 doc.findAttribute('version').value;          // '"1.2"'  raw source text, quotes kept
@@ -533,8 +550,13 @@ A repeated name inside an object is kept: for `{ a := 1; a := 2; b := 3; }`, `co
 
 Both work over ANVL **text**, not JS objects (ANVL is not JSON; objects use `:=`):
 
+<!-- example: alias anvil-node -->
 ```js
 const { Schema, TypeRegistry, SchemaViolation } = require('anvil-node');
+
+const schemaText = '#!aml\n@[schema]\nasset_id := { type := Numeric; required := true; };\nname := { type := String; };\n';
+const dataText   = '#!aml\nname := "widget";\n';
+const typesText  = '#!aml\n@[types]\nVIN := { type := String; size := 17; };\n';
 
 const schema = Schema.load(schemaText);         // text of a document carrying @[schema]
 const result = schema.validate(dataText);       // { valid, violations: [{ category, field, message }] }
@@ -583,6 +605,7 @@ offset); see the [types reference](types-reference.md#formats).
 
 ### Writing: `AnvilWriter` and `AnvilBuilder`
 
+<!-- example: alias anvil-node -->
 ```js
 const { AnvilWriter, AnvilBuilder, AnvilDialect } = require('anvil-node');
 
@@ -621,7 +644,10 @@ exposed yet in Node.js or WebAssembly (the Python and .NET bindings have `blob_t
 No `AnvlNode` wrapper at all, just a plain JS value straight back. Parses a **Value Fragment** —
 a single value expression, no shebang, no enclosing statement required:
 
+<!-- example: alias anvil-node -->
 ```js
+const anvil = require('anvil-node');
+
 anvil.parseRawValue('[(1,2), (3,4)]');
 // -> [[1, 2], [3, 4]]
 ```
@@ -677,6 +703,17 @@ a tree.
   number unless you pass one (see [the version string](Bindings-Guide.md#the-version-string)).
 - No other runtime dependencies once built.
 
+With a `config.anvl` like this:
+
+<!-- example: setup config.anvl -->
+```anvl
+server := {
+    host := localhost;
+    port := 8080;
+};
+```
+
+<!-- example: uses config.anvl -->
 ```csharp
 using Anvil.Net;
 
@@ -745,7 +782,32 @@ whitespace around it.
 
 ### Type registry and schema
 
+Given an `asset.types.anvl` and an `asset.schema.anvl` that includes it:
+
+<!-- example: setup asset.types.anvl -->
+```anvl
+#!aml
+@[types]
+
+AssetYear := { type := Numeric; integer := true; min := 1900; max := 2100; };
+```
+
+<!-- example: setup asset.schema.anvl -->
+<!-- example: uses asset.types.anvl -->
+```anvl
+#!aml
+include "asset.types.anvl";
+@[schema]
+
+name   := { type := String; required := true; };
+status := { type := enum; values := [ active, retired ]; };
+year   := { type := types.AssetYear; };
+```
+
+<!-- example: uses asset.schema.anvl asset.types.anvl -->
 ```csharp
+using Anvil.Net;
+
 using var schemaDoc = AnvilDocument.Load("asset.schema.anvl");   // carries @[schema]; may include @[types]
 using var schema = AnvilSchema.Load(schemaDoc)!;                  // null if it has no @[schema]
 
@@ -787,6 +849,8 @@ Equivalent to `parseRawValue()` on the Node/WASM bindings, but returns a real `A
 than a plain JS value — no enclosing document/statement context required:
 
 ```csharp
+using Anvil.Net;
+
 using var frag = AnvilDocument.ParseValueFragment("[(1,2,3),(4,5,6)]");
 if (frag?.FragmentValue is { Type: AnvilValueType.Array } rows)
 {
@@ -797,6 +861,8 @@ if (frag?.FragmentValue is { Type: AnvilValueType.Array } rows)
 ### Writing: `AnvilWriter` and `AnvilBuilder`
 
 ```csharp
+using Anvil.Net;
+
 using var w = AnvilWriter.Create(AnvilDialect.Aml);        // streaming: forward-only, chainable
 string text = w.Statement("server").BeginObject()
     .Statement("host").Bare("localhost")
@@ -861,6 +927,7 @@ not a synthetic namespace object or a class used purely for grouping.
   native library reports.
 - No other runtime dependencies once built.
 
+<!-- example: uses config.anvl -->
 ```python
 from anvil import AnvilDocument, ValueType
 
@@ -931,6 +998,9 @@ whitespace around it.
 
 ### Type registry and schema
 
+With the same `asset.types.anvl` and `asset.schema.anvl` as in the C# section:
+
+<!-- example: uses asset.schema.anvl asset.types.anvl -->
 ```python
 from anvil import AnvilDocument, AnvilSchema, AnvilTypeRegistry
 
@@ -969,6 +1039,8 @@ with AnvilDocument.load("asset.types.anvl") as types_doc, AnvilTypeRegistry.load
 ### `parse_value_fragment` / `.fragment_value` — for when you already know the shape
 
 ```python
+from anvil import AnvilDocument, ValueType
+
 with AnvilDocument.parse_value_fragment("[(1,2,3),(4,5,6)]") as frag:
     rows = frag.fragment_value
     if rows is not None and rows.type == ValueType.ARRAY:
