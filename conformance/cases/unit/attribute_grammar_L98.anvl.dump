@@ -1,6 +1,6 @@
-anvil-dump 1
+anvil-dump 2
 mode document
 input-bytes 21
 status error
 dialect AML
-error code=4012 name=ANVL_ERR_PARSER_INVALID_ATTRIBUTE category=2 category-name=ANVIL_ERR_HEADER line=1 column=3 message="The attribute identifier is invalid"
+error code=4012 name=ANVL_ERR_PARSER_INVALID_ATTRIBUTE category=2 category-name=ANVIL_ERR_HEADER line=1 column=3 source="" message="The attribute identifier is invalid"

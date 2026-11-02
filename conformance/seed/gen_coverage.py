@@ -105,6 +105,12 @@ put(I + "pos_path_too_long.anvl", '// c\n   include "%s";\nx := 1;\n' % ("b" * 1
 put(I + "src_root.anvl", 'include "sub/src_m.anvl";\nx := 1;\n')
 put(I + "sub/src_m.anvl", '\ninclude "../sub/src_n.anvl";\nm := 1;\n')
 put(I + "sub/src_n.anvl", '// leaf\n\nn := 1e;\n')                                              # 3:6
+# resolve errors with a position belong to the document that holds the statement (children are resolved first)
+put(I + "src_dup_child.anvl", '\n\nx := 1;\n')
+put(I + "src_dup_root.anvl", 'include "src_dup_child.anvl";\nx := 2;\n')                           # 4053, in src_dup_child 3:1
+put(I + "src_inherit_child.anvl", '\n\nz : q := { a := 1; };\n')
+put(I + "src_inherit_root.anvl", 'include "src_inherit_child.anvl";\nq := 1;\n')                   # 4020, in src_inherit_child 3:5
+put(I + "src_inherit_in_root.anvl", 'include "leaf_a.anvl";\nz : a := { b := 1; };\n')            # 4020, in the root 2:5
 
 # ------------------------------------------------------------------------------------------------ nesting
 N = "nesting/"

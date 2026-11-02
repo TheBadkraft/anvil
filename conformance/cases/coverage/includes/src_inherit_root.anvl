@@ -1,0 +1,2 @@
+include "src_inherit_child.anvl";
+q := 1;
