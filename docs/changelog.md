@@ -35,6 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolves testbit beside the repo, then `~/Projects/repos/testbit`, and exits 2 "testbit not found" instead of
   reporting bogus results; `--make-var NAME=VALUE` (repeatable, e.g. `BUILD_NUM=500`; without it make takes the
   commit count from the scratch clone); the cache key includes the testbit path and make variables.
+  Mandatory use (2026-11-02): a `python` adapter (`--adapter python`, auto-picked for a range that only touches
+  `scripts/` or `.claude/hooks/`) runs every `test_*.py` there through `scripts/tdd/python-runner.py` and separates
+  an assertion failure from any other error or an import crash. A complete run with every commit PASS writes
+  `<git-common-dir>/check-tdd/pass/<head-sha>.json` (`head, base, range, adapter, checker_version, checker_commit,
+  date, commits, result`); `check-tdd.py --has-pass <repo> <sha>` exits 0 if one exists and 1 if not, and runs
+  nothing. `.claude/hooks/require-tdd-pass.py` (PreToolUse, Bash) refuses `git merge` of a `feat/ fix/ tools/ perf/
+  chore/` branch (with or without `origin/`; also `git -C dir merge` and `cd dir && git merge`) unless a pass record
+  exists for that exact sha. `release/`, `integration/`, `docs/`, aborts and refs that do not resolve are not its
+  business. A file `<git-common-dir>/check-tdd/override/<sha>`, created only by the Principal Engineer on the owner's
+  explicit words, lets one merge through and is reported. It fails open on an internal error. Both hooks split
+  commands on `| ; &` only outside quotes, so `require-memcap.py` no longer refuses a quoted grep pattern that
+  mentions a runtime. Hook tests are `.claude/hooks/test_*.py`. Register `require-tdd-pass.py` in
+  `.claude/settings.json` to enable it. The result cache is only `--cache`, keyed by repo identity (the git common
+  dir), sha, adapter version and setup (testbit, make variables, `--no-compat`); a result of a suite that did not
+  run, or whose vendored pin was missing, is never written. The summary separates `cache_hits` (files from an
+  earlier invocation) from `reused` (a parent computed earlier in the same run); before, both were reported as
+  "cached", so a fresh cache showed most runs as cached.
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
   native-owned corpus that a second implementation (the schema phase of anvil.js) must reproduce byte for byte. A
