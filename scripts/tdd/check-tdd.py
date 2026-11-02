@@ -292,17 +292,35 @@ class NativeAdapter(Adapter):
         return {"ran": True, "tests": tests, "note": ""}
 
 
-def pick_adapter(repo, name, changed=None):
-    if name == "python":
-        return PythonAdapter()
-    if name == "node" or (name == "auto" and os.path.exists(os.path.join(repo, "package.json"))):
-        return NodeAdapter()
+ADAPTERS = {"node": NodeAdapter, "native": NativeAdapter, "python": PythonAdapter}
+
+
+def detect_adapter(repo, changed, head=None):
+    """The adapter this repo needs for a range: node for a package.json repo, python for a range that only touches
+    tooling (scripts/, .claude/hooks/), native for a test/unit repo. With `head`, the tree of that commit is read, so
+    the answer does not depend on what is checked out. None when nothing decides."""
+    def has(path):
+        if head:
+            return subprocess.run(["git", "-C", repo, "cat-file", "-e", "%s:%s" % (head, path)], capture_output=True).returncode == 0
+        return os.path.exists(os.path.join(repo, path))
+    if has("package.json"):
+        return "node"
     native_paths = ("src/", "include/", "test/")
-    if name == "auto" and changed and not any(under(f, native_paths) for f in changed) and any(under(f, PythonAdapter.roots) for f in changed):
-        return PythonAdapter()  # a range that only touches tooling is checked against the tooling's own tests
-    if name == "native" or (name == "auto" and os.path.isdir(os.path.join(repo, "test", "unit"))):
-        return NativeAdapter()
-    raise SystemExit("check-tdd: cannot pick an adapter for %s (use --adapter node|native)" % repo)
+    if changed and not any(under(f, native_paths) for f in changed) and any(under(f, PythonAdapter.roots) for f in changed):
+        return "python"
+    return "native" if has("test/unit") else None
+
+
+def pick_adapter(repo, name, changed=None, head=None):
+    detected = detect_adapter(repo, changed, head)
+    if name == "auto":
+        if not detected:
+            raise SystemExit("check-tdd: cannot pick an adapter for %s (use --adapter node|native|python)" % repo)
+        return ADAPTERS[detected]()
+    if detected and detected != name:
+        raise SystemExit("check-tdd: --adapter %s contradicts the detection: this repo and range need %s. Running %s here would "
+                         "measure the wrong suite." % (name, detected, name))
+    return ADAPTERS[name]()
 
 
 # ---------------------------------------------------------------------------------------------
@@ -446,6 +464,9 @@ def judge(kind, parent, cur, facts, state, opts):
             notes.append("RED replaces tests: %d from the parent no longer run: %s" % (len(removed), summarize(removed)))
         if facts["product_lines"]:
             notes.append("product code changed (%d lines): stubs only?" % facts["product_lines"])
+        weakened = {t for r in state["open_reds"] for t in r["pending"] if t not in ct}
+        if weakened:
+            reasons.append("RED weakens an open RED: %d of its still failing test(s) are gone or renamed: %s" % (len(weakened), summarize(weakened)))
         if newfail and not bad:
             state["open_reds"].append({"sha": facts["sha"], "files": set(facts["test_files"]), "pending": set(newfail)})
 
@@ -469,8 +490,6 @@ def judge(kind, parent, cur, facts, state, opts):
                 notes.append(msg)
             else:
                 reasons.append(msg)
-            if len(flipped) > opts.batch_limit:
-                reasons.append("batch: %d tests flipped at once (limit %d without [tests:])" % (len(flipped), opts.batch_limit))
         else:
             unmatched = [n for n in names if not any(name_matches(n, t) for t in flipped)]
             if unmatched:
@@ -479,6 +498,8 @@ def judge(kind, parent, cur, facts, state, opts):
             data["flipped_beyond_named"] = len(extra)
             if extra:
                 reasons.append("batch: %d test(s) flipped beyond the named: %s" % (len(extra), summarize(extra)))
+        if len(flipped) > opts.batch_limit:  # naming a whole test file does not escape the batch rule
+            reasons.append("batch: %d tests flipped at once (limit %d)" % (len(flipped), opts.batch_limit))
         if facts["product_lines"] > opts.max_green_lines:
             reasons.append("batch: product diff of %d lines (limit %d) for %d flipped test(s)" % (facts["product_lines"], opts.max_green_lines, len(flipped)))
         notes.append("flipped %d, product diff %d lines" % (len(flipped), facts["product_lines"]))
@@ -694,7 +715,7 @@ def write_pass_record(repo, base_sha, head_sha, opts, adapter, count):
     rec = {"head": head_sha, "base": base_sha, "range": opts.range, "adapter": adapter.name, "checker_version": CHECKER_VERSION,
            "checker_commit": commit, "date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "commits": count, "result": "pass",
            "options": {"lenient_tests": bool(opts.lenient_tests), "batch_limit": opts.batch_limit,
-                       "max_green_lines": opts.max_green_lines, "no_compat": bool(opts.no_compat)}}
+                       "max_green_lines": opts.max_green_lines, "no_compat": bool(opts.no_compat), "first_parent": bool(opts.first_parent)}}
     d = pass_dir(repo)
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, head_sha + ".json.tmp"), "w") as f:
@@ -735,7 +756,7 @@ def main(argv=None):
     base, head = opts.range.split("..")
     try:
         base_sha = git(repo, "rev-parse", base + "^{commit}").strip()
-        adapter = pick_adapter(repo, opts.adapter, git(repo, "diff", "--name-only", base_sha, head).split())
+        adapter = pick_adapter(repo, opts.adapter, git(repo, "diff", "--name-only", base_sha, head).split(), git(repo, "rev-parse", head + "^{commit}").strip())
         walk = ["rev-list", "--reverse"] + (["--first-parent"] if opts.first_parent else ["--no-merges", "--topo-order"]) + ["%s..%s" % (base_sha, head)]
         shas = git(repo, *walk).split()
     except (RuntimeError, SystemExit) as e:
