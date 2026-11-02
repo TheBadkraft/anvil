@@ -36,7 +36,7 @@ typedef struct {
 
 enum { V_DIALECT, V_BUILDER2, V_OPTION, V_GET_ERROR, V_ERROR_MESSAGE, V_ATTRIBUTE, V_ATTRIBUTE_STRING, V_INCLUDE,
        V_NULL, V_BOOL, V_NUMERIC, V_INT, V_DOUBLE, V_STRING, V_BARE, V_BLOB, V_VARREF, V_ARRAY, V_TUPLE, V_OBJECT,
-       V_APPEND, V_ADD, V_SET_BASE, V_MEMBER_ATTRIBUTE, V_MEMBER_ATTRIBUTE_STRING, V_FIND, V_EMIT, V_WRITE, V_COUNT };
+       V_APPEND, V_ADD, V_SET_BASE, V_SET_BLOCK, V_MEMBER_ATTRIBUTE, V_MEMBER_ATTRIBUTE_STRING, V_FIND, V_EMIT, V_WRITE, V_COUNT };
 
 // Parameter kinds: P pointer or NULL; S bytes or NULL plus an optional length; I int64; B bool; D double; E dialect
 // (AML, AMP or an integer); O option name and value; N node handle; M member handle; W writer dialect (AML, AMP, NULL).
@@ -70,6 +70,7 @@ static const struct {
    [V_APPEND] = {"append", "NN", 2, 0},
    [V_ADD] = {"add", "NPN", 3, 'M'},
    [V_SET_BASE] = {"set_base", "MP", 2, 0},
+   [V_SET_BLOCK] = {"set_block", "MB", 2, 0},
    [V_MEMBER_ATTRIBUTE] = {"member_attribute", "MPP", 3, 0},
    [V_MEMBER_ATTRIBUTE_STRING] = {"member_attribute_string", "MPSI", 3, 0},
    [V_FIND] = {"find", "NP", 2, 'M'},
@@ -578,6 +579,9 @@ int builder_script_run(const char *path, const char *emit_dir) {
          result = anvil_builder_add(b, st->slot[0] < 0 ? NULL : values[st->slot[0]], ptr_of(st, 1), st->slot[2] < 0 ? NULL : values[st->slot[2]]);
          break;
       case V_SET_BASE: ok = anvil_builder_set_base(b, st->slot[0] < 0 ? NULL : values[st->slot[0]], ptr_of(st, 1)); break;
+      case V_SET_BLOCK:
+         ok = anvil_builder_set_block(b, st->slot[0] < 0 ? NULL : values[st->slot[0]], strcmp(st->args[1].bytes, "true") == 0);
+         break;
       case V_MEMBER_ATTRIBUTE:
          ok = anvil_builder_member_attribute(b, st->slot[0] < 0 ? NULL : values[st->slot[0]], ptr_of(st, 1), ptr_of(st, 2));
          break;

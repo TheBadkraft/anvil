@@ -133,7 +133,8 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  * On failure the writer's error is also reported by anvil_builder_get_error.
  * Before anything is written, the bases are checked across every member the builder created,
  * including members never attached to the tree. A base names a top-level member, in this order:
- *  - the member it names must be an object (ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT);
+ *  - the member it names must be an object (ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT), and not a
+ *    block-form member (ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM);
  *  - it must exist (ANVIL_WRITER_ERR_MISSING_BASE) - unless the builder holds an include (even one
  *    added after the base was set), because the included file may declare it, so the builder
  *    cannot know and accepts it as before;

@@ -40,4 +40,5 @@ const anvil_writer_i Writer = {
    .end_object = anvil_writer_end_object,
    .finish = anvil_writer_finish,
    .data = anvil_writer_data,
+   .statement_block = anvil_writer_statement_block,
 };

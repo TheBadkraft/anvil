@@ -41,4 +41,5 @@ const anvil_builder_i Builder = {
    .find = anvil_builder_find,
    .write = anvil_builder_write,
    .emit = anvil_builder_emit,
+   .set_block = anvil_builder_set_block,
 };
