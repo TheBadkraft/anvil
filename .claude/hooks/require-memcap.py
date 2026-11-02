@@ -14,10 +14,48 @@ WRAPPERS = {"taskset", "nice", "ionice", "timeout", "env", "exec", "time", "comm
 SAFE_FLAGS = {"-", "-e", "-p", "-c", "--eval", "--print", "-v", "-V", "--version", "-h", "--help", "-n", "-q"}
 
 
+SEPARATORS = r"\|\||&&|[;&|\n()]"
+
+
+def split_segments(command):
+    """Split into simple commands on shell separators that are outside quotes: a `|` in `grep -E "a|node x"` is a
+    pattern, not a pipe. If the quotes do not balance (an apostrophe in a heredoc body, say), fall back to splitting
+    everywhere, which can only make the hook stricter."""
+    segs, cur, quote, i = [], [], None, 0
+    while i < len(command):
+        c = command[i]
+        if quote:
+            cur.append(c)
+            if c == "\\" and quote == '"' and i + 1 < len(command):
+                i += 1
+                cur.append(command[i])
+            elif c == quote:
+                quote = None
+        elif c in "'\"":
+            quote = c
+            cur.append(c)
+        elif c == "\\" and i + 1 < len(command):
+            cur.append(c)
+            i += 1
+            cur.append(command[i])
+        else:
+            m = re.match(SEPARATORS, command[i:])
+            if m:
+                segs.append("".join(cur))
+                cur = []
+                i += len(m.group(0))
+                continue
+            cur.append(c)
+        i += 1
+    if quote:
+        return re.split(SEPARATORS, command)
+    segs.append("".join(cur))
+    return segs
+
+
 def first_words(command):
-    # Split into simple commands on shell separators; heredoc bodies become their own lines
-    # and only count if a line itself starts with a heavy runtime.
-    for seg in re.split(r"\|\||&&|[;&|\n()]", command):
+    # Heredoc bodies become their own lines and only count if a line itself starts with a heavy runtime.
+    for seg in split_segments(command):
         seg = seg.strip()
         if not seg:
             continue
