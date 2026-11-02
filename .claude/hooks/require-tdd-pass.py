@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 
 SEPARATORS = r"\|\||&&|[;&|\n()]"
@@ -104,7 +105,73 @@ def is_guarded(ref):
     return bool(GUARDED.match(ref))
 
 
+def git_out(directory, *args):
+    p = subprocess.run(["git", "-C", directory, *args], capture_output=True, text=True)
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def valid_record(path, sha):
+    try:
+        with open(path) as f:
+            rec = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return isinstance(rec, dict) and rec.get("result") == "pass" and rec.get("head") == sha
+
+
+def merge_decision(command, cwd):
+    """("deny", reason), ("overridden", note) or None. A guarded ref that resolves needs
+    <git-common-dir>/check-tdd/pass/<sha>.json from a complete check-tdd run. A file
+    <git-common-dir>/check-tdd/override/<sha> lets one merge through: only the Principal Engineer creates it,
+    and only on the owner's explicit words. A ref that does not resolve is git's to refuse, not ours."""
+    notes = []
+    for d, ref in merge_targets(command, cwd):
+        if not is_guarded(ref) or not os.path.isdir(d):
+            continue
+        sha = git_out(d, "rev-parse", "--verify", "-q", ref + "^{commit}")
+        common = git_out(d, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        if not sha or not common:
+            continue
+        if valid_record(os.path.join(common, "check-tdd", "pass", sha + ".json"), sha):
+            continue
+        override = os.path.join(common, "check-tdd", "override", sha)
+        if os.path.exists(override):
+            notes.append("check-tdd overridden for %s (%s) by %s" % (ref, sha[:12], override))
+            continue
+        top = git_out(d, "rev-parse", "--show-toplevel") or d
+        base = git_out(d, "merge-base", "HEAD", sha) or "main"
+        return "deny", (
+            "Refused: `git merge %s` (%s) has no check-tdd pass record. Run the checker over the branch, in the foreground "
+            "under the cap, until every commit PASSes: systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 "
+            "-p RuntimeMaxSec=900 -- taskset -c <your cores> python3 scripts/tdd/check-tdd.py %s %s..%s  (add --budget "
+            "and rerun if it stops incomplete; agents/STANDARDS.md section 3). Do not merge around it. The one exception "
+            "is a file %s : only the Principal Engineer creates it, and only on the owner's explicit words."
+            % (ref, sha[:12], top, base[:12], sha, override))
+    if notes:
+        return "overridden", "; ".join(notes)
+    return None
+
+
 def main():
+    try:
+        data = json.load(sys.stdin)
+        command = (data.get("tool_input") or {}).get("command")
+        if command is None:
+            return 0
+        if not isinstance(command, str):
+            raise TypeError("command is %s" % type(command).__name__)
+        if "merge" not in command:
+            return 0
+        res = merge_decision(command, data.get("cwd") or os.getcwd())
+    except Exception as e:  # onFailure is `continue`: a broken guard must not block work
+        print("check-tdd hook error (allowing): %s: %s" % (type(e).__name__, e), file=sys.stderr)
+        return 0
+    if res and res[0] == "deny":
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                                                 "permissionDecisionReason": res[1]}}))
+    elif res:
+        print(res[1], file=sys.stderr)
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": res[1]}}))
     return 0
 
 
