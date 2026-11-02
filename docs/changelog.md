@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     backtick substitutions (also inside double quotes) as commands, parses `bash -c`, `sh -c` and `eval` strings,
     `xargs` and `find -exec`, and exempts a runtime only when a `systemd-run ... MemoryMax` wrapper is in the same
     command as the runtime. A table of 106 commands records the expected verdict for each.
-  - **Tests:** `scripts/tdd/test_check_tdd.py` (95 cases) builds tiny fixture repos with scripted commits;
+  - **Tests:** `scripts/tdd/test_check_tdd.py` (97 cases) builds tiny fixture repos with scripted commits;
     `.claude/hooks/test_require_tdd_pass.py` (32 cases) and `.claude/hooks/test_require_memcap.py` (13 cases) cover
     the hooks. Tooling only; no product code changed.
 
