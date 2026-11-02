@@ -23,8 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section no longer calls the block form `name { ... }` "equivalent" to `name := { ... }` or `:=` "optional": both parse and read
   the same, but the block form is read-only and can never be a base (4052), shown with the `Grand : Child` example. The same
   guide no longer says field merging is not implemented: it now describes the merge as observed in Anvil Native and
-  anvil.js v0.13.1-rc (own and inherited fields visible on the derived object, the nearer definition wins). Docs only;
-  not deployed.
+  anvil.js v0.13.1-rc (own and inherited fields visible on the derived object, the nearer definition wins). Sweep of the
+  guides for calls and features that do not exist: removed the AML guide's `hasBase()`/`baseIdentifier()` snippet
+  (no binding has either) and its hex color literal row (there is no hex literal form); corrected its attribute reading
+  example to the real anvil.js calls (`statement(name).findAttribute(key)`; `hasAttribute` is root only; the example key
+  `doc-level` was not a valid attribute key and is now `doc_level`), and its exponent rule (the sign is optional). Every
+  `anvil_*` call in the C examples and every method name in the Bindings guide was checked against the headers and the
+  anvil.js, anvil.py and anvil.net sources. Docs only; not deployed.
 
 ### Changed
 

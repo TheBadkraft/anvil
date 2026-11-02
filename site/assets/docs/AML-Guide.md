@@ -47,23 +47,19 @@ future.
 
 | Form | Example | Notes |
 |---|---|---|
-| Bare (unquoted) string | `hello`, `1.0.0`, `192.168.1.1` | Any token that isn't an int/float/bool/null/hex |
-| Quoted string | `"hello world"` | Supports `\"`, `\\`, `\n`, `\t`, `\r` |
+| Bare (unquoted) string | `hello`, `1.0.0`, `192.168.1.1` | Any token that isn't an int/float/bool/null |
+| Quoted string | `"hello world"` | Resolves `\"`, `\\`, `\n`, `\t`, `\r`; any other backslash sequence is kept as written (no `\u`, no `\x`). See the [language reference](language-reference.md) |
 | Integer | `42`, `-7` | |
 | Float | `3.14`, `5e+10`, `5.2e-3` | Requires a `.`, or exponent notation |
 | Boolean | `true`, `false` | |
 | Null | `null` | |
-| Hex color | `#RRGGBB`, `#RGB` | 3-digit expands to 6; `.asInt()` gives the numeric value, `.asString()` gives the canonical uppercase 6-digit form |
 
-A bare `#` that isn't a valid hex color is a parse error
-(`BARE_HASH_NOT_HEX`) — it's never treated as a comment.
+There is no hex color literal. `#` starts nothing in a value position, so `c := #f0a;` is a parse
+error (`ANVL_ERR_PARSER_EXPECTED_VALUE`); quote it (`"#f0a"`) to store it as text.
 
-**Exponent notation requires a mandatory sign.** `5e+10` and `5e-10` are
-valid; `5e10` is not — the `+`/`-` right after `e`/`E` is required, not
-optional. Anything shaped like an attempted exponent (a numeric mantissa
-immediately followed by `e`/`E`) that doesn't match the mandatory-sign form
-is a parse error (`MALFORMED_EXPONENT`), never a silent fallback to a bare
-string — an author who writes `5e10` clearly meant a number.
+**Exponents.** The sign after `e`/`E` is optional: `5e10`, `5e+10`, `5e-10` and `5.2E3` are all
+numbers. A malformed exponent (`1e`, `1e+`, `1e-`) is a parse error. See the
+[language reference](language-reference.md) for the full number grammar.
 
 ## Objects
 
@@ -97,19 +93,19 @@ empty and single-element tuples are both parse errors.
 Flag attributes (no value) and `key=value` attributes can mix freely:
 
 ```anvl
-@[doc-level]
+@[doc_level]
 server @[env = production, active] := {
     host @[required] := localhost;
 };
 ```
 
 ```js
-node.hasAttribute('doc-level'); // true -- module-level attributes are visible on the root itself
+doc.hasAttribute('doc_level');   // true -- module-level attributes are read on the root (the document)
 
-const server = node.get('server');
-server.hasAttribute('env');    // true
-server.attribute('env');       // "production"
-server.hasAttribute('active'); // true (flag attribute — value is "")
+const server = doc.statement('server');
+server.findAttribute('env').value;      // "production"
+server.findAttribute('active').value;   // null -- a flag attribute has no value
+server.attributes.map(a => a.key);      // ['env', 'active']
 ```
 
 Attribute values are always strings; the parser never interprets them.
@@ -143,12 +139,6 @@ That is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (4052). The error is reported a
 that inherits, not at the statement that chose the block form, so choose the block form only for
 an object nothing will inherit from. A block can still have a base (`Child : Base { ... };`); it
 just can't be one.
-
-```js
-const child = node.get('Child');
-child.hasBase();        // true
-child.baseIdentifier(); // "Base"
-```
 
 **Inheritance always requires an object value.** `Child : Base := 42;`,
 `Child : Base := [1, 2];`, and a blob are all parse errors
