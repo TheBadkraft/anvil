@@ -168,7 +168,7 @@ class GreenRules(Base):
 
     def test_green_naming_a_file_covers_its_tests(self):
         b = red_then(self.fx)
-        self.fx.commit("T-1: GREEN. ops [tests: ops.test.js]", {"src/lib.js": FULL})
+        self.fx.commit("T-1: GREEN. ops [tests: test/ops.test.js]", {"src/lib.js": FULL})
         self.assertPasses(b)
 
     def test_green_naming_a_test_that_did_not_flip_fails(self):
@@ -211,8 +211,8 @@ class GreenRules(Base):
 
     def test_red_closes_once_its_tests_pass(self):
         b = red_then(self.fx)
-        self.fx.commit("T-1: GREEN. all [tests: ops.test.js]", {"src/lib.js": FULL})
-        self.fx.commit("T-1: GREEN. add a case [tests: lib.test.js > add]", {
+        self.fx.commit("T-1: GREEN. all [tests: test/ops.test.js]", {"src/lib.js": FULL})
+        self.fx.commit("T-1: GREEN. add a case [tests: test/lib.test.js > add]", {
             "test/ops.test.js": TESTJS + case("mul", "assert.strictEqual(lib.mul(2, 3), 6);") + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);") + case("extra", "assert.ok(true);"),
             "test/lib.test.js": TESTJS + case("add", "assert.strictEqual(lib.add(1, 2), 4);")})
         rc, commits, _ = self.check(b)
@@ -266,10 +266,26 @@ class CompatSuite(Base):
         self.fx.commit("T-1: RED. x", {"test/compat/x.test.js": "const test = require('node:test'); test('x', () => { require('assert').strictEqual(1, 2); });\n"})
         self.assertPasses(b)
 
-    def test_no_compat_skips_it(self):
+    def test_no_compat_is_refused_when_the_repo_has_a_compat_script(self):
         b = self.compat_repo()
         self.fx.commit("T-1: RED. x", {"test/compat/x.test.js": "const test = require('node:test'); test('x', () => { require('assert').strictEqual(1, 2); });\n"})
-        self.assertFails(b, "no test newly fails", "--no-compat")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc, commits, _ = self.check(b, "--no-compat")
+        self.assertEqual((rc, commits), (2, []))
+        self.assertIn("--no-compat", err.getvalue())
+
+    def test_a_compat_run_with_no_events_is_a_setup_error(self):
+        b = self.fx.commit("init", {
+            "package.json": json.dumps({"name": "fx", "scripts": {"test": "node --test test/*.test.js", "compat": "node scripts/compat.js"}}),
+            "scripts/compat.js": "process.exit(0);\n", "src/lib.js": "exports.add = (a, b) => a + b;\n",
+            "test/lib.test.js": TESTJS + case("add", "assert.strictEqual(lib.add(1, 2), 3);")})
+        self.fx.commit("T-1: REFACTOR. x", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc, commits, _ = self.check(b)
+        self.assertEqual((rc, commits), (2, []))
+        self.assertIn("compat", err.getvalue())
 
 
 class PerfRules(Base):
@@ -646,6 +662,89 @@ class PythonSuite(PyBase):
         self.fx.commit("T-1: RED. mul", {"scripts/lib.py": STUB_MUL, "scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
         rc, commits, s = self.check(b)
         self.assertEqual((s.get("adapter"), [c["status"] for c in commits]), ("python", ["PASS"]), commits)
+
+
+class ExactTestNames(Base):
+    def test_a_substring_does_not_name_a_test(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: mu]", {"src/lib.js": MUL_ONLY})
+        self.assertFails(b, "named test(s) did not flip: mu")
+
+    def test_the_basename_of_a_test_file_is_not_its_path(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. ops [tests: ops.test.js]", {"src/lib.js": FULL})
+        self.assertFails(b, "named test(s) did not flip: ops.test.js")
+
+    def test_a_full_test_id_names_a_test(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: test/ops.test.js > mul]", {"src/lib.js": MUL_ONLY})
+        self.assertPasses(b)
+
+    def test_a_tag_in_the_body_counts_once(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul", {"src/lib.js": MUL_ONLY}, body="[tests: mul]\n[tests: mul]")
+        rc, rec = self.last(b)
+        self.assertEqual((rec["status"], rec["data"]["flipped"]), ("PASS", 1), rec)
+
+
+class TestSetRules(Base):
+    def test_an_untagged_commit_that_edits_a_test_fails(self):
+        b = self.fx.base()
+        self.fx.commit("tidy the tests", {"test/lib.test.js": TESTJS + case("add", "assert.ok(true);")})
+        self.assertFails(b, "touches test files without a RED/REFACTOR tag")
+
+    def test_an_untagged_commit_that_deletes_a_test_fails(self):
+        b = self.fx.base()
+        self.fx.commit("drop a test", {"test/lib.test.js": None})
+        self.assertFails(b, "touches test files without a RED/REFACTOR tag")
+
+    def test_a_green_that_deletes_a_failing_test_reduces_the_test_set(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: GREEN. mul [tests: mul]", {"src/lib.js": MUL_ONLY, "test/ops.test.js": None})
+        self.assertFails(b, "reduces the test set")
+
+    def test_a_red_that_replaces_tests_is_a_note(self):
+        b = self.fx.base()
+        self.fx.commit("T-1: RED. replace add", {"test/lib.test.js": TESTJS + case("add2", "assert.strictEqual(lib.add(2, 2), 5);")})
+        rec = self.assertPasses(b)
+        self.assertIn("replaces", " ".join(rec["notes"]))
+
+
+class SetupErrors(Base):
+    def test_a_missing_vendor_pin_is_a_setup_error_not_a_verdict(self):
+        b = self.fx.base()
+        self.fx.run("update-index", "--add", "--cacheinfo", "160000,%s,vendor/anvil" % ("a" * 40))
+        self.fx.run("commit", "-q", "-m", "T-1: REFACTOR. pin")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc, commits, _ = self.check(b)
+        self.assertEqual((rc, commits), (2, []))
+        self.assertIn("vendor/anvil", err.getvalue())
+
+
+class PassRecordOptions(Base):
+    def good_chain(self):
+        b = self.fx.base()
+        return b, self.fx.commit("T-1: REFACTOR. add", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+
+    def record(self, head):
+        common = self.fx.run("rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+        path = os.path.join(common, "check-tdd", "pass", head + ".json")
+        return json.load(open(path)) if os.path.exists(path) else None
+
+    def test_the_record_carries_the_options_of_the_run(self):
+        b, head = self.good_chain()
+        self.check(b, "--lenient-tests", "--batch-limit", "30", "--max-green-lines", "400")
+        rec = self.record(head)
+        self.assertEqual(rec and rec.get("options"), {"lenient_tests": True, "batch_limit": 30, "max_green_lines": 400, "no_compat": False})
+
+    def test_a_failing_run_removes_the_pass_record_of_that_head(self):
+        b = red_then(self.fx)
+        head = self.fx.commit("T-1: GREEN. mul [tests: mul]", {"src/lib.js": MUL_ONLY + "".join("// pad %d\n" % i for i in range(40))})
+        rc, _, _ = self.check(b)
+        self.assertEqual((rc, self.record(head) is not None), (0, True))
+        rc, _, _ = self.check(b, "--max-green-lines", "10")
+        self.assertEqual((rc, self.record(head)), (1, None))
 
 
 class CacheIdentity(Base):
