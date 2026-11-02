@@ -169,3 +169,24 @@ That is worth doing whatever happens with the emitter.
    way.
 5. **Not before AnvilScript.** The owner put scripting next (parser, compiler, VM, DSL registry), and this blocks no
    one.
+
+---
+
+## D. Owner clarification (2026-11-02): a JSON emitter on the native output
+
+Asked what the "new `.node`/`.wasm` approach" (mentioned by FlyWire) is, the owner said: "the new `.node`/`.wasm`
+approach is where we bolt a JSON emitter directly on to the ANVL Native output, replacing the default node spans."
+
+What that means, as recorded:
+- For the `.node` and `.wasm` builds, ANVL Native emits **JSON text directly** as it parses, in place of building its
+  default node spans. The JS side then needs only the engine's own `JSON.parse`, the fastest structure builder in
+  any JS engine, and no per-value copy-and-serialize walk in the binding (the cost that sank anvil-node and
+  anvil-wasm, see "Why this note exists").
+- It is a refinement of part A's idea: the boundary cost goes away because native's *output format* is the
+  boundary format, not because JS reads spans.
+- It is distinct from part A §3 ("spans only"), and needs the review questions of part B redone for it: how
+  attributes, bases, includes, blobs, comments and error positions map into the JSON; whether one emitter serves
+  every document or whether the format is lossy; and int64 precision (JSON numbers are doubles in JS).
+
+**Status:** recorded, not yet scheduled; part C's ordering (after AnvilScript) stands unless the owner changes it.
+**Downstream promise:** FlyWire will re-measure against it when it lands (FlyWire Engineer, 2026-10-31); tell them.
