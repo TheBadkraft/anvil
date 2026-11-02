@@ -24,6 +24,8 @@ A sample is marked by HTML comments right before its fence (blank lines may lie 
                                    is prepended to every sample that `uses` it. A js sample that uses a document
                                    starts with `const anvl = require('anvil.js')` and `doc`, that document parsed
   <!-- example: uses NAME... -->   see setup
+  <!-- example: alias NAME... -->  js: require('NAME') gives the anvil.js package (for samples written for
+                                   anvil-node, whose API anvil.js carries)
   <!-- example: output -->         the block must equal, up to the final newline, what the sample before it printed
 
 A C sample that has no main() is assembled: its #include lines are hoisted, its function definitions go to file
@@ -125,7 +127,7 @@ def skipped(reason, needs=False):
     return Result("SKIP", reason, needs=needs)
 
 
-KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None)}
+KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None), "alias": (1, None)}
 DOC_LANGS = {"anvl", "aml", "amp", ""}
 JS_LANGS = {"js", "javascript", "mjs", "node"}
 PY_LANGS = {"python", "py"}
@@ -539,7 +541,14 @@ def check_js(s, text, files, ctx, expected):
     if not ctx.js:
         return skipped("no --js (the anvil.js package)", needs=True)
     fname = "sample.mjs" if re.search(r"^\s*(import|export)\s", text, re.M) else "sample.js"
-    return run_code(ctx, ctx.sample_dir(under_jsenv=True), ["node", fname], files, fname, text, "node")
+    directory = ctx.sample_dir(under_jsenv=True)
+    for name in [a for kind, args in s.markers if kind == "alias" for a in args]:
+        shim = os.path.join(directory, "node_modules", name)
+        write_files(shim, {})
+        write_files(shim, {"package.json": json.dumps({"name": name, "main": "index.js"}),
+                           "index.js": "module.exports = require('anvil.js');\n",
+                           "index.mjs": "export * from 'anvil.js';\nexport { default } from 'anvil.js';\n"})
+    return run_code(ctx, directory, ["node", fname], files, fname, text, "node")
 
 
 HANDLERS["js"] = check_js
