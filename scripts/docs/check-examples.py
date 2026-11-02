@@ -311,7 +311,12 @@ def check_output(s, state):
     want, got = s.text.rstrip("\n"), state["stdout"].replace("\r\n", "\n").rstrip("\n")
     if want == got:
         return passed()
-    return failed("output differs: the block says %r, the run printed %r" % (tail_text(want, 200), tail_text(got, 200)))
+    wl, gl = want.split("\n"), got.split("\n")
+    for i in range(max(len(wl), len(gl))):
+        a = wl[i] if i < len(wl) else None
+        b = gl[i] if i < len(gl) else None
+        if a != b:
+            return failed("output differs at line %d: the block has %s, the run printed %s" % (i + 1, "nothing" if a is None else repr(a), "nothing" if b is None else repr(b)))
 
 
 def check_sample(s, state, ctx):
