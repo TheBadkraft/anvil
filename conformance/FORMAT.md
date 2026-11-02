@@ -418,6 +418,7 @@ An **argument** is a *word* or a *quoted string*:
 | `attribute_string` | *key*, *text* [, *len*] | `anvil_writer_attribute_string` |
 | `include` | *path* | `anvil_writer_include` |
 | `statement` | *name*, *base* (string or `NULL`) | `anvil_writer_statement` |
+| `statement_block` | *name*, *base* (string or `NULL`) | `anvil_writer_statement_block` (the block form `name [: base] { ... };`; BR-2611-anvl-writer-001) |
 | `null` | | `anvil_writer_null` |
 | `bool` | `true` \| `false` | `anvil_writer_bool` |
 | `numeric` | *text* | `anvil_writer_numeric` |
@@ -523,6 +524,12 @@ ticket in `conformance/writer-roundtrip-known.txt` (empty today). `gen_writer.py
 Areas: `lifecycle` (new, finish, data, get_error, error_message, sticky errors), `scalars` (null, bool, `int`, `numeric`,
 `double`), `strings`, `bare`, `blobs`, `collections` (arrays, tuples, objects, nesting), `attributes`, `statements`,
 `include`, `varref`, `amp` (the AMP dialect and what it refuses), `envelope` (King & Crucible messages).
+The area `blockform` (BR-2611-anvl-writer-001) holds the block form `name [: base] [@[attributes]] { ... };`: its layout, a
+base and attributes on it, it nested in an object and in another block form, the non-object values that
+`statement_block` refuses (`ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT`), AMP, and a base that names a block form already written
+(`ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM`; a block form declared after its user is outside what a streaming writer can see, and is
+covered by the builder). The two codes added are numbers 21 and 22; the script grammar and the run format are unchanged
+(a verb is added), so both stay version 1.
 Every `anvil_writer_err_code` the flat writer can return has a case; `ANVIL_WRITER_ERR_MEMORY` and
 `ANVIL_WRITER_ERR_DEPTH_EXCEEDED` cannot be reached through the flat writer (the latter belongs to `anvil_builder`), so
 they appear only through `error_message`.
@@ -594,20 +601,27 @@ optional length; `N` a node handle, `M` a member handle (a bound name or `NULL`)
 | `append` | *collection* `N`, *element* `N` | | `anvil_builder_append` |
 | `add` | *object* `N` (`NULL` is the document), *name* `P`, *value* `N` | member | `anvil_builder_add` |
 | `set_base` | *member* `M`, *base* `P` | | `anvil_builder_set_base` |
+| `set_block` | *member* `M`, `true` \| `false` | | `anvil_builder_set_block` (the block form `name [: base] { ... };`; BR-2611-anvl-writer-001) |
 | `member_attribute` | *member* `M`, *key* `P`, *value* `P` | | `anvil_builder_member_attribute` |
 | `member_attribute_string` | *member* `M`, *key* `P`, *text* `S` [, *len*] | | `anvil_builder_member_attribute_string` |
 | `find` | *object* `N` (`NULL` is the document), *name* `P` | member | `anvil_builder_find` |
 | `emit` | | | `anvil_builder_emit` |
 | `write` | [`AML` \| `AMP` \| `NULL`] | | `anvil_builder_write` into a fresh writer, then `anvil_writer_finish` (below) |
 
-**Bases.** `set_base` accepts any member of the builder and a valid name; nothing else about a base is checked there, except that
+**Bases.** `set_block` needs a member whose value is an object (`ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT`; `false` is always accepted) and a member of
+this builder (`INVALID_ARGUMENT`, checked before the dialect, as for `set_base`), and is `ANVIL_WRITER_ERR_DIALECT` in AMP.
+`set_base` accepts any member of the builder and a valid name; nothing else about a base is checked there, except that
 the member's value must be an object (`ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT`) and, for a member handle of the
 other builder, `ANVIL_WRITER_ERR_INVALID_ARGUMENT`. The rest is checked when the document is written, by `emit` and
 `write`, before anything is written, across **every member the builder created**, attached to the document or not. A base
 names a top-level statement (the reader looks bases up among the top-level names only, never in the enclosing object).
 The checks run in this order, and the first failure is the error:
 
-1. **Non-object.** The base names a top-level member whose value is not an object: `ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT` (BR-2610-anvl-writer-002).
+1. **Non-object, or block form.** The base names a top-level member whose value is not an object:
+   `ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT` (BR-2610-anvl-writer-002). Or it names a member marked `set_block true`:
+   `ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM` (BR-2611-anvl-writer-001), because the block form is read-only and the reader rejects it
+   as a base (4052). An include does not excuse it (the builder holds the member), and a block form that is itself based
+   on another is fine. Two block forms on each other are reported as this, not as a cycle.
 2. **Missing.** The base names no top-level member: `ANVIL_WRITER_ERR_MISSING_BASE` (BR-2610-anvl-writer-004). **Unless the builder
    holds any `include`** (added before or after the base): the included file may declare the base, so it is accepted.
 3. **Cycle.** The bases of the top-level statements loop back, a statement based on itself or `a` on `b` on `a`, or any longer
@@ -678,7 +692,7 @@ Areas: `lifecycle` (new, get_error, error_message, non-sticky errors, emit twice
 its errors), `names` (statement names, duplicates), `collections` (arrays, tuples, objects, attaching rules, nesting),
 `attributes` (module and member attributes), `include` (include ordering), `bases` (`set_base` and the three base checks above, across all members), `find`, `depth` (nesting up to and beyond the limit), `amp` (the
 AMP dialect and what it refuses), `handles` (null, foreign and misused handles), `envelope` (King & Crucible shaped
-documents) and `flywire` (FlyWire shaped documents).
+documents), `flywire` (FlyWire shaped documents) and `blockform` (`set_block`, the block form, and a block form as a base).
 
 ## The schema script, version 1
 
