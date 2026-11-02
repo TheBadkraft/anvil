@@ -648,6 +648,73 @@ class PythonSuite(PyBase):
         self.assertEqual((s.get("adapter"), [c["status"] for c in commits]), ("python", ["PASS"]), commits)
 
 
+class CacheIdentity(Base):
+    def refactor_chain(self, fx=None, n=3):
+        fx = fx or self.fx
+        b = fx.base()
+        for i in range(n):
+            fx.commit("T-1: REFACTOR. step %d" % i, {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f; // %d\n" % i})
+        return b
+
+    def test_a_fresh_cache_reports_no_hits_and_counts_in_run_reuse_apart(self):
+        b = self.refactor_chain()
+        rc, commits, s = self.check(b)
+        self.assertEqual((s["suite_runs"], s["cache_hits"], s.get("reused")), (4, 0, 2), s)
+
+    def test_a_second_run_reads_every_result_from_the_cache_and_runs_nothing(self):
+        b = self.refactor_chain()
+        self.check(b)
+        rc, commits, s = self.check(b)
+        self.assertEqual((s["suite_runs"], s["cache_hits"], s.get("reused")), (0, 4, 2), s)
+
+    def test_the_default_cache_directory_is_neither_read_nor_created_when_cache_is_given(self):
+        b = self.refactor_chain(n=1)
+        tmp = tempfile.mkdtemp(prefix="ctdd-tmp-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        old = tempfile.tempdir
+        tempfile.tempdir = tmp
+        try:
+            self.check(b)
+        finally:
+            tempfile.tempdir = old
+        self.assertEqual([n for n in os.listdir(tmp) if n.startswith("check-tdd-cache")], [])
+        self.assertTrue([n for n in os.listdir(self.cache) if n.endswith(".json")])
+
+    def test_two_repos_with_the_same_shas_do_not_share_results(self):
+        env = {"GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"}
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            b1 = self.refactor_chain()
+            other = Fixture()
+            self.addCleanup(other.cleanup)
+            b2 = self.refactor_chain(other)
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertEqual((b1, self.fx.run("rev-parse", "HEAD")), (b2, other.run("rev-parse", "HEAD")))
+        self.check(b1)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ct.main([other.dir, b2 + "..HEAD", "--json", "--cache", self.cache])
+        s = json.loads(out.getvalue())["summary"]
+        self.assertEqual((s["suite_runs"], s["cache_hits"]), (4, 0), s)
+
+    def test_cache_key_covers_the_repo_identity(self):
+        class A: testbit = ""; make_var = []; no_compat = False
+        self.assertNotEqual(ct.cache_key("node", "abc", A, "repo-one"), ct.cache_key("node", "abc", A, "repo-two"))
+
+    def test_a_result_of_a_suite_that_did_not_run_is_not_cached(self):
+        b = self.fx.commit("init", {"package.json": json.dumps({"name": "fx", "scripts": {}}), "src/lib.js": "exports.add = (a, b) => a + b;\n"})
+        self.fx.commit("T-1: REFACTOR. x", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+        rc, commits, s = self.check(b)
+        self.assertEqual(commits[-1]["status"], "FAIL")
+        self.assertEqual([n for n in os.listdir(self.cache) if n.endswith(".json")], [])
+
+
 class PassRecords(Base):
     def record_path(self, sha):
         common = self.fx.run("rev-parse", "--path-format=absolute", "--git-common-dir").strip()

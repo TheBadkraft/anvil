@@ -324,7 +324,7 @@ def native_make_cmd(unit, suite, opts):
     return ["make", "-C", unit, "test_" + suite, "TESTBIT=" + opts.testbit] + list(opts.make_var)
 
 
-def cache_key(adapter_name, sha, opts):
+def cache_key(adapter_name, sha, opts, repo_id=""):
     """Everything that changes what a run measures is in the key, so a bad-setup run cannot poison later ones."""
     parts = [adapter_name, "v" + ADAPTER_VERSION]
     if adapter_name == "native":
