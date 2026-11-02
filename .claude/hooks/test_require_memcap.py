@@ -107,9 +107,38 @@ SHELL_STRINGS = [
     ("find . -name x -exec node {} \\;", "node"), ("find . -exec python3 y.py {} +", "python3"), ('bash -c "echo $(node x.js)"', "node"),
     ("sudo bash -c 'make all'", "make"), ('env X=1 bash -c "npm test"', "npm"), ("time bash -c 'node x.js'", "node"),
     ("bash -c 'bash -c \"node x.js\"'", "node"), ("find . -execdir make {} \\;", "make"),
-    ('bash -c "echo hi"', None), ("bash script.sh", None), ("xargs echo", None), ("find . -name x -exec ls {} \\;", None),
+    ('bash -c "echo hi"', None), ("xargs echo", None), ("find . -name x -exec ls {} \\;", None),
     ('eval "ls"', None), ("bash -c 'node -e 1'", None), ("xargs node -e 1", None), ('systemd-run -p MemoryMax=1G -- bash -c "node x.js"', None),
     ("xargs -n1 systemd-run -p MemoryMax=1G -- node", None), ("find . -type f | xargs grep node", None),
+]
+
+
+WRAPPER_OPTIONS = [
+    ("sudo -u bob node x.js", "node"), ("sudo -u bob -g grp make all", "make"), ("sudo -E -u bob python3 x.py", "python3"),
+    ("timeout -s KILL 5 node x.js", "node"), ("timeout 5 python3 x.py", "python3"), ("timeout --signal=KILL 5 node x.js", "node"),
+    ("timeout -k 1 5s make all", "make"), ("env -u FOO make all", "make"), ("env -i node x.js", "node"), ("env -i A=1 node x.js", "node"),
+    ("taskset 0x3 node x.js", "node"), ("taskset 3 python3 x.py", "python3"), ("taskset -c 6-7 node x.js", "node"),
+    ("taskset -c 0,1 python3 x.py", "python3"), ("nice -n 5 node x.js", "node"), ("nice -5 make all", "make"),
+    ("ionice -c 2 -n 4 node x.js", "node"), ("ionice -c3 python3 x.py", "python3"), ("chrt 10 node x.js", "node"),
+    ("chrt -f 10 node x.js", "node"), ("stdbuf -oL node x.js", "node"), ("nohup nice -n 5 node x.js", "node"),
+    ("sudo -u bob ls", None), ("timeout -s KILL 5 ls", None), ("env -u FOO ls", None), ("taskset -c 6-7 ls", None),
+    ("nice -n 5 ls", None), ("sudo -u bob node -e 1", None), ("chrt 10 ls", None),
+    ("systemd-run -p MemoryMax=1G -- sudo -u bob node x.js", None),
+]
+SCRIPTS = [
+    ("bash script.sh", "bash"), ("sh script.sh", "sh"), ("./script.sh", "script.sh"), ("scripts/check-dump-valgrind.sh", "check-dump-valgrind.sh"),
+    ("bash -x script.sh", "bash"), ("sudo bash script.sh", "bash"), ("sh -e ./a.sh arg", "sh"), ("env X=1 ./run.sh", "run.sh"),
+    ("/abs/path/x.sh", "x.sh"), ("bash scripts/x.sh && true", "bash"), ("ls && ./build.sh", "build.sh"), ("bash -o pipefail x.sh", "bash"),
+    ("bash -n script.sh", None), ("bash --version", None), ("bash", None), ("sh -c 'echo hi'", None), ("ls script.sh", None),
+    ("cat x.sh", None), ("echo ./x.sh", None), ("grep foo x.sh", None), ("systemd-run -p MemoryMax=1G -- bash script.sh", None),
+    ("systemd-run -p MemoryMax=1G -- ./x.sh", None),
+]
+CAP_FORMS = [
+    ("systemd-run --description=MemoryMax -- node x.js", "node"), ('systemd-run --description "MemoryMax=4G" -- node x.js', "node"),
+    ("systemd-run -E MemoryMax=1 -- node x.js", "node"), ("systemd-run -p MemorySwapMax=0 -- node x.js", "node"),
+    ("systemd-run -p RuntimeMaxSec=MemoryMax -- node x.js", "node"),
+    ("systemd-run --property=MemoryMax=4G -- node x.js", None), ("systemd-run -pMemoryMax=4G -- node x.js", None),
+    ("systemd-run --property MemoryMax=4G -- node x.js", None), ('systemd-run -p "MemoryMax=4G" -- node x.js', None),
 ]
 
 
@@ -132,6 +161,15 @@ class RegressionTable(unittest.TestCase):
 
     def test_shell_strings_xargs_and_find_exec_are_commands(self):
         self.table(SHELL_STRINGS)
+
+    def test_wrapper_options_with_values_are_skipped(self):
+        self.table(WRAPPER_OPTIONS)
+
+    def test_a_script_run_uncapped_is_heavy(self):
+        self.table(SCRIPTS)
+
+    def test_only_a_property_memory_max_caps(self):
+        self.table(CAP_FORMS)
 
 
 if __name__ == "__main__":
