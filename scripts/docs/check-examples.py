@@ -8,6 +8,7 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -98,13 +99,74 @@ def skipped(reason, needs=False):
 KNOWN_MARKERS = {"fragment": (0, 0), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None)}
 DOC_LANGS = {"anvl", "aml", "amp", ""}
 JS_LANGS = {"js", "javascript", "mjs", "node"}
+PY_LANGS = {"python", "py"}
+NET_LANGS = {"csharp", "cs", "c#"}
+TIMEOUT = 60
+
+
+def run_cmd(cmd, cwd, env, timeout=TIMEOUT):
+    """Runs a command; returns (returncode, stdout, stderr). returncode is None on a timeout."""
+    try:
+        p = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired as e:
+        return None, (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timed out after %ds" % timeout
+    except OSError as e:
+        return 127, "", str(e)
+    return p.returncode, p.stdout, p.stderr
+
+
+def tail_text(text, n=300):
+    text = " ".join(text.split())
+    return text if len(text) <= n else "..." + text[-n:]
+
+
+class Setup:
+    """A named earlier sample: code to prepend (code languages) and files to put in the sample's directory."""
+
+    def __init__(self, name, kind, lang, code, files):
+        self.name, self.kind, self.lang, self.code, self.files = name, kind, lang, code, files
 
 
 class Context:
-    def __init__(self, scratch, dump=None, js=None):
-        self.scratch, self.dump, self.js = scratch, dump, js
+    def __init__(self, scratch, dump=None, js=None, core=None, py=None, net=None):
+        self.scratch, self.dump, self.js, self.core, self.py, self.net = scratch, dump, js, core, py, net
+        self.counter = 0
+        self.env = dict(os.environ)
+        home = os.path.join(scratch, "home")
+        tmp = os.path.join(scratch, "tmp")
+        os.makedirs(home, exist_ok=True)
+        os.makedirs(tmp, exist_ok=True)
+        self.env.update({"HOME": home, "TMPDIR": tmp, "XDG_CACHE_HOME": os.path.join(home, ".cache"), "XDG_CONFIG_HOME": os.path.join(home, ".config")})
+        self.jsenv = None
+
+    def sample_dir(self, under_jsenv=False):
+        self.counter += 1
+        base = self.js_env() if under_jsenv else self.scratch
+        d = os.path.join(base, "s%d" % self.counter)
+        os.makedirs(d)
+        return d
+
+    def js_env(self):
+        """A directory whose node_modules/anvil.js is the package under test, so require('anvil.js') finds it."""
+        if self.jsenv is None:
+            self.jsenv = os.path.join(self.scratch, "jsenv")
+            mods = os.path.join(self.jsenv, "node_modules")
+            os.makedirs(mods)
+            shutil.copytree(self.js, os.path.join(mods, "anvil.js"))
+        return self.jsenv
 
 
+def write_files(directory, files):
+    for name, text in files.items():
+        p = os.path.join(directory, name)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w") as f:
+            f.write(text)
+
+
+# ---------------------------------------------------------------------------------------------
+# documents: anvil-dump and anvil.js must agree
+# ---------------------------------------------------------------------------------------------
 def check_document(s, text, files, ctx, expected):
     if not ctx.dump:
         return skipped("no --dump (an anvil-dump built from the native tag)", needs=True)
@@ -122,6 +184,12 @@ def classify(lang):
         return "doc"
     if l in JS_LANGS:
         return "js"
+    if l == "c":
+        return "c"
+    if l in PY_LANGS:
+        return "py"
+    if l in NET_LANGS:
+        return "net"
     return "other"
 
 
@@ -150,11 +218,28 @@ def check_sample(s, state, ctx):
     if "fragment" in marks:
         return skipped("marked fragment: not run")
     kind = classify(s.lang)
+    if "output" in marks:
+        return failed("output blocks are not implemented")
+    prefix, files = "", {}
+    for name in marks.get("uses", []):
+        su = state["setups"].get(name)
+        if su is None:
+            return failed("uses '%s', but no earlier sample in this file is marked 'setup %s'" % (name, name))
+        if su.kind == "code":
+            if su.lang != s.lang:
+                return failed("uses '%s', a %s sample, from a %s sample" % (name, su.lang, s.lang))
+            prefix += su.code
+        files.update(su.files)
     handler = HANDLERS.get(kind)
     if handler is None:
         return failed("not implemented: %s samples" % kind)
     expected = int(marks["error"][0]) if "error" in marks else None
-    return handler(s, s.text, {}, ctx, expected)
+    text = prefix + s.text
+    res = handler(s, text, files, ctx, expected)
+    for name in marks.get("setup", []):
+        own = {name: s.text} if kind == "doc" else {}
+        state["setups"][name] = Setup(name, "doc" if kind == "doc" else "code", s.lang, text if kind != "doc" else "", dict(files, **own))
+    return res
 
 
 def check_file(path, rel, ctx):
@@ -168,6 +253,23 @@ def check_file(path, rel, ctx):
     return out
 
 
+def run_code(ctx, directory, cmd, files, fname, text, what):
+    write_files(directory, files)
+    write_files(directory, {fname: text})
+    rc, out, err = run_cmd(cmd, directory, ctx.env)
+    if rc != 0:
+        return failed("%s exited %s: %s" % (what, rc if rc is not None else "(timeout)", tail_text(err or out)))
+    return passed(stdout=out)
+
+
+def check_js(s, text, files, ctx, expected):
+    if not ctx.js:
+        return skipped("no --js (the anvil.js package)", needs=True)
+    fname = "sample.mjs" if re.search(r"^\s*(import|export)\s", text, re.M) else "sample.js"
+    return run_code(ctx, ctx.sample_dir(under_jsenv=True), ["node", fname], files, fname, text, "node")
+
+
+HANDLERS["js"] = check_js
 HANDLERS["doc"] = lambda s, text, files, ctx, expected: check_document(s, text, files, ctx, expected)
 
 
@@ -184,31 +286,51 @@ def find_markdown(root, paths):
     return found
 
 
+def package_dir(arg, flag):
+    if arg is None:
+        return None
+    if not os.path.isdir(arg):
+        raise SystemExit("check-examples: %s %s is not a directory" % (flag, arg))
+    return os.path.abspath(arg)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Run every fenced code sample in the documentation.")
     ap.add_argument("paths", nargs="*", help="markdown files or directories (default: docs/ and site/assets/docs/ under --root)")
     ap.add_argument("--root", default=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
     ap.add_argument("--dump", help="an anvil-dump binary built from the native tag being published")
-    ap.add_argument("--core", help="the core package")
-    ap.add_argument("--js", help="the anvil.js package")
-    ap.add_argument("--py", help="the anvil.py package")
-    ap.add_argument("--net", help="the anvil.net package")
+    ap.add_argument("--core", help="the core package (directory)")
+    ap.add_argument("--js", help="the anvil.js package (directory)")
+    ap.add_argument("--py", help="the anvil.py package (directory)")
+    ap.add_argument("--net", help="the anvil.net package (directory)")
+    ap.add_argument("--strict", action="store_true", help="a sample skipped for a missing package or toolchain fails the run")
+    ap.add_argument("--scratch", help="scratch directory (default: a temporary one, removed on exit)")
     opts = ap.parse_args(argv)
     root = os.path.abspath(opts.root)
-    scratch = tempfile.mkdtemp(prefix="check-examples-")
+    own = opts.scratch is None
+    scratch = os.path.abspath(opts.scratch) if opts.scratch else tempfile.mkdtemp(prefix="check-examples-")
+    os.makedirs(scratch, exist_ok=True)
     try:
-        ctx = Context(scratch, dump=opts.dump and os.path.abspath(opts.dump), js=opts.js and os.path.abspath(opts.js))
+        dump = os.path.abspath(opts.dump) if opts.dump else None
+        if dump and not os.access(dump, os.X_OK):
+            raise SystemExit("check-examples: --dump %s is not an executable" % opts.dump)
+        ctx = Context(scratch, dump=dump, js=package_dir(opts.js, "--js"), core=package_dir(opts.core, "--core"),
+                      py=package_dir(opts.py, "--py"), net=package_dir(opts.net, "--net"))
         counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
+        needs_skips = 0
         for path in find_markdown(root, opts.paths):
             rel = os.path.relpath(path, root).replace(os.sep, "/")
             for s, res in check_file(path, rel, ctx):
                 counts[res.status] += 1
+                if res.status == "SKIP" and res.needs:
+                    needs_skips += 1
                 label = s.lang or "(none)" if not s.orphan else "marker"
                 print("%s %s:%d %s%s" % (res.status, s.file, s.line, label, " - " + res.reason if res.reason else ""))
         print("check-examples: %d passed, %d failed, %d skipped" % (counts["PASS"], counts["FAIL"], counts["SKIP"]))
-        return 1 if counts["FAIL"] else 0
+        return 1 if counts["FAIL"] or (opts.strict and needs_skips) else 0
     finally:
-        shutil.rmtree(scratch, ignore_errors=True)
+        if own:
+            shutil.rmtree(scratch, ignore_errors=True)
 
 
 if __name__ == "__main__":
