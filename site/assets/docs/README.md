@@ -21,10 +21,11 @@ server := {
 };
 ```
 
-<!-- example: fragment source and source_len are the caller's -->
 ```c
 #include "anvil_flat.h"
 
+const char *source = "#!aml\nserver := { host := \"localhost\"; port := 8080; };\n";
+size_t source_len = strlen(source);
 anvil_document doc = anvil_load_buffer(source, source_len);
 anvil_statement stmt = anvil_document_find_statement(doc, "server");
 ```

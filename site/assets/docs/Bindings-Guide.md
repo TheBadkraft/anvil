@@ -243,10 +243,11 @@ What the headers cover:
 | `anvil_writer.h`, `anvil_builder.h` | The streaming writer and the document builder, which emit canonical AML and AMP |
 | `anvil_schema_vtable.h`, `anvil_type_registry_vtable.h` (and the writer and builder vtables) | Vtable forms of the schema, registry, writer and builder |
 
-<!-- example: fragment source and source_len are the caller's -->
 ```c
 #include "anvil_flat.h"
 
+const char *source = "#!aml\nhost := localhost;\n";
+size_t source_len = strlen(source);
 anvil_document doc = anvil_load_buffer(source, source_len);
 if (anvil_has_errors(doc)) {
     anvil_error err = anvil_document_get_error(doc);
@@ -293,7 +294,7 @@ the core reader, the type registry, AnvilSchema and the writer and builder.
 npm install ./anvil-wasm-v0.11.0-rc.tar.gz
 ```
 
-<!-- example: fragment anvil-wasm is not part of this check -->
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 const anvil = require('anvil-wasm');
 ```
@@ -325,7 +326,7 @@ Load the prebuilt bundle with a `<script>` tag. It needs no bundler and no `requ
 worker can cache it. By default `ready()` fetches it from **next to the script**: serve both files
 from one directory, or say where the `.wasm` is:
 
-<!-- example: fragment anvil-wasm is not part of this check -->
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 await anvl.ready({ wasmUrl: '/assets/anvil.wasm' });
 // or Emscripten's own hook, called with 'anvil.wasm' and the script's directory:
@@ -361,7 +362,7 @@ reinstall a new build of the same version, delete `node_modules/anvil-wasm` firs
 Instantiating a WASM module takes a moment, so you pay that cost once, explicitly, before doing
 anything else:
 
-<!-- example: fragment anvil-wasm is not part of this check -->
+<!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
 ```js
 const anvil = require('anvil-wasm');
 
@@ -390,7 +391,7 @@ reference. The differences are these:
   `loadFile` and `fromIncludesFile` resolve includes beside the file; the text loaders (`load`,
   `fromIncludes`) resolve them against the filesystem root, `/`.
 
-  <!-- example: fragment anvil-wasm is not part of this check -->
+  <!-- example: fragment anvil-wasm is frozen at v0.11.0-rc and not executed -->
   ```js
   anvil.writeFile('/schemas/types.anvl', typesText);
   const schema = anvil.Schema.loadFile('/schemas/asset.anvl');
@@ -549,9 +550,13 @@ A repeated name inside an object is kept: for `{ a := 1; a := 2; b := 3; }`, `co
 
 Both work over ANVL **text**, not JS objects (ANVL is not JSON; objects use `:=`):
 
-<!-- example: fragment needs schemaText and dataText of the caller's -->
+<!-- example: alias anvil-node -->
 ```js
 const { Schema, TypeRegistry, SchemaViolation } = require('anvil-node');
+
+const schemaText = '#!aml\n@[schema]\nasset_id := { type := Numeric; required := true; };\nname := { type := String; };\n';
+const dataText   = '#!aml\nname := "widget";\n';
+const typesText  = '#!aml\n@[types]\nVIN := { type := String; size := 17; };\n';
 
 const schema = Schema.load(schemaText);         // text of a document carrying @[schema]
 const result = schema.validate(dataText);       // { valid, violations: [{ category, field, message }] }
@@ -777,8 +782,32 @@ whitespace around it.
 
 ### Type registry and schema
 
-<!-- example: fragment needs asset.schema.anvl and asset.types.anvl files -->
+Given an `asset.types.anvl` and an `asset.schema.anvl` that includes it:
+
+<!-- example: setup asset.types.anvl -->
+```anvl
+#!aml
+@[types]
+
+AssetYear := { type := Numeric; integer := true; min := 1900; max := 2100; };
+```
+
+<!-- example: setup asset.schema.anvl -->
+<!-- example: uses asset.types.anvl -->
+```anvl
+#!aml
+include "asset.types.anvl";
+@[schema]
+
+name   := { type := String; required := true; };
+status := { type := enum; values := [ active, retired ]; };
+year   := { type := types.AssetYear; };
+```
+
+<!-- example: uses asset.schema.anvl asset.types.anvl -->
 ```csharp
+using Anvil.Net;
+
 using var schemaDoc = AnvilDocument.Load("asset.schema.anvl");   // carries @[schema]; may include @[types]
 using var schema = AnvilSchema.Load(schemaDoc)!;                  // null if it has no @[schema]
 
@@ -969,7 +998,9 @@ whitespace around it.
 
 ### Type registry and schema
 
-<!-- example: fragment needs asset.schema.anvl and asset.types.anvl files -->
+With the same `asset.types.anvl` and `asset.schema.anvl` as in the C# section:
+
+<!-- example: uses asset.schema.anvl asset.types.anvl -->
 ```python
 from anvil import AnvilDocument, AnvilSchema, AnvilTypeRegistry
 
