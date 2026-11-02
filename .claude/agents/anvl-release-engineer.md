@@ -71,6 +71,7 @@ Writer.
 | **Exports:** `nm -D` on every shipped `libanvil.so` lists the public schema and type-registry functions, and no internal symbol | core, net, py, java |
 | **README:** the README examples run against the package | each binding that has README tests |
 | **Downstream:** FlyWire's guard `flywire/tests/test-anvl-binding-grammar.js`, run read-only from a scratch copy pointed at the staged tarball | node, wasm |
+| **Docs samples:** `scripts/docs/check-examples.py --strict` with `--dump` (built from the tag) and `--core`/`--js`/`--py`/`--net` pointed at the staged tarballs exits 0; a failing sample blocks the release (owner, 2026-11-02) | every release |
 | **Checksum:** `SHA256SUMS` beside the tarballs, verified after download | every artifact |
 | **Live (after deploy):** rerun the install and grammar checks against the live anvldata.com URLs | every artifact |
 

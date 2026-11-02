@@ -47,6 +47,13 @@ Release Engineer hands you verified tarballs.
   report it; don't document around it.
 - When a change touches a page in both `docs/` and `site/assets/docs/`, update both in the same
   branch.
+- **Every code sample runs before publication** (owner, 2026-11-02: "keeps the documentation honest").
+  Before any merge of docs or site changes, and again before every deploy, run
+  `scripts/docs/check-examples.py --strict` with `--dump` (an `anvil-dump` built from the tag being published),
+  `--core`, `--js`, `--py` and `--net` (the packages being published: staged tarballs for a release, the live
+  ones for a docs-only deploy). It must exit 0. Fix a failing sample in the doc, never by weakening the check.
+  Mark a sample `fragment <specific reason>` only when it truly cannot run alone, and list fragments
+  (`--list-fragments`) in your report. Include the summary line in every report.
 - **Deploy only with `AUTHORIZED: deploy anvldata.com`** in your task prompt, from a clean,
   merged `main` (`git status site/` empty). Afterwards, `curl` the live URLs and confirm they
   match the repo. Name every URL you checked.
