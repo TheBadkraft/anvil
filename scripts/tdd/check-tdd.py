@@ -159,17 +159,28 @@ class Adapter:
         raise NotImplementedError
 
     def is_test(self, path):
-        return False
+        return under(path, self.tests)
 
     def is_product(self, path):
-        return False
+        return under(path, self.product)
 
     def is_input(self, path):
-        return False
+        return under(path, self.test_inputs)
 
 
 class PythonAdapter(Adapter):
+    """Tooling repos: scripts/ and .claude/hooks/. Tests are test_*.py files in those trees; everything else
+    in .claude/hooks/ and the .py/.js files under scripts/ are product."""
     name = "python"
+    roots = ("scripts/", ".claude/hooks/")
+
+    def is_test(self, path):
+        return under(path, self.roots) and path.endswith(".py") and os.path.basename(path).startswith("test_")
+
+    def is_product(self, path):
+        if self.is_test(path) or not under(path, self.roots):
+            return False
+        return path.startswith(".claude/hooks/") or path.endswith((".py", ".js"))
 
     def run(self, work, opts):
         return {"ran": False, "tests": {}, "note": "python adapter not implemented"}
@@ -243,6 +254,9 @@ def pick_adapter(repo, name, changed=None):
         return PythonAdapter()
     if name == "node" or (name == "auto" and os.path.exists(os.path.join(repo, "package.json"))):
         return NodeAdapter()
+    native_paths = ("src/", "include/", "test/")
+    if name == "auto" and changed and not any(under(f, native_paths) for f in changed) and any(under(f, PythonAdapter.roots) for f in changed):
+        return PythonAdapter()  # a range that only touches tooling is checked against the tooling's own tests
     if name == "native" or (name == "auto" and os.path.isdir(os.path.join(repo, "test", "unit"))):
         return NativeAdapter()
     raise SystemExit("check-tdd: cannot pick an adapter for %s (use --adapter node|native)" % repo)
@@ -523,14 +537,15 @@ class BudgetReached(Exception):
 def commit_facts(repo, adapter, sha, parent):
     base = parent if parent else git(repo, "hash-object", "-t", "tree", "/dev/null").strip()  # the empty tree
     files = [f for f in git(repo, "diff", "--name-only", "--no-renames", base, sha).splitlines() if f]
-    test_files = [f for f in files if under(f, adapter.tests)]
-    input_files = [f for f in files if under(f, adapter.test_inputs)]
-    product_files = [f for f in files if under(f, adapter.product)]
+    test_files = [f for f in files if adapter.is_test(f)]
+    input_files = [f for f in files if adapter.is_input(f)]
+    product_files = [f for f in files if adapter.is_product(f)]
     lines = 0
     if product_files:
-        for ln in git(repo, "diff", "--numstat", "--no-renames", base, sha, "--", *adapter.product).splitlines():
-            a, d, _ = (ln.split("\t") + ["", "", ""])[:3]
-            lines += (int(a) if a.isdigit() else 0) + (int(d) if d.isdigit() else 0)
+        for ln in git(repo, "diff", "--numstat", "--no-renames", base, sha).splitlines():
+            a, d, path = (ln.split("\t") + ["", "", ""])[:3]
+            if adapter.is_product(path):
+                lines += (int(a) if a.isdigit() else 0) + (int(d) if d.isdigit() else 0)
         if lines == 0:
             lines = 1  # a gitlink or binary change
     msg = git(repo, "log", "-1", "--format=%B", sha)
@@ -584,8 +599,8 @@ def main(argv=None):
         return 2
     base, head = opts.range.split("..")
     try:
-        adapter = pick_adapter(repo, opts.adapter)
         base_sha = git(repo, "rev-parse", base + "^{commit}").strip()
+        adapter = pick_adapter(repo, opts.adapter, git(repo, "diff", "--name-only", base_sha, head).split())
         walk = ["rev-list", "--reverse"] + (["--first-parent"] if opts.first_parent else ["--no-merges", "--topo-order"]) + ["%s..%s" % (base_sha, head)]
         shas = git(repo, *walk).split()
     except (RuntimeError, SystemExit) as e:
