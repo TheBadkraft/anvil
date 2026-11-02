@@ -74,4 +74,4 @@ Steps 1 to 7 are as in `release-v0.13.0-rc.md`, with these changes:
 | 4. Checks on the packaged files | pass, incl. the new installed-copy and browser checks (RED on the v0.13.0-rc package) |
 | 5. Benchmarks | done: native within 1.02x; no anvil.js row above 1.15x repeats; gaps carried over |
 | 6. Stage | done in `~/release-staging/v0.13.1-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
-| 7. Deploy and live check | after the owner's go and the Technical Writer's deploy |
+| 7. Deploy and live check | done: site 2c91a65; live downloads match the staged sha256, grammar and version 0.13.1-rc+479 in all four, anvil.js install, codes 11 and 1, IO name, `1e-999`, corpora and 171 exports pass |
