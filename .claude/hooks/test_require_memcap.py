@@ -130,6 +130,9 @@ class RegressionTable(unittest.TestCase):
     def test_the_cap_exempts_only_the_command_it_wraps(self):
         self.table(SAME_SEGMENT)
 
+    def test_shell_strings_xargs_and_find_exec_are_commands(self):
+        self.table(SHELL_STRINGS)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
