@@ -394,6 +394,16 @@ class JsTests(unittest.TestCase):
         self.assertEqual(st[0], "FAIL", r.out)
         self.assertIn("wrong value", st[2])
 
+    def test_alias_marker_makes_another_package_name_resolve_to_anvil_js(self):
+        d = Doc()
+        a = d.block("js", "const anvil = require('anvil-node');\nif (typeof anvil.parse !== 'function') throw new Error('no parse');", "alias anvil-node")
+        b = d.block("js", "require('anvil-node');")
+        r = run_check(d)
+        self.assertEqual(r.at(a)[0], "PASS", r.out + r.proc.stderr)
+        st = r.at(b)
+        self.assertEqual(st[0], "FAIL", r.out)
+        self.assertIn("anvil-node", st[2])
+
     def test_js_without_uses_does_not_see_earlier_samples(self):
         d = Doc()
         d.block("js", "const anvl = require('anvil.js');", "setup lib")
