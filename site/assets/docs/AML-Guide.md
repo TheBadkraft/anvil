@@ -92,6 +92,7 @@ empty and single-element tuples are both parse errors.
 `@[...]` attaches metadata to a document, a statement, or an object field.
 Flag attributes (no value) and `key=value` attributes can mix freely:
 
+<!-- example: setup attrs -->
 ```anvl
 @[doc_level]
 server @[env = production, active] := {
@@ -99,6 +100,7 @@ server @[env = production, active] := {
 };
 ```
 
+<!-- example: uses attrs -->
 ```js
 doc.hasAttribute('doc_level');   // true -- module-level attributes are read on the root (the document)
 
@@ -116,6 +118,7 @@ The `:=` form and the block form both parse, and both read back as the same obje
 not interchangeable: the block form `name { ... };` is an anonymous, **read-only** block, and it
 can never be a base. Only the `:=` form can be inherited from.
 
+<!-- example: setup inherit -->
 ```anvl
 Base := { a := 1; };
 Child : Base := { b := 2; };
@@ -125,12 +128,14 @@ Grand : Child := { c := 3; };
 This parses. With the block form for `Child`, the same document is rejected where `Grand` tries
 to inherit from it:
 
+<!-- example: error 4052 -->
 ```anvl
 Base := { a := 1; };
 Child : Base { b := 2; };
 Grand : Child := { c := 3; };
 ```
 
+<!-- example: fragment the message of the error above -->
 ```
 Cannot inherit from anonymous object (use ':=' for inheritable declarations)
 ```
@@ -151,6 +156,7 @@ A statement has at most one base, but the base can itself have one (`Grand : Chi
 field it inherits, through the whole chain, and a field it defines itself wins over the same name in a
 base (the nearest definition wins). Reading the merged object with the parsed example above:
 
+<!-- example: uses inherit -->
 ```js
 const grand = doc.get('Grand');
 grand.count;        // 3
