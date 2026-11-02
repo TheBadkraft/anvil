@@ -11,7 +11,9 @@ import io
 import json
 import os
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -745,6 +747,73 @@ class PassRecordOptions(Base):
         self.assertEqual((rc, self.record(head) is not None), (0, True))
         rc, _, _ = self.check(b, "--max-green-lines", "10")
         self.assertEqual((rc, self.record(head)), (1, None))
+
+
+class CacheSourceHash(unittest.TestCase):
+    class O:
+        testbit = ""
+        make_var = []
+        no_compat = False
+
+    def test_the_key_follows_the_runner_and_reporter_sources(self):
+        d = tempfile.mkdtemp(prefix="ctdd-src-")
+        self.addCleanup(shutil.rmtree, d, True)
+        for f in ("python-runner.py", "node-reporter.js"):
+            shutil.copy(os.path.join(HERE, f), d)
+        old = ct.HERE
+        ct.HERE = d
+        self.addCleanup(setattr, ct, "HERE", old)
+        keys = [ct.cache_key("python", "abc", self.O)]
+        for f in ("python-runner.py", "node-reporter.js"):
+            with open(os.path.join(d, f), "a") as fh:
+                fh.write("\n// changed\n")
+            keys.append(ct.cache_key("python", "abc", self.O))
+        self.assertEqual(len(set(keys)), 3, keys)
+
+
+class Signals(Base):
+    def slow_repo(self):
+        b = self.fx.commit("init", {
+            "package.json": json.dumps({"name": "fx", "scripts": {"test": "node --test test/*.test.js"}}),
+            "src/lib.js": "exports.add = (a, b) => a + b;\n",
+            "test/slow.test.js": "const test = require('node:test');\ntest('slow', async () => { await new Promise((r) => setTimeout(r, 60000)); });\n"})
+        self.fx.commit("T-1: REFACTOR. x", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+        return b
+
+    def leftovers(self, priv):
+        mine = [n for n in os.listdir(priv) if n.startswith("check-tdd-")]
+        procs = subprocess.run(["pgrep", "-f", priv], capture_output=True, text=True).stdout.split()
+        return mine, [p for p in procs if p != str(os.getpid())]
+
+    def run_and_signal(self, sig):
+        import time as _time
+        b = self.slow_repo()
+        priv = tempfile.mkdtemp(prefix="ctdd-priv-")
+        self.addCleanup(shutil.rmtree, priv, True)
+        p = subprocess.Popen([sys.executable, os.path.join(HERE, "check-tdd.py"), self.fx.dir, b + "..HEAD", "--cache", self.cache],
+                             env=dict(os.environ, TMPDIR=priv), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        deadline = _time.time() + 40
+        while _time.time() < deadline and not [n for n in os.listdir(priv) if n.startswith("check-tdd-")]:
+            _time.sleep(0.2)
+        while _time.time() < deadline and not subprocess.run(["pgrep", "-f", priv + ".*slow.test.js"], capture_output=True, text=True).stdout.split():
+            _time.sleep(0.2)
+        p.send_signal(sig)
+        try:
+            p.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            self.fail("the checker did not stop on the signal")
+        finally:
+            p.stdout.close()
+            p.stderr.close()
+        _time.sleep(0.5)
+        return self.leftovers(priv)
+
+    def test_sigterm_removes_the_scratch_clone_and_stops_the_suite(self):
+        self.assertEqual(self.run_and_signal(signal.SIGTERM), ([], []))
+
+    def test_sigint_removes_the_scratch_clone_and_stops_the_suite(self):
+        self.assertEqual(self.run_and_signal(signal.SIGINT), ([], []))
 
 
 class CacheIdentity(Base):
