@@ -4,7 +4,19 @@
 The Principal Engineer merges branches into main after the Verification Engineer passes them. check-tdd
 (scripts/tdd/check-tdd.py) is the mechanical check of the strict-TDD protocol (agents/STANDARDS.md section 3). Its
 complete, all-PASS run leaves <git-common-dir>/check-tdd/pass/<sha>.json. This hook refuses `git merge <ref>` when ref
-is a guarded branch and no such record exists for the exact sha. See merge_decision() for the override.
+is a guarded branch and no such record exists for the exact sha, made with the default options, whose base covers the
+commits the merge brings in. See merge_decision() for the override.
+
+This is a guardrail against a plausible slip by an agent, not a security boundary. It follows wrapper words, `bash -c`,
+`sh -c` and `eval` strings, `$( )` and backticks, `git -C`, `--git-dir`, `cd dir &&`, every spelling of a branch, a sha
+or tag that is the tip of a guarded branch, and `git pull <remote> <branch>` / `git pull . <branch>`.
+
+Out of scope, on purpose:
+  - git aliases and shell aliases or functions;
+  - `$'...'` strings and variable expansion of the subcommand or the ref (`git $cmd`, `git merge $b`);
+  - cherry-pick, rebase and `reset --hard`, and `git fetch . x:main`, which move a branch without `git merge`;
+  - a hand-forged pass record or override file. The records are advisory and trust-based: an agent that writes one
+    has breached the protocol, and the breach is to be reported, not worked around.
 """
 import importlib.util
 import json
@@ -179,30 +191,70 @@ def git_out(directory, *args):
     return p.stdout.strip() if p.returncode == 0 else None
 
 
-def valid_record(path, sha):
+MAX_BATCH_LIMIT, MAX_GREEN_LINES = 10, 150  # check-tdd's defaults: a record made with looser options does not count
+
+
+def record_problem(path, sha, directory):
+    """None if the record at `path` proves a clean check that covers this merge, else the reason it does not."""
     try:
         with open(path) as f:
             rec = json.load(f)
-    except (OSError, ValueError):
+    except OSError:
+        return "missing"
+    except ValueError:
+        return "it is not readable"
+    if not isinstance(rec, dict) or rec.get("result") != "pass" or rec.get("head") != sha:
+        return "it is not a pass record for this sha"
+    o = rec.get("options")
+    if not isinstance(o, dict):
+        return "it does not record the options of its run (an older checker made it)"
+    loose = [k for k, bad in (("lenient_tests", o.get("lenient_tests") is not False), ("no_compat", o.get("no_compat") is not False),
+                              ("batch_limit", not isinstance(o.get("batch_limit"), int) or o["batch_limit"] > MAX_BATCH_LIMIT),
+                              ("max_green_lines", not isinstance(o.get("max_green_lines"), int) or o["max_green_lines"] > MAX_GREEN_LINES)) if bad]
+    if loose:
+        return "options: it was made with loosened options (%s)" % ", ".join(loose)
+    base, mb = rec.get("base"), git_out(directory, "merge-base", "HEAD", sha)
+    if not base or not mb:
+        return "it does not name its base, or HEAD shares no history with the branch"
+    if git_out(directory, "merge-base", "--is-ancestor", base, mb) is None:
+        return "it covers %s..%s, but this merge brings in %s..%s" % (base[:12], sha[:12], mb[:12], sha[:12])
+    return None
+
+
+def is_guarded_tip(directory, ref, sha):
+    """A guarded branch name, or a sha, tag or other expression that is the tip of a guarded branch (local or remote).
+    A name that is itself a branch (main, release/...) is judged by its name alone."""
+    if is_guarded(ref):
+        return True
+    if any(git_out(directory, "show-ref", "--verify", "--quiet", prefix + ref) is not None for prefix in ("refs/heads/", "refs/remotes/")):
         return False
-    return isinstance(rec, dict) and rec.get("result") == "pass" and rec.get("head") == sha
+    return any(is_guarded(r) for r in (git_out(directory, "for-each-ref", "--points-at", sha, "--format=%(refname)") or "").split())
 
 
 def merge_decision(command, cwd):
-    """("deny", reason), ("overridden", note) or None. A guarded ref that resolves needs
-    <git-common-dir>/check-tdd/pass/<sha>.json from a complete check-tdd run. A file
-    <git-common-dir>/check-tdd/override/<sha> lets one merge through: only the Principal Engineer creates it,
-    and only on the owner's explicit words. A ref that does not resolve is git's to refuse, not ours."""
+    """("deny", reason), ("overridden", note) or None. A merge or pull of a guarded branch needs
+    <git-common-dir>/check-tdd/pass/<sha>.json from a complete check-tdd run with the default options that covers
+    the commits the merge brings in. A file <git-common-dir>/check-tdd/override/<sha> lets one merge through: only
+    the Principal Engineer creates it, and only on the owner's explicit words. A merge ref that does not resolve is
+    git's to refuse; a pull of a guarded branch that was never fetched is refused, because its tip is unknown."""
     notes = []
     for target in merge_targets(command, cwd):
-        d, ref = target[0], target[1]
-        if not is_guarded(ref) or not os.path.isdir(d):
+        d, ref, pull = target[0], target[1], len(target) == 3
+        if not os.path.isdir(d):
             continue
         sha = git_out(d, "rev-parse", "--verify", "-q", ref + "^{commit}")
         common = git_out(d, "rev-parse", "--path-format=absolute", "--git-common-dir")
-        if not sha or not common:
+        if not common:
             continue
-        if valid_record(os.path.join(common, "check-tdd", "pass", sha + ".json"), sha):
+        if not sha:
+            if pull and is_guarded(ref):
+                return "deny", ("Refused: `git pull %s` brings in a guarded branch whose tip is not known here. Fetch it first "
+                                "(git fetch), then run check-tdd over it and merge with `git merge`." % ref)
+            continue
+        if not is_guarded_tip(d, ref, sha):
+            continue
+        problem = record_problem(os.path.join(common, "check-tdd", "pass", sha + ".json"), sha, d)
+        if problem is None:
             continue
         override = os.path.join(common, "check-tdd", "override", sha)
         if os.path.exists(override):
@@ -210,13 +262,14 @@ def merge_decision(command, cwd):
             continue
         top = git_out(d, "rev-parse", "--show-toplevel") or d
         base = git_out(d, "merge-base", "HEAD", sha) or "main"
+        why = "has no check-tdd pass record" if problem == "missing" else "has a check-tdd pass record that does not count (%s)" % problem
         return "deny", (
-            "Refused: `git merge %s` (%s) has no check-tdd pass record. Run the checker over the branch, in the foreground "
+            "Refused: `git %s %s` (%s) %s. Run the checker over the branch, in the foreground "
             "under the cap, until every commit PASSes: systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 "
             "-p RuntimeMaxSec=900 -- taskset -c <your cores> python3 scripts/tdd/check-tdd.py %s %s..%s  (add --budget "
             "and rerun if it stops incomplete; agents/STANDARDS.md section 3). Do not merge around it. The one exception "
             "is a file %s : only the Principal Engineer creates it, and only on the owner's explicit words."
-            % (ref, sha[:12], top, base[:12], sha, override))
+            % ("pull" if pull else "merge", ref, sha[:12], why, top, base[:12], sha, override))
     if notes:
         return "overridden", "; ".join(notes)
     return None
