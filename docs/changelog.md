@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **BR-2611-anvl-docs-001, BR-2611-anvl-docs-002 (docs).** The language reference's String row now lists the five resolved
+  escapes (`\n \t \r \" \\`), says any other backslash sequence is kept as written (both characters), that there is no `\u` or `\x`,
+  that `"a\"` does not parse, and that strings are byte-length-delimited and carry any bytes. The AML guide's Inheritance
+  section no longer calls the block form `name { ... }` "equivalent" to `name := { ... }` or `:=` "optional": both parse and read
+  the same, but the block form is read-only and can never be a base (4052), shown with the `Grand : Child` example. Docs only;
+  not deployed.
+
 ### Changed
 
 - **Site and docs for v0.13.1-rc.** The downloads page, the Bindings guide (the `*_load_ex` loaders, anvil.js

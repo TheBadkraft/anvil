@@ -16,7 +16,8 @@ level := 12;
 ```
 
 An identifier followed directly by `{` (no `:=`) is an **anonymous object**
-statement — equivalent to `name := { ... };` for parsing purposes:
+statement. It parses like `name := { ... };` and reads back the same, but it is
+read-only and cannot be inherited from (see Inheritance below):
 
 ```anvl
 #!aml
@@ -115,20 +116,33 @@ Attribute values are always strings; the parser never interprets them.
 
 ## Inheritance
 
-The `:=` is optional for an inheriting statement, exactly as it's optional
-for a plain anonymous object — both forms below are equivalent:
+The `:=` form and the block form both parse, and both read back as the same object. They are
+not interchangeable: the block form `name { ... };` is an anonymous, **read-only** block, and it
+can never be a base. Only the `:=` form can be inherited from.
 
 ```anvl
 Base := { a := 1; };
 Child : Base := { b := 2; };
+Grand : Child := { c := 3; };
 ```
+
+This parses. With the block form for `Child`, the same document is rejected where `Grand` tries
+to inherit from it:
 
 ```anvl
 Base := { a := 1; };
-Child : Base {
-    b := 2;
-};
+Child : Base { b := 2; };
+Grand : Child := { c := 3; };
 ```
+
+```
+Cannot inherit from anonymous object (use ':=' for inheritable declarations)
+```
+
+That is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (4052). The error is reported at the statement
+that inherits, not at the statement that chose the block form, so choose the block form only for
+an object nothing will inherit from. A block can still have a base (`Child : Base { ... };`); it
+just can't be one.
 
 ```js
 const child = node.get('Child');
