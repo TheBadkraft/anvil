@@ -17,41 +17,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`scripts/tdd/check-tdd.py`, a mechanical checker of the strict-TDD protocol (STANDARDS section 3).**
-  `check-tdd.py <repo> <base>..<head>` replays the non-merge commits of the range (`--first-parent` for first-parent
-  only) in a scratch clone, runs the repo's suite at each commit and at its parent, and classifies each commit by its
-  `<ticket>: RED.` / `GREEN.` / `PERF.` / `REFACTOR.` subject. RED: a test that passed or did not exist now fails, every
-  newly failing test fails on an assertion (a TypeError, missing export, build error or crash is not RED), and the
-  commit changes tests. GREEN: nothing that passed fails, a failing test passes, the test files of open REDs are
-  unchanged, the targets are named `[tests: a, b]`, tests that flip beyond the named, and a product diff over
-  `--max-green-lines` (150), are batches. PERF: suite green before and after, tests unchanged, and a `[gate: path]`
-  record that says fail -> pass. REFACTOR: suite green before and after, tests unchanged, same test set. Any other
-  commit that touches product code is a FAIL. One line per commit, exit 1 on any FAIL, `--json` for machines,
-  results cached per commit SHA (`--cache`), `--budget` to run in bounded chunks (exit 3, rerun resumes). Adapters:
-  `node` (anvil.js: `npm test` plus `npm run compat`, via the `node-reporter.js` test reporter) and `native`
-  (each `test/unit/test_*.c` through its `make` target, parsed from testbit output). Its own tests,
-  `scripts/tdd/test_check_tdd.py`, build tiny fixture repos with scripted commits (48 cases). Tooling only; no
-  product code changed. Later fixes: `[tests: ...]` is bracket-balanced (names may contain `@[schema]`); native
-  resolves testbit beside the repo, then `~/Projects/repos/testbit`, and exits 2 "testbit not found" instead of
-  reporting bogus results; `--make-var NAME=VALUE` (repeatable, e.g. `BUILD_NUM=500`; without it make takes the
-  commit count from the scratch clone); the cache key includes the testbit path and make variables.
-  Mandatory use (2026-11-02): a `python` adapter (`--adapter python`, auto-picked for a range that only touches
-  `scripts/` or `.claude/hooks/`) runs every `test_*.py` there through `scripts/tdd/python-runner.py` and separates
-  an assertion failure from any other error or an import crash. A complete run with every commit PASS writes
-  `<git-common-dir>/check-tdd/pass/<head-sha>.json` (`head, base, range, adapter, checker_version, checker_commit,
-  date, commits, result`); `check-tdd.py --has-pass <repo> <sha>` exits 0 if one exists and 1 if not, and runs
-  nothing. `.claude/hooks/require-tdd-pass.py` (PreToolUse, Bash) refuses `git merge` of a `feat/ fix/ tools/ perf/
-  chore/` branch (with or without `origin/`; also `git -C dir merge` and `cd dir && git merge`) unless a pass record
-  exists for that exact sha. `release/`, `integration/`, `docs/`, aborts and refs that do not resolve are not its
-  business. A file `<git-common-dir>/check-tdd/override/<sha>`, created only by the Principal Engineer on the owner's
-  explicit words, lets one merge through and is reported. It fails open on an internal error. Both hooks split
-  commands on `| ; &` only outside quotes, so `require-memcap.py` no longer refuses a quoted grep pattern that
-  mentions a runtime. Hook tests are `.claude/hooks/test_*.py`. Register `require-tdd-pass.py` in
-  `.claude/settings.json` to enable it. The result cache is only `--cache`, keyed by repo identity (the git common
-  dir), sha, adapter version and setup (testbit, make variables, `--no-compat`); a result of a suite that did not
-  run, or whose vendored pin was missing, is never written. The summary separates `cache_hits` (files from an
-  earlier invocation) from `reused` (a parent computed earlier in the same run); before, both were reported as
-  "cached", so a fresh cache showed most runs as cached.
+- **`scripts/tdd/check-tdd.py`, a mechanical checker of the strict-TDD protocol (STANDARDS section 3;
+  FR-2611-anvl-tooling-001).** `check-tdd.py <repo> <base>..<head>` replays the non-merge commits of the range
+  (`--first-parent` for first-parent only) in a scratch clone, runs the repo's suite at each commit and at its parent,
+  and classifies each commit by its `<ticket>: RED.` / `GREEN.` / `PERF.` / `REFACTOR.` subject.
+  - **RED:** a test that passed or did not exist now fails, every newly failing test fails on an assertion (a
+    TypeError, missing export, build error or crash is not RED), and the commit changes tests. Replaced tests are a note.
+  - **GREEN:** nothing that passed fails, a failing test passes, the test files of open REDs are unchanged, the
+    targets are named `[tests: a, b]`, nothing flips beyond the named, and the product diff stays under
+    `--max-green-lines` (150). A GREEN may not reduce the test set.
+  - **Names in `[tests: ...]`** are exact: a full test id, a test's own name, or a test file's path (all its tests).
+    The tag is bracket-balanced, so names may contain `@[schema]`.
+  - **PERF:** suite green before and after, tests unchanged, and a `[gate: path]` record that says fail -> pass.
+    **REFACTOR:** suite green before and after, tests unchanged, same test set.
+  - **Untagged** commits may not touch product code or test files.
+  - **Adapters:** `node` (`npm test` and `npm run compat`, through a test reporter; `--no-compat` is refused when
+    `package.json` has a compat script), `native` (each `test/unit/test_*.c` through its `make` target; testbit is
+    found beside the repo or in `~/Projects/repos/testbit`, and `--make-var NAME=VALUE` passes variables such as
+    `BUILD_NUM`) and `python` (`--adapter python`, picked automatically for a range that only touches `scripts/` or
+    `.claude/hooks/`; it runs every `test_*.py` there and separates an assertion failure from any other error or an
+    import crash).
+  - **Output and exit codes:** one line per commit, `--json` for machines; 0 all PASS, 1 any FAIL, 2 usage or setup
+    error with no verdict (a missing vendor pin, a compat run with no events, a missing testbit), 3 incomplete
+    (`--budget` reached; rerun resumes).
+  - **Cache:** only `--cache`, keyed by repo identity, sha, adapter version, a hash of the runner, reporter and
+    adapter sources, and the setup (testbit, make variables, `--no-compat`). A result of a suite that did not run is
+    never written. The summary reports `cache_hits` (files from an earlier invocation) and `reused` (a parent computed
+    earlier in the same run) apart. SIGTERM, SIGHUP and Ctrl-C remove the scratch clone and kill the suite's whole
+    process group.
+  - **Pass records:** a complete run with every commit PASS writes
+    `<git-common-dir>/check-tdd/pass/<head-sha>.json` (`head, base, range, adapter, checker_version, checker_commit,
+    date, commits, result, options`); a FAIL run removes that head's record. `check-tdd.py --has-pass <repo> <sha>`
+    exits 0 if one exists and 1 if not, and runs nothing.
+  - **Merge guard:** `.claude/hooks/require-tdd-pass.py` (PreToolUse, Bash) refuses `git merge` and `git pull` of a
+    `feat/ fix/ tools/ perf/ chore/` branch unless a pass record exists for that exact sha, was made with the default
+    options (not `--lenient-tests`, not a loosened `--batch-limit` or `--max-green-lines`), and has a base that covers
+    the commits the merge brings in. It follows wrapper words, `bash -c`/`eval` strings, `$( )` and backticks, `git -C`
+    and `--git-dir`, every spelling of a branch, and a sha or tag at a guarded tip. `release/`, `integration/`, `docs/`
+    and aborts are exempt. A file `<git-common-dir>/check-tdd/override/<sha>` lets one merge through and is reported;
+    it is made only on the owner's explicit words. It fails open on an internal error. Out of scope, on purpose: git
+    and shell aliases, `$'...'` strings and variable expansion of the subcommand or ref, cherry-pick, rebase,
+    `reset --hard` and `fetch . x:main`, and hand-forged records or override files (the records are advisory and
+    trust-based; forging one is a protocol breach to report). Register the hook in `.claude/settings.json` to enable it.
+  - **Memory-cap hook:** `require-memcap.py` now splits commands on `| ; &` only outside quotes, runs `$( )` and
+    backtick substitutions (also inside double quotes) as commands, parses `bash -c`, `sh -c` and `eval` strings,
+    `xargs` and `find -exec`, and exempts a runtime only when a `systemd-run ... MemoryMax` wrapper is in the same
+    command as the runtime. A table of 106 commands records the expected verdict for each.
+  - **Tests:** `scripts/tdd/test_check_tdd.py` (95 cases) builds tiny fixture repos with scripted commits;
+    `.claude/hooks/test_require_tdd_pass.py` (32 cases) and `.claude/hooks/test_require_memcap.py` (13 cases) cover
+    the hooks. Tooling only; no product code changed.
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
   native-owned corpus that a second implementation (the schema phase of anvil.js) must reproduce byte for byte. A
