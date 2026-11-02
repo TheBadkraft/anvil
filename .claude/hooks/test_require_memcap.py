@@ -65,5 +65,71 @@ class HookOutput(unittest.TestCase):
         self.assertIsNone(run_hook('grep -E "a|node --test" notes.md'))
 
 
+# Regression table (FR-2611-anvl-tooling-001): every command with the runtime the hook must name, or None to allow.
+# The hook is a guardrail against a slip, not a security boundary: `eval "$x"` and aliases are out of scope.
+BASE = [
+    ("node x.js", "node"), ("python3 run.py", "python3"), ("python run.py", "python"), ("python3.11 run.py", "python3.11"),
+    ("npm test", "npm"), ("npx tsc", "npx"), ("make all", "make"), ("dotnet build", "dotnet"), ("/usr/bin/node x.js", "node"),
+    ("cat f | node script.js", "node"), ("echo hi; python3 run.py", "python3"), ("ls && make all", "make"),
+    ("false || npm test", "npm"), ("(cd x && npm test)", "npm"), ("taskset -c 6-7 node x.js", "node"), ("FOO=1 node x.js", "node"),
+    ("nice -n 5 python3 x.py", "python3"), ("timeout 60 node x.js", "node"), ("env A=1 B=2 make all", "make"),
+    ("time node x.js", "node"), ("nohup node x.js", "node"), ("sudo make install", "make"), ("exec python3 x.py", "python3"),
+    ("! node x.js", "node"), ("{ node x.js; }", "node"), ("if true; then node x.js; fi", "node"),
+    ("for f in a b; do python3 $f.py; done", "python3"), ("while true; do make all; done", "make"),
+    ('echo "a|b" | node script.js', "node"), ('echo "a;b"; python3 run.py', "python3"),
+    ("node -e '1'", None), ('python3 -c "print(1)"', None), ("node --version", None), ("python3 -", None), ("make", None), ("npm -v", None),
+    ("ls -l", None), ("git status", None), ("echo node x.js", None), ("cat node.js", None), ("grep -r node src", None),
+    ('grep -E "a|node --test" file', None), ("grep -E 'a|python3 run.py' file", None), ('echo "x; node app.js"', None),
+    ("echo 'a && python3 run.py'", None), ('git commit -m "tidy; python3 adapter notes"', None),
+    ("systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -p RuntimeMaxSec=60 -- node x.js", None),
+    ("systemd-run --user --scope -q -p MemoryMax=4G -- taskset -c 6-7 python3 y.py", None),
+    ("cat <<'EOF'\nyou run it with node x.js\nEOF", None),
+]
+SUBST = [
+    ('echo "$(node x.js)"', "node"), ('x="$(python3 y.py)"', "python3"), ('x="$(make all)"', "make"), ("echo $(npm test)", "npm"),
+    ("x=$(node y.js)", "node"), ("echo `node x.js`", "node"), ('x="`python3 y.py`"', "python3"), ("x=`make all`", "make"),
+    ('echo "a $(echo "$(node x.js)") b"', "node"), ('echo "$(cat f | python3 y.py)"', "python3"), ('f() { echo "$(node x.js)"; }', "node"),
+    ('git commit -m "$(npm test)"', "npm"), ('echo "$(ls)"', None), ('x="$(git rev-parse HEAD)"', None),
+    ("echo '$(node x.js)'", None), ('echo "\\$(node x.js)"', None), ("echo '`node x.js`'", None), ('echo "$(node -e 1)"', None),
+    ('echo "$(date)" "$(whoami)"', None), ("x=$(ls | wc -l)", None),
+]
+SAME_SEGMENT = [
+    ('echo "systemd-run MemoryMax=4G"; node x.js', "node"), ("systemd-run --scope -- node x.js", "node"),
+    ("systemd-run -p MemoryMax=4G -- true && node x.js", "node"), ("node x.js # systemd-run -p MemoryMax=4G", "node"),
+    ("systemd-run -p MemoryMax=4G -- node a.js; node b.js", "node"), ("echo MemoryMax systemd-run | node x.js", "node"),
+    ("systemd-run --user -p RuntimeMaxSec=9 -- python3 y.py", "python3"), ("MemoryMax=4G node x.js", "node"),
+    ("systemd-run -p MemoryMax=4G -- node x.js", None), ("systemd-run --property=MemoryMax=2G --scope -- make all", None),
+    ("systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -- taskset -c 6-7 npm test", None),
+]
+SHELL_STRINGS = [
+    ('bash -c "node x.js"', "node"), ("sh -c 'python3 y.py'", "python3"), ('bash -lc "make all"', "make"), ('eval "node x.js"', "node"),
+    ("eval node x.js", "node"), ("xargs node", "node"), ("echo a | xargs -n1 python3 y.py", "python3"), ("xargs -I{} node {}", "node"),
+    ("find . -name x -exec node {} \\;", "node"), ("find . -exec python3 y.py {} +", "python3"), ('bash -c "echo $(node x.js)"', "node"),
+    ("sudo bash -c 'make all'", "make"), ('env X=1 bash -c "npm test"', "npm"), ("time bash -c 'node x.js'", "node"),
+    ("bash -c 'bash -c \"node x.js\"'", "node"), ("find . -execdir make {} \\;", "make"),
+    ('bash -c "echo hi"', None), ("bash script.sh", None), ("xargs echo", None), ("find . -name x -exec ls {} \\;", None),
+    ('eval "ls"', None), ("bash -c 'node -e 1'", None), ("xargs node -e 1", None), ('systemd-run -p MemoryMax=1G -- bash -c "node x.js"', None),
+    ("xargs -n1 systemd-run -p MemoryMax=1G -- node", None), ("find . -type f | xargs grep node", None),
+]
+
+
+class RegressionTable(unittest.TestCase):
+    def table(self, rows):
+        got = {c: hook.heavy_use(c) for c, _ in rows}
+        self.assertEqual(got, dict(rows))
+
+    def test_the_corpus_has_at_least_eighty_commands(self):
+        self.assertGreaterEqual(len(BASE) + len(SUBST) + len(SAME_SEGMENT) + len(SHELL_STRINGS), 80)
+
+    def test_base_behaviour(self):
+        self.table(BASE)
+
+    def test_substitutions_in_and_out_of_double_quotes(self):
+        self.table(SUBST)
+
+    def test_the_cap_exempts_only_the_command_it_wraps(self):
+        self.table(SAME_SEGMENT)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
