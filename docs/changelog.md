@@ -15,7 +15,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **FR-2611-anvl-docs-001 (docs tooling).** `scripts/docs/check-examples.py` runs every fenced code sample in `docs/` and
+  `site/assets/docs/` against the packages being published and fails on any error: ANVL/AML/AMP documents through
+  `anvil-dump` (built from the native tag) and anvil.js, which must both accept a document or both reject it with the marked code;
+  js samples in Node against the anvil.js tarball; C samples compiled and linked against the core package; Python and C#
+  samples against anvil.py and anvil.net when the toolchain is there (otherwise reported as SKIP with the reason, never as
+  PASS). Packages are given as `--core`, `--js`, `--py`, `--net` (a directory, a tarball or a URL, so a docs-only deploy can
+  check the live downloads); `--dump` takes the `anvil-dump` binary; `--strict` fails the run on a skip caused by a missing
+  package or toolchain. Samples are marked with HTML comments before the fence: `fragment [reason]`, `error <code>`,
+  `setup <name>` / `uses <name>`, `output`, `alias <name>`; a sample with no marker that fails is a FAIL. 58 tests
+  (`python3 scripts/docs/test_check_examples.py`). The Technical Writer runs it before every publication.
+
 ### Fixed
+
+- **FR-2611-anvl-docs-001 (docs).** The first run of the example check over the current docs found and fixed:
+  the AMP guide named four error codes that do not exist (`AMP_OBJECT_FORBIDDEN`, `AMP_VARREF_FORBIDDEN`,
+  `AMP_ATTRIBUTE_FORBIDDEN`, `AMP_INHERITANCE_FORBIDDEN`) and said an object inside a tuple is `AMP_OBJECT_FORBIDDEN`: native and
+  anvil.js reject an object, a VarRef, an attribute and inheritance with 3100 (`ANVL_ERR_PARSER_UNEXPECTED_TOKEN`) and any
+  non-scalar array or tuple element, an object included, with 4401 (`ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR`); the getting-started
+  `print_value` output block never matched the code (the sample had no driver, and array elements print one level deeper,
+  4 spaces); the Bindings guide's samples that read `config.anvl` never showed it, and several samples lacked a `using`, an
+  import, a `require` or a defined variable. The check now runs these samples as written.
 
 - **BR-2611-anvl-docs-001, BR-2611-anvl-docs-002 (docs).** The language reference's String row now lists the five resolved
   escapes (`\n \t \r \" \\`), says any other backslash sequence is kept as written (both characters), that there is no `\u` or `\x`,
