@@ -25,7 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PASS). Packages are given as `--core`, `--js`, `--py`, `--net` (a directory, a tarball or a URL, so a docs-only deploy can
   check the live downloads); `--dump` takes the `anvil-dump` binary; `--strict` fails the run on a skip caused by a missing
   package or toolchain. Samples are marked with HTML comments before the fence: `fragment [reason]`, `error <code>`,
-  `setup <name>` / `uses <name>`, `output`, `alias <name>`; a sample with no marker that fails is a FAIL. 58 tests
+  `setup <name>` / `uses <name>`, `output`, `alias <name>`, `lang <name>`; a sample with no marker that fails is a FAIL. It also scans the
+  `<pre><code>` blocks of `site/*.html`, with the same markers as HTML comments. A `fragment` marker needs a reason (without
+  one it is a FAIL), the summary counts fragments and `--list-fragments` lists them with file, line and reason; an `error`
+  marker on anything but a document is a bad marker; `python3` and `py3` are Python, and a label naming an executable language
+  the tool does not run (`ts`, `cpp`, `jsx`, ...) is a skip that `--strict` fails. 67 tests
   (`python3 scripts/docs/test_check_examples.py`). The Technical Writer runs it before every publication.
 
 ### Fixed
@@ -37,7 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-scalar array or tuple element, an object included, with 4401 (`ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR`); the getting-started
   `print_value` output block never matched the code (the sample had no driver, and array elements print one level deeper,
   4 spaces); the Bindings guide's samples that read `config.anvl` never showed it, and several samples lacked a `using`, an
-  import, a `require` or a defined variable. The check now runs these samples as written.
+  import, a `require` or a defined variable. The check now runs these samples as written. The AMP page (`amp.html`) had the
+  same wrong codes as the AMP guide (and a fifth, `AMP_ARRAY_ELEMENT_NOT_SCALAR`; the real name is `ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR`, 4401)
+  and is corrected; the download page's C# and Python samples read a `config.anvl` they never showed. The getting-started and
+  schema C fragments and the Bindings guide's schema samples now run, with the files they read shown.
 
 - **BR-2611-anvl-docs-001, BR-2611-anvl-docs-002 (docs).** The language reference's String row now lists the five resolved
   escapes (`\n \t \r \" \\`), says any other backslash sequence is kept as written (both characters), that there is no `\u` or `\x`,
