@@ -36,9 +36,13 @@ GIT_VALUE_OPTIONS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-pa
 
 
 def split_segments(command):
-    """Split into simple commands on separators outside quotes (a `|` in `grep -E "a|git merge x"` is a pattern).
-    Unbalanced quotes fall back to splitting everywhere."""
-    segs, cur, quote, i = [], [], None, 0
+    return [text for text, _ in split_with_separators(command)]
+
+
+def split_with_separators(command):
+    """[(simple command, the separator that came before it)], split on separators outside quotes (a `|` in
+    `grep -E "a|git merge x"` is a pattern). Unbalanced quotes fall back to splitting everywhere."""
+    segs, cur, quote, i, sep = [], [], None, 0, ";"
     while i < len(command):
         c = command[i]
         if quote:
@@ -58,15 +62,15 @@ def split_segments(command):
         else:
             m = re.match(SEPARATORS, command[i:])
             if m:
-                segs.append("".join(cur))
-                cur = []
+                segs.append(("".join(cur), sep))
+                cur, sep = [], m.group(0)
                 i += len(m.group(0))
                 continue
             cur.append(c)
         i += 1
     if quote:
-        return re.split(SEPARATORS, command)
-    segs.append("".join(cur))
+        return [(s, ";") for s in re.split(SEPARATORS, command)]
+    segs.append(("".join(cur), sep))
     return segs
 
 
@@ -198,47 +202,87 @@ def _alias(sub, args, aliases):
         aliases[pos[0]] = pos[1]
 
 
+def _git_targets(words, here, aliases, stdin_refs=()):
+    """Targets of one `git ...` command (words[0] is git). `stdin_refs` are refs that xargs feeds a `git merge`."""
+    out = []
+    d, j = _git_global_options(words, here)
+    sub, args = (words[j], words[j + 1:]) if j < len(words) else ("", [])
+    if sub == "merge" and not ABORTING & set(args):
+        for a in list(_positionals(args)) + list(stdin_refs):
+            out.append((d, a, "unknown") if SUBST_MARK in a else (d, a))
+            if a in aliases:
+                out.append((d, aliases[a]))
+    elif sub == "pull":
+        pos = _positionals(args)
+        for spec in pos[1:]:
+            src = spec.split(":", 1)[0].lstrip("+")
+            if SUBST_MARK in src:
+                out.append((d, src, "unknown"))
+            elif src:
+                out.append((d, src if pos[0] == "." else "%s/%s" % (pos[0], src), "pull"))
+    else:
+        _alias(sub, args, aliases)
+    return out
+
+
+def _shell_strings(words, name, piped_from):
+    """Command lines a shell (or eval) is given: `-c STRING`, a herestring, or the text piped in by echo/printf."""
+    if name == "eval":
+        return [" ".join(words[1:])]
+    strings = [words[k + 1] for k, a in enumerate(words[1:-1], 1) if a.startswith("-") and not a.startswith("--") and "c" in a]
+    for k, w in enumerate(words):
+        if w.startswith("<<<"):
+            strings.append(w[3:] or (words[k + 1] if k + 1 < len(words) else ""))
+    bare = not strings and all(w.startswith("-") for w in words[1:])  # reads its commands from standard input
+    if bare and piped_from and piped_from[0].rsplit("/", 1)[-1] in ("echo", "printf"):
+        strings.append(" ".join(piped_from[1:]))
+        strings += piped_from[1:]
+    return list(dict.fromkeys(strings))
+
+
+def _xargs_git(words, here, aliases, piped_from):
+    """`xargs [options] git merge ...`: the refs come from the pipe (echo/printf: its words; else unknown)."""
+    k, value_options = 1, (_MEMCAP.XARGS_VALUE_OPTIONS if _MEMCAP else set())
+    while k < len(words) and words[k].startswith("-") and words[k] != "--":
+        k += 2 if words[k] in value_options else 1
+    sub = _strip(words[k + (1 if k < len(words) and words[k] == "--" else 0):])
+    if not sub or sub[0].rsplit("/", 1)[-1] != "git":
+        return []
+    if piped_from and piped_from[0].rsplit("/", 1)[-1] in ("echo", "printf"):
+        stdin = [w for w in piped_from[1:] if not w.startswith("-")]
+    else:
+        stdin = [SUBST_MARK] if piped_from else []  # something other than echo feeds it: unknown refs
+    return _git_targets(sub, here, aliases, stdin)
+
+
 def merge_targets(command, cwd, depth=0, aliases=None):
     """[(directory, ref)] for every ref a `git merge` names, [(directory, "<remote>/<branch>", "pull")] for a
-    `git pull`, and [(directory, text, "unknown")] for a ref that is computed ($( ) or backticks), in the command and
-    in what it runs: `cd <dir> &&`, `git -C <dir>`, `--git-dir`, wrapper words and their options, `bash -c`/`eval`
-    strings, substitutions. A branch made earlier in the command line (`git branch tmp feat/x; git merge tmp`) also
-    yields its start. --abort/--continue/--quit name nothing."""
-    out, here = [], cwd
+    `git pull`, and [(directory, text, "unknown")] for a ref that is computed ($( ) or backticks, or xargs input from
+    something other than echo), in the command and in what it runs: `cd <dir> &&`, `git -C <dir>`, `--git-dir`,
+    wrapper words and their options, `bash -c`/`eval` strings, a command line piped or herestring-ed into a shell,
+    `xargs git merge`, substitutions. A branch made earlier in the command line (`git branch tmp feat/x; git merge
+    tmp`) also yields its start. --abort/--continue/--quit name nothing."""
+    out, here, prev = [], cwd, []
     aliases = {} if aliases is None else aliases
     if depth > 4:
         return out
     for inner in substitutions(command):
         out += merge_targets(inner, here, depth + 1, aliases)
-    for seg in split_segments(_mask(command)):
+    for seg, sep in split_with_separators(_mask(command)):
         words = _strip(_words(seg))
+        piped_from, prev = (prev if sep == "|" else []), words
         if not words:
             continue
         name = words[0].rsplit("/", 1)[-1]
         if name == "cd" and len(words) > 1:
             here = _join(here, words[1])
         elif name in SHELLS or name == "eval":
-            strings = [words[k + 1] for k, a in enumerate(words[1:-1], 1) if a.startswith("-") and not a.startswith("--") and "c" in a] if name in SHELLS else [" ".join(words[1:])]
-            for s in strings:
+            for s in _shell_strings(words, name, piped_from):
                 out += merge_targets(s, here, depth + 1, aliases)
+        elif name == "xargs":
+            out += _xargs_git(words, here, aliases, piped_from)
         elif name == "git":
-            d, j = _git_global_options(words, here)
-            sub, args = (words[j], words[j + 1:]) if j < len(words) else ("", [])
-            if sub == "merge" and not ABORTING & set(args):
-                for a in _positionals(args):
-                    out.append((d, a, "unknown") if SUBST_MARK in a else (d, a))
-                    if a in aliases:
-                        out.append((d, aliases[a]))
-            elif sub == "pull":
-                pos = _positionals(args)
-                for spec in pos[1:]:
-                    src = spec.split(":", 1)[0].lstrip("+")
-                    if SUBST_MARK in src:
-                        out.append((d, src, "unknown"))
-                    elif src:
-                        out.append((d, src if pos[0] == "." else "%s/%s" % (pos[0], src), "pull"))
-            else:
-                _alias(sub, args, aliases)
+            out += _git_targets(words, here, aliases)
     return out
 
 
