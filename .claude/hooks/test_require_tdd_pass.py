@@ -6,6 +6,7 @@
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -69,6 +70,110 @@ class Guarded(unittest.TestCase):
     def test_exempt_and_unrelated_names(self):
         for r in ("release/v1", "origin/release/v1", "integration/v0.13-native-fixes", "docs/x", "main", "origin/main", "feat", "feature/x", "a1b2c3d"):
             self.assertFalse(hook.is_guarded(r), r)
+
+
+def run_hook(command, cwd, raw=None):
+    payload = raw if raw is not None else json.dumps({"tool_input": {"command": command}, "cwd": cwd})
+    p = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    out = json.loads(p.stdout) if p.stdout.strip() else None
+    return p.returncode, out, p.stderr
+
+
+def verdict(out):
+    return out["hookSpecificOutput"]["permissionDecision"] if out and "permissionDecision" in out.get("hookSpecificOutput", {}) else "allow"
+
+
+def reason(out):
+    return json.dumps(out) if out else ""
+
+
+class Decision(unittest.TestCase):
+    def sh(self, *a):
+        return subprocess.run(["git", "-C", self.repo, *a], check=True, capture_output=True, text=True).stdout.strip()
+
+    def setUp(self):
+        self.repo = os.path.realpath(tempfile.mkdtemp(prefix="ctdd-hook-"))
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        self.sh("init", "-q", "-b", "main")
+        for k, v in (("user.email", "t@example.org"), ("user.name", "t"), ("commit.gpgsign", "false")):
+            self.sh("config", k, v)
+        self.sh("commit", "-q", "--allow-empty", "-m", "init")
+        for b in ("feat/x", "release/v1", "docs/x", "integration/i", "fix/r"):
+            self.sh("checkout", "-q", "-b", b, "main")
+            self.sh("commit", "-q", "--allow-empty", "-m", b)
+        self.sh("checkout", "-q", "main")
+        self.sh("update-ref", "refs/remotes/origin/fix/r", self.sh("rev-parse", "fix/r"))
+        self.sha = self.sh("rev-parse", "feat/x")
+        self.common = os.path.join(self.repo, ".git")
+
+    def record(self, sha=None, **over):
+        sha = sha or self.sha
+        d = os.path.join(self.common, "check-tdd", "pass")
+        os.makedirs(d, exist_ok=True)
+        rec = {"head": sha, "result": "pass"}
+        rec.update(over)
+        with open(os.path.join(d, sha + ".json"), "w") as f:
+            json.dump(rec, f)
+
+    def decide(self, command, cwd=None):
+        rc, out, err = run_hook(command, cwd or self.repo)
+        self.assertEqual(rc, 0, err)
+        return verdict(out), out, err
+
+    def test_denied_without_a_record_naming_the_command_and_the_override(self):
+        v, out, _ = self.decide("git merge feat/x")
+        self.assertEqual(v, "deny")
+        text = out["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertRegex(text, r"check-tdd\.py %s \S+\.\.%s" % (re.escape(self.repo), self.sha))
+        self.assertIn(os.path.join(self.common, "check-tdd", "override", self.sha), text)
+        self.assertIn("owner", text)
+
+    def test_allowed_with_a_pass_record_for_that_sha(self):
+        self.record()
+        self.assertEqual(self.decide("git merge feat/x")[0], "allow")
+
+    def test_a_record_for_another_sha_or_a_failed_record_does_not_count(self):
+        self.record(self.sh("rev-parse", "fix/r"))
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(result="fail")
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+        self.record(head="0" * 40)
+        self.assertEqual(self.decide("git merge feat/x")[0], "deny")
+
+    def test_an_override_file_lets_it_through_and_says_so(self):
+        d = os.path.join(self.common, "check-tdd", "override")
+        os.makedirs(d)
+        open(os.path.join(d, self.sha), "w").close()
+        v, out, err = self.decide("git merge feat/x")
+        self.assertEqual(v, "allow")
+        self.assertIn("overridden", reason(out) + err)
+
+    def test_exempt_branches_and_unresolvable_refs_and_aborts_pass(self):
+        for c in ("git merge release/v1", "git merge --ff-only release/v1", "git merge docs/x", "git merge integration/i",
+                  "git merge feat/missing", "git merge --abort", "git merge --continue", "git merge main"):
+            self.assertEqual(self.decide(c)[0], "allow", c)
+
+    def test_directory_forms_and_remote_names_are_guarded(self):
+        for c in ("git -C %s merge feat/x" % self.repo, "cd %s && git merge feat/x" % self.repo, "git merge --no-ff -m 'ship it; now' feat/x",
+                  "git merge --ff-only feat/x", "git merge origin/fix/r"):
+            cwd = "/" if "-C" in c or "cd " in c else self.repo
+            self.assertEqual(self.decide(c, cwd)[0], "deny", c)
+
+    def test_a_quoted_mention_is_not_a_merge(self):
+        for c in ('grep -E "a|git merge feat/x" notes.md', 'echo "git merge feat/x"', "git log feat/x", "ls"):
+            self.assertEqual(self.decide(c)[0], "allow", c)
+
+    def test_outside_a_repository_nothing_resolves(self):
+        d = tempfile.mkdtemp(prefix="ctdd-nogit-")
+        self.addCleanup(shutil.rmtree, d, True)
+        self.assertEqual(self.decide("git merge feat/x", d)[0], "allow")
+
+    def test_internal_errors_fail_open_with_a_note(self):
+        rc, out, err = run_hook(None, None, raw="not json")
+        self.assertEqual((rc, out), (0, None))
+        rc, out, err = run_hook(None, None, raw=json.dumps({"tool_input": {"command": 5}, "cwd": self.repo}))
+        self.assertEqual((rc, out), (0, None))
+        self.assertIn("check-tdd hook error", err)
 
 
 if __name__ == "__main__":
