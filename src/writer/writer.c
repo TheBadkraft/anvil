@@ -358,6 +358,13 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base) 
    return true;
 }
 
+bool anvil_writer_statement_block(anvil_writer w, const char *name, const char *base) {
+   (void)w;
+   (void)name;
+   (void)base;
+   return false; // stub (BR-2611-anvl-writer-001)
+}
+
 /* ----------------------------------------------------------------------- *
  * Values
  * ----------------------------------------------------------------------- */

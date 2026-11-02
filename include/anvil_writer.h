@@ -105,6 +105,17 @@ bool anvil_writer_include(anvil_writer w, const char *path);
  */
 bool anvil_writer_statement(anvil_writer w, const char *name, const char *base);
 
+/**
+ * @brief Begin a block-form statement at the top level or inside an object: the anonymous, read-only
+ * form `name [: base] [@[attributes]] { ... };`. Complete it with anvil_writer_begin_object and
+ * anvil_writer_end_object; any other value fails with ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT. AML only
+ * (ANVIL_WRITER_ERR_DIALECT in AMP). Names, attributes and the base follow anvil_writer_statement. A
+ * block-form statement cannot itself be a base: the reader rejects that (4052), so the writer refuses a
+ * base that names a block-form statement already written at the top level with
+ * ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM. (A base declared later, or by an included file, is not seen here.)
+ */
+bool anvil_writer_statement_block(anvil_writer w, const char *name, const char *base);
+
 /* ---- scalar values ----------------------------------------------------- */
 
 bool anvil_writer_null(anvil_writer w);

@@ -107,6 +107,15 @@ anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *n
 /** @brief Declare an inheritance base. The statement's value must be an object. AML only. A member
  * handle of another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT, as for the node handles. */
 bool anvil_builder_set_base(anvil_builder b, anvil_member member, const char *base);
+/**
+ * @brief Mark a statement as block form: emitted as `name [: base] [@[attributes]] { ... };`, the
+ * anonymous, read-only form, instead of `name := { ... };`. The statement's value must be an object
+ * (ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT); AML only. `block` false restores the default form. A
+ * block-form statement cannot be a base: emit and write refuse a document where some member's base
+ * names a top-level block-form member with ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM (the reader rejects it,
+ * 4052), whether or not the builder holds an include, since the member is known.
+ */
+bool anvil_builder_set_block(anvil_builder b, anvil_member member, bool block);
 /** @brief Statement attribute; same rules as anvil_writer_attribute. AML only. A member handle of
  * another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT. */
 bool anvil_builder_member_attribute(anvil_builder b, anvil_member member, const char *key, const char *value);

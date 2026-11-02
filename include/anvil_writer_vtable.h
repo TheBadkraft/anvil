@@ -57,6 +57,7 @@ typedef struct anvil_writer_i {
    bool (*end_object)(anvil_writer w);
    bool (*finish)(anvil_writer w);
    const char *(*data)(anvil_writer w, size_t *length);
+   bool (*statement_block)(anvil_writer w, const char *name, const char *base);
 } anvil_writer_i;
 extern const anvil_writer_i Writer;
 

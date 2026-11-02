@@ -564,6 +564,13 @@ bool anvil_builder_set_base(anvil_builder b, anvil_member m, const char *base) {
    return outcome(b, ANVIL_WRITER_OK);
 }
 
+bool anvil_builder_set_block(anvil_builder b, anvil_member m, bool block) {
+   (void)b;
+   (void)m;
+   (void)block;
+   return false; // stub (BR-2611-anvl-writer-001)
+}
+
 bool anvil_builder_member_attribute(anvil_builder b, anvil_member m, const char *key, const char *value) {
    if (!member_ready(b, m)) {
       return false;

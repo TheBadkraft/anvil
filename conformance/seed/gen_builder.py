@@ -375,6 +375,87 @@ case(BS, "non_object_set_base_does_not_stick", [let("v", "int 1"), let("m", 'add
 case(BS, "target_is_failed_member", [let("t", "int 1"), 'add NULL "target" t', 'add NULL "target" t', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"], cont=True)
 case(BS, "amp_set_base", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_base m "b"', "get_error"], "AMP", cont=True)
 
+# ============================================================================================ block form (BR-2611-anvl-writer-001)
+# set_block marks a statement as the anonymous, read-only block form `name [: base] [@[attributes]] { ... };`. A top-level
+# block-form member cannot be a base (the reader's 4052): emit and write refuse it with BASE_IS_BLOCK_FORM.
+BK = "blockform"
+def blk(name="blk", h="o", mh="m", field="k", v="1"):
+    """a top-level object member, bound to mh"""
+    return [let(h + "_v", "int " + v), let(h, "object"), 'add %s %s %s_v' % (h, q(field), h), let(mh, 'add NULL %s %s' % (q(name), h))]
+def derived(name="derived", h="d", mh="dm"):
+    return [let(h, "object"), let(h + "x", "int 2"), 'add %s "j" %sx' % (h, h), let(mh, 'add NULL %s %s' % (q(name), h))]
+case(BK, "simple", blk() + ['set_block m true', "emit"])
+case(BK, "simple_write", blk() + ['set_block m true', "write"])
+case(BK, "default_off", blk() + ["emit"], desc="without set_block the form is name := { ... };")
+case(BK, "false_is_default", blk() + ['set_block m false', "emit"])
+case(BK, "on_then_off", blk() + ['set_block m true', "emit", 'set_block m false', "emit"])
+case(BK, "off_then_on", blk() + ['set_block m false', 'set_block m true', "emit"])
+case(BK, "on_twice", blk() + ['set_block m true', 'set_block m true', "emit"])
+case(BK, "two_members", blk("a", "oa", "ma") + blk("b", "ob", "mb") + ['set_block ma true', 'set_block mb true', "emit"])
+case(BK, "mixed", blk("a", "oa", "ma") + blk("b", "ob", "mb") + blk("c", "oc", "mc") + ['set_block mb true', "emit"])
+case(BK, "with_base", blk("base", "ob", "mb") + blk("d", "od", "md", "x", "2") + ['set_block md true', 'set_base md "base"', "emit"])
+case(BK, "base_before_block", blk("base", "ob", "mb") + blk("d", "od", "md", "x", "2") + ['set_base md "base"', 'set_block md true', "emit"], desc="the order of set_base and set_block does not matter")
+case(BK, "with_attributes", blk() + ['set_block m true', 'member_attribute m "env" "production"', 'member_attribute m "flag" NULL', 'member_attribute_string m "note" "a, b"', "emit"])
+case(BK, "attributes_before_block", blk() + ['member_attribute m "env" "production"', 'set_block m true', "emit"])
+case(BK, "base_and_attributes", blk("base", "ob", "mb") + blk("d", "od", "md", "x", "2") + ['set_block md true', 'set_base md "base"', 'member_attribute md "k" "v"', "emit"])
+case(BK, "nested_member", [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true',
+                           let("w", "int 2"), 'add outer "after" w', 'add NULL "outer" outer', "emit"])
+case(BK, "nested_in_nested", [let("v", "int 1"), let("c", "object"), 'add c "x" v', let("b", "object"), let("cm", 'add b "c" c'), 'set_block cm true', let("a", "object"), let("bm", 'add a "b" b'), 'set_block bm true',
+                              let("am", 'add NULL "a" a'), 'set_block am true', "emit"])
+case(BK, "nested_with_base", blk("base", "ob", "mb") + [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true', 'set_base im "base"',
+                                                      'member_attribute im "k" "v"', 'add NULL "outer" outer', "emit"], desc="a nested block form has a base looked up among the top-level names")
+case(BK, "array_of_objects_inside", [let("a", "array"), let("o1", "object"), let("k1", "int 1"), 'add o1 "k" k1', let("o2", "object"), let("k2", "int 2"), 'add o2 "k" k2', "append a o1", "append a o2",
+                                     let("p", "object"), 'add p "list" a', let("pm", 'add NULL "p" p'), 'set_block pm true', "emit"])
+case(BK, "with_header", ['attribute "doc" NULL', 'include "inc.anvl"'] + blk() + ['set_block m true', "emit"])
+case(BK, "fields_of_every_kind", [let("o", "object"), let("a", "int 1"), 'add o "a" a', let("b", 'string "s"'), 'add o "b" b', let("c", "array"), let("c1", "int 1"), "append c c1", 'add o "c" c',
+                                  let("d", "tuple"), let("d1", "int 1"), let("d2", "int 2"), "append d d1", "append d d2", 'add o "d" d', let("e", "null"), 'add o "e" e', let("f", 'blob "t" "x"'), 'add o "f" f',
+                                  let("g", 'varref "a"'), 'add o "g" g', let("m", 'add NULL "p" o'), 'set_block m true', "emit"])
+case(BK, "many_members_100", sum([[let("v%d" % i, "int %d" % i), let("o%d" % i, "object"), 'add o%d "x" v%d' % (i, i), let("m%d" % i, 'add NULL "b%d" o%d' % (i, i)), 'set_block m%d true' % i] for i in range(100)], []) + ["emit"])
+case(BK, "emit_twice", blk() + ['set_block m true', "emit", "emit"])
+case(BK, "emit_after_change", blk() + ["emit", 'set_block m true', "emit", 'set_block m false', "emit"])
+case(BK, "write_then_emit", blk() + ['set_block m true', "write", "emit", "write"])
+case(BK, "member_from_find", blk() + [let("f", 'find NULL "blk"'), 'set_block f true', "emit"])
+# errors at set_block
+for k in ("null", "bool true", "int 1", 'string "s"', 'bare "x"', 'blob "t" "d"', 'varref "r"', "array", "tuple"):
+    nm = k.split()[0]
+    case(BK, "non_object_value_%s" % nm, [let("v", k), let("m", 'add NULL "n" v'), 'set_block m true', "get_error", "emit"], cont=True, desc="a block-form statement takes an object")
+case(BK, "non_object_array_filled", [let("v", "array"), let("x", "int 1"), "append v x", let("m", 'add NULL "n" v'), 'set_block m true', "get_error", "emit"], cont=True)
+case(BK, "non_object_off_is_fine", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m false', "get_error", "emit"], cont=True)
+case(BK, "non_object_does_not_stick", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m true', "emit"], cont=True)
+case(BK, "null_member", ['set_block NULL true', "get_error"], cont=True)
+case(BK, "null_member_false", ['set_block NULL false', "get_error"], cont=True)
+case(BK, "foreign_member", [let("o", "object"), let("m", 'add NULL "o" o'), 'other set_block m true', "other get_error", "get_error", "emit"], cont=True, b2="AML",
+     desc="a member of another builder is INVALID_ARGUMENT, as for set_base")
+case(BK, "foreign_member_dialect_order", [let("v", "int 1"), let("m", 'add NULL "v" v'), 'other set_block m true', "other get_error"], cont=True, b2="AMP", desc="the foreign check comes before the dialect check")
+case(BK, "amp", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m true', "get_error", "emit"], "AMP", cont=True, desc="AMP has no block form")
+case(BK, "amp_off", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m false', "get_error"], "AMP", cont=True)
+case(BK, "dialect_invalid", ['set_block NULL true', "get_error"], "9", cont=True, desc="the null builder")
+# a block-form member as a base
+case(BK, "base_is_block", blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit", "write", "get_error"], cont=True,
+     desc="the reader rejects a block as a base (4052): emit and write refuse it")
+case(BK, "base_is_block_set_first", blk() + derived() + ['set_base dm "blk"', 'set_block m true', "emit"], cont=True)
+case(BK, "base_is_block_then_off", blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit", 'set_block m false', "emit"], cont=True,
+     desc="the builder is unchanged by the refusal: turning the option off makes the document legal")
+case(BK, "base_is_block_then_rebased", blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit"] + blk("other", "oo", "mo") + ['set_base dm "other"', "emit"], cont=True)
+case(BK, "block_has_base_itself", blk("base", "ob", "mb") + blk("d", "od", "md", "x", "2") + ['set_block md true', 'set_base md "base"', "emit"], desc="a block-form member may have an ordinary base")
+case(BK, "block_based_on_block", blk("a", "oa", "ma") + blk("b", "ob", "mb") + ['set_block ma true', 'set_block mb true', 'set_base mb "a"', "emit"], cont=True)
+case(BK, "block_chain_through_block", blk("c", "oc", "mc") + blk("b", "ob", "mb") + blk("a", "oa", "ma") + ['set_block mb true', 'set_base mb "c"', 'set_base ma "b"', "emit"], cont=True)
+case(BK, "two_blocks_on_each_other", blk("p", "op", "mp") + blk("q", "oq", "mq") + ['set_block mp true', 'set_block mq true', 'set_base mp "q"', 'set_base mq "p"', "emit"], cont=True,
+     desc="reported as BASE_IS_BLOCK_FORM, not as a cycle")
+case(BK, "self_base_block", blk("p", "op", "mp") + ['set_block mp true', 'set_base mp "p"', "emit"], cont=True)
+case(BK, "nested_member_base_is_block", blk() + [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block m true', 'set_base im "blk"', 'add NULL "outer" outer', "emit"], cont=True)
+case(BK, "unattached_member_base_is_block", blk() + [let("v", "int 1"), let("loose", "object"), let("inner", "object"), 'add inner "x" v', let("lm", 'add loose "n" inner'), 'set_block m true', 'set_base lm "blk"', "emit"], cont=True,
+     desc="a member of an object that is never attached is checked too")
+case(BK, "base_is_block_with_include", ['include "x.anvl"'] + blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit"], cont=True,
+     desc="an include does not excuse it: the builder holds the member")
+case(BK, "base_is_nested_block_name_only", [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true', 'add NULL "outer" outer'] + derived() + ['set_base dm "inner"', "emit"], cont=True,
+     desc="a nested block form is not a top-level name: the base names nothing (MISSING_BASE)")
+case(BK, "base_is_block_vs_scalar_first", [let("n", "int 1"), 'add NULL "n" n'] + blk() + derived() + derived("e", "e", "em") + ['set_block m true', 'set_base dm "blk"', 'set_base em "n"', "emit"], cont=True,
+     desc="the first member in order is reported")
+case(BK, "base_is_block_vs_missing", blk() + derived() + derived("e", "e", "em") + ['set_block m true', 'set_base dm "blk"', 'set_base em "nothere"', "emit"], cont=True,
+     desc="a block-form base is reported before a missing one")
+case(BK, "many_derived_one_block_base", blk() + sum([[let("d%d" % i, "object"), let("x%d" % i, "int %d" % i), 'add d%d "j" x%d' % (i, i), let("m%d" % i, 'add NULL "d%d" d%d' % (i, i)), 'set_base m%d "blk"' % i] for i in range(4)], []) + ['set_block m true', "emit"], cont=True)
+
 # ============================================================================================ find
 FD = "find"
 case(FD, "found_top", [let("v", "int 1"), 'add NULL "a" v', 'find NULL "a"'])
