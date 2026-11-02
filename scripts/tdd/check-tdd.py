@@ -387,6 +387,25 @@ def test_names(tid):
     return names
 
 
+def join_names(parts, tests):
+    """`[tests: a, b]` splits on commas, but a test name may hold ', ': join neighbouring parts while the joined text
+    is the name of a test (the longest join first)."""
+    known = set()
+    for t in tests:
+        known |= test_names(t)
+    out, i = [], 0
+    while i < len(parts):
+        for j in range(len(parts), i, -1):
+            if ", ".join(parts[i:j]) in known:
+                out.append(", ".join(parts[i:j]))
+                i = j
+                break
+        else:
+            out.append(parts[i])
+            i += 1
+    return out
+
+
 def name_matches(name, tid):
     return name in test_names(tid)
 
@@ -443,7 +462,7 @@ def judge(kind, parent, cur, facts, state, opts):
             locked |= {f for f in facts["test_files"] if f in r["files"]}
         if locked:
             reasons.append("test file(s) of an open RED changed: %s" % ", ".join(sorted(locked)))
-        names = facts["named"]
+        names = join_names(facts["named"], ct)
         if not names:
             msg = "no [tests: ...] named"
             if opts.lenient_tests:
