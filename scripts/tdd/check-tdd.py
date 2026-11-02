@@ -234,6 +234,8 @@ class NodeAdapter(Adapter):
             scripts = {}
         if tests and "compat" in scripts and not opts.no_compat:
             ctests, cnote = self._events(["npm", "run", "compat", "--silent"], work, opts, "", inner_tap=True)
+            if not ctests:
+                raise SetupError("`npm run compat` produced no test events, so its tests were not measured: %s" % cnote)
             for tid, rec in ctests.items():
                 tests["compat:" + re.sub(r"^/[^ ]*?anvil-compat-[^/]+/", "", tid)] = rec
             note = cnote
@@ -343,8 +345,20 @@ def summarize(ids, cap=4):
     return s + (" (+%d more)" % (len(ids) - cap) if len(ids) > cap else "")
 
 
+def test_names(tid):
+    """What `[tests: ...]` may call a test: its full id, its own name, or its test file's path (all its tests)."""
+    base = re.sub(r" #\d+$", "", tid)
+    names = {tid, base}
+    if " > " in base:
+        names |= {base.split(" > ", 1)[0], base.rsplit(" > ", 1)[-1]}
+    elif "::" in base:
+        file, rest = base.split("::", 1)
+        names |= {file, rest, rest.rsplit(".", 1)[-1]}
+    return names
+
+
 def name_matches(name, tid):
-    return name == tid or name in tid
+    return name in test_names(tid)
 
 
 def judge(kind, parent, cur, facts, state, opts):
@@ -380,13 +394,16 @@ def judge(kind, parent, cur, facts, state, opts):
             ex = "; ".join("%s [%s]" % (t if len(t) < 70 else t[:67] + "...", ct[t].get("m", "")[:70]) for t in sorted(bad)[:3])
             reasons.append("%d newly failing test(s) do not fail on an assertion (%s): %s" % (len(bad), "/".join(kinds), ex))
         if removed:
-            notes.append("%d test(s) from the parent no longer run: %s" % (len(removed), summarize(removed)))
+            notes.append("RED replaces tests: %d from the parent no longer run: %s" % (len(removed), summarize(removed)))
         if facts["product_lines"]:
             notes.append("product code changed (%d lines): stubs only?" % facts["product_lines"])
         if newfail and not bad:
             state["open_reds"].append({"sha": facts["sha"], "files": set(facts["test_files"]), "pending": set(newfail)})
 
-    elif kind == "GREEN":
+    if kind in ("GREEN", "PERF") and removed:
+        reasons.append("%s reduces the test set: %d test(s) gone: %s" % (kind, len(removed), summarize(removed)))
+
+    if kind == "GREEN":
         if regress:
             reasons.append("%d test(s) that passed at the parent fail or are gone: %s" % (len(regress), summarize(regress)))
         if not flipped:
@@ -448,9 +465,12 @@ def judge(kind, parent, cur, facts, state, opts):
 
 
 def judge_untagged(facts):
+    out = []
     if facts["product_files"]:
-        return ["touches product code without a RED/GREEN/PERF/REFACTOR tag: %s" % summarize(facts["product_files"], 3)]
-    return []
+        out.append("touches product code without a RED/GREEN/PERF/REFACTOR tag: %s" % summarize(facts["product_files"], 3))
+    if facts["test_files"]:
+        out.append("touches test files without a RED/REFACTOR tag: %s" % summarize(facts["test_files"], 3))
+    return out
 
 
 def read_gate(text):
@@ -539,12 +559,12 @@ class Runner:
         except subprocess.TimeoutExpired:
             res = {"ran": False, "tests": {}, "note": "suite timed out (%ds)" % self.opts.run_timeout}
         if miss:
-            res["note"] = (res.get("note", "") + " " + miss).strip()
+            raise SetupError("%s (at %s)" % (miss, sha[:7]))
         res["seconds"] = round(time.time() - t0, 1)
         res["sha"] = sha
         self.runs += 1
         self.memo[sha] = res
-        if res["ran"] and not miss:  # a bad-setup result (suite did not run, pin missing) must not poison later runs
+        if res["ran"]:  # a bad-setup result (suite did not run, pin missing) must not poison later runs
             os.makedirs(self.cache, exist_ok=True)
             with open(key + ".tmp", "w") as f:
                 json.dump(res, f)
@@ -554,6 +574,10 @@ class Runner:
 
 class BudgetReached(Exception):
     pass
+
+
+class SetupError(Exception):
+    """The checker cannot measure here (a missing pin or suite input): no verdict, exit 2."""
 
 
 def commit_facts(repo, adapter, sha, parent):
@@ -619,7 +643,9 @@ def write_pass_record(repo, base_sha, head_sha, opts, adapter, count):
     except OSError:
         commit = "unknown"
     rec = {"head": head_sha, "base": base_sha, "range": opts.range, "adapter": adapter.name, "checker_version": CHECKER_VERSION,
-           "checker_commit": commit, "date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "commits": count, "result": "pass"}
+           "checker_commit": commit, "date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "commits": count, "result": "pass",
+           "options": {"lenient_tests": bool(opts.lenient_tests), "batch_limit": opts.batch_limit,
+                       "max_green_lines": opts.max_green_lines, "no_compat": bool(opts.no_compat)}}
     d = pass_dir(repo)
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, head_sha + ".json.tmp"), "w") as f:
@@ -672,6 +698,15 @@ def main(argv=None):
             print("check-tdd: testbit not found (looked beside the repo and in ~/Projects/repos/testbit); pass --testbit DIR", file=sys.stderr)
             return 2
         opts.testbit = os.path.realpath(opts.testbit)
+    if adapter.name == "node" and opts.no_compat:
+        shown = subprocess.run(["git", "-C", repo, "show", head + ":package.json"], capture_output=True, text=True).stdout
+        try:
+            has_compat = "compat" in json.loads(shown or "{}").get("scripts", {})
+        except ValueError:
+            has_compat = False
+        if has_compat:
+            print("check-tdd: --no-compat is refused: package.json has a compat script, and skipping it can hide a failure", file=sys.stderr)
+            return 2
     os.makedirs(opts.cache, exist_ok=True)
 
     scratch = tempfile.mkdtemp(prefix="check-tdd-", dir=opts.scratch)
@@ -711,6 +746,9 @@ def main(argv=None):
             rec.update(status="FAIL" if reasons else "PASS", kind=kind, reasons=reasons, notes=notes, data=data,
                        seconds=cres.get("seconds"))
             records.append(rec)
+    except SetupError as e:
+        print("check-tdd: setup error, no verdict: %s" % e, file=sys.stderr)
+        return 2
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
 
@@ -728,6 +766,10 @@ def main(argv=None):
         print("-- %(pass)d PASS, %(fail)d FAIL of %(checked)d/%(commits)d commits; %(suite_runs)d suite runs, %(cache_hits)d from --cache, %(reused)d reused in the run, %(seconds)ss%(inc)s" %
               dict(summary, inc="; INCOMPLETE (budget reached, rerun)" if incomplete else ""))
     if fails:
+        try:  # a FAIL at this head withdraws any earlier pass record for it
+            os.remove(os.path.join(pass_dir(repo), git(repo, "rev-parse", head + "^{commit}").strip() + ".json"))
+        except OSError:
+            pass
         return 1
     if incomplete:
         return 3
