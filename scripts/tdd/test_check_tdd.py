@@ -648,6 +648,57 @@ class PythonSuite(PyBase):
         self.assertEqual((s.get("adapter"), [c["status"] for c in commits]), ("python", ["PASS"]), commits)
 
 
+class PassRecords(Base):
+    def record_path(self, sha):
+        common = self.fx.run("rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+        return os.path.join(common, "check-tdd", "pass", sha + ".json")
+
+    def has_pass(self, sha):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return ct.main(["--has-pass", self.fx.dir, sha])
+
+    def two_good_commits(self):
+        b = self.fx.base()
+        self.fx.commit("T-1: REFACTOR. add", {"src/lib.js": "const f = (a, b) => a + b;\nexports.add = f;\n"})
+        return b, self.fx.commit("notes", {"README.md": "x\n"})
+
+    def test_a_complete_passing_run_writes_a_record(self):
+        b, head = self.two_good_commits()
+        rc, _, _ = self.check(b)
+        self.assertEqual(rc, 0)
+        path = self.record_path(head)
+        self.assertTrue(os.path.exists(path), path)
+        with open(path) as f:
+            rec = json.load(f)
+        self.assertEqual((rec["head"], rec["base"], rec["range"], rec["adapter"], rec["commits"], rec["result"]),
+                         (head, b, b + "..HEAD", "node", 2, "pass"))
+        for key in ("checker_version", "checker_commit", "date"):
+            self.assertTrue(rec.get(key), key)
+
+    def test_has_pass_answers_from_the_record_alone(self):
+        b, head = self.two_good_commits()
+        self.assertEqual(self.has_pass(head), 1)
+        self.check(b)
+        self.assertEqual(self.has_pass(head), 0)
+        self.assertEqual(self.has_pass(head[:8]), 0)
+        self.assertEqual(self.has_pass(b), 1)
+        self.assertEqual(self.has_pass("nosuchref"), 1)
+
+    def test_a_failing_run_writes_no_record(self):
+        b = self.fx.base()
+        head = self.fx.commit("speed up add", {"src/lib.js": "exports.add = (a, b) => b + a;\n"})
+        rc, _, _ = self.check(b)
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(self.record_path(head)))
+        self.assertEqual(self.has_pass(head), 1)
+
+    def test_an_incomplete_run_writes_no_record(self):
+        b, head = self.two_good_commits()
+        rc, _, _ = self.check(b, "--budget", "-1")
+        self.assertEqual(rc, 3)
+        self.assertFalse(os.path.exists(self.record_path(head)))
+
+
 class GateRecord(unittest.TestCase):
     def test_forms(self):
         self.assertEqual(ct.read_gate('{"before": "fail", "after": "pass"}'), "fail->pass")

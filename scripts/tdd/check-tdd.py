@@ -585,6 +585,9 @@ def resolve_gate(repo, sha, gate, gate_root):
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["--has-pass"]:
+        return 1  # stub
     ap = argparse.ArgumentParser(prog="check-tdd", description="Mechanical checker of the strict-TDD protocol (STANDARDS section 3).")
     ap.add_argument("repo")
     ap.add_argument("range", help="<base>..<head>: the commits reachable from head and not from base")
