@@ -158,6 +158,22 @@ class Adapter:
         """-> {"ran": bool, "tests": {id: {s,k,m}}, "note": str}"""
         raise NotImplementedError
 
+    def is_test(self, path):
+        return False
+
+    def is_product(self, path):
+        return False
+
+    def is_input(self, path):
+        return False
+
+
+class PythonAdapter(Adapter):
+    name = "python"
+
+    def run(self, work, opts):
+        return {"ran": False, "tests": {}, "note": "python adapter not implemented"}
+
 
 class NodeAdapter(Adapter):
     """anvil.js and other node:test repos: `npm test`, and `npm run compat` when package.json has it (anvil-node's own
@@ -222,7 +238,9 @@ class NativeAdapter(Adapter):
         return {"ran": True, "tests": tests, "note": ""}
 
 
-def pick_adapter(repo, name):
+def pick_adapter(repo, name, changed=None):
+    if name == "python":
+        return PythonAdapter()
     if name == "node" or (name == "auto" and os.path.exists(os.path.join(repo, "package.json"))):
         return NodeAdapter()
     if name == "native" or (name == "auto" and os.path.isdir(os.path.join(repo, "test", "unit"))):
@@ -544,7 +562,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="check-tdd", description="Mechanical checker of the strict-TDD protocol (STANDARDS section 3).")
     ap.add_argument("repo")
     ap.add_argument("range", help="<base>..<head>: the commits reachable from head and not from base")
-    ap.add_argument("--adapter", default="auto", choices=["auto", "node", "native"])
+    ap.add_argument("--adapter", default="auto", choices=["auto", "node", "native", "python"])
     ap.add_argument("--first-parent", action="store_true", help="walk first-parent commits only (default: every non-merge commit in the range, oldest first)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--cache", default=os.path.join(tempfile.gettempdir(), "check-tdd-cache-%d" % os.getuid()))

@@ -523,6 +523,131 @@ class NativeSetup(Base):
         self.assertNotEqual(ct.cache_key("native", "abc", A), ct.cache_key("node", "abc", A))
 
 
+class AdapterPaths(unittest.TestCase):
+    def test_python_adapter_classifies_scripts_and_hooks(self):
+        a = ct.PythonAdapter()
+        tests = ["scripts/tdd/test_x.py", ".claude/hooks/test_h.py", "scripts/a/b/test_z.py"]
+        product = ["scripts/tdd/x.py", "scripts/tdd/x.js", ".claude/hooks/h.py", "scripts/a/b/c.py"]
+        neither = ["scripts/check.sh", "docs/a.md", "src/a.c", ".claude/settings.json", "scripts/data.json"]
+        got = {p: (a.is_test(p), a.is_product(p)) for p in tests + product + neither}
+        want = {p: (True, False) for p in tests}
+        want.update({p: (False, True) for p in product})
+        want.update({p: (False, False) for p in neither})
+        self.assertEqual(got, want)
+
+    def test_node_and_native_keep_their_prefixes(self):
+        n, c = ct.NodeAdapter(), ct.NativeAdapter()
+        self.assertEqual([n.is_product("src/a.js"), n.is_product("js/a.js"), n.is_test("test/a.js"), n.is_input("vendor/anvil"), n.is_product("docs/a.md")],
+                         [True, True, True, True, False])
+        self.assertEqual([c.is_product("src/a.c"), c.is_product("include/a.h"), c.is_test("test/unit/a.c"), c.is_input("vendor/anvil"), c.is_product("scripts/a.py")],
+                         [True, True, True, False, False])
+
+
+class PickAdapter(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="ctdd-pick-")
+        self.addCleanup(shutil.rmtree, self.d, True)
+        os.makedirs(os.path.join(self.d, "test", "unit"))
+
+    def test_scripts_only_range_picks_python(self):
+        self.assertEqual(ct.pick_adapter(self.d, "auto", ["scripts/tdd/x.py", ".claude/hooks/h.py", "docs/changelog.md"]).name, "python")
+
+    def test_a_range_touching_native_code_stays_native(self):
+        self.assertEqual(ct.pick_adapter(self.d, "auto", ["src/a.c", "scripts/x.py"]).name, "native")
+        self.assertEqual(ct.pick_adapter(self.d, "auto", None).name, "native")
+
+    def test_a_node_repo_keeps_node(self):
+        with open(os.path.join(self.d, "package.json"), "w") as f:
+            f.write("{}")
+        self.assertEqual(ct.pick_adapter(self.d, "auto", ["scripts/x.js"]).name, "node")
+
+    def test_explicit_name_wins(self):
+        self.assertEqual(ct.pick_adapter(self.d, "python", ["src/a.c"]).name, "python")
+
+
+PYTEST = "import unittest\nimport lib\n\n\nclass T(unittest.TestCase):\n"
+
+
+def pycase(name, body):
+    return "    def test_%s(self):\n        %s\n" % (name, body)
+
+
+class PyBase(Base):
+    def py_base(self):
+        return self.fx.commit("init", {
+            "scripts/lib.py": "def add(a, b):\n    return a + b\n",
+            "scripts/test_lib.py": PYTEST + pycase("add", "self.assertEqual(lib.add(1, 2), 3)")})
+
+    def check_py(self, base, *extra):
+        return self.check(base, "--adapter", "python", *extra)
+
+    def last_py(self, base, *extra):
+        rc, commits, _ = self.check_py(base, *extra)
+        self.assertTrue(commits, "no commits reported (rc=%s)" % rc)
+        return rc, commits[-1]
+
+
+STUB_MUL = "def add(a, b):\n    return a + b\n\n\ndef mul(a, b):\n    return 0\n"
+REAL_MUL = "def add(a, b):\n    return a + b\n\n\ndef mul(a, b):\n    return a * b\n"
+
+
+class PythonSuite(PyBase):
+    def test_red_on_an_assertion_passes(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/lib.py": STUB_MUL, "scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
+        rc, rec = self.last_py(b)
+        self.assertEqual((rec["status"], rc), ("PASS", 0), rec)
+        self.assertEqual(rec["data"]["newly_failing"], 1)
+
+    def test_red_on_an_attribute_error_fails(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
+        rc, rec = self.last_py(b)
+        self.assertEqual(rec["status"], "FAIL", rec)
+        self.assertIn("do not fail on an assertion", " ".join(rec["reasons"]))
+
+    def test_red_with_an_import_error_fails(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/test_mul.py": "import nothere\n"})
+        rc, rec = self.last_py(b)
+        self.assertEqual(rec["status"], "FAIL", rec)
+        self.assertIn("do not fail on an assertion", " ".join(rec["reasons"]))
+
+    def test_red_with_a_syntax_error_fails(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/test_mul.py": "def (:\n"})
+        rc, rec = self.last_py(b)
+        self.assertEqual(rec["status"], "FAIL", rec)
+
+    def test_green_flipping_the_named_test_passes(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/lib.py": STUB_MUL, "scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
+        self.fx.commit("T-1: GREEN. mul [tests: test_mul]", {"scripts/lib.py": REAL_MUL})
+        rc, rec = self.last_py(b)
+        self.assertEqual((rec["status"], rc), ("PASS", 0), rec)
+        self.assertEqual(rec["data"]["flipped"], 1)
+
+    def test_a_hook_test_is_discovered(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. hook", {".claude/hooks/h.py": "def f():\n    return 0\n",
+                                         ".claude/hooks/test_h.py": "import unittest\nimport h\n\n\nclass H(unittest.TestCase):\n" + pycase("f", "self.assertEqual(h.f(), 1)")})
+        rc, rec = self.last_py(b)
+        self.assertEqual((rec["status"], rec["data"]["newly_failing"]), ("PASS", 1), rec)
+
+    def test_untagged_product_change_fails_and_docs_pass(self):
+        b = self.py_base()
+        self.fx.commit("tidy", {"scripts/lib.py": "def add(a, b):\n    return b + a\n"})
+        self.fx.commit("notes", {"docs/x.md": "x\n", "scripts/run.sh": "true\n"})
+        rc, commits, _ = self.check_py(b)
+        self.assertEqual([c["status"] for c in commits], ["FAIL", "PASS"], commits)
+
+    def test_auto_picks_python_for_a_scripts_only_range(self):
+        b = self.py_base()
+        self.fx.commit("T-1: RED. mul", {"scripts/lib.py": STUB_MUL, "scripts/test_mul.py": PYTEST + pycase("mul", "self.assertEqual(lib.mul(2, 3), 6)")})
+        rc, commits, s = self.check(b)
+        self.assertEqual((s.get("adapter"), [c["status"] for c in commits]), ("python", ["PASS"]), commits)
+
+
 class GateRecord(unittest.TestCase):
     def test_forms(self):
         self.assertEqual(ct.read_gate('{"before": "fail", "after": "pass"}'), "fail->pass")
