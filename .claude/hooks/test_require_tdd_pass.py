@@ -62,7 +62,50 @@ class MergeTargets(unittest.TestCase):
             self.assertEqual(self.targets(c), [], c)
 
 
+class MergeTargetsSlips(unittest.TestCase):
+    """The plausible slips: a wrapper word, a shell string, a substitution, --git-dir, a pull."""
+
+    def targets(self, command, cwd="/w"):
+        return hook.merge_targets(command, cwd)
+
+    def test_wrapper_words_keywords_and_an_absolute_git_path(self):
+        for c in ("env GIT_X=1 git merge feat/x", "command git merge feat/x", "time git merge feat/x", "nohup git merge feat/x",
+                  "sudo git merge feat/x", "exec git merge feat/x", "/usr/bin/git merge feat/x", "! git merge feat/x",
+                  "{ git merge feat/x; }", "if true; then git merge feat/x; fi", "for i in 1; do git merge feat/x; done",
+                  "while false; do git merge feat/x; done", "FOO=1 git merge feat/x"):
+            self.assertEqual(self.targets(c), [("/w", "feat/x")], c)
+
+    def test_shell_strings_are_parsed_as_commands(self):
+        self.assertEqual(self.targets('bash -c "git merge feat/x"'), [("/w", "feat/x")])
+        self.assertEqual(self.targets("sh -c 'cd /r && git merge feat/x'"), [("/r", "feat/x")])
+        self.assertEqual(self.targets('eval "git merge fix/y"'), [("/w", "fix/y")])
+
+    def test_substitutions_and_backticks_are_commands(self):
+        self.assertEqual(self.targets('echo "$(git merge feat/x)"'), [("/w", "feat/x")])
+        self.assertEqual(self.targets("x=`git merge feat/x`"), [("/w", "feat/x")])
+        self.assertEqual(self.targets("echo '$(git merge feat/x)'"), [])
+
+    def test_git_dir_and_work_tree_options(self):
+        self.assertEqual(self.targets("git --git-dir=/r/.git merge feat/x"), [("/r", "feat/x")])
+        self.assertEqual(self.targets("git --git-dir /r/.git merge feat/x"), [("/r", "feat/x")])
+        self.assertEqual(self.targets("git --work-tree=/t merge feat/x"), [("/t", "feat/x")])
+
+    def test_a_pull_of_a_branch_is_a_merge_of_it(self):
+        self.assertEqual(self.targets("git pull origin feat/x"), [("/w", "origin/feat/x", "pull")])
+        self.assertEqual(self.targets("git pull . fix/y"), [("/w", "fix/y", "pull")])
+        self.assertEqual(self.targets("git pull --no-rebase -s ours origin chore/z"), [("/w", "origin/chore/z", "pull")])
+        self.assertEqual(self.targets("git pull origin feat/a:main"), [("/w", "origin/feat/a", "pull")])
+        self.assertEqual(self.targets("git pull"), [])
+        self.assertEqual(self.targets("git pull origin"), [])
+
+
 class Guarded(unittest.TestCase):
+    def test_other_spellings_of_a_branch(self):
+        for r in ("heads/feat/x", "upstream/feat/x", "refs/remotes/upstream/fix/a", "remotes/origin/chore/d"):
+            self.assertTrue(hook.is_guarded(r), r)
+        for r in ("upstream/release/v1", "refs/remotes/upstream/docs/a", "refs/tags/v1"):
+            self.assertFalse(hook.is_guarded(r), r)
+
     def test_guarded_prefixes_with_or_without_origin(self):
         for r in ("feat/x", "origin/feat/x", "fix/a", "tools/b", "perf/c", "chore/d", "origin/chore/d", "refs/heads/feat/x", "refs/remotes/origin/fix/a"):
             self.assertTrue(hook.is_guarded(r), r)
@@ -104,13 +147,15 @@ class Decision(unittest.TestCase):
         self.sh("checkout", "-q", "main")
         self.sh("update-ref", "refs/remotes/origin/fix/r", self.sh("rev-parse", "fix/r"))
         self.sha = self.sh("rev-parse", "feat/x")
+        self.init = self.sh("rev-parse", "main")
         self.common = os.path.join(self.repo, ".git")
 
     def record(self, sha=None, **over):
         sha = sha or self.sha
         d = os.path.join(self.common, "check-tdd", "pass")
         os.makedirs(d, exist_ok=True)
-        rec = {"head": sha, "result": "pass"}
+        rec = {"head": sha, "result": "pass", "base": self.init,
+               "options": {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}}
         rec.update(over)
         with open(os.path.join(d, sha + ".json"), "w") as f:
             json.dump(rec, f)
