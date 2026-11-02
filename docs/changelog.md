@@ -30,16 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     The tag is bracket-balanced, so names may contain `@[schema]`.
   - **PERF:** suite green before and after, tests unchanged, and a `[gate: path]` record that says fail -> pass.
     **REFACTOR:** suite green before and after, tests unchanged, same test set.
-  - **Untagged** commits may not touch product code or test files.
+  - **Untagged** commits may not touch product code or test files. A RED may not remove or rename a test that is
+    still failing from an open RED. Naming a whole test file in `[tests: ...]` still counts every flipped test against
+    `--batch-limit` (10).
   - **Adapters:** `node` (`npm test` and `npm run compat`, through a test reporter; `--no-compat` is refused when
     `package.json` has a compat script), `native` (each `test/unit/test_*.c` through its `make` target; testbit is
     found beside the repo or in `~/Projects/repos/testbit`, and `--make-var NAME=VALUE` passes variables such as
-    `BUILD_NUM`) and `python` (`--adapter python`, picked automatically for a range that only touches `scripts/` or
-    `.claude/hooks/`; it runs every `test_*.py` there and separates an assertion failure from any other error or an
-    import crash).
+    `BUILD_NUM`) and `python` (it runs every `test_*.py` under `scripts/` and `.claude/hooks/` and separates an
+    assertion failure from any other error or an import crash). The adapter is detected from the repo and the range
+    (`package.json` means node; a range that only touches `scripts/` or `.claude/hooks/` means python; `test/unit`
+    means native). An explicit `--adapter` that contradicts the detection is refused with exit 2, because running the
+    wrong suite measures nothing.
   - **Output and exit codes:** one line per commit, `--json` for machines; 0 all PASS, 1 any FAIL, 2 usage or setup
-    error with no verdict (a missing vendor pin, a compat run with no events, a missing testbit), 3 incomplete
-    (`--budget` reached; rerun resumes).
+    error with no verdict (a missing vendor pin, a compat run with no events, a missing testbit, a contradicting
+    adapter), 3 incomplete (`--budget` reached; rerun resumes).
   - **Cache:** only `--cache`, keyed by repo identity, sha, adapter version, a hash of the runner, reporter and
     adapter sources, and the setup (testbit, make variables, `--no-compat`). A result of a suite that did not run is
     never written. The summary reports `cache_hits` (files from an earlier invocation) and `reused` (a parent computed
@@ -47,24 +51,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     process group.
   - **Pass records:** a complete run with every commit PASS writes
     `<git-common-dir>/check-tdd/pass/<head-sha>.json` (`head, base, range, adapter, checker_version, checker_commit,
-    date, commits, result, options`); a FAIL run removes that head's record. `check-tdd.py --has-pass <repo> <sha>`
-    exits 0 if one exists and 1 if not, and runs nothing.
+    date, commits, result, options`; the adapter is the one actually used, and the options include `first_parent`); a
+    FAIL run removes that head's record. `check-tdd.py --has-pass <repo> <sha>` exits 0 if one exists and 1 if not, and
+    runs nothing.
   - **Merge guard:** `.claude/hooks/require-tdd-pass.py` (PreToolUse, Bash) refuses `git merge` and `git pull` of a
     `feat/ fix/ tools/ perf/ chore/` branch unless a pass record exists for that exact sha, was made with the default
-    options (not `--lenient-tests`, not a loosened `--batch-limit` or `--max-green-lines`), and has a base that covers
-    the commits the merge brings in. It follows wrapper words, `bash -c`/`eval` strings, `$( )` and backticks, `git -C`
-    and `--git-dir`, every spelling of a branch, and a sha or tag at a guarded tip. `release/`, `integration/`, `docs/`
-    and aborts are exempt. A file `<git-common-dir>/check-tdd/override/<sha>` lets one merge through and is reported;
-    it is made only on the owner's explicit words. It fails open on an internal error. Out of scope, on purpose: git
-    and shell aliases, `$'...'` strings and variable expansion of the subcommand or ref, cherry-pick, rebase,
-    `reset --hard` and `fetch . x:main`, and hand-forged records or override files (the records are advisory and
-    trust-based; forging one is a protocol breach to report). Register the hook in `.claude/settings.json` to enable it.
-  - **Memory-cap hook:** `require-memcap.py` now splits commands on `| ; &` only outside quotes, runs `$( )` and
+    options (not `--lenient-tests`, `--no-compat` or `--first-parent`, not a loosened `--batch-limit` or
+    `--max-green-lines`), names the adapter the repo needs for the range, and has a base that covers the commits the
+    merge brings in. Any name, sha or tag that is the tip of a guarded branch, local or remote, is guarded, so
+    `git branch tmp feat/x; git merge tmp` is a merge of `feat/x`. A ref that is computed (`$( )`, backticks, or xargs
+    input from something other than echo) is refused with "pass the ref explicitly". It follows wrapper words and their
+    options, `bash -c`/`eval` strings, a command line piped, herestring-ed or heredoc-ed into a shell, `xargs git
+    merge`, `git -C`, `--git-dir` and `cd dir &&`. `release/`, `integration/`, `docs/` and aborts are exempt. A file
+    `<git-common-dir>/check-tdd/override/<sha>` lets one merge through and is reported; it is made only on the owner's
+    explicit words. It fails open on an internal error. Out of scope, on purpose: git and shell aliases, `$'...'`
+    strings and variable expansion of the subcommand or ref, cherry-pick, rebase, `reset --hard` and
+    `fetch . x:main`, and hand-forged records or override files (the records are advisory and trust-based; forging
+    one is a protocol breach to report). Register the hook in `.claude/settings.json` to enable it.
+  - **Memory-cap hook:** `require-memcap.py` splits commands on `| ; &` only outside quotes, runs `$( )` and
     backtick substitutions (also inside double quotes) as commands, parses `bash -c`, `sh -c` and `eval` strings,
-    `xargs` and `find -exec`, and exempts a runtime only when a `systemd-run ... MemoryMax` wrapper is in the same
-    command as the runtime. A table of 106 commands records the expected verdict for each.
-  - **Tests:** `scripts/tdd/test_check_tdd.py` (97 cases) builds tiny fixture repos with scripted commits;
-    `.claude/hooks/test_require_tdd_pass.py` (32 cases) and `.claude/hooks/test_require_memcap.py` (13 cases) cover
+    `xargs` and `find -exec`, and skips wrapper options with values (`sudo -u X`, `timeout -s SIG N`, `env -u X`,
+    `taskset`, `nice -n N`, `ionice -c N`, `chrt N`). A shell script run uncapped (`bash x.sh`, `./x.sh`) is refused,
+    since heavy work hides in scripts; `bash -n` and other safe flags stay allowed, and there is no allowlist. A runtime
+    is exempt only when a `systemd-run` wrapper in the same command carries `-p MemoryMax=...` or
+    `--property=MemoryMax=...`; a description or any other text that mentions it does not count. A table of 166
+    commands records the expected verdict for each.
+  - **Tests:** `scripts/tdd/test_check_tdd.py` (106 cases) builds tiny fixture repos with scripted commits;
+    `.claude/hooks/test_require_tdd_pass.py` (46 cases) and `.claude/hooks/test_require_memcap.py` (16 cases) cover
     the hooks. Tooling only; no product code changed.
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
