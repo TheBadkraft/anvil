@@ -661,10 +661,31 @@ static bool include_path_on_stack(list stack, const char *normalized) {
    return false;
 }
 
+// The 1-based line and column of the `include` keyword of `inc` in `parent`'s source, counted in
+// bytes (a line break is `\n` alone): where an include error is reported (BR-2611-anvl-errors-001).
+static void include_error_position(module_document parent, anvl_include inc, usize *line,
+                                   usize *col) {
+   *line = 1;
+   *col = 1;
+   const char *data = parent && parent->source ? Source.data(parent->source) : NULL;
+   if (!data || !inc || !inc->decl.start || inc->decl.start < data) {
+      return;
+   }
+   for (const char *p = data; p < inc->decl.start; p++) {
+      if (*p == '\n') {
+         (*line)++;
+         *col = 1;
+      } else {
+         (*col)++;
+      }
+   }
+}
+
 static anvl_result include_load_child(module_context ctx, module_document parent,
                                       anvl_include inc, list stack, usize *out_size,
                                       anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
+   const char *child_path = NULL; // set when the failure is in the child document's own content
    usize path_len = Source.slice_length(inc->path);
    if (path_len < 2) {
       err_code = ANVL_ERR_INCLUDE_FILE_NOT_FOUND;
@@ -722,6 +743,8 @@ static anvl_result include_load_child(module_context ctx, module_document parent
       if (err_code == ANVL_ERR_IO_FILE_NOT_FOUND || err_code == ANVL_ERR_IO_FILE_READ ||
           err_code == ANVL_ERR_IO_INVALID_PATH) {
          err_code = ANVL_ERR_INCLUDE_FILE_NOT_FOUND;
+      } else {
+         child_path = resolved; // e.g. an invalid shebang: the child's own line 1, column 1
       }
       goto error_child;
    }
@@ -768,8 +791,14 @@ error:
    if (out_err_code) {
       *out_err_code = err_code;
    }
-   if (err_code != ANVL_ERR_NONE) {
-      doc_set_error(parent, err_code, 1, 1, parent->filepath);
+   if (err_code != ANVL_ERR_NONE && !doc_has_errors(parent)) {
+      if (child_path) {
+         doc_set_error(parent, err_code, 1, 1, child_path);
+      } else {
+         usize line = 1, col = 1;
+         include_error_position(parent, inc, &line, &col);
+         doc_set_error(parent, err_code, line, col, parent->filepath);
+      }
    }
    return ANVL_RES_ERR;
 }
