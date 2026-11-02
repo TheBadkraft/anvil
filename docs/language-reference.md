@@ -267,7 +267,7 @@ gives a richer detail object (message text, line, column) beyond the stable cate
 The categories above are the public contract. Underneath, the reader records one specific code per reason, and
 `anvil_document_get_error` and the conformance dumps carry it. The codes below were made specific for the grammar
 rules in §3 to §7 (a rejected input keeps its category and place; only the code is sharper). The three IO codes are a
-behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code 0 and an empty message; the category is unchanged:
+behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code 0 and an empty message; the category is unchanged. The names were spelled `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH` until v0.13.1-rc, which changed them to the `errors.h` identifiers below (the codes did not change), so every error name now equals its identifier:
 
 | Code | Name | Reported for |
 |---|---|---|

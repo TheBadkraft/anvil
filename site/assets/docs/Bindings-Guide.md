@@ -17,7 +17,7 @@ no matter which one reads it. Pick the one that matches where your code runs.
 
 \* Unsupported: frozen at v0.11.0-rc and no longer updated; replaced by anvil.js. The v0.11.0-rc downloads stay available.
 
-The current release is `v0.13.0-rc`, built from one source tag: the native library, anvil.js,
+The current release is `v0.13.1-rc`, built from one source tag: the native library, anvil.js,
 .NET and Python. The Node.js and WebAssembly downloads are from `v0.11.0-rc`: they are frozen,
 receive no further updates and are replaced by anvil.js, but they stay downloadable at their
 existing addresses. Checksums for every download are in
@@ -31,9 +31,9 @@ binding too, but it is not distributed.
 ### The version string
 
 A library reports its version as the release plus a build number after a `+`, valid semver:
-a prebuilt `v0.13.0-rc` download reports `0.13.0-rc+463` (anvil.js reports it from `getVersion()`),
+a prebuilt `v0.13.1-rc` download reports `0.13.1-rc+479` (anvil.js reports it from `getVersion()`),
 and the build number is the same in every download of the release. A binding **built from source**
-has no build number of its own, so it reports plain `0.13.0-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
+has no build number of its own, so it reports plain `0.13.1-rc` (no `+` part). That is expected. Set `ANVL_BUILD=<n>` when you build
 or install from source if you want a build number in the string. Treat the string as a
 sanity check, not a compatibility contract to branch logic on.
 
@@ -51,7 +51,7 @@ instead of a one-call conversion, and each follows its own language's idiom.
 
 ## JavaScript (anvil.js)
 
-**[Download anvil.js-v0.13.0-rc.tar.gz](/assets/downloads/anvil.js-v0.13.0-rc.tar.gz)** — a
+**[Download anvil.js-v0.13.1-rc.tar.gz](/assets/downloads/anvil.js-v0.13.1-rc.tar.gz)** — a
 pure-JavaScript ANVL implementation: no native code, no WebAssembly. It replaces the Node.js and WebAssembly
 downloads going forward (both stay available at v0.11.0-rc). It has the same reader API as the Node.js
 binding below (`parse`, `parseRawValue`, `lastError`, `getVersion`, nodes and statements, `asInt`,
@@ -64,14 +64,14 @@ binding: `AnvilBuilder`, `AnvilNode` and `AnvilMember` for the builder, `TypeReg
 schema, and `setIo` (below).
 
 ```sh
-npm install ./anvil.js-v0.13.0-rc.tar.gz
+npm install ./anvil.js-v0.13.1-rc.tar.gz
 ```
 
 ```js
 const anvl = require('anvil.js');           // Node 18 or later
 const doc = anvl.parse('#!aml\nfoo := 1;');
 doc.get('foo').asInt(); // 1
-anvl.getVersion();      // "0.13.0-rc+463"
+anvl.getVersion();      // "0.13.1-rc+479"
 ```
 
 In a Node ES module, both forms work: the default import (`import anvl from 'anvil.js'`) and named
@@ -107,7 +107,7 @@ Two differences from the Node.js binding and the C API are documented:
 `AnvilBuilder`, `AnvilNode` and `AnvilMember` are the builder API of the Node.js binding (see
 [Writing: `AnvilWriter` and `AnvilBuilder`](Bindings-Guide.md#writing-anvilwriter-and-anvilbuilder)). They write the
 same bytes as Anvil Native on 866 of the 915 native builder cases. `TypeRegistry` and `Schema` match the C
-library on all 559 native schema cases. Two documented differences:
+library on all 561 native schema cases. Two documented differences:
 
 - **49 native builder cases are C-API-only and are not run.** They pass a null, a handle of another builder, or text
   that is not valid UTF-8, which JavaScript cannot express. The package's tests list them.
@@ -117,6 +117,19 @@ library on all 559 native schema cases. Two documented differences:
 The builder's inheritance-cycle and missing-base errors are builder codes 19 and 20 (see the
 [language reference](language-reference.md#12-errors)). `TypeRegistry` `fromIncludes` merges the root document's own
 `@[types]` last, so they override included ones.
+
+### Load errors and the exported error codes
+
+A document without `@[schema]` makes `Schema.load` return `null`, and one without `@[types]` makes `TypeRegistry.load`
+return `null` (new in v0.13.1-rc: they now say why). After a null `Schema.load`, `lastError()` is code `11`
+(`ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING`); after a null `TypeRegistry.load` it is code `1`
+(`ANVIL_TYPE_ERR_ATTRIBUTE_MISSING`). `SchemaErrorCode` and `TypeErrorCode` are exported by the package, as named imports
+and on `require('anvil.js')`, so you can compare against the names instead of the numbers:
+
+```js
+import { Schema, TypeRegistry, SchemaErrorCode, TypeErrorCode, lastError } from 'anvil.js';
+if (Schema.load(text) === null && lastError().code === SchemaErrorCode.ATTRIBUTE_MISSING) { /* no @[schema] */ }
+```
 
 ### Includes in a browser: `setIo`
 
@@ -142,39 +155,44 @@ figures in the package's README. Every figure is time taken as subject divided b
 "Cold" is the first call in a fresh process; "warm" is the median of 101 calls after a warm-up. One machine, each
 side in its own fresh process, median of 10 to 20 processes.
 
-anvil.js v0.13.0-rc vs anvil-node v0.10.0-rc, reading per-request documents (parse, then `get('payload')`):
+anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc, reading per-request documents (parse, then `get('payload')`):
 
 | Document | Cold | Warm |
 |---|---|---|
-| small `@bin` read response, 1 / 5 / 17 rows | 1.39x / 1.40x / 1.60x | 2.09x / 2.67x / 1.38x |
-| small `@bin` poll response, 1 / 5 / 17 rows | 1.41x / 1.42x / 1.50x | 2.07x / 2.59x / 1.42x |
-| `@bin` envelope, 17 / 100 rows | 1.56x / 1.48x | 1.31x / 0.84x |
-| `@table` envelope, 17 / 100 rows | 1.44x / 1.19x | 0.77x / 0.35x |
-| error document | 1.78x | 1.87x |
-| raw table text, 17 rows | 1.08x | 0.43x |
+| small `@bin` read response, 1 / 5 / 17 rows | 1.38x / 1.35x / 1.59x | 2.09x / 2.64x / 1.42x |
+| small `@bin` poll response, 1 / 5 / 17 rows | 1.36x / 1.36x / 1.58x | 2.02x / 2.59x / 1.42x |
+| `@bin` envelope, 17 / 100 rows | 1.52x / 1.45x | 1.36x / 0.81x |
+| `@table` envelope, 17 / 100 rows | 1.42x / 1.15x | 0.77x / 0.34x |
+| error document | 1.65x | 1.91x |
+| raw table text, 17 rows | 1.12x | 0.44x |
 
 Every other document size measured, from 1,000 rows up, is at 0.19x to 0.93x. Also against anvil-node v0.10.0-rc:
 
-- `validateValue` on a 12-field record, calls 200 to 400 of a process: 1.26x (create-valid), 1.13x (missing required
-  field), 1.12x (type violation). Call 1, calls 20 to 120 and steady state are at 0.49x to 0.99x.
+- `validateValue` on a 12-field record, calls 200 to 400 of a process: 1.28x (create-valid), 1.18x (missing required
+  field), 1.14x (type violation).
 - `Schema.load`: 11.1x (0.374 ms against 0.034 ms for a typical assets schema), partly the warm-up it performs so that
-  later validation is fast.
+  later validation is fast. Schema `validate` of one record: 1.06x to 1.08x; of 100 and 10,000 records: 0.40x to 0.42x.
 
-anvil.js v0.13.0-rc vs anvil.js v0.12.1-rc: cold, the same documents are faster in every row (0.14x to 0.73x). Warm,
-small documents are slower: 1.24x and 1.18x for the one-row read and poll responses, 1.74x and 1.60x for the five-row
-ones, 1.20x for the error document (2 to 5 microseconds per call); every other warm row is within 1.02x. Writing a
-ten-response document is 1.105x and 1.064x in two runs (0.0070 against 0.0064 ms per call).
+anvil.js v0.13.1-rc vs anvil.js v0.13.0-rc: reading the same per-request documents, cold 0.97x to 1.03x and warm 0.97x to
+1.01x, unchanged. `validateValue` steady state is 0.98x to 1.19x because of the corrected `integer` check on the fast path
+(the two rows above 1.15x were 1.03x and 1.12x on a rerun). Writing is 0.94x to 1.21x with no consistent direction (the
+one 1.21x was 1.02x on a rerun). Against v0.12.1-rc, warm small documents are slower, as they were in v0.13.0-rc: 1.24x
+and 1.18x for the one-row read and poll responses, 1.74x and 1.60x for the five-row ones, 1.20x for the error document
+(anvil.js v0.13.0-rc vs anvil.js v0.12.1-rc).
 
-Elsewhere anvil.js is faster than the Node.js binding: parsing is 0.09x to 0.21x of the time, writing 0.15x to 0.68x,
-the builder 0.23x to 0.96x and schema `validate` of 100 and 10,000 records 0.39x to 0.42x.
+Elsewhere anvil.js is faster than the Node.js binding (anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc): parsing is 0.09x to
+0.20x of the time, parsing plus reading every value 0.11x to 0.44x, writing 0.17x to 0.70x, the builder 0.18x to 0.95x.
 
 ### Errors
 
 `lastError()` returns `{ code, name, message, line, column }` for the most recent `parse()` or
 `parseRawValue()` failure, or `null` if that call succeeded. The `code` is the numeric error code (a
 repeated key is `4001`) and `name` is its name. A file that cannot be loaded reports its own code: a missing file is
-`1002`, a directory or an unreadable file `1001`, an empty path `1003` (new in v0.13.0-rc; before, the code was 0 with an
-empty message). A rejected writer or builder call throws `AnvilWriterError` with a `.code`.
+`1002` (`ANVL_ERR_IO_FILE_NOT_FOUND`), a directory or an unreadable file `1001` (`ANVL_ERR_IO_FILE_READ`), an empty path `1003`
+(`ANVL_ERR_IO_INVALID_PATH`) (new in v0.13.0-rc; before, the code was 0 with an empty message). **Changed in v0.13.1-rc:**
+these three names were `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH`. They are now
+the identifiers in `errors.h`; the codes did not change. Anything that matches the old strings, such as a log filter, a
+test or `lastError().name`, must change. A rejected writer or builder call throws `AnvilWriterError` with a `.code`.
 
 In a browser, with no bundler, the tarball holds `dist/anvil.mjs` (an ES module) or
 `dist/anvil.global.js` (a script tag that defines `window.anvl`). In the browser builds, `include` is resolved through `setIo` (above).
@@ -186,21 +204,29 @@ The package licence is `SEE LICENSE IN LICENSE.txt`; the terms are in progress (
 
 The C library itself — link it directly if you're not going through a JS binding at all.
 
-**[Download anvil-v0.13.0-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.13.0-rc-linux-x86_64.tar.gz)**
+**[Download anvil-v0.13.1-rc-linux-x86_64.tar.gz](/assets/downloads/anvil-v0.13.1-rc-linux-x86_64.tar.gz)**
 — static (`libanvil.a`) and shared (`libanvil.so`) builds, release (stripped, `-O2`), plus every
 public header (`include/anvil_*.h`). Linux x86_64 only today; other platforms build from source
 (`make lib` in the [anvil repo](https://github.com/TheBadkraft/anvil)) until real cross-platform
 CI exists.
 
 ```sh
-tar -xzf anvil-v0.13.0-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.13.0-rc-linux-x86_64/include \
-    -L anvil-v0.13.0-rc-linux-x86_64/lib -lanvil -o your_program
+tar -xzf anvil-v0.13.1-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.13.1-rc-linux-x86_64/include \
+    -L anvil-v0.13.1-rc-linux-x86_64/lib -lanvil -o your_program
 ```
 
-The library reports `0.13.0-rc+463` from `anvil_get_version()`. `libanvil.so` exports exactly
+The library reports `0.13.1-rc+479` from `anvil_get_version()`. `libanvil.so` exports exactly
 the public API and no internal symbols, so it cannot collide with other libraries loaded in the
 same process.
+
+**New in v0.13.1-rc (additive).** `anvil_schema_load` returned NULL for a document without `@[schema]`, and
+`anvil_type_registry_load` for one without `@[types]`, with no reason. `anvil_schema_load_ex(doc, &err)` and
+`anvil_type_registry_load_ex(doc, &err)` return the reason: `ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING` (11) and
+`ANVIL_TYPE_ERR_ATTRIBUTE_MISSING` (1). `anvil_schema_err_code_name` and `_message`, and `anvil_type_err_code_name` and
+`_message`, give each code its name and a message; all are in the `Schema` and `TypeRegistry` vtables. The reason is
+returned, never stored, so concurrent loads are unaffected. The old functions behave as before, and the library
+exports 171 functions (165 before); nothing was removed or changed.
 
 What the headers cover:
 
@@ -209,8 +235,8 @@ What the headers cover:
 | `anvil_flat.h` | The primary API: load, statements, values, attributes, errors |
 | `anvil_vtable.h` | The same API as a struct of function pointers |
 | `anvil_types.h` | Opaque handles and stable error categories |
-| `anvil_type_registry.h` | The opt-in type registry (`@[types]`) |
-| `anvil_schema.h` | AnvilSchema (`@[schema]`) |
+| `anvil_type_registry.h` | The opt-in type registry (`@[types]`), including `anvil_type_registry_load_ex` |
+| `anvil_schema.h` | AnvilSchema (`@[schema]`), including `anvil_schema_load_ex` |
 | `anvil_writer.h`, `anvil_builder.h` | The streaming writer and the document builder, which emit canonical AML and AMP |
 | `anvil_schema_vtable.h`, `anvil_type_registry_vtable.h` (and the writer and builder vtables) | Vtable forms of the schema, registry, writer and builder |
 
@@ -619,7 +645,7 @@ compatibility contract to branch logic on.
 
 ## .NET
 
-**[Download anvil-net-v0.13.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.13.0-rc-linux-x64.tar.gz)**
+**[Download anvil-net-v0.13.1-rc-linux-x64.tar.gz](/assets/downloads/anvil-net-v0.13.1-rc-linux-x64.tar.gz)**
 — a prebuilt managed assembly plus the native library it links against. The tarball holds
 `lib/Anvil.Net.dll`, `lib/libanvil.so`, a README and the licence. **There is no NuGet package**:
 nothing is published to nuget.org, and the tarball contains no `.nupkg`. Reference the assembly
@@ -796,21 +822,21 @@ string text2 = b.Emit();
 
 ### `AnvilDocument.GetVersion()`
 
-Returns the underlying Anvil Native version string (`"0.13.0-rc+463"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.13.1-rc+479"` for the prebuilt download) —
 same toolchain sanity check as the Node/WASM bindings' `getVersion()`, not a compatibility
 contract.
 
 ## Python
 
-**[Download anvil-py-v0.13.0-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.13.0-rc-linux-x64.tar.gz)**
+**[Download anvil-py-v0.13.1-rc-linux-x64.tar.gz](/assets/downloads/anvil-py-v0.13.1-rc-linux-x64.tar.gz)**
 — a pure-`ctypes` binding, no compiled extension module, plus the native library it links
 against (`libanvil.so`, inside the package at `src/anvil/runtimes/linux-x64/native/`).
 
 Extract it and put the `src` directory on `PYTHONPATH`:
 
 ```sh
-tar xzf anvil-py-v0.13.0-rc-linux-x64.tar.gz
-export PYTHONPATH="$PWD/anvil-py-v0.13.0-rc-linux-x64/src:$PYTHONPATH"
+tar xzf anvil-py-v0.13.1-rc-linux-x64.tar.gz
+export PYTHONPATH="$PWD/anvil-py-v0.13.1-rc-linux-x64/src:$PYTHONPATH"
 python3 -c "from anvil import AnvilDocument; print('ok')"
 ```
 
@@ -979,5 +1005,5 @@ with AnvilBuilder.create(AnvilDialect.AML) as b:         # builder: attach in an
 
 ### `AnvilDocument.get_version()`
 
-Returns the underlying Anvil Native version string (`"0.13.0-rc+463"` for the prebuilt download) —
+Returns the underlying Anvil Native version string (`"0.13.1-rc+479"` for the prebuilt download) —
 same toolchain sanity check as every other binding's `getVersion()`/`GetVersion()`, not a compatibility contract.

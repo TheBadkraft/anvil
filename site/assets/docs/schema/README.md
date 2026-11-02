@@ -103,7 +103,10 @@ links     := {
 };
 ```
 
-`include` lines come first in the header, before the `@[schema]` attribute. Load it with `anvil_schema_load(doc)` and check a data document with `anvil_schema_validate`. The
+`include` lines come first in the header, before the `@[schema]` attribute. Load it with `anvil_schema_load(doc)` and check a data document with `anvil_schema_validate`. A document without `@[schema]`
+makes `anvil_schema_load` return NULL; `anvil_schema_load_ex(doc, &err)` returns the same NULL and also the reason,
+`ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING` (11), new in v0.13.1-rc (`anvil_schema_err_code_name` and `_message` give its name and
+a message). In anvil.js, `lastError()` is code 11 after such a load. The
 schema copies everything it needs out of the document at load time, so it stays usable after the
 schema document is disposed. A malformed schema is still returned, never rejected: what is wrong
 with it is reported as diagnostics (below), and the caller decides whether that is fatal. Load the
@@ -120,8 +123,9 @@ data document yourself and check `anvil_has_errors` before validating it.
 - **`nullable`.** A declared type rejects an explicit `null` unless the rule says
   `nullable := true`; a `null` then skips every other constraint. An absent field is governed only
   by `required`, so `required := true; nullable := true;` means "must be present, may be null".
-- **`integer`.** `integer := true` requires a numeric value to be whole, judged by its value, not
-  how it is written: `2`, `2.0` and `1e+3` pass; `2.5` fails.
+- **`integer`.** `integer := true` requires a numeric value to be whole, judged by the exact decimal value of the
+  literal's text (changed in v0.13.1-rc): `2`, `2.0`, `1e+3` and zero in any spelling pass; `2.5`, `1.000001`, `1e-999` and
+  `1.0000000000000001` fail.
 - **Exact bounds.** `min`, `max` and the values they are compared with are exact. They are never
   truncated or rounded, so `min := 0.5` means 0.5 (it once behaved as 0), and an integer near 2^63
   does not round. A bound that is not a valid number is a `MALFORMED_CONSTRAINT` diagnostic and is

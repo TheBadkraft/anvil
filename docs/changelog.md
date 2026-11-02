@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Site and docs for v0.13.1-rc.** The downloads page, the Bindings guide (the `*_load_ex` loaders, anvil.js
+  `SchemaErrorCode`, `TypeErrorCode` and `lastError()` codes 11 and 1, the IO error names, refreshed backlogged
+  small-document speed gaps), the public changelog, the language reference (IO names `ANVL_ERR_IO_*`), the types and schema
+  references (the `integer` rule read from the literal's text, `ANVIL_*_ERR_ATTRIBUTE_MISSING`) describe v0.13.1-rc. Node.js and
+  WebAssembly stay Unsupported and the licence stays in progress. No download or feature described there is missing.
+
 ---
 
 ## [v0.13.1-rc] — (2026-10-31)

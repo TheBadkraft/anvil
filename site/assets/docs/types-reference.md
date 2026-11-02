@@ -46,7 +46,7 @@ document includes a file whose header carries `@[types]`, every type that file d
 available as `types.<Name>` inside the including document.
 
 *Runtime support: implemented — `@[types]` detection and the every-statement-is-a-definition
-rule (`anvil_type_registry_load` rejects any document without the attribute), and cross-file
+rule (`anvil_type_registry_load` rejects any document without the attribute; `anvil_type_registry_load_ex` also says why, with `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING` (1), new in v0.13.1-rc), and cross-file
 `types.X` resolution via `include` (`anvil_type_registry_load_from_includes`, see "Using a type
 from another document" below).*
 
@@ -122,10 +122,13 @@ text, not characters, and must be a non-negative integer: `"héllo"` is 5 charac
 (`é` is two in UTF-8), so it exceeds `size := 5`. (For a blob, `size` counts the payload bytes.) A constraint that is not a valid number is reported as a
 `MALFORMED_CONSTRAINT` diagnostic and treated as not declared, never as `0`.
 
-`integer := true` requires a numeric value to be whole. It is judged by the number's *value*, not
-how it is written: `2`, `2.0` and `1e+3` pass, `2.5` and `1e-1` fail (with a `TYPE_MISMATCH`
-violation saying "value must be an integer"). A field referencing the type inherits it, and may
-override it with its own `integer := false`. A decimal or exponent literal beyond double range, such as `1e400`,
+`integer := true` requires a numeric value to be whole. It is judged by the exact decimal value of the
+literal's *text*, not by the parsed double (changed in v0.13.1-rc): a decimal or exponent literal is whole only if its
+exact value has no nonzero digit after the point. `2`, `2.0`, `1e+3`, `1e3` and zero in any spelling (`0.0e-999`, `0e5`) pass;
+`2.5`, `1e-1`, `1.000001`, `1e-999`, `0.5e-400` and `1.0000000000000001` fail (with a `TYPE_MISMATCH` violation saying
+"value must be an integer"). Before v0.13.1-rc, the last three passed because they rounded to a whole double. The check
+reads the text in one bounded pass, so an absurd exponent costs no more than the literal's length. A field referencing the
+type inherits the rule, and may override it with its own `integer := false`. A decimal or exponent literal beyond double range, such as `1e400`,
 is rejected as a `TYPE_MISMATCH` (changed in v0.13.0-rc); a digits-only literal past 64 bits is a whole number and
 still passes.
 

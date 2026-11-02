@@ -3,6 +3,156 @@
 What changed in each release of Anvil, for people using it. Downloads are on the
 [download page](/download).
 
+## v0.13.1-rc
+
+Released 2026-10-31. This is a release candidate.
+
+v0.13.1-rc is a patch release with two behaviour changes. **Read these first if you match error names or use the `integer`
+type.**
+
+### Behaviour changes
+
+- **Error name strings equal their identifiers.** The names of three IO errors were spelled differently from the
+  identifiers in `errors.h`. They are now `ANVL_ERR_IO_FILE_READ` (1001), `ANVL_ERR_IO_FILE_NOT_FOUND` (1002) and
+  `ANVL_ERR_IO_INVALID_PATH` (1003); before they were `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and
+  `ANVL_ERR_FILE_INVALID_PATH`. These were the only three mismatches among 107 codes, and a check now fails the build if any name
+  differs from its identifier. The codes and the enum are unchanged. Anything that matches the old strings (a log filter, a test,
+  `lastError().name` in anvil.js) must change.
+- **`integer := true` decides whole-ness from the literal's text.** A decimal or exponent literal is whole only if its exact
+  decimal value has no nonzero digit after the point. `1e-999`, `0.5e-400`, `1.000001` and `1.0000000000000001` now fail
+  with "value must be an integer"; before, the last two and the underflowing literals passed because they rounded to a whole
+  double. Zero in any spelling, `1e3`, `1.0`, a digits-only literal past 64 bits, and the rejection of `1e400` are unchanged.
+
+### Downloads
+
+The native downloads (core, Python and .NET) are Linux x86_64 (glibc). anvil.js is plain JavaScript: it runs in
+Node 18 or later and in any browser. Each native file is built from the same source tag, and the library inside
+reports exactly `0.13.1-rc+479`; anvil.js reports the same string from `getVersion()`.
+
+| Download | What it is |
+|---|---|
+| `anvil-v0.13.1-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
+| `anvil.js-v0.13.1-rc.tar.gz` | The pure-JavaScript package for Node and browsers: reader, writer, builder, types and schema |
+| `anvil-py-v0.13.1-rc-linux-x64.tar.gz` | Python package (CPython 3.11+, standard library only) |
+| `anvil-net-v0.13.1-rc-linux-x64.tar.gz` | .NET 9 assembly (`Anvil.Net.dll`) with its native library |
+
+`SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.13.1-rc` lists this
+release only):
+
+```
+876fece1c4d4ee45bdf09b21b494e89ce0f1fd295b8e4eb649a089e89c61a114  anvil.js-v0.13.1-rc.tar.gz
+eef31501ed61b0fa98002a370a67a08f0c047b0f9072b69cffd789e5bbf675d2  anvil-net-v0.13.1-rc-linux-x64.tar.gz
+0237de90360a5780da2087c3ccbbafcca18df4787cf797c3c82ec64a8752a729  anvil-py-v0.13.1-rc-linux-x64.tar.gz
+8579f079c1f49d9e2d6ace44b4584da3de5b995589b692bd75d19924fe945717  anvil-v0.13.1-rc-linux-x86_64.tar.gz
+fa318c4e5fe3da7a3dbd626021747be06053bc6ec6891def314c1831e75aefd3  anvil.js-v0.13.0-rc.tar.gz
+aaf9b3fcd9b0d85ec64d6088f4948819cf0dd65b54b29f2264201504c26c8740  anvil-net-v0.13.0-rc-linux-x64.tar.gz
+bc8e79ccf291733a72a145451fb68abeb96b341dc9749b7ff5e8715f65245cd0  anvil-py-v0.13.0-rc-linux-x64.tar.gz
+e366ebc87ba5716004bdfba6bbd60afa1226c1c3c1eabc5810bb2152835ac2ab  anvil-v0.13.0-rc-linux-x86_64.tar.gz
+ee89439b3b1ce61134b7432dfb5fe7d9e3456bbd887b1a4f01824f48ce4ab6f1  anvil.js-v0.12.1-rc.tar.gz
+4be20e69edc39228659589fb9ce5759b1324218f4178f4c1274ef95809be0ade  anvil-net-v0.12.1-rc-linux-x64.tar.gz
+9dd6636973dfcb2bc84aa5753e871ba9638a5272445f4bb21eb5b1f375ff9748  anvil-py-v0.12.1-rc-linux-x64.tar.gz
+7adc031aaadb5301fdfe06b798eaa366a63b7db7fd283fed0efebec05d8052b3  anvil-v0.12.1-rc-linux-x86_64.tar.gz
+bbdfba42f6bb4b1cd2195eef4915713f007da5ce53d9bf096fdc4992edc93472  anvil.js-v0.12.0-rc.tar.gz
+3f665f841a9c6c17e53fc4ff405f680d5757470cb3a94c37aaae353896191653  anvil-net-v0.12.0-rc-linux-x64.tar.gz
+39bb99217acbb7262ebe88511b2f9766794782770c247ebc71882ed90f8a9b41  anvil-py-v0.12.0-rc-linux-x64.tar.gz
+e695abf19d8a16dc71bcffb6346f8e28843eacf14cd3d6561cbd07f69dab2bcf  anvil-v0.12.0-rc-linux-x86_64.tar.gz
+fee2cc4abb5fb72e162735ba72edeef450610b650dec0b02c11d3548c27c07f6  anvil-net-v0.11.0-rc-linux-x64.tar.gz
+2cf2f5120318d2c0307c378c4a951f89107358e5c932cdb3bfbf511fc45f24f5  anvil-node-v0.11.0-rc-linux-x86_64.tar.gz
+0c5a14bcd117d15fef9bd0a5dd00467fac9786e69d7c0999edcf5d0eec89a952  anvil-py-v0.11.0-rc-linux-x64.tar.gz
+1d8ae18e21f150b979e751a0d43cfe4d88931c5a5a79fe0c8e1de0ec35874794  anvil-v0.11.0-rc-linux-x86_64.tar.gz
+17ca4e8c3433178b86e2d08bf215a914564f5c207691c59cbc4378e0c0498339  anvil-wasm-v0.11.0-rc.tar.gz
+ecaffbd1fc88b13b5a51164d320d1cbc8d38c6981f0890ab3c685d054f91c470  anvil-net-v0.10.0-rc-linux-x64.tar.gz
+0f4990601ee4d92dc74284ab96c1fc802e213df336609b7c7bfebc0a8d716ccc  anvil-node-v0.10.0-rc-linux-x86_64.tar.gz
+de6596406ad838a532bc65332b83d79efa3ff6d7145f0c951f5dd55b77dfab99  anvil-py-v0.10.0-rc-linux-x64.tar.gz
+32e52f3979659ecc56f652e5cedc739856ea0a90a60bb66558c13380b4c45880  anvil-v0.10.0-rc-linux-x86_64.tar.gz
+10eb6cc989d0a9615c951a941602d148a02caee76bb25c8168e3fe85021047d9  anvil-wasm-v0.10.0-rc.tar.gz
+```
+
+The Node (`anvil-node`) and WebAssembly (`anvil-wasm`) builds are not part of this release. Their v0.11.0-rc
+downloads stay available at their existing addresses. The Java binding is not distributed.
+
+### What else changed
+
+- **A load can say why it failed (additive).** A document without `@[schema]` made `anvil_schema_load` return NULL, and one
+  without `@[types]` made `anvil_type_registry_load` return NULL, with no reason. New functions `anvil_schema_load_ex` and
+  `anvil_type_registry_load_ex` return the reason: `ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING` (11) and
+  `ANVIL_TYPE_ERR_ATTRIBUTE_MISSING` (1), with name and message functions for each. The old functions behave as before.
+  The library now exports 171 functions (165 before); nothing was removed or changed.
+- **anvil.js has the same three changes.** After a null `Schema.load`, `lastError()` is code 11
+  (`ANVIL_SCHEMA_ERR_ATTRIBUTE_MISSING`); after a null `TypeRegistry.load` it is code 1 (`ANVIL_TYPE_ERR_ATTRIBUTE_MISSING`).
+  `SchemaErrorCode` and `TypeErrorCode` are exported, and the IO error names and `integer` follow the library. The conformance
+  corpora grew to 561 schema scripts; anvil.js matches native on all of them, and on the reader (1884), writer (749 + 15
+  C-API-only) and builder (866 + 49 C-API-only) corpora.
+- **Python and .NET:** no API changes; they pick up the library changes.
+
+### Performance
+
+Every figure is time taken, as subject divided by baseline, so lower is faster. "Cold" is the first call in a fresh
+process; "warm" is the median of 101 calls after a warm-up. Measured on the packaged files, one machine, each side in its own
+fresh process, median of 10 or more processes.
+
+#### Native
+
+native v0.13.1-rc vs native v0.13.0-rc, warm, packaged static library, 9 interleaved runs, one CPU: parse 1.002x to
+1.020x, validate 0.994x to 1.003x. Through `libanvil.so`: 0.989x to 1.007x. Loading 20,000 five-line documents: 0.987x
+(static library) and 1.001x (`libanvil.so`). The first load in a fresh process, cold: 0.99x (static library, 14.5 against
+14.7 microseconds) and 1.01x (`libanvil.so`, 17.2 against 17.1 microseconds).
+
+#### anvil.js against anvil.js v0.13.0-rc
+
+anvil.js v0.13.1-rc vs anvil.js v0.13.0-rc, reading FlyWire's per-request documents (parse, then `get('payload')`), 36
+documents: cold 0.97x to 1.03x, warm 0.97x to 1.01x. Unchanged.
+
+`validateValue` on a 12-field record, anvil.js v0.13.1-rc vs anvil.js v0.13.0-rc, microseconds per call, two runs (10 and 20
+processes): call 1 (cold) 1.00x to 1.08x, calls 20 to 120 1.00x to 1.04x, calls 200 to 400 1.00x to 1.11x, steady state
+0.98x to 1.19x (the two rows above 1.15x, `create-missing-required` and `update-partial`, were 1.03x and 1.12x on the rerun). This is the cost of the corrected `integer`
+check on the fast path.
+
+Writing, anvil.js v0.13.1-rc vs anvil.js v0.13.0-rc, warm, nine workloads, two runs: 0.94x to 1.21x with no consistent
+direction (the one 1.21x, `kc-request-x10`, was 1.02x on the rerun).
+
+#### Known performance gaps in anvil.js (not fixed; backlogged)
+
+Unchanged from v0.13.0-rc: small documents are where anvil.js is slower than anvil-node. These are measured again for this
+release, they are not promises, and they are not fixed. They supersede the figures in the package's README.
+
+anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc, FlyWire's per-request documents, time ratio, lower is faster:
+
+| Document | Cold | Warm |
+|---|---|---|
+| small `@bin` read response, 1 / 5 / 17 rows | 1.38x / 1.35x / 1.59x | 2.09x / 2.64x / 1.42x |
+| small `@bin` poll response, 1 / 5 / 17 rows | 1.36x / 1.36x / 1.58x | 2.02x / 2.59x / 1.42x |
+| `@bin` envelope, 17 / 100 rows | 1.52x / 1.45x | 1.36x / 0.81x |
+| `@table` envelope, 17 / 100 rows | 1.42x / 1.15x | 0.77x / 0.34x |
+| error document | 1.65x | 1.91x |
+| raw table text, 17 rows | 1.12x | 0.44x |
+
+Every other document size measured, from 1,000 rows up, is at 0.19x to 0.93x.
+
+- `validateValue` on a 12-field record, anvil.js vs anvil-node v0.10.0-rc, calls 200 to 400 of a process: 1.28x
+  (create-valid), 1.18x (missing required field), 1.14x (type violation).
+- `Schema.load`, anvil.js vs anvil-node v0.10.0-rc: 11.1x (0.374 ms against 0.034 ms for FlyWire's assets schema).
+  Schema `validate` of one record: 1.06x to 1.08x; of 100 and 10,000 records: 0.40x to 0.42x.
+- Against v0.12.1-rc, warm small documents are slower, as in v0.13.0-rc: `amp-bin-read-1` 1.24x, `amp-bin-poll-1`
+  1.18x, `amp-bin-read-5` 1.74x, `amp-bin-poll-5` 1.60x, `errdoc` 1.20x (anvil.js v0.13.0-rc vs anvil.js v0.12.1-rc).
+
+#### anvil.js against anvil-node, other workloads (information)
+
+anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc: parsing is 0.09x to 0.20x of the time, parsing plus reading every value 0.11x to
+0.44x (nine workloads); writing 0.17x to 0.70x (nine workloads); builder and emit 0.18x to 0.95x (thirteen workloads). Against
+`JSON.parse` (information only), parse 0.30x to 1.8x and parse plus read 0.7x to 4.3x.
+
+### Licence
+
+Every download includes a `LICENSE.txt` with the ANVL Software Licence terms, which are still in progress: free for
+personal and educational use, free for commercial use by organizations with up to 3 developer seats, and no
+redistribution.
+
+### The version string
+
+The library reports its version as `0.13.1-rc+479`: the release, then the build number after a `+`. This is valid
+semver. The build number is the same in every download of this release.
+
 ## v0.13.0-rc
 
 Released 2026-10-31. This is a release candidate.
