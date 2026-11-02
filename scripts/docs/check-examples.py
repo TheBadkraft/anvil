@@ -130,7 +130,9 @@ def skipped(reason, needs=False):
 KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None), "alias": (1, None)}
 DOC_LANGS = {"anvl", "aml", "amp", ""}
 JS_LANGS = {"js", "javascript", "mjs", "node"}
-PY_LANGS = {"python", "py"}
+PY_LANGS = {"python", "python3", "py", "py3"}
+NON_EXECUTABLE = {"sh", "bash", "shell", "zsh", "console", "text", "txt", "json", "yaml", "yml", "toml", "ini", "xml", "html", "css",
+                  "diff", "markdown", "md", "csv", "mermaid", "svg", "dockerfile", "makefile"}
 NET_LANGS = {"csharp", "cs", "c#"}
 TIMEOUT = 60
 
@@ -281,7 +283,7 @@ def classify(lang):
         return "py"
     if l in NET_LANGS:
         return "net"
-    return "other"
+    return "other" if l in NON_EXECUTABLE else "unsupported"
 
 
 HANDLERS = {}
@@ -535,6 +537,13 @@ def check_other(s, text, files, ctx, expected):
 HANDLERS["py"] = check_py
 HANDLERS["net"] = check_net
 HANDLERS["other"] = check_other
+
+
+def check_unsupported(s, text, files, ctx, expected):
+    return skipped("unsupported executable language '%s': this sample is not run" % s.lang, needs=True)
+
+
+HANDLERS["unsupported"] = check_unsupported
 
 
 def check_js(s, text, files, ctx, expected):
