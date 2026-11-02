@@ -138,8 +138,41 @@ def simple_command(words, depth):
             while i < len(words) and (words[i].startswith("-") or re.match(r"^[0-9][0-9,.:smh-]*$", words[i])):
                 i += 1
         else:
-            yield base, words[i + 1:]
+            args = words[i + 1:]
+            yield base, args
+            for inner in nested_commands(base, args):
+                yield from commands(inner, depth + 1) if isinstance(inner, str) else simple_command(inner, depth + 1)
             return
+
+
+XARGS_VALUE_OPTIONS = {"-n", "-I", "-L", "-P", "-d", "-E", "-s", "-a"}
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
+EXEC_OPTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
+
+
+def nested_commands(base, args):
+    """Commands hidden in a command's arguments: a string for `bash -c`/`eval` (parsed as a command line) or a word
+    list for what `xargs` and `find -exec` run."""
+    if base in SHELLS:
+        for k, a in enumerate(args[:-1]):
+            if a.startswith("-") and not a.startswith("--") and "c" in a:
+                return [args[k + 1]]
+    elif base == "eval":
+        return [" ".join(args)]
+    elif base == "xargs":
+        k = 0
+        while k < len(args) and args[k].startswith("-") and args[k] != "--":
+            k += 2 if args[k] in XARGS_VALUE_OPTIONS else 1
+        sub = args[k + (1 if k < len(args) and args[k] == "--" else 0):]
+        return [sub + ["<stdin>"]] if sub else []  # xargs adds its input as arguments
+    elif base == "find":
+        out = []
+        for k, a in enumerate(args):
+            if a in EXEC_OPTIONS:
+                end = next((j for j in range(k + 1, len(args)) if args[j] in (";", "+")), len(args))
+                out.append(args[k + 1:end])
+        return out
+    return []
 
 
 def commands(command, depth=0):
