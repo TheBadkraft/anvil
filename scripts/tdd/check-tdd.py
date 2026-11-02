@@ -30,6 +30,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,35 @@ def git(repo, *args, check=True, text=True):
     if check and p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args), p.stderr.strip()))
     return p.stdout
+
+
+def run_suite(cmd, timeout=None, **kw):
+    """subprocess.run in its own process group: whatever ends the run (timeout, SIGTERM, Ctrl-C), the suite's whole
+    tree is killed, not just the npm or make at its root."""
+    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=kw.get("text"),
+                         **{k: v for k, v in kw.items() if k in ("cwd", "env")})
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except BaseException:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        p.wait()
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
+def source_hash():
+    """The sources that decide what a run measures: this adapter, the python runner and the node reporter."""
+    h = hashlib.sha1()
+    for path in (os.path.abspath(__file__), os.path.join(HERE, "python-runner.py"), os.path.join(HERE, "node-reporter.js")):
+        try:
+            with open(path, "rb") as f:
+                h.update(f.read())
+        except OSError:
+            h.update(b"?")
+    return h.hexdigest()[:10]
 
 
 def under(path, prefixes):
@@ -186,7 +216,7 @@ class PythonAdapter(Adapter):
         fd, dest = tempfile.mkstemp(prefix="ctdd-py-")
         os.close(fd)
         try:
-            p = subprocess.run([sys.executable, os.path.join(HERE, "python-runner.py"), work, dest],
+            p = run_suite([sys.executable, os.path.join(HERE, "python-runner.py"), work, dest],
                                capture_output=True, text=True, timeout=opts.run_timeout)
             with open(dest) as f:
                 recs = [json.loads(ln) for ln in f.read().splitlines() if ln.strip()]
@@ -216,7 +246,7 @@ class NodeAdapter(Adapter):
             if inner_tap:  # a script that passes its own --test-reporter: node wants one destination per reporter
                 extra += " --test-reporter-destination=stdout"
             env = dict(os.environ, NODE_OPTIONS=(os.environ.get("NODE_OPTIONS", "") + " " + extra).strip())
-            p = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=opts.run_timeout, env=env)
+            p = run_suite(cmd, cwd=work, capture_output=True, text=True, timeout=opts.run_timeout, env=env)
             with open(dest) as f:
                 lines = f.read().splitlines()
         finally:
@@ -257,7 +287,7 @@ class NativeAdapter(Adapter):
         tests = {}
         for s in suites:
             cmd = native_make_cmd(unit, s, opts)
-            p = subprocess.run(cmd, capture_output=True, text=True, timeout=opts.run_timeout)
+            p = run_suite(cmd, capture_output=True, text=True, timeout=opts.run_timeout)
             tests.update(parse_testbit(p.stdout, s, p.returncode))
         return {"ran": True, "tests": tests, "note": ""}
 
@@ -328,7 +358,7 @@ def native_make_cmd(unit, suite, opts):
 
 def cache_key(adapter_name, sha, opts, repo_id=""):
     """Everything that changes what a run measures is in the key, so a bad-setup run cannot poison later ones."""
-    parts = [adapter_name, "v" + ADAPTER_VERSION]
+    parts = [adapter_name, "v" + ADAPTER_VERSION, "s" + source_hash()]
     if adapter_name == "native":
         h = hashlib.sha1(("\0".join([os.path.realpath(opts.testbit or "")] + list(opts.make_var))).encode()).hexdigest()[:10]
         parts.append("m" + h)
@@ -709,6 +739,8 @@ def main(argv=None):
             return 2
     os.makedirs(opts.cache, exist_ok=True)
 
+    for sig in (signal.SIGTERM, signal.SIGHUP):  # run the finally blocks: remove the scratch clone, kill the suite
+        signal.signal(sig, lambda signum, frame: sys.exit(128 + signum))
     scratch = tempfile.mkdtemp(prefix="check-tdd-", dir=opts.scratch)
     runner = Runner(repo, adapter, opts, scratch)
     state = {"open_reds": []}
