@@ -149,6 +149,17 @@ size_t anvil_error_get_line(anvil_error err);
 size_t anvil_error_get_column(anvil_error err);
 
 /**
+ * @brief The document this error occurred in, as the path it was opened by: the including document's
+ * directory, a `/`, and the include string as written (not normalised), so a document in `sub/` that
+ * includes `"../x.anvl"` is `<root dir>/sub/../x.anvl`. Empty when the error is in the root document
+ * (or has no document, e.g. an unreadable root file). The line and column of this error are positions
+ * inside that document. Same buffer-sizing convention as anvil_error_get_message: the full length is
+ * returned whatever the buffer size, and the text is copied NUL-terminated up to buflen - 1 bytes.
+ * @param err The error to read. NULL writes an empty string and returns 0.
+ */
+size_t anvil_error_get_source(anvil_error err, char *buf, size_t buflen);
+
+/**
  * @brief Look up a top-level statement by name.
  * @param doc The document to search.
  * @param name The statement's declared name.

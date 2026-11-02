@@ -432,6 +432,11 @@ size_t anvil_error_get_column(anvil_error err) {
    return e ? (size_t)e->column : 0;
 }
 
+size_t anvil_error_get_source(anvil_error err, char *buf, size_t buflen) {
+   (void)err;
+   return copy_to_buffer("", 0, buf, buflen); // stub (FR-2611-anvl-errors-001)
+}
+
 anvil_value anvil_statement_get_value(anvil_statement stmt) {
    anvl_statement s = (anvl_statement)stmt;
    if (!s) {

@@ -2356,6 +2356,130 @@ static void test_anv79_include_error_in_an_included_document_is_positioned_in_it
    rm_tmpdir(amp, dir);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV80-84 (FR-2611-anvl-errors-001) - the error carries the source of the document it occurred in:
+ * the path it was opened by, empty for the root.
+ * ---------------------------------------------------------------------- */
+static void source_of(anvil_error err, char *out, size_t cap) {
+   out[0] = '?';
+   out[1] = '\0';
+   if (err) {
+      anvil_error_get_source(err, out, cap);
+   }
+}
+
+static void expect_error_in(const tmp_file *files, const char *root, int category,
+                            const char *source, size_t line, size_t col, const char *tag) {
+   char dir[64];
+   anvil_document doc = load_in_tmpdir(files, root, dir);
+   TestBit.is_not_null(doc, tag);
+   if (doc) {
+      TestBit.is_equal_int(category, anvil_get_error(doc), tag);
+      anvil_error err = anvil_document_get_error(doc);
+      char got[256];
+      source_of(err, got, sizeof got);
+      TestBit.is_equal_int(0, strcmp(source, got), tag);
+      TestBit.is_equal_int((long long)strlen(source), (long long)(err ? anvil_error_get_source(err, NULL, 0) : 0), tag);
+      TestBit.is_equal_int((long long)line, (long long)anvil_error_get_line(err), tag);
+      TestBit.is_equal_int((long long)col, (long long)anvil_error_get_column(err), tag);
+      anvil_dispose(doc);
+   }
+   rm_tmpdir(files, dir);
+}
+
+static void test_anv80_root_error_has_an_empty_source(void) {
+   const tmp_file syntax[] = {{"r.anvl", "x := 1e;\n"}, {NULL, NULL}};
+   expect_error_in(syntax, "r.anvl", ANVIL_ERR_SYNTAX, "", 1, 6, "ANV80: a syntax error in the root");
+   const tmp_file missing[] = {{"r.anvl", "include \"nope.anvl\";\n"}, {NULL, NULL}};
+   expect_error_in(missing, "r.anvl", ANVIL_ERR_INCLUDE, "", 1, 1, "ANV80: a missing include of the root");
+   const tmp_file in_dir[] = {{"sub/r.anvl", "x := 1e;\n"}, {NULL, NULL}};
+   expect_error_in(in_dir, "sub/r.anvl", ANVIL_ERR_SYNTAX, "", 1, 6, "ANV80: a root in a directory");
+   const char *buf = "#!aml\nx := 1e;\n";
+   anvil_document doc = anvil_load_buffer(buf, strlen(buf));
+   char got[64];
+   source_of(doc ? anvil_document_get_error(doc) : NULL, got, sizeof got);
+   TestBit.is_equal_int(0, strcmp("", got), "ANV80: an error in a buffer load has an empty source");
+   anvil_dispose(doc);
+   // the root is the only document with an empty source: its included document's error is not empty
+   const tmp_file both[] = {{"r.anvl", "include \"c.anvl\";\nx := 1e;\n"}, {"c.anvl", "c := 1;\n"}, {NULL, NULL}};
+   expect_error_in(both, "r.anvl", ANVIL_ERR_SYNTAX, "", 2, 6, "ANV80: a root error after a good include");
+   const tmp_file child[] = {{"r.anvl", "include \"c.anvl\";\n"}, {"c.anvl", "c := 1e;\n"}, {NULL, NULL}};
+   char d2[64];
+   doc = load_in_tmpdir(child, "r.anvl", d2);
+   anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+   TestBit.is_true(err && anvil_error_get_source(err, NULL, 0) > 0,
+                   "ANV80: an included document's error has a non-empty source");
+   anvil_dispose(doc);
+   rm_tmpdir(child, d2);
+}
+
+static void test_anv81_error_in_a_nested_include_names_its_document(void) {
+   // root -> sub/m.anvl -> ../sub/n.anvl (a syntax error on line 3): two levels deep
+   const tmp_file files[] = {{"r.anvl", "include \"sub/m.anvl\";\nx := 1;\n"},
+                             {"sub/m.anvl", "\ninclude \"../sub/n.anvl\";\nm := 1;\n"},
+                             {"sub/n.anvl", "// leaf\n\nn := 1e;\n"}, {NULL, NULL}};
+   expect_error_in(files, "r.anvl", ANVIL_ERR_SYNTAX, "./sub/../sub/n.anvl", 3, 6,
+                   "ANV81: the source is the path the document was opened by");
+   const tmp_file one[] = {{"r.anvl", "include \"c.anvl\";\n"}, {"c.anvl", "\n\nn := 1e;\n"}, {NULL, NULL}};
+   expect_error_in(one, "r.anvl", ANVIL_ERR_SYNTAX, "./c.anvl", 3, 6, "ANV81: one level deep");
+   const tmp_file shebang[] = {{"r.anvl", "include \"c.anvl\";\n"}, {"c.anvl", "#!zzz\nq := 1;\n"}, {NULL, NULL}};
+   expect_error_in(shebang, "r.anvl", ANVIL_ERR_INCLUDE, "./c.anvl", 1, 1,
+                   "ANV81: an invalid shebang is the included document's own error");
+}
+
+static void test_anv82_missing_include_inside_an_include(void) {
+   const tmp_file files[] = {{"r.anvl", "include \"m.anvl\";\nx := 1;\n"},
+                             {"m.anvl", "\n  include \"nope.anvl\";\nm := 1;\n"}, {NULL, NULL}};
+   expect_error_in(files, "r.anvl", ANVIL_ERR_INCLUDE, "./m.anvl", 2, 3,
+                   "ANV82: the including document is the source");
+}
+
+static void test_anv83_cycle_is_attributed_to_the_closing_document(void) {
+   const tmp_file files[] = {{"a.anvl", "include \"b.anvl\";\na := 1;\n"},
+                             {"b.anvl", "\n\ninclude \"a.anvl\";\nb := 1;\n"}, {NULL, NULL}};
+   expect_error_in(files, "a.anvl", ANVIL_ERR_INCLUDE, "./b.anvl", 3, 1,
+                   "ANV83: a cycle is reported in the document that closes it");
+   const tmp_file self[] = {{"s.anvl", "include \"s.anvl\";\n"}, {NULL, NULL}};
+   expect_error_in(self, "s.anvl", ANVIL_ERR_INCLUDE, "", 1, 1, "ANV83: a self include is in the root");
+}
+
+static void test_anv84_source_buffer_convention(void) {
+   const tmp_file files[] = {{"r.anvl", "include \"c.anvl\";\n"}, {"c.anvl", "\n\nn := 1e;\n"}, {NULL, NULL}};
+   char dir[64];
+   anvil_document doc = load_in_tmpdir(files, "r.anvl", dir);
+   anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+   TestBit.is_not_null(err, "ANV84: error");
+   if (err) {
+      char small[4] = "zzz";
+      TestBit.is_equal_int(8, (long long)anvil_error_get_source(err, small, sizeof small),
+                           "ANV84: the full length is returned for a short buffer");
+      TestBit.is_equal_int(0, strcmp("./c", small), "ANV84: truncated and NUL-terminated");
+      TestBit.is_equal_int(8, (long long)anvil_error_get_source(err, NULL, 0), "ANV84: size query");
+   }
+   char one[8] = "q";
+   TestBit.is_equal_int(0, (long long)anvil_error_get_source(NULL, one, sizeof one),
+                        "ANV84: NULL error is empty");
+   TestBit.is_equal_int(0, (int)one[0], "ANV84: NULL error writes an empty string");
+   anvil_dispose(doc);
+   rm_tmpdir(files, dir);
+}
+
+static void test_anv85_resolver_errors_name_their_document(void) {
+   // a duplicate top-level name is reported at the second occurrence, which is in the included document
+   const tmp_file dup[] = {{"r.anvl", "include \"c.anvl\";\nx := 2;\n"}, {"c.anvl", "\n\nx := 1;\n"}, {NULL, NULL}};
+   expect_error_in(dup, "r.anvl", ANVIL_ERR_RESOLVE, "./c.anvl", 3, 1,
+                   "ANV85: a duplicate identifier is attributed to the document that holds it");
+   // an inheritance error is reported at the base name of the deriving statement, in its document
+   const tmp_file inherit[] = {{"r.anvl", "include \"c.anvl\";\nq := 1;\n"},
+                               {"c.anvl", "\n\nz : q := { a := 1; };\n"}, {NULL, NULL}};
+   expect_error_in(inherit, "r.anvl", ANVIL_ERR_RESOLVE, "./c.anvl", 3, 5,
+                   "ANV85: an inheritance error in an included document");
+   const tmp_file in_root[] = {{"r.anvl", "include \"c.anvl\";\nz : q := { a := 1; };\n"},
+                               {"c.anvl", "q := 1;\n"}, {NULL, NULL}};
+   expect_error_in(in_root, "r.anvl", ANVIL_ERR_RESOLVE, "", 2, 5,
+                   "ANV85: the same error in the root has an empty source");
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -2483,6 +2607,15 @@ int main(void) {
                   test_anv78_include_path_too_long_is_at_the_include_keyword, th);
    TestBit.run_ex("ANV79_include_error_in_an_included_document_is_positioned_in_it", NULL,
                   test_anv79_include_error_in_an_included_document_is_positioned_in_it, th);
+   TestBit.run_ex("ANV80_root_error_has_an_empty_source", NULL, test_anv80_root_error_has_an_empty_source, th);
+   TestBit.run_ex("ANV81_error_in_a_nested_include_names_its_document", NULL,
+                  test_anv81_error_in_a_nested_include_names_its_document, th);
+   TestBit.run_ex("ANV82_missing_include_inside_an_include", NULL, test_anv82_missing_include_inside_an_include, th);
+   TestBit.run_ex("ANV83_cycle_is_attributed_to_the_closing_document", NULL,
+                  test_anv83_cycle_is_attributed_to_the_closing_document, th);
+   TestBit.run_ex("ANV84_source_buffer_convention", NULL, test_anv84_source_buffer_convention, th);
+   TestBit.run_ex("ANV85_resolver_errors_name_their_document", NULL,
+                  test_anv85_resolver_errors_name_their_document, th);
 
    return TestBit.report();
 }

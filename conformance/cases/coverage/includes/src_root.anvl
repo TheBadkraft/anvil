@@ -1,0 +1,2 @@
+include "sub/src_m.anvl";
+x := 1;

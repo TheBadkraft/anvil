@@ -100,6 +100,11 @@ put(I + "pos_self_second_line.anvl", '// c\ninclude "pos_self_second_line.anvl";
 put(I + "pos_cycle_a.anvl", 'include "pos_cycle_b.anvl";\na := 1;\n')
 put(I + "pos_cycle_b.anvl", '\n\ninclude "pos_cycle_a.anvl";\nb := 1;\n')                          # 3:1 cycle, closed in b
 put(I + "pos_path_too_long.anvl", '// c\n   include "%s";\nx := 1;\n' % ("b" * 1100))               # 2:4
+# the source of an error (FR-2611-anvl-errors-001): a syntax error two include levels down, in a document
+# opened through a path with ".." in it
+put(I + "src_root.anvl", 'include "sub/src_m.anvl";\nx := 1;\n')
+put(I + "sub/src_m.anvl", '\ninclude "../sub/src_n.anvl";\nm := 1;\n')
+put(I + "sub/src_n.anvl", '// leaf\n\nn := 1e;\n')                                              # 3:6
 
 # ------------------------------------------------------------------------------------------------ nesting
 N = "nesting/"
