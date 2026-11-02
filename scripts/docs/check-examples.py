@@ -117,7 +117,8 @@ def run_cmd(cmd, cwd, env, timeout=TIMEOUT):
 
 
 def tail_text(text, n=300):
-    text = " ".join(text.split())
+    """The end of a failure text on one line, without the stack frames ("    at ...") that bury the message."""
+    text = " ".join(l.strip() for l in text.splitlines() if not re.match(r"^\s+at ", l))
     return text if len(text) <= n else "..." + text[-n:]
 
 
