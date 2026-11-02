@@ -1,0 +1,4 @@
+anvil-builder-run 1
+emit bytes=108 text="#!aml\n\np {\n   a := 1;\n   b := \"s\";\n   c := [1];\n   d := (1, 2);\n   e := null;\n   f := @t`x`;\n   g := $a;\n};\n"
+steps 25
+status ok

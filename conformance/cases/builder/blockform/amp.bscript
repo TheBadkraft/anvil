@@ -1,0 +1,9 @@
+anvil-builder-script 1
+# AMP has no block form
+option on-error continue
+dialect AMP
+let v = int 1
+let m = add NULL "n" v
+set_block m true
+get_error
+emit

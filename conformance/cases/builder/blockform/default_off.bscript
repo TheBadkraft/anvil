@@ -1,0 +1,8 @@
+anvil-builder-script 1
+# without set_block the form is name := { ... };
+dialect AML
+let o_v = int 1
+let o = object
+add o "k" o_v
+let m = add NULL "blk" o
+emit

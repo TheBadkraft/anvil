@@ -1,0 +1,16 @@
+anvil-builder-script 1
+# an include does not excuse it: the builder holds the member
+option on-error continue
+dialect AML
+include "x.anvl"
+let o_v = int 1
+let o = object
+add o "k" o_v
+let m = add NULL "blk" o
+let d = object
+let dx = int 2
+add d "j" dx
+let dm = add NULL "derived" d
+set_block m true
+set_base dm "blk"
+emit

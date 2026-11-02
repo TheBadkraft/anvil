@@ -1,0 +1,503 @@
+anvil-builder-script 1
+dialect AML
+let v0 = int 0
+let o0 = object
+add o0 "x" v0
+let m0 = add NULL "b0" o0
+set_block m0 true
+let v1 = int 1
+let o1 = object
+add o1 "x" v1
+let m1 = add NULL "b1" o1
+set_block m1 true
+let v2 = int 2
+let o2 = object
+add o2 "x" v2
+let m2 = add NULL "b2" o2
+set_block m2 true
+let v3 = int 3
+let o3 = object
+add o3 "x" v3
+let m3 = add NULL "b3" o3
+set_block m3 true
+let v4 = int 4
+let o4 = object
+add o4 "x" v4
+let m4 = add NULL "b4" o4
+set_block m4 true
+let v5 = int 5
+let o5 = object
+add o5 "x" v5
+let m5 = add NULL "b5" o5
+set_block m5 true
+let v6 = int 6
+let o6 = object
+add o6 "x" v6
+let m6 = add NULL "b6" o6
+set_block m6 true
+let v7 = int 7
+let o7 = object
+add o7 "x" v7
+let m7 = add NULL "b7" o7
+set_block m7 true
+let v8 = int 8
+let o8 = object
+add o8 "x" v8
+let m8 = add NULL "b8" o8
+set_block m8 true
+let v9 = int 9
+let o9 = object
+add o9 "x" v9
+let m9 = add NULL "b9" o9
+set_block m9 true
+let v10 = int 10
+let o10 = object
+add o10 "x" v10
+let m10 = add NULL "b10" o10
+set_block m10 true
+let v11 = int 11
+let o11 = object
+add o11 "x" v11
+let m11 = add NULL "b11" o11
+set_block m11 true
+let v12 = int 12
+let o12 = object
+add o12 "x" v12
+let m12 = add NULL "b12" o12
+set_block m12 true
+let v13 = int 13
+let o13 = object
+add o13 "x" v13
+let m13 = add NULL "b13" o13
+set_block m13 true
+let v14 = int 14
+let o14 = object
+add o14 "x" v14
+let m14 = add NULL "b14" o14
+set_block m14 true
+let v15 = int 15
+let o15 = object
+add o15 "x" v15
+let m15 = add NULL "b15" o15
+set_block m15 true
+let v16 = int 16
+let o16 = object
+add o16 "x" v16
+let m16 = add NULL "b16" o16
+set_block m16 true
+let v17 = int 17
+let o17 = object
+add o17 "x" v17
+let m17 = add NULL "b17" o17
+set_block m17 true
+let v18 = int 18
+let o18 = object
+add o18 "x" v18
+let m18 = add NULL "b18" o18
+set_block m18 true
+let v19 = int 19
+let o19 = object
+add o19 "x" v19
+let m19 = add NULL "b19" o19
+set_block m19 true
+let v20 = int 20
+let o20 = object
+add o20 "x" v20
+let m20 = add NULL "b20" o20
+set_block m20 true
+let v21 = int 21
+let o21 = object
+add o21 "x" v21
+let m21 = add NULL "b21" o21
+set_block m21 true
+let v22 = int 22
+let o22 = object
+add o22 "x" v22
+let m22 = add NULL "b22" o22
+set_block m22 true
+let v23 = int 23
+let o23 = object
+add o23 "x" v23
+let m23 = add NULL "b23" o23
+set_block m23 true
+let v24 = int 24
+let o24 = object
+add o24 "x" v24
+let m24 = add NULL "b24" o24
+set_block m24 true
+let v25 = int 25
+let o25 = object
+add o25 "x" v25
+let m25 = add NULL "b25" o25
+set_block m25 true
+let v26 = int 26
+let o26 = object
+add o26 "x" v26
+let m26 = add NULL "b26" o26
+set_block m26 true
+let v27 = int 27
+let o27 = object
+add o27 "x" v27
+let m27 = add NULL "b27" o27
+set_block m27 true
+let v28 = int 28
+let o28 = object
+add o28 "x" v28
+let m28 = add NULL "b28" o28
+set_block m28 true
+let v29 = int 29
+let o29 = object
+add o29 "x" v29
+let m29 = add NULL "b29" o29
+set_block m29 true
+let v30 = int 30
+let o30 = object
+add o30 "x" v30
+let m30 = add NULL "b30" o30
+set_block m30 true
+let v31 = int 31
+let o31 = object
+add o31 "x" v31
+let m31 = add NULL "b31" o31
+set_block m31 true
+let v32 = int 32
+let o32 = object
+add o32 "x" v32
+let m32 = add NULL "b32" o32
+set_block m32 true
+let v33 = int 33
+let o33 = object
+add o33 "x" v33
+let m33 = add NULL "b33" o33
+set_block m33 true
+let v34 = int 34
+let o34 = object
+add o34 "x" v34
+let m34 = add NULL "b34" o34
+set_block m34 true
+let v35 = int 35
+let o35 = object
+add o35 "x" v35
+let m35 = add NULL "b35" o35
+set_block m35 true
+let v36 = int 36
+let o36 = object
+add o36 "x" v36
+let m36 = add NULL "b36" o36
+set_block m36 true
+let v37 = int 37
+let o37 = object
+add o37 "x" v37
+let m37 = add NULL "b37" o37
+set_block m37 true
+let v38 = int 38
+let o38 = object
+add o38 "x" v38
+let m38 = add NULL "b38" o38
+set_block m38 true
+let v39 = int 39
+let o39 = object
+add o39 "x" v39
+let m39 = add NULL "b39" o39
+set_block m39 true
+let v40 = int 40
+let o40 = object
+add o40 "x" v40
+let m40 = add NULL "b40" o40
+set_block m40 true
+let v41 = int 41
+let o41 = object
+add o41 "x" v41
+let m41 = add NULL "b41" o41
+set_block m41 true
+let v42 = int 42
+let o42 = object
+add o42 "x" v42
+let m42 = add NULL "b42" o42
+set_block m42 true
+let v43 = int 43
+let o43 = object
+add o43 "x" v43
+let m43 = add NULL "b43" o43
+set_block m43 true
+let v44 = int 44
+let o44 = object
+add o44 "x" v44
+let m44 = add NULL "b44" o44
+set_block m44 true
+let v45 = int 45
+let o45 = object
+add o45 "x" v45
+let m45 = add NULL "b45" o45
+set_block m45 true
+let v46 = int 46
+let o46 = object
+add o46 "x" v46
+let m46 = add NULL "b46" o46
+set_block m46 true
+let v47 = int 47
+let o47 = object
+add o47 "x" v47
+let m47 = add NULL "b47" o47
+set_block m47 true
+let v48 = int 48
+let o48 = object
+add o48 "x" v48
+let m48 = add NULL "b48" o48
+set_block m48 true
+let v49 = int 49
+let o49 = object
+add o49 "x" v49
+let m49 = add NULL "b49" o49
+set_block m49 true
+let v50 = int 50
+let o50 = object
+add o50 "x" v50
+let m50 = add NULL "b50" o50
+set_block m50 true
+let v51 = int 51
+let o51 = object
+add o51 "x" v51
+let m51 = add NULL "b51" o51
+set_block m51 true
+let v52 = int 52
+let o52 = object
+add o52 "x" v52
+let m52 = add NULL "b52" o52
+set_block m52 true
+let v53 = int 53
+let o53 = object
+add o53 "x" v53
+let m53 = add NULL "b53" o53
+set_block m53 true
+let v54 = int 54
+let o54 = object
+add o54 "x" v54
+let m54 = add NULL "b54" o54
+set_block m54 true
+let v55 = int 55
+let o55 = object
+add o55 "x" v55
+let m55 = add NULL "b55" o55
+set_block m55 true
+let v56 = int 56
+let o56 = object
+add o56 "x" v56
+let m56 = add NULL "b56" o56
+set_block m56 true
+let v57 = int 57
+let o57 = object
+add o57 "x" v57
+let m57 = add NULL "b57" o57
+set_block m57 true
+let v58 = int 58
+let o58 = object
+add o58 "x" v58
+let m58 = add NULL "b58" o58
+set_block m58 true
+let v59 = int 59
+let o59 = object
+add o59 "x" v59
+let m59 = add NULL "b59" o59
+set_block m59 true
+let v60 = int 60
+let o60 = object
+add o60 "x" v60
+let m60 = add NULL "b60" o60
+set_block m60 true
+let v61 = int 61
+let o61 = object
+add o61 "x" v61
+let m61 = add NULL "b61" o61
+set_block m61 true
+let v62 = int 62
+let o62 = object
+add o62 "x" v62
+let m62 = add NULL "b62" o62
+set_block m62 true
+let v63 = int 63
+let o63 = object
+add o63 "x" v63
+let m63 = add NULL "b63" o63
+set_block m63 true
+let v64 = int 64
+let o64 = object
+add o64 "x" v64
+let m64 = add NULL "b64" o64
+set_block m64 true
+let v65 = int 65
+let o65 = object
+add o65 "x" v65
+let m65 = add NULL "b65" o65
+set_block m65 true
+let v66 = int 66
+let o66 = object
+add o66 "x" v66
+let m66 = add NULL "b66" o66
+set_block m66 true
+let v67 = int 67
+let o67 = object
+add o67 "x" v67
+let m67 = add NULL "b67" o67
+set_block m67 true
+let v68 = int 68
+let o68 = object
+add o68 "x" v68
+let m68 = add NULL "b68" o68
+set_block m68 true
+let v69 = int 69
+let o69 = object
+add o69 "x" v69
+let m69 = add NULL "b69" o69
+set_block m69 true
+let v70 = int 70
+let o70 = object
+add o70 "x" v70
+let m70 = add NULL "b70" o70
+set_block m70 true
+let v71 = int 71
+let o71 = object
+add o71 "x" v71
+let m71 = add NULL "b71" o71
+set_block m71 true
+let v72 = int 72
+let o72 = object
+add o72 "x" v72
+let m72 = add NULL "b72" o72
+set_block m72 true
+let v73 = int 73
+let o73 = object
+add o73 "x" v73
+let m73 = add NULL "b73" o73
+set_block m73 true
+let v74 = int 74
+let o74 = object
+add o74 "x" v74
+let m74 = add NULL "b74" o74
+set_block m74 true
+let v75 = int 75
+let o75 = object
+add o75 "x" v75
+let m75 = add NULL "b75" o75
+set_block m75 true
+let v76 = int 76
+let o76 = object
+add o76 "x" v76
+let m76 = add NULL "b76" o76
+set_block m76 true
+let v77 = int 77
+let o77 = object
+add o77 "x" v77
+let m77 = add NULL "b77" o77
+set_block m77 true
+let v78 = int 78
+let o78 = object
+add o78 "x" v78
+let m78 = add NULL "b78" o78
+set_block m78 true
+let v79 = int 79
+let o79 = object
+add o79 "x" v79
+let m79 = add NULL "b79" o79
+set_block m79 true
+let v80 = int 80
+let o80 = object
+add o80 "x" v80
+let m80 = add NULL "b80" o80
+set_block m80 true
+let v81 = int 81
+let o81 = object
+add o81 "x" v81
+let m81 = add NULL "b81" o81
+set_block m81 true
+let v82 = int 82
+let o82 = object
+add o82 "x" v82
+let m82 = add NULL "b82" o82
+set_block m82 true
+let v83 = int 83
+let o83 = object
+add o83 "x" v83
+let m83 = add NULL "b83" o83
+set_block m83 true
+let v84 = int 84
+let o84 = object
+add o84 "x" v84
+let m84 = add NULL "b84" o84
+set_block m84 true
+let v85 = int 85
+let o85 = object
+add o85 "x" v85
+let m85 = add NULL "b85" o85
+set_block m85 true
+let v86 = int 86
+let o86 = object
+add o86 "x" v86
+let m86 = add NULL "b86" o86
+set_block m86 true
+let v87 = int 87
+let o87 = object
+add o87 "x" v87
+let m87 = add NULL "b87" o87
+set_block m87 true
+let v88 = int 88
+let o88 = object
+add o88 "x" v88
+let m88 = add NULL "b88" o88
+set_block m88 true
+let v89 = int 89
+let o89 = object
+add o89 "x" v89
+let m89 = add NULL "b89" o89
+set_block m89 true
+let v90 = int 90
+let o90 = object
+add o90 "x" v90
+let m90 = add NULL "b90" o90
+set_block m90 true
+let v91 = int 91
+let o91 = object
+add o91 "x" v91
+let m91 = add NULL "b91" o91
+set_block m91 true
+let v92 = int 92
+let o92 = object
+add o92 "x" v92
+let m92 = add NULL "b92" o92
+set_block m92 true
+let v93 = int 93
+let o93 = object
+add o93 "x" v93
+let m93 = add NULL "b93" o93
+set_block m93 true
+let v94 = int 94
+let o94 = object
+add o94 "x" v94
+let m94 = add NULL "b94" o94
+set_block m94 true
+let v95 = int 95
+let o95 = object
+add o95 "x" v95
+let m95 = add NULL "b95" o95
+set_block m95 true
+let v96 = int 96
+let o96 = object
+add o96 "x" v96
+let m96 = add NULL "b96" o96
+set_block m96 true
+let v97 = int 97
+let o97 = object
+add o97 "x" v97
+let m97 = add NULL "b97" o97
+set_block m97 true
+let v98 = int 98
+let o98 = object
+add o98 "x" v98
+let m98 = add NULL "b98" o98
+set_block m98 true
+let v99 = int 99
+let o99 = object
+add o99 "x" v99
+let m99 = add NULL "b99" o99
+set_block m99 true
+emit

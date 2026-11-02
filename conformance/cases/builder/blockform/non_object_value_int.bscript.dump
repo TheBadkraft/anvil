@@ -1,0 +1,6 @@
+anvil-builder-run 1
+failed line=7 code=21 name=ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT call="set_block m true" message="a block-form statement must have an object value"
+get_error code=21 name=ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT
+emit bytes=15 text="#!aml\n\nn := 1;\n"
+steps 7
+status ok

@@ -1,0 +1,12 @@
+anvil-builder-script 1
+dialect AML
+let v = int 1
+let inner = object
+add inner "x" v
+let outer = object
+let im = add outer "inner" inner
+set_block im true
+let w = int 2
+add outer "after" w
+add NULL "outer" outer
+emit

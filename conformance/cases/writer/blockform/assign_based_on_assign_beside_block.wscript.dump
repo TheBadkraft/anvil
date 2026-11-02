@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 17
+status ok
+output bytes=79 text="#!aml\n\nblk {\n   f := 1;\n};\nbase := {\n   x := 1;\n};\nd : base := {\n   y := 2;\n};\n"

@@ -1,0 +1,18 @@
+anvil-writer-script 1
+dialect AML
+statement_block "blk" NULL
+begin_object
+statement "f" NULL
+int 1
+end_object
+statement "base" NULL
+begin_object
+statement "x" NULL
+int 1
+end_object
+statement "d" "base"
+begin_object
+statement "y" NULL
+int 2
+end_object
+finish

@@ -20,10 +20,12 @@ error_message code=17 text="field name declared twice in one object"
 error_message code=18 text="attribute key given twice"
 error_message code=19 text="inheritance cycle: a statement's base chain loops back to itself"
 error_message code=20 text="base names no member of the document and no include could supply it"
+error_message code=21 text="a block-form statement must have an object value"
+error_message code=22 text="a base cannot be a block-form statement (it is read-only)"
 error_message code=100 text="unknown error"
 error_message code=-1 text="unknown error"
 error_message code=-2147483648 text="unknown error"
 error_message code=2147483647 text="unknown error"
-steps 26
+steps 28
 status ok
 output none

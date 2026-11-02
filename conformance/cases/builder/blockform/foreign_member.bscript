@@ -1,0 +1,13 @@
+anvil-builder-script 1
+# a member of another builder is INVALID_ARGUMENT, as for set_base
+option on-error continue
+dialect AML
+builder2 AML
+let v = int 1
+let o = object
+add o "k" v
+let m = add NULL "o" o
+other set_block m true
+other get_error
+get_error
+emit

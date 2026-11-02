@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=6 code=21 name=ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT call="int 1" message="a block-form statement must have an object value"
+steps 5
+status error code=21 name=ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT
+output none

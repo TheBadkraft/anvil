@@ -92,7 +92,7 @@ case(LF, "write_aml_features_into_amp", [let("o", "object"), let("i", "int 1"), 
 case(LF, "write_failure", [let("a", "array"), 'add NULL "a" a', "write", "get_error"], cont=True, desc="write fails like emit")
 case(LF, "write_then_emit_failure", [let("a", "array"), 'add NULL "a" a', "write", "emit", "get_error"], cont=True)
 case(LF, "emit_amp_and_write_aml", [let("a", "int 1"), 'add NULL "a" a', "emit", "write AML", "write AMP"], "AMP")
-for c in list(range(-1, 21)):
+for c in list(range(-1, 23)):
     case(LF, "error_message_%s" % str(c).replace("-", "m"), ["error_message %d" % c])
 case(LF, "error_message_extremes", ["error_message 2147483647", "error_message -2147483648"])
 case(LF, "get_error_all_via_calls", [
@@ -424,7 +424,7 @@ case(BK, "non_object_off_is_fine", [let("v", "int 1"), let("m", 'add NULL "n" v'
 case(BK, "non_object_does_not_stick", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m true', "emit"], cont=True)
 case(BK, "null_member", ['set_block NULL true', "get_error"], cont=True)
 case(BK, "null_member_false", ['set_block NULL false', "get_error"], cont=True)
-case(BK, "foreign_member", [let("o", "object"), let("m", 'add NULL "o" o'), 'other set_block m true', "other get_error", "get_error", "emit"], cont=True, b2="AML",
+case(BK, "foreign_member", [let("v", "int 1"), let("o", "object"), 'add o "k" v', let("m", 'add NULL "o" o'), 'other set_block m true', "other get_error", "get_error", "emit"], cont=True, b2="AML",
      desc="a member of another builder is INVALID_ARGUMENT, as for set_base")
 case(BK, "foreign_member_dialect_order", [let("v", "int 1"), let("m", 'add NULL "v" v'), 'other set_block m true', "other get_error"], cont=True, b2="AMP", desc="the foreign check comes before the dialect check")
 case(BK, "amp", [let("v", "int 1"), let("m", 'add NULL "n" v'), 'set_block m true', "get_error", "emit"], "AMP", cont=True, desc="AMP has no block form")
@@ -433,6 +433,8 @@ case(BK, "dialect_invalid", ['set_block NULL true', "get_error"], "9", cont=True
 # a block-form member as a base
 case(BK, "base_is_block", blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit", "write", "get_error"], cont=True,
      desc="the reader rejects a block as a base (4052): emit and write refuse it")
+case(BK, "base_is_block_declared_later", derived() + ['set_base dm "blk"'] + blk() + ['set_block m true', "emit"], cont=True,
+     desc="the streaming writer cannot see a block declared after its user; the builder can, and refuses it")
 case(BK, "base_is_block_set_first", blk() + derived() + ['set_base dm "blk"', 'set_block m true', "emit"], cont=True)
 case(BK, "base_is_block_then_off", blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit", 'set_block m false', "emit"], cont=True,
      desc="the builder is unchanged by the refusal: turning the option off makes the document legal")

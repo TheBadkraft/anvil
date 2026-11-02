@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 12
+status ok
+output bytes=63 text="#!aml\n\no := {\n   inner {\n      x := 1;\n   };\n   after := 2;\n};\n"

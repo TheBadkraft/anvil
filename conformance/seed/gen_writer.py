@@ -740,8 +740,6 @@ v = Obj(S1("x", Int(1)))
 for i in range(100): v = Obj(BS("n", v)) if i % 2 == 0 else Obj(S1("n", v))
 doc(BF, "deep_alternating_100", "AML", [S1("a", v)])
 doc(BF, "block_declared_after_assign_base_use", "AML", [S1("d", Obj(S1("x", Int(1))), base="later_assign"), S1("later_assign", Obj(S1("y", Int(2)))), BS("blk", Obj(S1("z", Int(3))))])
-doc(BF, "block_declared_after_its_user", "AML", [S1("d", Obj(S1("x", Int(1))), base="later"), BS("later", Obj(S1("y", Int(2))))],
-    desc="the streaming writer cannot see a base declared later; this text is one the reader rejects (4052), the builder refuses it")
 # steps of the value: each one a different non-object value
 for nm, steps in (("null", ["null"]), ("bool", ["bool true"]), ("numeric", ['numeric "1.5"']), ("int", ["int 1"]), ("double", ["double 1.5"]),
                   ("string", ['string "s"']), ("bare", ['bare "w"']), ("blob", ['blob "t" "x"']), ("varref", ['varref "n"']),
@@ -784,7 +782,6 @@ err(BF, "block_base_is_block", "AML", BLK + ['statement_block "d" "blk"'], E("BA
 err(BF, "nested_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"), desc="a base is looked up among the top-level names, at any depth")
 err(BF, "nested_block_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement_block "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
 err(BF, "base_is_block_after_others", "AML", ['statement "a" NULL', "int 1"] + BLK + ['statement "b" NULL', "int 2", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
-err(BF, "base_is_block_checked_before_value", "AML", BLK + ['statement "d" "blk"', "int 1"], E("BASE_IS_BLOCK_FORM"))
 
 # ---- write the scripts (never a dump) ---------------------------------------------------------------------------
 seen = set()

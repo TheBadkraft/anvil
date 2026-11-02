@@ -1,0 +1,26 @@
+anvil-builder-script 1
+dialect AML
+let o = object
+let a = int 1
+add o "a" a
+let b = string "s"
+add o "b" b
+let c = array
+let c1 = int 1
+append c c1
+add o "c" c
+let d = tuple
+let d1 = int 1
+let d2 = int 2
+append d d1
+append d d2
+add o "d" d
+let e = null
+add o "e" e
+let f = blob "t" "x"
+add o "f" f
+let g = varref "a"
+add o "g" g
+let m = add NULL "p" o
+set_block m true
+emit

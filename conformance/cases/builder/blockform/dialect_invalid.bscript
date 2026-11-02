@@ -1,0 +1,6 @@
+anvil-builder-script 1
+# the null builder
+option on-error continue
+dialect 9
+set_block NULL true
+get_error

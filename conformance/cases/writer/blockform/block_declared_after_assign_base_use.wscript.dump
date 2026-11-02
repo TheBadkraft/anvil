@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 17
+status ok
+output bytes=95 text="#!aml\n\nd : later_assign := {\n   x := 1;\n};\nlater_assign := {\n   y := 2;\n};\nblk {\n   z := 3;\n};\n"

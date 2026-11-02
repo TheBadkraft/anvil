@@ -22,6 +22,8 @@ error_message 17
 error_message 18
 error_message 19
 error_message 20
+error_message 21
+error_message 22
 error_message 100
 error_message -1
 error_message -2147483648
