@@ -1,0 +1,3 @@
+// c
+include "pos_self_second_line.anvl";
+x := 1;

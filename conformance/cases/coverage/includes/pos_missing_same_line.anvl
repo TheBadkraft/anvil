@@ -1,0 +1,2 @@
+include "leaf_a.anvl"; include "no_such_file.anvl";
+x := 1;

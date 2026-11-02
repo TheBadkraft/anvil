@@ -88,6 +88,18 @@ put(I + "bare_missing_suffix.anvl", 'include "leaf_a";\n')
 put(I + "no_semicolon_include.anvl", 'include "leaf_a.anvl"\nx := 1;\n')
 put(I + "include_after_statement.anvl", 'x := 1;\ninclude "leaf_a.anvl";\n')
 put(I + "include_before_shebang_attr.anvl", '#!aml\n@[m="1"]\ninclude "leaf_a.anvl";\nx := 1;\n')
+# where an include error is reported: the `include` keyword of the failing statement, in the document that
+# holds it, counted in bytes (BR-2611-anvl-errors-001)
+put(I + "pos_missing_after_comment.anvl", '// a comment\n  include "no_such_file.anvl";\nx := 1;\n')   # 2:3
+put(I + "pos_missing_same_line.anvl", 'include "leaf_a.anvl"; include "no_such_file.anvl";\nx := 1;\n')  # 1:24
+put(I + "pos_missing_after_tab.anvl", 'include "leaf_a.anvl";\n\tinclude "no_such_file.anvl";\nx := 1;\n')  # 2:2
+put(I + "pos_missing_after_multibyte.anvl", '/* \u00e9 */ include "no_such_file.anvl";\nx := 1;\n')  # 1:10
+put(I + "pos_mid_missing.anvl", '\n  include "no_such_file.anvl";\nm := 1;\n')                   # 2:3 in this child
+put(I + "pos_missing_nested.anvl", '// root\ninclude "pos_mid_missing.anvl";\nx := 1;\n')             # error in the child
+put(I + "pos_self_second_line.anvl", '// c\ninclude "pos_self_second_line.anvl";\nx := 1;\n')      # 2:1 cycle
+put(I + "pos_cycle_a.anvl", 'include "pos_cycle_b.anvl";\na := 1;\n')
+put(I + "pos_cycle_b.anvl", '\n\ninclude "pos_cycle_a.anvl";\nb := 1;\n')                          # 3:1 cycle, closed in b
+put(I + "pos_path_too_long.anvl", '// c\n   include "%s";\nx := 1;\n' % ("b" * 1100))               # 2:4
 
 # ------------------------------------------------------------------------------------------------ nesting
 N = "nesting/"

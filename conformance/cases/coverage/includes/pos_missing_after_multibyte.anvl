@@ -1,0 +1,2 @@
+/* é */ include "no_such_file.anvl";
+x := 1;
