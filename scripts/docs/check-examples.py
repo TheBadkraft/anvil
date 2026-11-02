@@ -334,6 +334,90 @@ def run_code(ctx, directory, cmd, files, fname, text, what):
     return passed(stdout=out)
 
 
+C_PRELUDE = ["anvil_flat.h", "anvil_type_registry.h", "anvil_schema.h", "anvil_writer.h", "anvil_builder.h"]
+C_STD = ["stdio.h", "stdlib.h", "string.h", "stdint.h", "stdbool.h"]
+C_KEYWORDS = r"(?:if|for|while|switch|else|do|return|case|goto|sizeof)"
+C_FUNC_HEAD = re.compile(r"^(?!" + C_KEYWORDS + r"\b)[A-Za-z_][\w \t\*]*?[\w\*]\s*\(")
+
+
+def split_c(text):
+    """(includes, functions, statements, has_main) of a C sample: preprocessor includes, top-level function
+    definitions (a line at column 0 that opens one, up to its closing brace) and everything else."""
+    includes, funcs, stmts, has_main = [], [], [], False
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if re.match(r"^\s*#\s*include\b", ln):
+            includes.append(ln.strip())
+            i += 1
+        elif C_FUNC_HEAD.match(ln) and not ln.rstrip().endswith(";"):
+            depth, seen, block = 0, False, []
+            while i < len(lines):
+                block.append(lines[i])
+                depth += lines[i].count("{") - lines[i].count("}")
+                seen = seen or "{" in lines[i]
+                i += 1
+                if seen and depth <= 0:
+                    break
+            funcs.append("\n".join(block))
+            if re.match(r"^[\w \t\*]*\bmain\s*\(", block[0]):
+                has_main = True
+        else:
+            stmts.append(ln)
+            i += 1
+    return includes, funcs, stmts, has_main
+
+
+def find_dir_with(root, marker):
+    if os.path.exists(os.path.join(root, marker)):
+        return root
+    for dp, dn, fn in os.walk(root):
+        if marker in fn or marker in dn:
+            return dp
+    return None
+
+
+def assemble_c(text, include_dir):
+    includes, funcs, stmts, has_main = split_c(text)
+    head = ["#include <%s>" % h for h in C_STD]
+    head += ['#include "%s"' % h for h in C_PRELUDE if os.path.exists(os.path.join(include_dir, h))]
+    head += [i for i in includes if i not in head]
+    body = list(funcs)
+    if not has_main:
+        body.append("int main(void) {\n" + "\n".join(stmts) + "\nreturn 0;\n}")
+    else:
+        body.append("\n".join(stmts))
+    return "\n".join(head) + "\n\n" + "\n\n".join(body) + "\n"
+
+
+def check_c(s, text, files, ctx, expected):
+    if not ctx.core:
+        return skipped("no --core (the core package)", needs=True)
+    if shutil.which("gcc") is None:
+        return skipped("no gcc on this machine", needs=True)
+    inc = find_dir_with(ctx.core, "anvil_flat.h")
+    lib = None
+    for dp, dn, fn in os.walk(ctx.core):
+        if "libanvil.a" in fn:
+            lib = os.path.join(dp, "libanvil.a")
+    if inc is None or lib is None:
+        return failed("the core package has no anvil_flat.h and lib/libanvil.a")
+    directory = ctx.sample_dir()
+    write_files(directory, files)
+    write_files(directory, {"sample.c": assemble_c(text, inc)})
+    rc, out, err = run_cmd(["gcc", "-std=gnu11", "-w", "-I" + inc, "sample.c", lib, "-lm", "-o", "sample"], directory, ctx.env)
+    if rc != 0:
+        return failed("compile or link failed: " + tail_text(err or out))
+    rc, out, err = run_cmd(["./sample"], directory, ctx.env)
+    if rc != 0:
+        return failed("the program exited %s: %s" % (rc if rc is not None else "(timeout)", tail_text(err or out)))
+    return passed(stdout=out)
+
+
+HANDLERS["c"] = check_c
+
+
 def check_js(s, text, files, ctx, expected):
     if not ctx.js:
         return skipped("no --js (the anvil.js package)", needs=True)
