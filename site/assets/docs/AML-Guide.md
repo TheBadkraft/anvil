@@ -156,11 +156,24 @@ child.baseIdentifier(); // "Base"
 mutable container and can't participate in inheritance, regardless of
 which of the two forms above you use.
 
-Inheritance is single-inheritance only. **Field merging is not currently
-implemented** — `hasBase()`/`baseIdentifier()` expose the relationship, but
-accessing an inherited field through `.get()` on the derived node will not
-walk up to the base. If your workflow needs merged fields, resolve the base
-chain yourself via `baseIdentifier()`.
+A statement has at most one base, but the base can itself have one (`Grand : Child`, `Child : Base`).
+**Fields are merged when the document is resolved.** The derived object holds its own fields and every
+field it inherits, through the whole chain, and a field it defines itself wins over the same name in a
+base (the nearest definition wins). Reading the merged object with the parsed example above:
+
+```js
+const grand = doc.get('Grand');
+grand.count;        // 3
+grand.get('c');     // 3  (its own)
+grand.get('b');     // 2  (from Child)
+grand.get('a');     // 1  (from Base, two levels up)
+```
+
+An override replaces the inherited field rather than adding a second one. With
+`Base := { a := 1; }; Child : Base := { a := 9; b := 2; };`, `Child` has two fields, `a` is `9` and `b` is
+`2`; `Grand : Child := { c := 3; }` then has three: `c`, then `a` (`9`) and `b` (`2`). Own fields come first
+in iteration order, followed by the inherited ones. The base itself is unchanged. Anvil Native and anvil.js
+(v0.13.1-rc) give the same result.
 
 ## VarRefs
 

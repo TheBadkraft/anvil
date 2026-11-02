@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   escapes (`\n \t \r \" \\`), says any other backslash sequence is kept as written (both characters), that there is no `\u` or `\x`,
   that `"a\"` does not parse, and that strings are byte-length-delimited and carry any bytes. The AML guide's Inheritance
   section no longer calls the block form `name { ... }` "equivalent" to `name := { ... }` or `:=` "optional": both parse and read
-  the same, but the block form is read-only and can never be a base (4052), shown with the `Grand : Child` example. Docs only;
+  the same, but the block form is read-only and can never be a base (4052), shown with the `Grand : Child` example. The same
+  guide no longer says field merging is not implemented: it now describes the merge as observed in Anvil Native and
+  anvil.js v0.13.1-rc (own and inherited fields visible on the derived object, the nearer definition wins). Docs only;
   not deployed.
 
 ### Changed
