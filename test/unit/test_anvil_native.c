@@ -2276,6 +2276,86 @@ static void test_anv75_directory_part_cycles_unchanged(void) {
    rmdir(d);
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV76-79 (BR-2611-anvl-errors-001) - an include error is reported at the `include` keyword of the
+ * statement that caused it, in the document that holds that statement, not at 1:1 of the root.
+ * ---------------------------------------------------------------------- */
+static void expect_include_error_at(const tmp_file *files, const char *root, int code, size_t line,
+                                    size_t col, const char *tag) {
+   char dir[64];
+   anvil_document doc = load_in_tmpdir(files, root, dir);
+   TestBit.is_not_null(doc, tag);
+   if (doc) {
+      TestBit.is_equal_int(ANVIL_ERR_INCLUDE, anvil_get_error(doc), tag);
+      anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+      char buf[128] = "";
+      anvil_error_get_message(err, buf, sizeof buf);
+      TestBit.is_equal_int(0, strcmp(anvl_error_code_message((anvl_err_code)code), buf), tag);
+      TestBit.is_equal_int((long long)line, (long long)anvil_error_get_line(err), tag);
+      TestBit.is_equal_int((long long)col, (long long)anvil_error_get_column(err), tag);
+      anvil_dispose(doc);
+   }
+   rm_tmpdir(files, dir);
+}
+
+static void test_anv76_include_not_found_is_at_the_include_keyword(void) {
+   const tmp_file second_line[] = {{"r.anvl", "// c\ninclude \"nope.anvl\";\n"}, {NULL, NULL}};
+   expect_include_error_at(second_line, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 2, 1,
+                           "ANV76: second line, column 1");
+   const tmp_file after_comment[] = {{"r.anvl", "// c\n  include \"nope.anvl\";\nx := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(after_comment, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 2, 3,
+                           "ANV76: after a comment, indented");
+   const tmp_file same_line[] = {{"r.anvl", "include \"a.anvl\"; include \"nope.anvl\";\n"},
+                                 {"a.anvl", "a := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(same_line, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 1, 19,
+                           "ANV76: two includes on one line, the second one fails");
+   const tmp_file tab[] = {{"r.anvl", "include \"a.anvl\";\n\tinclude \"nope.anvl\";\n"},
+                           {"a.anvl", "a := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(tab, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 2, 2,
+                           "ANV76: a tab counts as one byte");
+   // "/* \xc3\xa9 */ " is nine bytes: the column counts bytes, not characters
+   const tmp_file bytes[] = {{"r.anvl", "/* \xc3\xa9 */ include \"nope.anvl\";\n"}, {NULL, NULL}};
+   expect_include_error_at(bytes, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 1, 10,
+                           "ANV76: the column counts bytes");
+}
+
+static void test_anv77_include_cycle_is_at_the_closing_include(void) {
+   const tmp_file self[] = {{"s.anvl", "// c\ninclude \"s.anvl\";\nx := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(self, "s.anvl", ANVL_ERR_INCLUDE_CYCLIC, 2, 1,
+                           "ANV77: a self include, second line");
+   // the include that closes the cycle is the one in b.anvl, line 3
+   const tmp_file mutual[] = {{"a.anvl", "include \"b.anvl\";\na := 1;\n"},
+                              {"b.anvl", "\n\ninclude \"a.anvl\";\nb := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(mutual, "a.anvl", ANVL_ERR_INCLUDE_CYCLIC, 3, 1,
+                           "ANV77: mutual cycle, reported where b.anvl includes a.anvl");
+}
+
+static void test_anv78_include_path_too_long_is_at_the_include_keyword(void) {
+   static char text[1200];
+   int n = snprintf(text, sizeof text, "// c\n   include \"");
+   memset(text + n, 'b', 1100);
+   strcpy(text + n + 1100, "\";\n");
+   const tmp_file files[] = {{"r.anvl", text}, {NULL, NULL}};
+   expect_include_error_at(files, "r.anvl", ANVL_ERR_INVALID_ARGUMENT, 2, 4,
+                           "ANV78: a joined path of 1024 bytes or more");
+}
+
+static void test_anv79_include_error_in_an_included_document_is_positioned_in_it(void) {
+   const tmp_file files[] = {{"r.anvl", "include \"m.anvl\";\nx := 1;\n"},
+                             {"m.anvl", "\n  include \"nope.anvl\";\nm := 1;\n"}, {NULL, NULL}};
+   expect_include_error_at(files, "r.anvl", ANVL_ERR_INCLUDE_FILE_NOT_FOUND, 2, 3,
+                           "ANV79: a missing include inside an included document");
+   // the other include errors keep the position they already had
+   const tmp_file amp[] = {{"r.amp", "#!amp\ninclude \"a.anvl\";\n"}, {NULL, NULL}};
+   char dir[64];
+   anvil_document doc = load_in_tmpdir(amp, "r.amp", dir);
+   anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+   TestBit.is_true(err && anvil_error_get_line(err) == 2 && anvil_error_get_column(err) == 1,
+                   "ANV79: include in AMP stays at its keyword (2:1)");
+   anvil_dispose(doc);
+   rm_tmpdir(amp, dir);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -2395,6 +2475,14 @@ int main(void) {
                   test_anv73_other_spellings_are_the_same_document, th);
    TestBit.run_ex("ANV74_no_false_cycles", NULL, test_anv74_no_false_cycles, th);
    TestBit.run_ex("ANV75_directory_part_cycles_unchanged", NULL, test_anv75_directory_part_cycles_unchanged, th);
+   TestBit.run_ex("ANV76_include_not_found_is_at_the_include_keyword", NULL,
+                  test_anv76_include_not_found_is_at_the_include_keyword, th);
+   TestBit.run_ex("ANV77_include_cycle_is_at_the_closing_include", NULL,
+                  test_anv77_include_cycle_is_at_the_closing_include, th);
+   TestBit.run_ex("ANV78_include_path_too_long_is_at_the_include_keyword", NULL,
+                  test_anv78_include_path_too_long_is_at_the_include_keyword, th);
+   TestBit.run_ex("ANV79_include_error_in_an_included_document_is_positioned_in_it", NULL,
+                  test_anv79_include_error_in_an_included_document_is_positioned_in_it, th);
 
    return TestBit.report();
 }
