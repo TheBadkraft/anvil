@@ -21,6 +21,7 @@ changes AML's own default behavior — a document that never opts in never has t
 A document that *defines* types carries the `@[types]` module attribute, at the top of the file,
 before any statements:
 
+<!-- example: setup vehicle_types.anvl -->
 ```anvl
 #!aml
 @[types]
@@ -255,6 +256,7 @@ reference can't be copied and reads as NULL.
 A schema, or any other document, brings a type into scope by including the file that defines it,
 then referencing it by its `types.` — prefixed name:
 
+<!-- example: uses vehicle_types.anvl -->
 ```anvl
 include "vehicle_types.anvl";
 

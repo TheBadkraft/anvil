@@ -181,6 +181,7 @@ anonymous block and so can't be a base in turn.
 
 ## 7. Includes
 
+<!-- example: fragment names a file that is not part of the example -->
 ```anvl
 include "path/to/file.anvl";
 ```
