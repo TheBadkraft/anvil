@@ -332,6 +332,8 @@ def cache_key(adapter_name, sha, opts, repo_id=""):
         parts.append("m" + h)
     elif getattr(opts, "no_compat", False):
         parts.append("nc")
+    if repo_id:
+        parts.append("r" + hashlib.sha1(repo_id.encode()).hexdigest()[:10])
     return "-".join(parts) + "-" + sha
 
 
@@ -479,7 +481,10 @@ class Runner:
         self.started = time.time()
         self.cloned = False
         self.runs = 0
-        self.hits = 0
+        self.hits = 0      # results read from files of an earlier invocation, in --cache
+        self.reused = 0    # results computed or read earlier in this invocation (a commit's parent, mostly)
+        self.memo = {}
+        self.repo_id = os.path.realpath(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
 
     def _clone(self):
         if self.cloned:
@@ -513,11 +518,15 @@ class Runner:
         return ""
 
     def result(self, sha):
-        key = os.path.join(self.cache, cache_key(self.adapter.name, sha, self.opts) + ".json")
+        if sha in self.memo:
+            self.reused += 1
+            return self.memo[sha]
+        key = os.path.join(self.cache, cache_key(self.adapter.name, sha, self.opts, self.repo_id) + ".json")
         if os.path.exists(key):
             self.hits += 1
             with open(key) as f:
-                return json.load(f)
+                self.memo[sha] = json.load(f)
+            return self.memo[sha]
         if self.opts.budget and time.time() - self.started > self.opts.budget:
             raise BudgetReached()
         self._clone()
@@ -533,11 +542,13 @@ class Runner:
             res["note"] = (res.get("note", "") + " " + miss).strip()
         res["seconds"] = round(time.time() - t0, 1)
         res["sha"] = sha
-        os.makedirs(self.cache, exist_ok=True)
-        with open(key + ".tmp", "w") as f:
-            json.dump(res, f)
-        os.replace(key + ".tmp", key)
         self.runs += 1
+        self.memo[sha] = res
+        if res["ran"] and not miss:  # a bad-setup result (suite did not run, pin missing) must not poison later runs
+            os.makedirs(self.cache, exist_ok=True)
+            with open(key + ".tmp", "w") as f:
+                json.dump(res, f)
+            os.replace(key + ".tmp", key)
         return res
 
 
@@ -706,7 +717,7 @@ def main(argv=None):
     fails = [r for r in records if r["status"] == "FAIL"]
     summary = {"repo": repo, "range": opts.range, "adapter": adapter.name, "commits": len(shas), "checked": len(records),
                "pass": len(records) - len(fails), "fail": len(fails), "incomplete": incomplete,
-               "suite_runs": runner.runs, "cache_hits": runner.hits, "seconds": round(time.time() - t_start, 1)}
+               "suite_runs": runner.runs, "cache_hits": runner.hits, "reused": runner.reused, "seconds": round(time.time() - t_start, 1)}
     if opts.json:
         json.dump({"summary": summary, "commits": records}, sys.stdout, indent=1)
         print()
@@ -714,7 +725,7 @@ def main(argv=None):
         for r in records:
             detail = "; ".join(r["reasons"] + ([] if r["status"] == "FAIL" else r["notes"]))
             print("%s %s %-8s %s%s" % (r["status"], r["sha"], r["kind"], r["subject"][:70], (" | " + detail) if detail else ""))
-        print("-- %(pass)d PASS, %(fail)d FAIL of %(checked)d/%(commits)d commits; %(suite_runs)d suite runs, %(cache_hits)d cached, %(seconds)ss%(inc)s" %
+        print("-- %(pass)d PASS, %(fail)d FAIL of %(checked)d/%(commits)d commits; %(suite_runs)d suite runs, %(cache_hits)d from --cache, %(reused)d reused in the run, %(seconds)ss%(inc)s" %
               dict(summary, inc="; INCOMPLETE (budget reached, rerun)" if incomplete else ""))
     if fails:
         return 1
