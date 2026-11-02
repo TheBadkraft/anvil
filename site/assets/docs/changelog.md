@@ -39,6 +39,7 @@ reports exactly `0.13.1-rc+479`; anvil.js reports the same string from `getVersi
 `SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.13.1-rc` lists this
 release only):
 
+<!-- example: fragment a release checksum list, not code -->
 ```
 876fece1c4d4ee45bdf09b21b494e89ce0f1fd295b8e4eb649a089e89c61a114  anvil.js-v0.13.1-rc.tar.gz
 eef31501ed61b0fa98002a370a67a08f0c047b0f9072b69cffd789e5bbf675d2  anvil-net-v0.13.1-rc-linux-x64.tar.gz
@@ -177,6 +178,7 @@ reports exactly `0.13.0-rc+463`; anvil.js reports the same string from `getVersi
 `SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.13.0-rc` lists this
 release only):
 
+<!-- example: fragment a release checksum list, not code -->
 ```
 fa318c4e5fe3da7a3dbd626021747be06053bc6ec6891def314c1831e75aefd3  anvil.js-v0.13.0-rc.tar.gz
 aaf9b3fcd9b0d85ec64d6088f4948819cf0dd65b54b29f2264201504c26c8740  anvil-net-v0.13.0-rc-linux-x64.tar.gz
@@ -337,6 +339,7 @@ reports exactly `0.12.1-rc+420`; anvil.js reports the same string from `getVersi
 `SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.12.1-rc` lists this
 release only):
 
+<!-- example: fragment a release checksum list, not code -->
 ```
 ee89439b3b1ce61134b7432dfb5fe7d9e3456bbd887b1a4f01824f48ce4ab6f1  anvil.js-v0.12.1-rc.tar.gz
 4be20e69edc39228659589fb9ce5759b1324218f4178f4c1274ef95809be0ade  anvil-net-v0.12.1-rc-linux-x64.tar.gz
@@ -444,6 +447,7 @@ library inside reports exactly `0.12.0-rc+389`; anvil.js reports the same string
 Checksums are in [`SHA256SUMS`](/assets/downloads/SHA256SUMS), which lists every published download, this release and earlier ones
 (`SHA256SUMS-v0.12.0-rc` lists this release only):
 
+<!-- example: fragment a release checksum list, not code -->
 ```
 bbdfba42f6bb4b1cd2195eef4915713f007da5ce53d9bf096fdc4992edc93472  anvil.js-v0.12.0-rc.tar.gz
 3f665f841a9c6c17e53fc4ff405f680d5757470cb3a94c37aaae353896191653  anvil-net-v0.12.0-rc-linux-x64.tar.gz

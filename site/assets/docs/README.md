@@ -21,6 +21,7 @@ server := {
 };
 ```
 
+<!-- example: fragment source and source_len are the caller's -->
 ```c
 #include "anvil_flat.h"
 
