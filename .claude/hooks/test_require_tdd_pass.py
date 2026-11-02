@@ -89,6 +89,33 @@ class MergeTargetsMoreSlips(unittest.TestCase):
         self.assertIn(("/w", "feat/x"), self.targets('git -C "$(pwd)" merge feat/x'))
 
 
+class MergeTargetsPipes(unittest.TestCase):
+    """A command given to a shell on its standard input, or a ref given to xargs."""
+
+    def targets(self, command, cwd="/w"):
+        return hook.merge_targets(command, cwd)
+
+    def test_text_piped_into_a_shell_is_a_command_line(self):
+        for c in ("printf 'git merge feat/x' | sh", 'echo "git merge feat/x" | bash', "echo 'git merge feat/x' | sh -s",
+                  "echo git merge feat/x | bash -e"):
+            self.assertEqual(self.targets(c), [("/w", "feat/x")], c)
+
+    def test_a_herestring_or_heredoc_into_a_shell_is_a_command_line(self):
+        for c in ("bash <<< 'git merge feat/x'", 'sh <<<"git merge feat/x"', "bash <<'EOF'\ngit merge feat/x\nEOF"):
+            self.assertEqual(self.targets(c), [("/w", "feat/x")], c)
+
+    def test_xargs_git_merge_takes_its_refs_from_the_pipe(self):
+        self.assertEqual(self.targets("echo feat/x | xargs git merge"), [("/w", "feat/x")])
+        self.assertEqual(self.targets("echo feat/x fix/y | xargs -n1 git merge --no-ff"), [("/w", "feat/x"), ("/w", "fix/y")])
+        unknown = self.targets('git branch --list "feat/*" | xargs git merge')
+        self.assertEqual([t[2] for t in unknown if len(t) == 3], ["unknown"])
+        self.assertEqual(self.targets("xargs git merge feat/x"), [("/w", "feat/x")])
+
+    def test_harmless_pipes_name_nothing(self):
+        for c in ("printf 'hello' | sh", "echo feat/x | xargs echo", "echo 'git merge feat/x' | cat", "ls | xargs git status", "echo hi | bash script.sh"):
+            self.assertEqual(self.targets(c), [], c)
+
+
 class MergeTargetsSlips(unittest.TestCase):
     """The plausible slips: a wrapper word, a shell string, a substitution, --git-dir, a pull."""
 
@@ -268,6 +295,13 @@ class Decision(unittest.TestCase):
         self.assertEqual(self.decide("git merge feat/x")[0], "deny")
         self.record(base=self.init)
         self.assertEqual(self.decide("git merge feat/x")[0], "allow")
+
+    def test_a_merge_given_to_a_shell_on_its_input_is_judged(self):
+        for c in ("printf 'git merge feat/x' | sh", "bash <<< 'git merge feat/x'", "echo feat/x | xargs git merge",
+                  'git branch --list "feat/*" | xargs git merge'):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        self.record()
+        self.assertEqual(self.decide("printf 'git merge feat/x' | sh")[0], "allow")
 
     def test_a_first_parent_record_is_refused(self):
         good = {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}
