@@ -30,7 +30,6 @@ SEPARATORS = r"\|\||&&|[;&|\n()]"
 GUARDED = re.compile(r"^(?:refs/)?(?:heads/|remotes/[^/]+/|[^/]+/)?(?:feat|fix|tools|perf|chore)/")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
 KEYWORDS = {"{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!"}
-WRAPPERS = {"env", "command", "exec", "time", "nohup", "sudo", "setsid", "builtin", "nice", "ionice", "timeout", "stdbuf"}
 ABORTING = {"--abort", "--continue", "--quit"}
 VALUE_OPTIONS = {"-m", "-F", "-s", "-X", "--message", "--file", "--strategy", "--strategy-option", "--into-name"}
 GIT_VALUE_OPTIONS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
@@ -71,12 +70,17 @@ def split_segments(command):
     return segs
 
 
+SUBST_MARK = "\x01"  # stands for a $( ) or backtick substitution in a command whose text is parsed
+
+
 def _join(base, path):
+    if SUBST_MARK in path:  # a computed directory: stay where we are
+        return base
     return os.path.normpath(os.path.join(base, os.path.expanduser(path)))
 
 
 def _sibling(name):
-    """Load a sibling hook file, for the substitution scanner both hooks share."""
+    """Load a sibling hook file, for the substitution scanner and wrapper tables both hooks share."""
     try:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
         spec = importlib.util.spec_from_file_location("sibling_" + re.sub(r"\W", "_", name), path)
@@ -84,7 +88,7 @@ def _sibling(name):
         spec.loader.exec_module(mod)
         return mod
     except Exception as e:
-        print("check-tdd hook: cannot load %s (%s); substitutions in commands are not followed" % (name, e), file=sys.stderr)
+        print("check-tdd hook: cannot load %s (%s); substitutions and wrapper options are not followed" % (name, e), file=sys.stderr)
         return None
 
 
@@ -95,6 +99,40 @@ def substitutions(text):
     return _MEMCAP.substitutions(text) if _MEMCAP else []
 
 
+def _mask(text):
+    """The text with every $( ) and backtick substitution replaced by SUBST_MARK, so that its body neither splits the
+    command nor hides a computed ref. The bodies are parsed on their own, by merge_targets()."""
+    if not _MEMCAP:
+        return text
+    out, i, single, double = [], 0, False, False
+    while i < len(text):
+        c = text[i]
+        if single:
+            single = c != "'"
+            out.append(c)
+        elif c == "\\":
+            out.append(text[i:i + 2])
+            i += 1
+        elif c == "'" and not double:
+            single = True
+            out.append(c)
+        elif c == '"':
+            double = not double
+            out.append(c)
+        elif c == "$" and text.startswith("(", i + 1):
+            out.append(SUBST_MARK)
+            i = _MEMCAP._close_paren(text, i + 2)
+        elif c == "`":
+            out.append(SUBST_MARK)
+            i += 1
+            while i < len(text) and text[i] != "`":
+                i += 2 if text[i] == "\\" else 1
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
 def _words(seg):
     try:
         return shlex.split(seg.strip())
@@ -103,16 +141,17 @@ def _words(seg):
 
 
 def _strip(words):
-    """Drop what comes before the command: assignments, shell keywords, wrapper words and their options."""
+    """Drop what comes before the command: assignments, shell keywords, wrapper words with their options, systemd-run."""
     i = 0
-    while i < len(words):
+    while i < len(words) and _MEMCAP:
         w = words[i]
+        base = w.rsplit("/", 1)[-1]
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w) or w in KEYWORDS:
             i += 1
-        elif w.rsplit("/", 1)[-1] in WRAPPERS:
-            i += 1
-            while i < len(words) and (words[i].startswith("-") or re.match(r"^[0-9][0-9,.:smh-]*$", words[i])):
-                i += 1
+        elif base == "systemd-run":
+            i = _MEMCAP.systemd_run_command(words, i)
+        elif base in _MEMCAP.WRAPPERS:
+            i = _MEMCAP.skip_wrapper(words, i)
         else:
             break
     return words[i:]
@@ -146,16 +185,32 @@ def _positionals(args):
     return out
 
 
-def merge_targets(command, cwd, depth=0):
-    """[(directory, ref)] for every ref a `git merge` names, and [(directory, "<remote>/<branch>", "pull")] for a
-    `git pull`, in the command and in what it runs: `cd <dir> &&`, `git -C <dir>`, `--git-dir`, wrapper words,
-    `bash -c`/`eval` strings, `$( )` and backticks. --abort/--continue/--quit name nothing."""
+def _alias(sub, args, aliases):
+    """`git branch N S`, `git tag N S`, `git checkout -b N S`, `git switch -c N S` make N a name for S later in the
+    same command line, before N exists for the hook to resolve."""
+    if sub in ("branch", "tag") and not {"-d", "-D", "--delete"} & set(args):
+        pos = _positionals(args)
+    elif sub in ("checkout", "switch") and {"-b", "-B", "-c", "-C"} & set(args):
+        pos = [a for a in args if not a.startswith("-")]
+    else:
+        return
+    if len(pos) >= 2:
+        aliases[pos[0]] = pos[1]
+
+
+def merge_targets(command, cwd, depth=0, aliases=None):
+    """[(directory, ref)] for every ref a `git merge` names, [(directory, "<remote>/<branch>", "pull")] for a
+    `git pull`, and [(directory, text, "unknown")] for a ref that is computed ($( ) or backticks), in the command and
+    in what it runs: `cd <dir> &&`, `git -C <dir>`, `--git-dir`, wrapper words and their options, `bash -c`/`eval`
+    strings, substitutions. A branch made earlier in the command line (`git branch tmp feat/x; git merge tmp`) also
+    yields its start. --abort/--continue/--quit name nothing."""
     out, here = [], cwd
+    aliases = {} if aliases is None else aliases
     if depth > 4:
         return out
     for inner in substitutions(command):
-        out += merge_targets(inner, here, depth + 1)
-    for seg in split_segments(command):
+        out += merge_targets(inner, here, depth + 1, aliases)
+    for seg in split_segments(_mask(command)):
         words = _strip(_words(seg))
         if not words:
             continue
@@ -165,18 +220,25 @@ def merge_targets(command, cwd, depth=0):
         elif name in SHELLS or name == "eval":
             strings = [words[k + 1] for k, a in enumerate(words[1:-1], 1) if a.startswith("-") and not a.startswith("--") and "c" in a] if name in SHELLS else [" ".join(words[1:])]
             for s in strings:
-                out += merge_targets(s, here, depth + 1)
+                out += merge_targets(s, here, depth + 1, aliases)
         elif name == "git":
             d, j = _git_global_options(words, here)
             sub, args = (words[j], words[j + 1:]) if j < len(words) else ("", [])
             if sub == "merge" and not ABORTING & set(args):
-                out += [(d, a) for a in _positionals(args)]
+                for a in _positionals(args):
+                    out.append((d, a, "unknown") if SUBST_MARK in a else (d, a))
+                    if a in aliases:
+                        out.append((d, aliases[a]))
             elif sub == "pull":
                 pos = _positionals(args)
                 for spec in pos[1:]:
                     src = spec.split(":", 1)[0].lstrip("+")
-                    if src:
+                    if SUBST_MARK in src:
+                        out.append((d, src, "unknown"))
+                    elif src:
                         out.append((d, src if pos[0] == "." else "%s/%s" % (pos[0], src), "pull"))
+            else:
+                _alias(sub, args, aliases)
     return out
 
 
@@ -209,6 +271,7 @@ def record_problem(path, sha, directory):
     if not isinstance(o, dict):
         return "it does not record the options of its run (an older checker made it)"
     loose = [k for k, bad in (("lenient_tests", o.get("lenient_tests") is not False), ("no_compat", o.get("no_compat") is not False),
+                              ("first_parent", o.get("first_parent") is not False),
                               ("batch_limit", not isinstance(o.get("batch_limit"), int) or o["batch_limit"] > MAX_BATCH_LIMIT),
                               ("max_green_lines", not isinstance(o.get("max_green_lines"), int) or o["max_green_lines"] > MAX_GREEN_LINES)) if bad]
     if loose:
@@ -218,16 +281,30 @@ def record_problem(path, sha, directory):
         return "it does not name its base, or HEAD shares no history with the branch"
     if git_out(directory, "merge-base", "--is-ancestor", base, mb) is None:
         return "it covers %s..%s, but this merge brings in %s..%s" % (base[:12], sha[:12], mb[:12], sha[:12])
+    needs = detect_adapter(directory, base, sha)
+    if needs and rec.get("adapter") != needs:
+        return "its adapter (%s) is not the one this repo needs for the range (%s)" % (rec.get("adapter"), needs)
     return None
 
 
+def detect_adapter(directory, base, sha):
+    """The adapter check-tdd's detection gives for the range base..sha (the same rule as scripts/tdd/check-tdd.py)."""
+    def has(path):
+        return git_out(directory, "cat-file", "-e", "%s:%s" % (sha, path)) is not None
+    if has("package.json"):
+        return "node"
+    changed = (git_out(directory, "diff", "--name-only", base, sha) or "").split()
+    if changed and not any(f.startswith(("src/", "include/", "test/")) for f in changed) and any(f.startswith(("scripts/", ".claude/hooks/")) for f in changed):
+        return "python"
+    return "native" if has("test/unit") else None
+
+
 def is_guarded_tip(directory, ref, sha):
-    """A guarded branch name, or a sha, tag or other expression that is the tip of a guarded branch (local or remote).
-    A name that is itself a branch (main, release/...) is judged by its name alone."""
+    """A guarded branch name, or any name, sha or expression that resolves to the tip of a guarded branch (local or
+    remote): `git branch tmp feat/x; git merge tmp` is a merge of feat/x. main, HEAD and release tips that are not also
+    guarded tips are not."""
     if is_guarded(ref):
         return True
-    if any(git_out(directory, "show-ref", "--verify", "--quiet", prefix + ref) is not None for prefix in ("refs/heads/", "refs/remotes/")):
-        return False
     return any(is_guarded(r) for r in (git_out(directory, "for-each-ref", "--points-at", sha, "--format=%(refname)") or "").split())
 
 
@@ -239,7 +316,10 @@ def merge_decision(command, cwd):
     git's to refuse; a pull of a guarded branch that was never fetched is refused, because its tip is unknown."""
     notes = []
     for target in merge_targets(command, cwd):
-        d, ref, pull = target[0], target[1], len(target) == 3
+        d, ref, pull = target[0], target[1], len(target) == 3 and target[2] == "pull"
+        if len(target) == 3 and target[2] == "unknown":
+            return "deny", ("Refused: the ref of this `git merge` or `git pull` is computed ($( ) or backticks), so the guard cannot tell "
+                            "which branch it is: pass the ref explicitly, as a branch name or a sha.")
         if not os.path.isdir(d):
             continue
         sha = git_out(d, "rev-parse", "--verify", "-q", ref + "^{commit}")
