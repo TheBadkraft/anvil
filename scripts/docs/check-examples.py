@@ -17,11 +17,12 @@ sample: `PASS|FAIL|SKIP <file>:<line> <language> [- reason]`, then a summary. Ex
 
 A sample is marked by HTML comments right before its fence (blank lines may lie between):
 
-  <!-- example: fragment -->        not runnable alone: SKIP
+  <!-- example: fragment [why] -->  not runnable alone: SKIP (the reason is printed)
   <!-- example: error 4052 -->      an intentionally invalid document: both parsers must reject it with this code
   <!-- example: setup NAME -->      checked as usual, and kept as NAME. A document is written as the file NAME in
                                    the directory of every sample that `uses` it (so an include finds it); code
-                                   is prepended to every sample that `uses` it
+                                   is prepended to every sample that `uses` it. A js sample that uses a document
+                                   starts with `const anvl = require('anvil.js')` and `doc`, that document parsed
   <!-- example: uses NAME... -->   see setup
   <!-- example: output -->         the block must equal, up to the final newline, what the sample before it printed
 
@@ -124,7 +125,7 @@ def skipped(reason, needs=False):
     return Result("SKIP", reason, needs=needs)
 
 
-KNOWN_MARKERS = {"fragment": (0, 0), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None)}
+KNOWN_MARKERS = {"fragment": (0, None), "output": (0, 0), "error": (1, 1), "setup": (1, 1), "uses": (1, None)}
 DOC_LANGS = {"anvl", "aml", "amp", ""}
 JS_LANGS = {"js", "javascript", "mjs", "node"}
 PY_LANGS = {"python", "py"}
@@ -297,6 +298,12 @@ def check_markers(s):
     return found, None
 
 
+JS_DOC_PRELUDE = """const anvl = require('anvil.js');
+const doc = anvl.parse(%s);
+if (!doc) throw new Error('the setup document does not parse: ' + JSON.stringify(anvl.lastError()));
+"""
+
+
 def check_output(s, state):
     """An output block must equal, up to the final newline, what the sample before it printed."""
     if state["stdout"] is None:
@@ -314,11 +321,11 @@ def check_sample(s, state, ctx):
     if err:
         return failed(err)
     if "fragment" in marks:
-        return skipped("marked fragment: not run")
+        return skipped("marked fragment" + (": " + " ".join(marks["fragment"]) if marks["fragment"] else ": not run"))
     kind = classify(s.lang)
     if "output" in marks:
         return check_output(s, state)
-    prefix, files = "", {}
+    prefix, files, doc_text = "", {}, None
     for name in marks.get("uses", []):
         su = state["setups"].get(name)
         if su is None:
@@ -328,10 +335,14 @@ def check_sample(s, state, ctx):
                 return failed("uses '%s', a %s sample, from a %s sample" % (name, su.lang, s.lang))
             prefix += su.code
         files.update(su.files)
+        if su.kind == "doc":
+            doc_text = su.files[name]
     handler = HANDLERS.get(kind)
     if handler is None:
         return failed("not implemented: %s samples" % kind)
     expected = int(marks["error"][0]) if "error" in marks else None
+    if doc_text is not None and kind == "js":
+        prefix = JS_DOC_PRELUDE % json.dumps(doc_text) + prefix
     text = prefix + s.text
     res = handler(s, text, files, ctx, expected)
     state["stdout"] = res.stdout
