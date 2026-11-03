@@ -71,6 +71,7 @@ Writer.
 | **Exports:** `nm -D` on every shipped `libanvil.so` lists the public schema and type-registry functions, and no internal symbol | core, net, py, java |
 | **README:** the README examples run against the package | each binding that has README tests |
 | **Downstream:** FlyWire's guard `flywire/tests/test-anvl-binding-grammar.js`, run read-only from a scratch copy pointed at the staged tarball | node, wasm |
+| **Binding suites:** each released binding's **full** test suite (including its vtable/enum drift tests) passes at the release pin, built from the tag in a clean clone; a single failure blocks the release. (2026-11-03: anvil.py and anvil.net shipped v0.13.1-rc with 4 failing tests each - an include-order writer test and unmirrored FR-2610-anvl-schema-009 members - because no gate ran them.) | py, net, java, js |
 | **Docs samples:** `scripts/docs/check-examples.py --strict` with `--dump` (built from the tag) and `--core`/`--js`/`--py`/`--net` pointed at the staged tarballs exits 0; a failing sample blocks the release (owner, 2026-11-02) | every release |
 | **Checksum:** `SHA256SUMS` beside the tarballs, verified after download | every artifact |
 | **Live (after deploy):** rerun the install and grammar checks against the live anvldata.com URLs | every artifact |
