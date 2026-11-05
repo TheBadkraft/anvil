@@ -355,15 +355,54 @@ typedef struct {
 } rc_node;
 
 typedef struct {
+   anvl_value ref;  // the VarRef value; its text.start is the `$`
+   uint32_t target; // node index of the statement whose value the reference resolves to
+} rc_edge;
+
+typedef struct {
    module_context ctx;
    rc_node *nodes;
    uint32_t n;
-   anvl_value best; // the reference to report so far
+   uint32_t *table;  // open addressing: a concrete (non-reference) value -> its node index + 1, 0 for a free slot
+   usize table_cap;  // a power of two
+   uint32_t *start;  // n + 1 offsets into edges
+   rc_edge *edges;
+   usize edge_count, edge_cap;
+   uint32_t *comp;   // node -> strongly connected component
+   anvl_value best;  // the reference to report so far
 } rc_graph;
 
-// Visits the references in the walkable subtree of node i (members and elements at any depth, inherited fields; not
-// through another reference) and keeps in g->best the one that comes first in the source among those that resolve to
-// the value of node i itself. `stack` is a reusable scratch; false means out of memory.
+static usize rc_hash(const void *p, usize cap) {
+   return (usize)((((unsigned long long)(usize)p >> 4) * 0x9E3779B97F4A7C15ull) >> 24) & (cap - 1);
+}
+
+// The node whose value is `value`, RC_NONE if none. A resolved reference points at the concrete value that the end
+// of its chain of references holds (resolve_varref_chain), which is the value of one top-level statement.
+static uint32_t rc_node_of(const rc_graph *g, const void *value) {
+   for (usize at = rc_hash(value, g->table_cap); g->table[at]; at = (at + 1) & (g->table_cap - 1)) {
+      if (g->nodes[g->table[at] - 1].value == value) {
+         return g->table[at] - 1;
+      }
+   }
+   return RC_NONE;
+}
+
+static bool rc_add_edge(rc_graph *g, anvl_value ref, uint32_t target) {
+   if (g->edge_count == g->edge_cap) {
+      usize cap = g->edge_cap ? g->edge_cap * 2 : 64;
+      rc_edge *bigger = realloc(g->edges, cap * sizeof *bigger);
+      if (!bigger) {
+         return false;
+      }
+      g->edges = bigger;
+      g->edge_cap = cap;
+   }
+   g->edges[g->edge_count++] = (rc_edge){ref, target};
+   return true;
+}
+
+// Adds an edge for each resolved reference in the walkable subtree of node i (members and elements at any depth,
+// inherited fields; not through another reference). `stack` is a reusable scratch; false means out of memory.
 static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
    usize top = 0;
    (*stack)[top++] = g->nodes[i].value;
@@ -372,11 +411,13 @@ static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
       list items = NULL;
       bool is_object = false;
       switch (v->type) {
-      case ANVL_VALUE_VARREF:
-         if (v->varref.resolved == g->nodes[i].value && (!g->best || v->text.start < g->best->text.start)) {
-            g->best = v;
+      case ANVL_VALUE_VARREF: {
+         uint32_t t = v->varref.resolved ? rc_node_of(g, v->varref.resolved) : RC_NONE;
+         if (t != RC_NONE && !rc_add_edge(g, v, t)) {
+            return false;
          }
          continue;
+      }
       case ANVL_VALUE_ARRAY:
       case ANVL_VALUE_TUPLE:
          items = v->collection.items;
@@ -410,8 +451,59 @@ static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
    return true;
 }
 
-// ANVL_RES_ERR with *out_err_code set when a statement of the root document holds a reference to itself, or on running
-// out of memory. The error is at the `$` of the first such reference.
+// Fills g->comp with the strongly connected components: Tarjan's algorithm, iterative (an explicit call stack), so a
+// chain of 100000 statements does not recurse. Two nodes are in one component exactly when each can reach the other.
+static bool rc_components(rc_graph *g) {
+   usize n = g->n;
+   uint32_t *mem = calloc(n ? 5 * n : 1, sizeof *mem);
+   if (!mem) {
+      return false;
+   }
+   uint32_t *order = mem, *low = mem + n, *cursor = mem + 2 * n, *stack = mem + 3 * n, *calls = mem + 4 * n;
+   uint32_t next_order = 1, next_comp = 0;
+   usize sp = 0;
+   for (usize i = 0; i < n; i++) {
+      g->comp[i] = RC_NONE;
+   }
+   for (uint32_t root = 0; root < n; root++) {
+      usize depth = 0;
+      if (order[root]) {
+         continue;
+      }
+      order[root] = low[root] = next_order++;
+      cursor[root] = g->start[root];
+      calls[depth++] = stack[sp++] = root;
+      while (depth > 0) {
+         uint32_t v = calls[depth - 1];
+         if (cursor[v] < g->start[v + 1]) {
+            uint32_t w = g->edges[cursor[v]++].target;
+            if (!order[w]) {
+               order[w] = low[w] = next_order++;
+               cursor[w] = g->start[w];
+               calls[depth++] = stack[sp++] = w;
+            } else if (g->comp[w] == RC_NONE && order[w] < low[v]) { // w is on Tarjan's stack
+               low[v] = order[w];
+            }
+            continue;
+         }
+         if (low[v] == order[v]) {
+            for (uint32_t w = RC_NONE; w != v;) {
+               g->comp[w = stack[--sp]] = next_comp;
+            }
+            next_comp++;
+         }
+         depth--;
+         if (depth > 0 && low[v] < low[calls[depth - 1]]) {
+            low[calls[depth - 1]] = low[v];
+         }
+      }
+   }
+   free(mem);
+   return true;
+}
+
+// ANVL_RES_ERR with *out_err_code set when a reference in the root document leads back to a container holding it, or on
+// running out of memory. The error is at the `$` of the first reference that lies on a cycle.
 static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out_err_code) {
    rc_graph g = {.ctx = ctx};
    anvl_value *stack = NULL;
@@ -419,21 +511,54 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    module_document doc = NULL;
    List.get(ctx->docs, 0, (object *)&doc);
    usize capacity = doc && doc->body ? (usize)FArray.capacity(doc->body, sizeof(anvl_statement)) : 0;
+   for (g.table_cap = 16; g.table_cap < capacity * 2;) {
+      g.table_cap *= 2;
+   }
    g.nodes = malloc((capacity ? capacity : 1) * sizeof *g.nodes);
+   g.table = calloc(g.table_cap, sizeof *g.table);
+   g.start = malloc((capacity + 1) * sizeof *g.start);
+   g.comp = malloc((capacity ? capacity : 1) * sizeof *g.comp);
    stack = malloc(stack_cap * sizeof *stack);
-   bool ok = g.nodes && stack;
+   bool ok = g.nodes && g.table && g.start && g.comp && stack;
    for (usize i = 0; ok && i < capacity; i++) {
       anvl_statement stmt = NULL;
       FArray.get(doc->body, (int)i, sizeof(anvl_statement), (object *)&stmt);
-      if (stmt && stmt->value && Source.slice_length(stmt->name) != 0) {
-         g.nodes[g.n++] = (rc_node){stmt->value};
+      if (!stmt || !stmt->value || Source.slice_length(stmt->name) == 0) {
+         continue;
       }
+      g.nodes[g.n] = (rc_node){stmt->value};
+      if (stmt->value->type != ANVL_VALUE_VARREF) { // a reference resolves to a concrete value, never to a reference
+         usize at = rc_hash(stmt->value, g.table_cap);
+         while (g.table[at]) {
+            at = (at + 1) & (g.table_cap - 1);
+         }
+         g.table[at] = g.n + 1;
+      }
+      g.n++;
    }
    for (uint32_t i = 0; ok && i < g.n; i++) {
+      g.start[i] = (uint32_t)g.edge_count;
       ok = rc_scan(&g, i, &stack, &stack_cap);
+   }
+   if (ok) {
+      g.start[g.n] = (uint32_t)g.edge_count;
+      ok = rc_components(&g);
+   }
+   // an edge whose two ends are in one component closes a cycle (a self edge included)
+   for (uint32_t i = 0; ok && i < g.n; i++) {
+      for (usize e = g.start[i]; e < g.start[i + 1]; e++) {
+         anvl_value ref = g.edges[e].ref;
+         if (g.comp[i] == g.comp[g.edges[e].target] && (!g.best || ref->text.start < g.best->text.start)) {
+            g.best = ref;
+         }
+      }
    }
    free(stack);
    free(g.nodes);
+   free(g.table);
+   free(g.start);
+   free(g.comp);
+   free(g.edges);
    if (!ok) {
       anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
       *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
