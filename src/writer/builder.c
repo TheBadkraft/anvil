@@ -73,6 +73,7 @@ struct anvil_member_t {
    bool block; // emitted as the block form `name { ... };`, which cannot be a base
    attr_list attrs;
    struct anvil_node_t *value;
+   size_t cache_gen, cache_start, cache_count; // the reference check: the edges of this field's subtree (a range of ref_graph.to) in check number cache_gen
 };
 
 // A module-header entry: an attribute, or (is_include) an include whose path is item.key.
@@ -92,6 +93,7 @@ struct anvil_builder_t {
    size_t member_cap;
    wg_nameset names; // document-level statement names; each name's value is its member's position + 1 in members
    size_t base_count; // members that have a base
+   size_t ref_checks; // reference checks run so far (numbers the caches in the members)
    size_t varref_count; // '$' reference nodes created; zero lets the reference check be skipped
    struct anvil_node_t **nodes; // every node, for disposal
    size_t node_count;
@@ -836,6 +838,10 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
  * resolves, through any chain of references, to the value of T. A cycle in that graph is the error. A plain chain
  * cycle (a := $b; b := $a;) resolves to nothing, so it has no edge. A reference to a name the builder does not
  * hold (an include may supply it) has no edge either, and neither does a base it does not hold.
+ *
+ * Cost: a field a member inherits is walked once however many members inherit it (its edges are kept in the field and
+ * copied), so the check is linear in the document plus, per deriving member, its inherited field count and the
+ * references in them.
  * ----------------------------------------------------------------------- */
 static size_t member_by_name(const struct anvil_builder_t *b, const char *name) {
    size_t at = wg_nameset_get(&b->names, name);
@@ -846,6 +852,7 @@ typedef struct {
    size_t *final;         // member -> the member whose value its reference chain ends in, SIZE_MAX if none
    unsigned char *state;  // 0 not computed, 1 on the current chase, 2 done
    size_t *path;          // scratch of n entries
+   size_t gen;    // the number of this check
    size_t *start; // n + 1 offsets into to
    size_t *to;    // edge targets (member indices)
    size_t count, cap;
@@ -952,7 +959,20 @@ static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size
       for (size_t k = 0; ok && k < ancestor->value->count; k++) {
          const struct anvil_member_t *field = ancestor->value->members[k];
          int added = wg_nameset_add(&seen, field->name);
-         ok = added >= 0 && (added == 0 || ref_scan(b, g, field->value));
+         struct anvil_member_t *cached = (struct anvil_member_t *)field;
+         if (added <= 0) {
+            ok = added == 0;
+         } else if (cached->cache_gen == g->gen) { // inherited by an earlier member: copy its edges, do not walk it again
+            for (size_t e = cached->cache_start; ok && e < cached->cache_start + cached->cache_count; e++) {
+               ok = ref_edge(g, g->to[e]);
+            }
+         } else {
+            size_t start = g->count;
+            ok = ref_scan(b, g, field->value);
+            cached->cache_gen = g->gen;
+            cached->cache_start = start;
+            cached->cache_count = g->count - start;
+         }
       }
       cur = ancestor->base ? member_by_name(b, ancestor->base) : SIZE_MAX;
    }
@@ -1011,6 +1031,7 @@ static anvil_writer_err_code check_references(anvil_builder b) {
    }
    size_t n = b->member_count;
    ref_graph g = {0};
+   g.gen = ++b->ref_checks;
    g.final = malloc(n * sizeof *g.final);
    g.state = calloc(n, 1);
    g.path = malloc(n * sizeof *g.path);
