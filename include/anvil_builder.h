@@ -145,13 +145,21 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  *    a -> b -> a included (ANVIL_WRITER_ERR_INHERITANCE_CYCLE), include or not.
  * Only top-level members have a base (anvil_builder_set_base refuses it on a nested member), so every
  * base is looked up among the top-level names.
+ * Then the '$' references are checked, as the reader does (it refuses them with 4054): a reference that
+ * leads back to a container holding it is ANVIL_WRITER_ERR_REFERENCE_CYCLE. A member holds a reference
+ * when it is in its fields and elements at any depth or in a field it inherits from a base and does not
+ * override by name; a reference leads to the value of the member it names, following a chain of references
+ * (`a := $b;`). `s := { a := $s; };`, `a := [ $a ];`, two members that refer to each other, and a base
+ * whose field refers to the member that derives from it are refused. A reference to a scalar, a plain chain
+ * cycle (`a := $b; b := $a;`, which the reader leaves unresolved) and a name the builder does not hold
+ * (an include may supply it) are not. The streaming writer (anvil_writer_varref) cannot see this check.
  */
 bool anvil_builder_write(anvil_builder b, anvil_writer w);
 
 /**
  * @brief Emit the document as text, NUL-terminated (the NUL is not counted in `*length`).
  * Borrowed: valid until the next emit or anvil_builder_dispose. NULL on error. May be called
- * again after changing the builder. Checks bases as anvil_builder_write does.
+ * again after changing the builder. Checks bases and references as anvil_builder_write does.
  */
 const char *anvil_builder_emit(anvil_builder b, size_t *length);
 

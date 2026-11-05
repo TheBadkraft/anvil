@@ -826,9 +826,16 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
 }
 
 /* ----------------------------------------------------------------------- *
- * Reference cycles (BR-2611-anvl-resolver-002). The reader refuses a document where a '$' reference leads back to a
- * container holding it (4054); the builder refuses it at emit or write, as it does a base cycle. The streaming writer
- * cannot, for the same reason it cannot see a base cycle: it holds no document.
+ * Reference cycles (BR-2611-anvl-resolver-002). The reader refuses a document where a '$' reference leads back
+ * to a container holding it (4054); the builder refuses it at emit or write, as it does a base cycle. The
+ * streaming writer cannot, for the same reason it cannot see a base cycle: it holds no document.
+ *
+ * The rule is the reader's (src/core/resolver.c, "Reference cycles"), on the top-level members: member S has an
+ * edge to member T for every reference in S's walkable subtree - its fields and elements at any depth, and the
+ * fields it inherits from its bases that it does not override by name, but not through another reference - that
+ * resolves, through any chain of references, to the value of T. A cycle in that graph is the error. A plain chain
+ * cycle (a := $b; b := $a;) resolves to nothing, so it has no edge. A reference to a name the builder does not
+ * hold (an include may supply it) has no edge either, and neither does a base it does not hold.
  * ----------------------------------------------------------------------- */
 static size_t member_by_name(const struct anvil_builder_t *b, const char *name) {
    size_t at = wg_nameset_get(&b->names, name);
@@ -924,6 +931,35 @@ static bool ref_scan(const struct anvil_builder_t *b, ref_graph *g, const struct
    return true;
 }
 
+// The edges of member i: its own subtree, then the inherited fields it does not override, nearest base first.
+static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size_t i) {
+   const struct anvil_member_t *m = b->members[i];
+   if (!ref_scan(b, g, m->value)) {
+      return false;
+   }
+   size_t cur = m->base ? member_by_name(b, m->base) : SIZE_MAX;
+   if (cur == SIZE_MAX) {
+      return true;
+   }
+   wg_nameset seen = {0};
+   bool ok = true;
+   for (size_t k = 0; ok && k < m->value->count; k++) {
+      ok = wg_nameset_add(&seen, m->value->members[k]->name) >= 0;
+   }
+   // The chain is acyclic: check_bases has run.
+   while (ok && cur != SIZE_MAX) {
+      const struct anvil_member_t *ancestor = b->members[cur];
+      for (size_t k = 0; ok && k < ancestor->value->count; k++) {
+         const struct anvil_member_t *field = ancestor->value->members[k];
+         int added = wg_nameset_add(&seen, field->name);
+         ok = added >= 0 && (added == 0 || ref_scan(b, g, field->value));
+      }
+      cur = ancestor->base ? member_by_name(b, ancestor->base) : SIZE_MAX;
+   }
+   wg_nameset_free(&seen);
+   return ok;
+}
+
 // Whether the graph g has a cycle: iterative depth-first search with three colours (1 on the current path,
 // 2 done), each member visited once. `pos` is the cursor of a member on the path.
 static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
@@ -969,8 +1005,6 @@ static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
    return cycle;
 }
 
-// A cycle among the members' references: member S has an edge to member T for every reference in its fields and
-// elements, at any depth, that resolves to the value of T (through any chain of references: a := $b; b := $c;).
 static anvil_writer_err_code check_references(anvil_builder b) {
    if (b->varref_count == 0 || b->member_count == 0) {
       return ANVIL_WRITER_OK;
@@ -986,7 +1020,7 @@ static anvil_writer_err_code check_references(anvil_builder b) {
    anvil_writer_err_code result = g.final && g.state && g.path && g.start && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
    for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
       g.start[i] = g.count;
-      if (b->members[i]->value->kind != NODE_VARREF && !ref_scan(b, &g, b->members[i]->value)) {
+      if (!ref_member_edges(b, &g, i)) {
          result = ANVIL_WRITER_ERR_MEMORY;
       }
    }

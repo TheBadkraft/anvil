@@ -347,8 +347,9 @@ usize mod_ctx_arena_size_hint(usize summed_source_length);
  * (`ANVL_STMT_OBJECT_BLOCK`) statement is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (anonymous
  * objects are immutable and cannot be inherited from). Finally, for every `ANVL_VALUE_VARREF`
  * in the context (any nesting depth), chases its target to a final concrete value, setting
- * `.varref.resolved` — a missing target or a reference cycle is not an error, it just leaves
- * `.resolved` `NULL`; a target naming a block-form statement resolves to its object value. See notes/resolution-phase.md for
+ * `.varref.resolved` — a missing target or a plain chain cycle (`a := $b; b := $a;`) is not an error, it just leaves
+ * `.resolved` `NULL`; a target naming a block-form statement resolves to its object value. Last, a resolved
+ * reference that leads back to a container holding it is `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` (see resolver.c, "Reference cycles"). See notes/resolution-phase.md for
  * the full design.
  */
 anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code);

@@ -147,7 +147,11 @@ bool anvil_writer_bare(anvil_writer w, const char *text);
 /** @brief Blob `@tag`content``. `tag` is NULL/empty for an untagged blob, else an identifier of at most 31 chars. */
 bool anvil_writer_blob(anvil_writer w, const char *tag, const char *data, size_t length);
 
-/** @brief `$name` reference (AML only). Statement values and collection elements; never attributes. */
+/** @brief `$name` reference (AML only). Statement values and collection elements; never attributes.
+ * The streaming writer does not look at what a reference names, so it cannot see a reference that leads back to a
+ * container holding it (`s := { a := $s; };`), which the reader refuses with ANVL_ERR_RESOLVER_REFERENCE_CYCLE (4054);
+ * it writes such a document, as it writes a base cycle. anvil_builder_write and anvil_builder_emit refuse it
+ * (ANVIL_WRITER_ERR_REFERENCE_CYCLE). */
 bool anvil_writer_varref(anvil_writer w, const char *name);
 
 /* ---- collections ------------------------------------------------------- */
