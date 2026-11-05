@@ -1,4 +1,5 @@
 anvil-builder-script 1
+option on-error continue
 dialect AML
 include "x.anvl"
 let outer = object

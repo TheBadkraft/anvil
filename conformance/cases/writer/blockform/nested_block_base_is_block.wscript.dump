@@ -1,5 +1,5 @@
 anvil-writer-run 1
-failed line=10 code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM call="statement_block \"d\" \"blk\"" message="a base cannot be a block-form statement (it is read-only)"
+failed line=10 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="statement_block \"d\" \"blk\"" message="only a top-level statement can have a base"
 steps 9
-status error code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM
+status error code=23 name=ANVIL_WRITER_ERR_NESTED_BASE
 output none

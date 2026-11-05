@@ -96,6 +96,9 @@ typedef enum {
    ANVL_ERR_PARSER_INVALID_BLOB_TAG = 4019,
    ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT = 4020,
    ANVL_ERR_PARSER_INVALID_BARE_LITERAL = 4021,
+   // A base (`a : b := { ... };` or `a : b { ... };`) on a statement inside an object, at any depth.
+   // Only a top-level statement may have a base.
+   ANVL_ERR_PARSER_NESTED_BASE = 4022,
 
    // Resolver Errors (405x)
    ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050,

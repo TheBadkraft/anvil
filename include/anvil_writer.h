@@ -104,7 +104,9 @@ bool anvil_writer_include(anvil_writer w, const char *path);
  * ANVIL_WRITER_ERR_DUPLICATE_FIELD (the reader rejects both). The writer can't see names pulled in by
  * an include.
  * @param name Identifier, not a reserved word. @param base Optional inheritance base
- * (identifier, not reserved), or NULL. A base requires an object value; AML only.
+ * (identifier, not reserved), or NULL. A base requires an object value; AML only. Only a top-level
+ * statement may have a base: a base on a statement inside an object fails with
+ * ANVIL_WRITER_ERR_NESTED_BASE (the reader rejects it, 4022), at any depth.
  */
 bool anvil_writer_statement(anvil_writer w, const char *name, const char *base);
 
@@ -116,6 +118,8 @@ bool anvil_writer_statement(anvil_writer w, const char *name, const char *base);
  * block-form statement cannot itself be a base: the reader rejects that (4052), so the writer refuses a
  * base that names a block-form statement already written at the top level with
  * ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM. (A base declared later, or by an included file, is not seen here.)
+ * As for anvil_writer_statement, a base on a block-form statement inside an object fails with
+ * ANVIL_WRITER_ERR_NESTED_BASE.
  */
 bool anvil_writer_statement_block(anvil_writer w, const char *name, const char *base);
 

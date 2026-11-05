@@ -75,6 +75,7 @@ record what native does today, and a port must match it.
 | 4019 | `ANVL_ERR_PARSER_INVALID_BLOB_TAG` | yes (5 dumps) | `coverage/errors/blob_tag_invalid.anvl` |
 | 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | yes (17 dumps) | `coverage/errors/inherit_from_array.anvl` |
 | 4021 | `ANVL_ERR_PARSER_INVALID_BARE_LITERAL` | yes (2 dumps) | `unit/body_amp_L1029.anvl` |
+| 4022 | `ANVL_ERR_PARSER_NESTED_BASE` | yes (20 dumps) | `coverage/errors/nested_base_reproduction.anvl` (BR-2611-anvl-resolver-001; only a top-level statement may have a base) |
 | 4050 | `ANVL_ERR_RESOLVER_CYCLE_DETECTED` | yes (4 dumps) | `coverage/errors/inherit_cycle.anvl` |
 | 4051 | `ANVL_ERR_RESOLVER_MISSING_BASE` | yes (4 dumps) | `coverage/errors/inherit_unknown_base.anvl` |
 | 4052 | `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` | yes (2 dumps) | `coverage/errors/inherit_from_anonymous.anvl` |

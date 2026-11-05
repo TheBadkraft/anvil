@@ -1,5 +1,5 @@
 anvil-writer-script 1
-# a base is looked up among the top-level names, at any depth
+# a nested base is refused before its target is looked at
 dialect AML
 statement_block "blk" NULL
 begin_object

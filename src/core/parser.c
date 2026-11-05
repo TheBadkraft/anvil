@@ -933,6 +933,13 @@ static bool parse_statement_in(anvl_source src, anvl_statement *out_stmt, name_s
       }
       Source.consume(src, 1); // ':'
       Source.skip_whitespace_and_comments(src);
+      // Only a top-level statement may have a base (`names` is set for a statement inside an
+      // object, at any depth): refused at the base name, before the rest of the statement is read.
+      // A ':' with no name after it (`{ a: 1; }`) names no base, so it stays the expected-identifier error.
+      if (names && Source.is_identifier_start(Source.peek(src))) {
+         parser_set_error_at(src, ANVL_ERR_PARSER_NESTED_BASE, src->line, src->col);
+         return false;
+      }
       if (!parse_identifier(src, &(*out_stmt)->base)) {
          parser_set_error(src, ANVL_ERR_PARSER_EXPECTED_IDENTIFIER);
          return false;

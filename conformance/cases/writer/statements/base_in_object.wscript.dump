@@ -1,4 +1,5 @@
 anvil-writer-run 1
-steps 15
-status ok
-output bytes=82 text="#!aml\n\nbase := {\n   x := 1;\n};\no := {\n   inner : base := {\n      y := 2;\n   };\n};\n"
+failed line=11 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="statement \"inner\" \"base\"" message="only a top-level statement can have a base"
+steps 9
+status error code=23 name=ANVIL_WRITER_ERR_NESTED_BASE
+output none

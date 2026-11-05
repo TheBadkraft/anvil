@@ -1,0 +1,6 @@
+anvil-dump 2
+mode document
+input-bytes 40
+status error
+dialect AML
+error code=4022 name=ANVL_ERR_PARSER_NESTED_BASE category=4 category-name=ANVIL_ERR_SYNTAX line=2 column=12 source="" message="Only a top-level statement can have a base"

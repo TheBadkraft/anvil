@@ -32,6 +32,7 @@ static const char *const err_names[] = {
    "ANVIL_WRITER_ERR_MISSING_BASE",
    "ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT",
    "ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM",
+   "ANVIL_WRITER_ERR_NESTED_BASE",
 };
 #define ERR_NAME_COUNT (sizeof err_names / sizeof err_names[0])
 

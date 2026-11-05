@@ -1,5 +1,6 @@
 anvil-builder-script 1
-# a nested block form has a base looked up among the top-level names
+# a nested block form has no base (only a top-level statement has one): refused, the rest is kept
+option on-error continue
 dialect AML
 let ob_v = int 1
 let ob = object

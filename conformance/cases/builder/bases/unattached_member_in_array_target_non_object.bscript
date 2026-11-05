@@ -1,5 +1,6 @@
 anvil-builder-script 1
 # the array holding the object is never attached
+option on-error continue
 dialect AML
 let t = int 1
 add NULL "target" t

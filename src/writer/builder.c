@@ -547,6 +547,9 @@ bool anvil_builder_set_base(anvil_builder b, anvil_member m, const char *base) {
       return false;
    }
    anvil_writer_err_code code = wg_check_name(base);
+   if (code == ANVIL_WRITER_OK && m->value->parent != NULL) {
+      code = ANVIL_WRITER_ERR_NESTED_BASE; // added to an object: nested, for good (a member is never moved)
+   }
    if (code == ANVIL_WRITER_OK && m->value->kind != NODE_OBJECT) {
       code = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
    }
@@ -738,7 +741,7 @@ static bool has_include(const struct anvil_builder_t *b) {
 }
 
 // BR-2610-anvl-writer-002 and -004: what the reader would refuse about the bases, across every member the builder
-// created (attached or not). A base names a top-level member of this document. In this order:
+// created. A base names a top-level member of this document. In this order:
 //  - the member it names must be an object (INHERITANCE_REQUIRES_OBJECT), and not block form (BASE_IS_BLOCK_FORM);
 //  - it must exist, unless the builder holds an include, which may supply it (MISSING_BASE);
 //  - the chain of top-level members' bases must not loop (INHERITANCE_CYCLE).
@@ -755,14 +758,13 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
    bool chain = false; // some member's base names a member that has a base itself: only then can there be a cycle
    anvil_writer_err_code result = ANVIL_WRITER_OK;
    const char *last_base = NULL;
-   size_t last_at = 0, top_based = 0;
-   // the top-level members first...
+   size_t last_at = 0;
+   // Only top-level members have a base (set_base refuses it on a nested member), so these are all of them.
    for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
       const struct anvil_member_t *m = b->members[i];
       if (!m->base) {
          continue;
       }
-      top_based++;
       if (last_base && strcmp(last_base, m->base) == 0) {
          continue; // the same base as the previous based member: already checked
       }
@@ -776,27 +778,6 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
          result = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM; // the reader rejects a block form as a base (4052)
       } else if (b->members[last_at - 1]->base) {
          chain = true;
-      }
-   }
-   // ...then, only if some member below the top level (or never attached) has a base, every member the builder
-   // created. Those are the ones whose value has a parent; a top-level member's value has none.
-   last_base = NULL;
-   for (size_t i = 0; result == ANVIL_WRITER_OK && top_based < b->base_count && i < b->all_member_count; i++) {
-      const struct anvil_member_t *m = b->all_members[i];
-      if (!m->base || m->value->parent == NULL) {
-         continue;
-      }
-      if (last_base && strcmp(last_base, m->base) == 0) {
-         continue;
-      }
-      last_base = m->base;
-      size_t at = wg_nameset_get(&b->names, m->base);
-      if (!at) {
-         missing = missing || !includes;
-      } else if (b->members[at - 1]->value->kind != NODE_OBJECT) {
-         result = ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT;
-      } else if (b->members[at - 1]->block) {
-         result = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM;
       }
    }
    if (result != ANVIL_WRITER_OK) {

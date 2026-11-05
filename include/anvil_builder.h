@@ -105,7 +105,10 @@ bool anvil_builder_append(anvil_builder b, anvil_node collection, anvil_node ele
 anvil_member anvil_builder_add(anvil_builder b, anvil_node object, const char *name, anvil_node value);
 
 /** @brief Declare an inheritance base. The statement's value must be an object. AML only. A member
- * handle of another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT, as for the node handles. */
+ * handle of another builder is ANVIL_WRITER_ERR_INVALID_ARGUMENT, as for the node handles. Only a
+ * top-level member (added with a NULL object) may have a base: for a member added to an object, at
+ * any depth, this fails at once with ANVIL_WRITER_ERR_NESTED_BASE (the reader rejects it, 4022). A
+ * member never leaves the object it was added to, so the answer cannot change later. */
 bool anvil_builder_set_base(anvil_builder b, anvil_member member, const char *base);
 /**
  * @brief Mark a statement as block form: emitted as `name [: base] [@[attributes]] { ... };`, the
@@ -140,7 +143,8 @@ anvil_member anvil_builder_find(anvil_builder b, anvil_node object, const char *
  *    cannot know and accepts it as before;
  *  - the chain of top-level members' bases must not loop, a statement based on itself or
  *    a -> b -> a included (ANVIL_WRITER_ERR_INHERITANCE_CYCLE), include or not.
- * A base set on a nested member is looked up among the top-level names, as the reader does.
+ * Only top-level members have a base (anvil_builder_set_base refuses it on a nested member), so every
+ * base is looked up among the top-level names.
  */
 bool anvil_builder_write(anvil_builder b, anvil_writer w);
 

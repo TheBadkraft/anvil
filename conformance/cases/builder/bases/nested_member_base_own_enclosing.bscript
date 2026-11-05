@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# the reproduction of BR-2611-anvl-resolver-001: a member based on its own enclosing top-level statement
+option on-error continue
+dialect AML
+let s1 = object
+let f3 = object
+let x = int 1
+add f3 "a" x
+let fm = add s1 "f3" f3
+set_base fm "s1"
+add NULL "s1" s1
+emit

@@ -1,0 +1,5 @@
+anvil-builder-run 1
+failed line=14 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="set_base dm \"base\"" message="only a top-level statement can have a base"
+emit bytes=111 text="#!aml\n\nbase := {\n   k := 1;\n};\ntop : base := {\n   z := 3;\n};\nouter := {\n   derived := {\n      j := 2;\n   };\n};\n"
+steps 19
+status ok

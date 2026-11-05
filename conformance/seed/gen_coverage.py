@@ -110,6 +110,8 @@ put(I + "src_dup_child.anvl", '\n\nx := 1;\n')
 put(I + "src_dup_root.anvl", 'include "src_dup_child.anvl";\nx := 2;\n')                           # 4053, in src_dup_child 3:1
 put(I + "src_inherit_child.anvl", '\n\nz : q := { a := 1; };\n')
 put(I + "src_inherit_root.anvl", 'include "src_inherit_child.anvl";\nq := 1;\n')                   # 4020, in src_inherit_child 3:5
+put(I + "src_nested_base_child.anvl", "q := { a : q { b := 1; }; };\n")
+put(I + "src_nested_base_root.anvl", 'include "src_nested_base_child.anvl";\nx := 1;\n')               # 4022, in src_nested_base_child 1:15
 put(I + "src_inherit_in_root.anvl", 'include "leaf_a.anvl";\nz : a := { b := 1; };\n')            # 4020, in the root 2:5
 
 # ------------------------------------------------------------------------------------------------ nesting
@@ -434,6 +436,23 @@ put(G + "inherit_from_scalar_block_form.anvl", "a := 1;\nb : a { c := 1; };\n")
 put(G + "inherit_from_object_chain.anvl", "a := { x := 1; };\nb : a := { y := 2; };\nc : b := { z := 3; };\n")
 put(G + "inherit_from_anonymous.anvl", "a { x := 1; };\nb : a := { y := 2; };\n")
 put(G + "inherit_scalar_value_after_base.anvl", "a := { x := 1; };\nb : a := 5;\n")
+# only a top-level statement has a base (BR-2611-anvl-resolver-001): 4022, found at parse time, so it also beats 4051
+put(G + "nested_base_reproduction.anvl", "s1 := { f3 : s1 { a := 1; }; };\n")              # used to load, then hang a tree walk
+put(G + "nested_base_enclosing_assign.anvl", "s1 := { f3 : s1 := { a := 1; }; };\n")
+put(G + "nested_base_names_top_level_object.anvl", "a := { q := 1; };\nx := { b : a := { c := 1; }; };\n")
+put(G + "nested_base_names_top_level_object_block.anvl", "a := { q := 1; };\nx := { b : a { c := 1; }; };\n")
+put(G + "nested_base_missing_name.anvl", "x := { b : nothere { c := 1; }; };\n")             # 4022, not 4051
+put(G + "nested_base_missing_name_assign.anvl", "x := { b : nothere := { c := 1; }; };\n")
+put(G + "nested_base_depth3_assign.anvl", "a := { q := 1; };\nx := { y := { z : a := { c := 1; }; }; };\n")
+put(G + "nested_base_depth3_block.anvl", "a := { q := 1; };\nx := { y := { z : a { c := 1; }; }; };\n")
+put(G + "nested_base_depth50.anvl", "x := { " + "y := { " * 48 + "z : x { c := 1; }; " + "}; " * 48 + "};\n")
+put(G + "nested_base_in_block_form_statement.anvl", "a := { q := 1; };\nx {\n  y : a { c := 1; };\n};\n")
+put(G + "nested_base_in_array_object.anvl", "a := { q := 1; };\nx := [ { b : a { c := 1; }; } ];\n")
+put(G + "nested_base_after_fields.anvl", "a := { q := 1; };\nx := {\n  f := 1;\n  g := 2;\n  b : a := { c := 1; };\n};\n")
+put(G + "nested_base_scalar_value.anvl", "a := { q := 1; };\nx := { b : a := 5; };\n")     # 4022 first, not 4020
+put(G + "nested_base_on_nested_first_error.anvl", "x := { y := { z : a { c := 1; }; };\n")   # unclosed after: 4022 is still first
+put(G + "nested_colon_without_name.anvl", "x := { b : := 1; };\n")                          # no name after ':': not a base
+put(G + "nested_base_top_level_base_ok.anvl", "a := { q := 1; };\nb : a := { r := { s := 2; }; };\nc : a { t := 3; };\n")
 put(G + "shebang_second_other_dialect.anvl", "#!aml\n#!amp\nx := 1;\n")
 put(G + "shebang_second_after_statement.anvl", "#!aml\nx := 1;\n#!aml\ny := 2;\n")
 put(G + "shebang_one_ok.anvl", "#!aml\nx := 1;\n")

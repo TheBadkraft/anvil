@@ -1,4 +1,5 @@
 anvil-builder-run 1
-emit bytes=90 text="#!aml\n\nbase := {\n   k := 1;\n};\nouter := {\n   inner : base @[k=v] {\n      x := 1;\n   };\n};\n"
-steps 15
+failed line=15 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="set_base im \"base\"" message="only a top-level statement can have a base"
+emit bytes=83 text="#!aml\n\nbase := {\n   k := 1;\n};\nouter := {\n   inner @[k=v] {\n      x := 1;\n   };\n};\n"
+steps 16
 status ok

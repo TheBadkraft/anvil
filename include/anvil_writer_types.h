@@ -70,6 +70,7 @@ typedef enum {
    ANVIL_WRITER_ERR_MISSING_BASE,                // a builder base names no top-level member and the document includes nothing that could supply it
    ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT,       // a block-form statement (name { ... };) must have an object value
    ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM,          // a statement's base is a block-form statement, which is read-only and cannot be a base (the reader's 4052)
+   ANVIL_WRITER_ERR_NESTED_BASE,                 // a base on a statement inside an object: only a top-level statement may have one (the reader's 4022)
 } anvil_writer_err_code;
 
 #ifdef __cplusplus

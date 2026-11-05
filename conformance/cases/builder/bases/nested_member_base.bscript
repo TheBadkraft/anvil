@@ -1,4 +1,6 @@
 anvil-builder-script 1
+# only a top-level member has a base (BR-2611-anvl-resolver-001, the reader's 4022): set_base on a member of an object is refused with NESTED_BASE
+option on-error continue
 dialect AML
 let o_v = int 1
 let o = object

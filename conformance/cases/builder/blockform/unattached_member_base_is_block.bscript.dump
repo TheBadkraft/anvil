@@ -1,4 +1,5 @@
 anvil-builder-run 1
-failed line=16 code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM call="emit" message="a base cannot be a block-form statement (it is read-only)"
+failed line=15 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="set_base lm \"blk\"" message="only a top-level statement can have a base"
+emit bytes=27 text="#!aml\n\nblk {\n   k := 1;\n};\n"
 steps 14
-status error code=22 name=ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM
+status ok

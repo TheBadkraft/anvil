@@ -1,0 +1,2 @@
+include "src_nested_base_child.anvl";
+x := 1;

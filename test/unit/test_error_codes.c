@@ -153,13 +153,46 @@ static void test_p2_non_object_base(void) {
       CASE_ERR("P2.08 bare word", "a := word;\nb : a := { c := 1; };", 4020, RES, 2, 5),
       CASE_ERR("P2.09 varref", "z := { q := 1; };\na := $z;\nb : a := { c := 1; };", 4020, RES, 3, 5),
       CASE_ERR("P2.10 base declared after the derived statement", "b : a := { c := 1; };\na := 1;", 4020, RES, 1, 5),
-      CASE_ERR("P2.11 nested derived statement", "a := 1;\nx := { b : a := { c := 1; }; };", 4020, RES, 2, 12),
+      CASE_ERR("P2.11 nested derived statement is 4022 first", "a := 1;\nx := { b : a := { c := 1; }; };", 4022, SYN, 2, 12),
       CASE_ERR("P2.12 block-form derived statement", "a := 1;\nb : a { c := 1; };", 4020, RES, 2, 5),
       CASE_OK("P2.13 object base", "a := { x := 1; };\nb : a := { y := 2; };"),
       CASE_OK("P2.14 chain of object bases", "a := { x := 1; };\nb : a := { y := 2; };\nc : b := { z := 3; };"),
       CASE_ERR("P2.15 anonymous base stays 4052", "a { x := 1; };\nb : a := { y := 2; };", 4052, RES, 0, 0),
       CASE_ERR("P2.16 missing base stays 4051", "b : zz := { c := 1; };", 4051, RES, 0, 0),
       CASE_ERR("P2.17 non-object value after a base stays 4020 (parse time)", "a := { x := 1; };\nb : a := 5;", 4020, SYN, 2, 10),
+   };
+   RUN(cases);
+}
+
+static void test_p7_nested_base_message(void) {
+   const char *m = anvl_error_code_message(ANVL_ERR_PARSER_NESTED_BASE);
+   TestBit.is_equal_int(4022, ANVL_ERR_PARSER_NESTED_BASE, "P7.code: ANVL_ERR_PARSER_NESTED_BASE is 4022");
+   TestBit.is_true(m && strcmp(m, "Only a top-level statement can have a base") == 0, "P7.message: the text");
+   const char *n = anvl_error_code_name(ANVL_ERR_PARSER_NESTED_BASE);
+   TestBit.is_true(n && strcmp(n, "ANVL_ERR_PARSER_NESTED_BASE") == 0, "P7.name: the enum identifier");
+}
+
+/* ====================================================================== *
+ * Part 7: only a top-level statement has a base (4022; BR-2611-anvl-resolver-001)
+ * ====================================================================== */
+static void test_p7_nested_base(void) {
+   static const ec_case cases[] = {
+      CASE_ERR("P7.01 the reproduction: a block on its enclosing statement", "s1 := { f3 : s1 { a := 1; }; };", 4022, SYN, 1, 14),
+      CASE_ERR("P7.02 assign form", "x := { b : a := { c := 1; }; };", 4022, SYN, 1, 12),
+      CASE_ERR("P7.03 block form", "x := { b : a { c := 1; }; };", 4022, SYN, 1, 12),
+      CASE_ERR("P7.04 depth 3, assign form", "x := { y := { z : a := { c := 1; }; }; };", 4022, SYN, 1, 19),
+      CASE_ERR("P7.05 depth 3, block form", "x := { y := { z : a { c := 1; }; }; };", 4022, SYN, 1, 19),
+      CASE_ERR("P7.06 inside a block-form statement", "x { y : a { c := 1; }; };", 4022, SYN, 1, 9),
+      CASE_ERR("P7.07 the base names an existing top-level object", "a := { q := 1; };\nx := { b : a := { c := 1; }; };", 4022, SYN, 2, 12),
+      CASE_ERR("P7.08 the base names a missing name: 4022 wins over 4051", "x := { b : nothere { c := 1; }; };", 4022, SYN, 1, 12),
+      CASE_ERR("P7.09 refused before the rest of the statement is read", "x := { b : a := 1; };", 4022, SYN, 1, 12),
+      CASE_ERR("P7.12 a ':' with no name after it is not a base", "x := { b : := 1; };", 2001, SYN, 1, 12),
+      CASE_ERR("P7.13 a JSON-style colon stays the expected-identifier error", "x := { a: 1; };", 2001, SYN, 1, 11),
+      CASE_ERR("P7.10 after other fields, on a later line", "a := { q := 1; };\nx := {\n  f := 1;\n  b : a { c := 1; };\n};", 4022, SYN, 4, 7),
+      CASE_ERR("P7.11 in a sibling of a valid top-level base", "a := { q := 1; };\nb : a := { r := 2; };\nc := { d : a := { s := 3; }; };", 4022, SYN, 3, 12),
+      CASE_OK("P7.20 a top-level base, assign form", "a := { q := 1; };\nb : a := { r := 2; };"),
+      CASE_OK("P7.21 a top-level base, block form", "a := { q := 1; };\nb : a { r := 2; };"),
+      CASE_OK("P7.22 a nested object without a base", "a := { q := 1; };\nb : a := { r := { s := 2; }; };"),
    };
    RUN(cases);
 }
@@ -379,6 +412,8 @@ int main(void) {
    TestBit.run_ex("P1_duplicate_object_fields_large", NULL, test_p1_duplicate_object_fields_large, th);
    TestBit.run_ex("P1_duplicate_attribute_keys", NULL, test_p1_duplicate_attribute_keys, th);
    TestBit.run_ex("P2_non_object_base", NULL, test_p2_non_object_base, th);
+   TestBit.run_ex("P7_nested_base", NULL, test_p7_nested_base, th);
+   TestBit.run_ex("P7_nested_base_message", NULL, test_p7_nested_base_message, th);
    TestBit.run_ex("P3_multiple_shebang", NULL, test_p3_multiple_shebang, th);
    TestBit.run_ex("P3_module_attributes_after_statements", NULL,
                   test_p3_module_attributes_after_statements, th);

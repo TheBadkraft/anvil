@@ -1277,8 +1277,9 @@ static void test_w25_a_block_form_statement_cannot_be_a_base(void) {
    const anvil_writer_err_code code = ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM;
    expect_error(ANVIL_WRITER_AML, base_is_block, code, "W25: statement with a block-form base");
    expect_error(ANVIL_WRITER_AML, block_base_is_block, code, "W25: block-form statement with a block-form base");
-   expect_error(ANVIL_WRITER_AML, nested_base_is_block, code, "W25: a nested statement's base is a top-level block");
-   expect_error(ANVIL_WRITER_AML, nested_block_base_is_block, code, "W25: a nested block's base is a top-level block");
+   // a base inside an object is refused as a nested base before its target is looked at (4022)
+   expect_error(ANVIL_WRITER_AML, nested_base_is_block, ANVIL_WRITER_ERR_NESTED_BASE, "W25: a nested statement's base is a top-level block");
+   expect_error(ANVIL_WRITER_AML, nested_block_base_is_block, ANVIL_WRITER_ERR_NESTED_BASE, "W25: a nested block's base is a top-level block");
 
    // an ordinary object is a fine base, also for a block; a block declared later is not seen by a streaming writer
    anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
@@ -1346,6 +1347,71 @@ static void test_w27_block_form_error_messages(void) {
    TestBit.is_equal_int(22, ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM, "W27: and are numbered in order");
 }
 
+/* ---------------------------------------------------------------------- *
+ * W28 (BR-2611-anvl-resolver-001) - only a top-level statement has a base
+ * ---------------------------------------------------------------------- */
+static bool top_object_a(anvil_writer w) {
+   return anvil_writer_statement(w, "a", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "q", NULL) &&
+          anvil_writer_int(w, 1) && anvil_writer_end_object(w);
+}
+static bool nested_base_existing(anvil_writer w) {
+   return top_object_a(w) && anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "d", "a");
+}
+static bool nested_block_base_existing(anvil_writer w) {
+   return top_object_a(w) && anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement_block(w, "d", "a");
+}
+static bool nested_base_missing(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "nothere");
+}
+static bool nested_base_own_enclosing(anvil_writer w) {
+   return anvil_writer_statement(w, "s1", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement_block(w, "f3", "s1");
+}
+static bool nested_base_depth3(anvil_writer w) {
+   return top_object_a(w) && anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) &&
+          anvil_writer_statement(w, "p", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "a");
+}
+static bool nested_base_in_array_object(anvil_writer w) {
+   return top_object_a(w) && anvil_writer_statement(w, "x", NULL) && anvil_writer_begin_array(w) &&
+          anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "a");
+}
+static bool nested_base_amp(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "a");
+}
+static bool nested_base_bad_name(anvil_writer w) {
+   return anvil_writer_statement(w, "o", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "d", "1bad");
+}
+
+static void test_w28_nested_base(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_NESTED_BASE;
+   expect_error(ANVIL_WRITER_AML, nested_base_existing, code, "W28: a nested base naming a top-level object");
+   expect_error(ANVIL_WRITER_AML, nested_block_base_existing, code, "W28: a nested block-form base naming a top-level object");
+   expect_error(ANVIL_WRITER_AML, nested_base_missing, code, "W28: a nested base naming nothing");
+   expect_error(ANVIL_WRITER_AML, nested_base_own_enclosing, code, "W28: a nested block based on its enclosing statement");
+   expect_error(ANVIL_WRITER_AML, nested_base_depth3, code, "W28: depth 3");
+   expect_error(ANVIL_WRITER_AML, nested_base_in_array_object, code, "W28: an object inside an array");
+   expect_error(ANVIL_WRITER_AMP, nested_base_amp, ANVIL_WRITER_ERR_DIALECT, "W28: AMP has no bases at all, DIALECT first");
+   expect_error(ANVIL_WRITER_AML, nested_base_bad_name, ANVIL_WRITER_ERR_INVALID_IDENTIFIER, "W28: an invalid base name is reported first");
+
+   // the top level still takes a base, in both forms, and a nested statement without one is fine
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(top_object_a(w), "W28: a top-level object");
+   TestBit.is_true(anvil_writer_statement(w, "b", "a") && anvil_writer_begin_object(w) && anvil_writer_statement(w, "r", NULL) &&
+                      anvil_writer_begin_object(w) && anvil_writer_statement(w, "s", NULL) && anvil_writer_int(w, 2) &&
+                      anvil_writer_end_object(w) && anvil_writer_end_object(w),
+                   "W28: a top-level base with a nested object without one");
+   TestBit.is_true(anvil_writer_statement_block(w, "c", "a") && anvil_writer_begin_object(w) && anvil_writer_statement(w, "t", NULL) &&
+                      anvil_writer_int(w, 3) && anvil_writer_end_object(w),
+                   "W28: a top-level block-form base");
+   TestBit.is_true(anvil_writer_finish(w), "W28: finishes");
+   anvil_writer_dispose(w);
+
+   const char *m = anvil_writer_error_message(ANVIL_WRITER_ERR_NESTED_BASE);
+   TestBit.is_true(m && strcmp(m, "unknown error") != 0 && strstr(m, "top-level") != NULL, "W28: NESTED_BASE says top-level");
+   TestBit.is_equal_int(23, ANVIL_WRITER_ERR_NESTED_BASE, "W28: NESTED_BASE is numbered 23, appended");
+}
+
 int main(void) {
    TestBit.run_ex("W01_lifecycle", NULL, test_w01_lifecycle, th);
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
@@ -1369,6 +1435,7 @@ int main(void) {
    TestBit.run_ex("W18_hash_is_fnv1a_64", NULL, test_w18_hash_is_fnv1a_64, th);
    TestBit.run_ex("W19_nameset_survives_growth", NULL, test_w19_nameset_survives_growth, th);
    TestBit.run_ex("W20_duplicate_fields", NULL, test_w20_duplicate_fields, th);
+   TestBit.run_ex("W28_nested_base", NULL, test_w28_nested_base, th);
    TestBit.run_ex("W21_duplicate_attribute_keys", NULL, test_w21_duplicate_attribute_keys, th);
    TestBit.run_ex("W22_keyword_names", NULL, test_w22_keyword_names, th);
    TestBit.run_ex("W23_block_form_output", NULL, test_w23_block_form_output, th);
