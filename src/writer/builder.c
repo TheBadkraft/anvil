@@ -73,7 +73,7 @@ struct anvil_member_t {
    bool block; // emitted as the block form `name { ... };`, which cannot be a base
    attr_list attrs;
    struct anvil_node_t *value;
-   size_t cache_gen, cache_start, cache_count; // the reference check: the edges of this field's subtree (a range of ref_graph.to) in check number cache_gen
+   size_t cache_gen, cache_node; // the reference check number cache_gen: this field's vertex in the graph (SIZE_MAX: it holds no reference)
 };
 
 // A module-header entry: an attribute, or (is_include) an include whose path is item.key.
@@ -839,9 +839,8 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
  * cycle (a := $b; b := $a;) resolves to nothing, so it has no edge. A reference to a name the builder does not
  * hold (an include may supply it) has no edge either, and neither does a base it does not hold.
  *
- * Cost: a field a member inherits is walked once however many members inherit it (its edges are kept in the field and
- * copied), so the check is linear in the document plus, per deriving member, its inherited field count and the
- * references in them.
+ * Cost: time and memory O(the document + the merged member count). An inherited field is a vertex of its own, holding
+ * the references of its subtree once; a member that inherits it has one edge to it, never a copy of its references.
  * ----------------------------------------------------------------------- */
 static size_t member_by_name(const struct anvil_builder_t *b, const char *name) {
    size_t at = wg_nameset_get(&b->names, name);
@@ -856,8 +855,12 @@ typedef struct {
    unsigned char *state;  // 0 not computed, 1 on the current chase, 2 done
    size_t *path;          // scratch of n entries
    size_t gen;    // the number of this check
-   size_t *start; // n + 1 offsets into to
-   size_t *to;    // edge targets (member indices)
+   size_t total;  // vertices: the members, then the inherited fields that hold a reference
+   size_t cur;    // the vertex the edges being added leave
+   size_t *start; // total + 1 offsets into sorted
+   size_t *from;  // edge sources, in the order the edges were added
+   size_t *to;    // edge targets (vertex indices), in the order the edges were added
+   size_t *sorted; // the targets grouped by source
    size_t count, cap;
    const struct anvil_node_t **stack; // scratch for the subtree scan
    size_t stack_cap;
@@ -897,13 +900,19 @@ static size_t ref_final(const struct anvil_builder_t *b, ref_graph *g, size_t j)
 static bool ref_edge(ref_graph *g, size_t target) {
    if (g->count == g->cap) {
       size_t cap = g->cap ? g->cap * 2 : 64;
-      size_t *bigger = realloc(g->to, cap * sizeof *bigger);
-      if (!bigger) {
+      size_t *bigger_to = realloc(g->to, cap * sizeof *bigger_to);
+      if (!bigger_to) {
          return false;
       }
-      g->to = bigger;
+      g->to = bigger_to;
+      size_t *bigger_from = realloc(g->from, cap * sizeof *bigger_from);
+      if (!bigger_from) {
+         return false;
+      }
+      g->from = bigger_from;
       g->cap = cap;
    }
+   g->from[g->count] = g->cur;
    g->to[g->count++] = target;
    return true;
 }
@@ -944,6 +953,7 @@ static bool ref_scan(const struct anvil_builder_t *b, ref_graph *g, const struct
 // The edges of member i: its own subtree, then the inherited fields it does not override, nearest base first.
 static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size_t i) {
    const struct anvil_member_t *m = b->members[i];
+   g->cur = i;
    if (!ref_scan(b, g, m->value)) {
       return false;
    }
@@ -965,17 +975,23 @@ static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size
          struct anvil_member_t *cached = (struct anvil_member_t *)field;
          if (added <= 0) {
             ok = added == 0;
-         } else if (cached->cache_gen == g->gen) { // inherited by an earlier member: copy its edges, do not walk it again
-            for (size_t e = cached->cache_start; ok && e < cached->cache_start + cached->cache_count; e++) {
-               ok = ref_edge(g, g->to[e]);
-            }
-         } else {
-            size_t start = g->count;
-            ok = ref_scan(b, g, field->value);
-            cached->cache_gen = g->gen;
-            cached->cache_start = start;
-            cached->cache_count = g->count - start;
+            continue;
          }
+         // an inherited field is a vertex of its own, holding the references of its subtree (walked once); a member
+         // that inherits it has one edge to it, not a copy of its references. A field with no reference has no vertex.
+         if (cached->cache_gen != g->gen) {
+            size_t before = g->count;
+            cached->cache_node = g->total++;
+            g->cur = cached->cache_node;
+            ok = ref_scan(b, g, field->value);
+            if (g->count == before) {
+               g->total--;
+               cached->cache_node = SIZE_MAX;
+            }
+            cached->cache_gen = g->gen;
+            g->cur = i;
+         }
+         ok = ok && (cached->cache_node == SIZE_MAX || ref_edge(g, cached->cache_node));
       }
       cur = ancestor->base ? member_by_name(b, ancestor->base) : SIZE_MAX;
    }
@@ -985,7 +1001,8 @@ static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size
 
 // Whether the graph g has a cycle: iterative depth-first search with three colours (1 on the current path,
 // 2 done), each member visited once. `pos` is the cursor of a member on the path.
-static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
+static bool ref_graph_has_cycle(ref_graph *g, bool *memory) {
+   size_t n = g->total;
    unsigned char *colour = calloc(n ? n : 1, 1);
    size_t *pos = malloc((n ? n : 1) * sizeof *pos);
    size_t *calls = malloc((n ? n : 1) * sizeof *calls);
@@ -1008,7 +1025,7 @@ static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
       while (!cycle && depth > 0) {
          size_t v = calls[depth - 1];
          if (pos[v] < g->start[v + 1]) {
-            size_t w = g->to[pos[v]++];
+            size_t w = g->sorted[pos[v]++];
             if (colour[w] == 1) {
                cycle = true;
             } else if (colour[w] == 0) {
@@ -1038,20 +1055,36 @@ static anvil_writer_err_code check_references(anvil_builder b) {
    g.final = malloc(n * sizeof *g.final);
    g.state = calloc(n, 1);
    g.path = malloc(n * sizeof *g.path);
-   g.start = malloc((n + 1) * sizeof *g.start);
+   g.total = n;
    g.stack_cap = 64;
    g.stack = malloc(g.stack_cap * sizeof *g.stack);
-   anvil_writer_err_code result = g.final && g.state && g.path && g.start && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   anvil_writer_err_code result = g.final && g.state && g.path && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
    for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
-      g.start[i] = g.count;
       if (!ref_member_edges(b, &g, i)) {
          result = ANVIL_WRITER_ERR_MEMORY;
       }
    }
+   if (result == ANVIL_WRITER_OK) { // group the targets by source (counting sort)
+      g.start = calloc(g.total + 1, sizeof *g.start);
+      g.sorted = malloc((g.count ? g.count : 1) * sizeof *g.sorted);
+      result = g.start && g.sorted ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   }
    if (result == ANVIL_WRITER_OK) {
-      g.start[n] = g.count;
+      for (size_t e = 0; e < g.count; e++) {
+         g.start[g.from[e] + 1]++;
+      }
+      for (size_t v = 0; v < g.total; v++) {
+         g.start[v + 1] += g.start[v];
+      }
+      for (size_t e = 0; e < g.count; e++) {
+         g.sorted[g.start[g.from[e]]++] = g.to[e];
+      }
+      for (size_t v = g.total; v > 0; v--) {
+         g.start[v] = g.start[v - 1];
+      }
+      g.start[0] = 0;
       bool memory = false;
-      result = ref_graph_has_cycle(&g, n, &memory) ? ANVIL_WRITER_ERR_REFERENCE_CYCLE
+      result = ref_graph_has_cycle(&g, &memory) ? ANVIL_WRITER_ERR_REFERENCE_CYCLE
                : memory                           ? ANVIL_WRITER_ERR_MEMORY
                                                   : ANVIL_WRITER_OK;
    }
@@ -1060,6 +1093,8 @@ static anvil_writer_err_code check_references(anvil_builder b) {
    free(g.state);
    free(g.path);
    free(g.start);
+   free(g.sorted);
+   free(g.from);
    free(g.to);
    free((void *)g.stack);
    return result;
