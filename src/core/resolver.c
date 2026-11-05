@@ -129,9 +129,10 @@ static anvl_result build_identifiers(module_context ctx, anvl_err_code *out_err_
    return ANVL_RES_OK;
 }
 
-// Validates every `base` in the context (any nesting depth, via the flat ctx->statements
-// index — base is legal on a nested statement too, not just a top-level one) against
-// ctx->identifiers. A base naming nothing in the map is ANVL_ERR_RESOLVER_MISSING_BASE; a
+// Validates every `base` in the context (via the flat ctx->statements index) against
+// ctx->identifiers. Only a top-level statement can have a base — the parser rejects one on a nested
+// statement (ANVL_ERR_PARSER_NESTED_BASE) — so a base here is always a top-level one, and a base can
+// never name a statement that contains the one using it. A base naming nothing in the map is ANVL_ERR_RESOLVER_MISSING_BASE; a
 // base naming an anonymous (ANVL_STMT_OBJECT_BLOCK) statement is
 // ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS — anonymous objects are immutable and inline, with no
 // life of their own independent of the one statement that declares them, so nothing can
@@ -274,8 +275,8 @@ static anvl_result merge_inherited_fields(module_context ctx, anvl_statement stm
    return ANVL_RES_ERR;
 }
 
-// Runs merge_inherited_fields for every statement in the context (any nesting depth) that has
-// a non-empty base.
+// Runs merge_inherited_fields for every statement in the context that has a non-empty base (only
+// top-level statements do; the parser rejects a base on a nested one).
 static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
    usize stmt_count = List.size(ctx->statements);
    for (usize i = 0; i < stmt_count; i++) {
