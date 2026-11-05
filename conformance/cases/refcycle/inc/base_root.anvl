@@ -1,0 +1,2 @@
+include "base_child.anvl";
+leaf : base := { q := 1; };
