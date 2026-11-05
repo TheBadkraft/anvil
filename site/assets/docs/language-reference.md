@@ -32,7 +32,7 @@ immediately, not as a post-hoc check.
 ## 3. Document Structure
 
 A document is a flat or nested sequence of **statements**. A statement has an optional
-inheritance base, optional attributes, a name, and a value — in one of two forms (assignment or block, below):
+inheritance base (only a top-level statement may have one; see §6), optional attributes, a name, and a value — in one of two forms (assignment or block, below):
 
 ```anvl
 #!aml
@@ -50,7 +50,7 @@ There are two statement forms for an object, and they are not the same statement
   a base (§6) and a `$ident` reference to it resolves (§4).
 - **Block form, `ident { ... };`.** An **anonymous block**: read-only, and it cannot be inherited.
   Using one as a base is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (4052). A `$ident` reference to
-  one resolves like any other statement, because a reference is a read. A block can still *have* a base (`d : b { ... };`), it just can't *be* one.
+  one resolves like any other statement, because a reference is a read. A top-level block can still *have* a base (`d : b { ... };`), it just can't *be* one.
   The parser records it as its own statement kind (`OBJECT_BLOCK`, against `ASSIGN`), which
   `anvil-dump` prints.
 
@@ -174,8 +174,25 @@ tuple, string, blob or bare word is an error, and so is a `$` reference, even on
 (`ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT`, 4020; category `ANVIL_ERR_RESOLVE`, found when the document is
 resolved, reported at the base name in the deriving statement). A base that doesn't exist is 4051, an inheritance
 cycle 4050, and a base declared in the block form `name { ... }` is 4052 (an anonymous block cannot be inherited; see §3).
-A `name { ... }` statement can still *have* a base: `d : b { ... }` is fine, but that `d` is itself an
+A top-level `name { ... }` statement can still *have* a base: `d : b { ... }` is fine, but that `d` is itself an
 anonymous block and so can't be a base in turn.
+
+**Only a top-level statement may have a base.** A base (`: base`) on any statement nested inside an object, in
+either form and at any depth, is `ANVL_ERR_PARSER_NESTED_BASE` (4022, "Only a top-level statement can have a
+base"), reported at the base name. It wins over 4051, 4020 and 4052, so a nested base is 4022 whether or not its
+name exists or is a usable base. A `:` with no name after it in a nested statement is still 2001.
+
+<!-- example: error 4022 -->
+```anvl
+#!aml
+base := { x := 1; };
+outer := {
+   inner : base := { y := 2; };
+};
+```
+
+The writer and builder refuse the same thing with `ANVIL_WRITER_ERR_NESTED_BASE` (23; §12): the writer at
+`statement` / `statement_block`, and the builder at once at `set_base`, not when the document is written.
 
 ## 7. Includes
 
@@ -289,6 +306,7 @@ behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code
 | 4012 | `ANVL_ERR_PARSER_INVALID_ATTRIBUTE` | an attribute key that is not an identifier |
 | 4013 | `ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY` | an attribute key repeated on a statement or in the module header |
 | 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | a base that is not an object value (category `ANVIL_ERR_RESOLVE`) |
+| 4022 | `ANVL_ERR_PARSER_NESTED_BASE` | a base on a statement nested inside an object, in either form and at any depth; wins over 4051, 4020 and 4052 |
 | 4053 | `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` | a top-level name repeated (including across includes) |
 | 4201 | `ANVL_ERR_INCLUDE_NOT_FIRST` | `include` after a statement |
 | 4204 | `ANVL_ERR_INCLUDE_FILE_NOT_FOUND` | an `include` of a file that does not exist, or of a directory |
@@ -346,8 +364,11 @@ These cover the grammar rules above:
 | `ANVIL_WRITER_ERR_DUPLICATE_ATTRIBUTE_KEY` | 18 | an attribute key repeated on one statement, or in the module header (the reader's 4013) |
 | `ANVIL_WRITER_ERR_INHERITANCE_CYCLE` | 19 | the builder's top-level statements' bases loop back (a statement based on itself, `a` on `b` on `a`; the reader's 4050) |
 | `ANVIL_WRITER_ERR_MISSING_BASE` | 20 | the builder holds a base that names no top-level statement and the builder holds no `include` that could supply it (the reader's 4051) |
+| `ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT` | 21 | a block-form statement, `name { ... };`, whose value is not an object |
+| `ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM` | 22 | a base that names a block-form statement (the reader's 4052) |
+| `ANVIL_WRITER_ERR_NESTED_BASE` | 23 | a base on a statement inside an object, at any depth; the writer refuses it at `statement` / `statement_block`, the builder at `set_base` (the reader's 4022) |
 
-Codes 17 to 20 were appended, so the existing values keep their numbers. The builder reports 19 and 20 when it is written or emitted; with any `include` a base that names nothing in the document is accepted, because the included file may declare it. The writer can't see names that an
+Codes 17 to 23 were appended (23 is the newest), so the existing values keep their numbers. The builder reports 19 and 20 when it is written or emitted; with any `include` a base that names nothing in the document is accepted, because the included file may declare it. The writer can't see names that an
 `include` brings in, so a collision with an included name is found only when the document is read.
 
 ### Real language bindings today

@@ -112,6 +112,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BR-2611-anvl-docs-003.** The language reference (§3, §6, the parser error table, the writer error table) and the AML guide
+  state that only a top-level statement may have a base, show `ANVL_ERR_PARSER_NESTED_BASE` (4022) with a checked sample, and
+  list `ANVIL_WRITER_ERR_NESTED_BASE` (23) with the previously unlisted codes 21 and 22. The Bindings guide names builder code 23.
+  Docs only; not deployed.
+
 - **Site and docs for v0.13.1-rc.** The downloads page, the Bindings guide (the `*_load_ex` loaders, anvil.js
   `SchemaErrorCode`, `TypeErrorCode` and `lastError()` codes 11 and 1, the IO error names, refreshed backlogged
   small-document speed gaps), the public changelog, the language reference (IO names `ANVL_ERR_IO_*`), the types and schema

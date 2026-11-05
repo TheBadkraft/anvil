@@ -114,7 +114,7 @@ library on all 561 native schema cases. Two documented differences:
 - **Builder handles are new on each call.** `find()` and `add()` return a new `AnvilMember` handle on every call, as the
   Node.js binding's do; two handles for one statement are not `===`, so compare by what they hold, not by identity.
 
-The builder's inheritance-cycle and missing-base errors are builder codes 19 and 20 (see the
+The builder's inheritance-cycle and missing-base errors are builder codes 19 and 20, and a base on a nested statement is code 23, refused at `set_base` (see the
 [language reference](language-reference.md#12-errors)). `TypeRegistry` `fromIncludes` merges the root document's own
 `@[types]` last, so they override included ones.
 
