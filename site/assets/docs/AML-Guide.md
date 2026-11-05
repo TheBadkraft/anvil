@@ -142,8 +142,20 @@ Cannot inherit from anonymous object (use ':=' for inheritable declarations)
 
 That is `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` (4052). The error is reported at the statement
 that inherits, not at the statement that chose the block form, so choose the block form only for
-an object nothing will inherit from. A block can still have a base (`Child : Base { ... };`); it
+an object nothing will inherit from. A top-level block can still have a base (`Child : Base { ... };`); it
 just can't be one.
+
+**Only a top-level statement may have a base.** A base on a statement nested inside an object, in either form
+and at any depth, is `ANVL_ERR_PARSER_NESTED_BASE` (4022, "Only a top-level statement can have a base"),
+reported at the base name:
+
+<!-- example: error 4022 -->
+```anvl
+Base := { a := 1; };
+Outer := {
+   Inner : Base := { b := 2; };
+};
+```
 
 **Inheritance always requires an object value.** `Child : Base := 42;`,
 `Child : Base := [1, 2];`, and a blob are all parse errors
