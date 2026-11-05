@@ -17,7 +17,7 @@ Part of `notes/plan-2611-portable-ports.md`. Status: approved in principle (2026
 | Task | Work | Done when |
 |---|---|---|
 | PY-H0 | Fix BR-2611-anvl-py-001 first, so the reference passes its own suite | suite green at the pin |
-| PY-H1a (FR-2611-anvl-py-001) | `tests/conformance/reader_run.py`: prints `anvil-dump 2` for a corpus input, through the public API only | 1902/1902 byte-exact against native's dumps |
+| PY-H1a (FR-2611-anvl-py-001) | `tests/conformance/reader_run.py`: prints the public-API projection of `anvil-dump 2` (spans, dialect, statement kind, bases and `$` references are native internals the API does not expose) | every corpus case's projection equal to the projected native dump (2039 at v0.14.1-rc) |
 | PY-H1b (FR-2611-anvl-py-001) | `writer_run.py` for `anvil-writer-script 1` | writer corpus byte-exact; C-API-only list exact and enforced |
 | PY-H1c (FR-2611-anvl-py-001) | `builder_run.py` for `anvil-builder-script 1` | builder corpus byte-exact; C-API-only list exact |
 | PY-H1d (FR-2611-anvl-py-001) | `schema_run.py` for `anvil-schema-script 1` | 561/561 |
@@ -31,12 +31,17 @@ The runners use only the public API, so the same runners later drive the pure po
 **Harness gate:** PY-H1-H5 green against the ctypes binding, independently verified. Then the owner decides on the
 port.
 
+**Reader decision (Principal Engineer, 2026-11-05):** the byte-exact `anvil-dump 2` can't be printed through a public API, because it needs spans, dialect, statement kind, bases and references. So:
+- Against the ctypes binding, the harness compares a public-API projection, and that is the binding's reader contract.
+- The pure port adds an internal dump module that must match native byte for byte, as anvil.js's `src/dump.js` does. Port gate P1 uses both.
+- No native introspection ABI is added for this.
+
 ## Port phase (after owner approval)
 
 | Task | Scope |
 |---|---|
 | PY-R0 | Rename the ctypes binding: repo `anvl-py-binding`, import `anvl_py_binding` (proposed), downloads renamed. Notify K&C. New empty `anvil.py` repo on Linode. |
-| PY-P1 | Reader and read API (pure Python): reader corpus and fuzz |
+| PY-P1 | Reader and read API (pure Python): reader corpus projection plus an internal byte-exact `anvil-dump 2` module, and fuzz |
 | PY-P2 | Writer |
 | PY-P3 | Builder |
 | PY-P4 | Types and schema |
