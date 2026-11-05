@@ -1,6 +1,6 @@
 # Plan 2611, lane: Python (`anvil.py`, pure Python)
 
-Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
+Part of `notes/plan-2611-portable-ports.md`. Status: approved in principle (2026-11-04). Tracked as Rivet plan `anvil.py/portable-port`.
 
 ## Today
 
@@ -46,7 +46,7 @@ port.
 - Integers are arbitrary precision, so int64 bounds and BigInt cases are easy.
 - Byte-exact output means working on `bytes`, not `str`, for the source and the writer.
 - Error columns are UTF-8 byte columns, as in native.
-- **Speed is the real unknown.** A pure-Python reader may be much slower than ctypes on large documents but faster on
+- **Speed** (D3: a report, not a gate). **It is the real unknown.** A pure-Python reader may be much slower than ctypes on large documents but faster on
   small ones, because ctypes pays per call. H5 measures both before any gate is set (D3).
 
 ## Not in scope

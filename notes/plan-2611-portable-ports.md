@@ -1,7 +1,7 @@
 # Plan 2611: portable ANVL implementations (Python, C#, Java)
 
-**Status:** proposed, 2026-11-04. Nothing in the port phase is approved. The owner approves each language after
-its harness is proven.
+**Status:** approved in principle, 2026-11-04 (D1 to D4 below). Each port phase still starts only after its harness
+is proven.
 **Umbrella ticket:** FR-2611-anvl-ports-001 (Rivet, project `anvil`).
 
 ## Owner direction (2026-11-04)
@@ -95,20 +95,30 @@ These happen **when a language's port phase starts**, never before, so no consum
 1. v0.14.0-rc ships first. This plan doesn't touch it.
 2. **Python harness (H1-H5),** proven against anvil.py. It's the quickest runner to write, and the Python checker
    adapter exists for tooling.
-3. **C# harness, then Java harness.** These can run in parallel with the Python port if the owner approves it.
-4. Ports, one language at a time, in the order the owner chooses.
+3. **Java harness, then C# harness** (D4: Python, then Java, then .NET).
+4. Ports, one language at a time, in that order.
 5. Build on demand runs as its own lane (`plan-2611-build-on-demand.md`).
 
-## Decisions for the owner
+## Owner decisions (2026-11-04)
 
-- D1. Approve harness-first, and the proof against the native-backed binding.
-- D2. The names for the renamed native-backed bindings: repos, packages, imports and downloads.
-- D3. The speed-gate threshold for each port. A pure C# or Java port may be slower than today's native-backed binding,
-  because calling native from those languages is cheap. Propose: report-only for the first port release, then set a
-  gate from the measurements.
-- D4. The order of the ports.
+- D1. **Approved:** harness first, proven against the native-backed binding.
+- D2. **Approved:** the renamed bindings are `anvl-py-binding`, `anvl-net-binding` and `anvl-java-binding`. The
+  package and import names follow the same pattern (proposed per lane).
+- D3. **No speed gate for the ports.** Instead, a **speed report with a comparison against the native-backed
+  binding**, so a user can make an informed choice. The stats are gathered later. For .NET, `unsafe` code is fine
+  for performance.
+- D4. **Order:** Python first, then Java, then .NET.
+- Build on demand: "we'll circle back to this". Its service lane waits.
 
 ## Lanes
+
+The lanes are tracked as **Rivet plans** (ordered tickets in harness, port and release lanes). The notes below are
+the narrative.
+- `anvil.py/portable-port`
+- `anvil.java/portable-port`
+- `anvil.net/portable-port`
+- `anvil/build-on-demand`
+
 
 - `notes/plan-2611-port-python.md`
 - `notes/plan-2611-port-csharp.md`

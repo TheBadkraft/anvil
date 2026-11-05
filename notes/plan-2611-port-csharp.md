@@ -1,6 +1,6 @@
 # Plan 2611, lane: C# (`anvil.net`, pure C#)
 
-Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
+Part of `notes/plan-2611-portable-ports.md`. Status: approved in principle (2026-11-04). Tracked as Rivet plan `anvil.net/portable-port`.
 
 ## Today
 
@@ -38,6 +38,6 @@ Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
 **C#-specific notes**
 - Spans and `Utf8` APIs make byte-exact parsing natural.
 - `long` and `ulong` cover int64; use `BigInteger` only where native allows it.
-- **Speed:** P/Invoke into native is cheap, so the pure port may be slower than the binding on large documents. H5
+- **Speed** (D3: a report and comparison, not a gate; `unsafe` is allowed). P/Invoke into native is cheap, so the pure port may be slower than the binding on large documents. H5
   measures it first (D3).
 - **Target framework:** keep the binding's current target framework unless the owner chooses otherwise.

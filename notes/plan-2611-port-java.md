@@ -1,6 +1,6 @@
 # Plan 2611, lane: Java (`anvil.java`, pure Java)
 
-Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
+Part of `notes/plan-2611-portable-ports.md`. Status: approved in principle (2026-11-04). Tracked as Rivet plan `anvil.java/portable-port`.
 
 ## Today
 

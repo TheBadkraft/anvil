@@ -1,6 +1,6 @@
 # Plan 2611, lane: native builds on demand (for performance users)
 
-Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04). The owner calls the build-on-demand
+Part of `notes/plan-2611-portable-ports.md`. Status: approved in principle (2026-11-04). Tracked as Rivet plan `anvil/build-on-demand`. The owner calls the build-on-demand
 tooling "a work in progress".
 
 ## Owner direction
