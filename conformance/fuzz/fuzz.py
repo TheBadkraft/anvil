@@ -114,6 +114,9 @@ def gen_stmt(r, depth, names, top):
     if top: r.top_name = name
     attrs = gen_attrs(r)
     base = b''
+    # Only a top-level statement may have a base (4022). A clean (valid) document gets none at all, since the generator
+    # cannot promise a base names a top-level object; an error-injecting one may put a base on any statement, a nested
+    # one included, and then the document is invalid (never generated as valid).
     if names and not r.clean and r.randrange(8) == 0: base = b' : ' + r.choice(names)
     form = r.randrange(10)
     if form == 0:
