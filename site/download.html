@@ -30,33 +30,38 @@
       for other runtimes; anvil.js is the pure-JavaScript implementation for Node and browsers. Pick what matches where your code runs.
     </p>
 
+    <p class="lede" style="font-size: 15px;"><strong>v0.14.0-rc changes the language:</strong> only a top-level statement may have a base,
+      so a base on a nested statement is now an error (4022). See the <a href="/docs#changelog.md">changelog</a> before you upgrade.
+      The C library and anvil.js are at v0.14.0-rc. The .NET and Python downloads below stay at v0.13.1-rc: there is no
+      v0.14.0-rc build of either, and they do not have the v0.14 changes (they still accept a nested base).</p>
+
     <h2>Native library — C / C++</h2>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil-v0.13.1-rc-linux-x86_64.tar.gz</strong> — static (<code>libanvil.a</code>)
+          <strong>anvil-v0.14.0-rc-linux-x86_64.tar.gz</strong> — static (<code>libanvil.a</code>)
           and shared (<code>libanvil.so</code>) release builds, plus the public headers. Linux
           x86_64 only today; other platforms build from source until real cross-platform CI
           exists.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil-v0.13.1-rc-linux-x86_64.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil-v0.14.0-rc-linux-x86_64.tar.gz">Download</a>
       </div>
       <!-- example: lang sh -->
-      <pre><code>tar -xzf anvil-v0.13.1-rc-linux-x86_64.tar.gz
-gcc your_program.c -I anvil-v0.13.1-rc-linux-x86_64/include \
-    -L anvil-v0.13.1-rc-linux-x86_64/lib -lanvil -o your_program</code></pre>
+      <pre><code>tar -xzf anvil-v0.14.0-rc-linux-x86_64.tar.gz
+gcc your_program.c -I anvil-v0.14.0-rc-linux-x86_64/include \
+    -L anvil-v0.14.0-rc-linux-x86_64/lib -lanvil -o your_program</code></pre>
     </div>
 
     <h2>JavaScript &mdash; anvil.js (Node and browsers)</h2>
     <div class="card">
       <div class="dl-row">
         <div>
-          <strong>anvil.js-v0.13.1-rc.tar.gz</strong> &mdash; the JavaScript package. Pure
+          <strong>anvil.js-v0.14.0-rc.tar.gz</strong> &mdash; the JavaScript package. Pure
           JavaScript, with no native code and no WebAssembly: it runs in Node 18 or later and in any
           browser. <strong>It is now complete: reader, writer, builder, types and schema.</strong> It has the same API as
           the Node.js binding, plus <code>isNull()</code>, and matches Anvil Native on the shared conformance
-          corpora: the reader (1,884 cases), the writer (749 of 764), the builder (866 of 915) and the schema and
-          type registry (561 of 561). The other writer cases (15) and builder cases (49) are C-API-only, because they
+          corpora: the reader (1,920 cases), the writer (851 of 867), the builder (933 of 986) and the schema and
+          type registry (561 of 561). The other writer cases (16) and builder cases (53) are C-API-only, because they
           pass a null, a handle of another builder or text that is not valid UTF-8, which JavaScript cannot
           express. <code>value()</code> writes a safe integer as an integer, and
           <code>setIo({ read(path) })</code> lets a browser resolve <code>include</code> from files you supply.
@@ -65,10 +70,10 @@ gcc your_program.c -I anvil-v0.13.1-rc-linux-x86_64/include \
           It replaces the Node.js and WebAssembly downloads below, which stay downloadable at
           v0.11.0-rc.
         </div>
-        <a class="btn secondary" href="/assets/downloads/anvil.js-v0.13.1-rc.tar.gz">Download</a>
+        <a class="btn secondary" href="/assets/downloads/anvil.js-v0.14.0-rc.tar.gz">Download</a>
       </div>
       <!-- example: lang sh -->
-      <pre><code>npm install ./anvil.js-v0.13.1-rc.tar.gz</code></pre>
+      <pre><code>npm install ./anvil.js-v0.14.0-rc.tar.gz</code></pre>
       <!-- example: lang js -->
       <pre><code>import { parse, AnvilWriter, AnvilBuilder, TypeRegistry, Schema, AnvilDialect } from 'anvil.js';   // or: const anvl = require('anvil.js')
 const doc = parse('#!aml\nfoo := 1;');
@@ -185,9 +190,9 @@ doc.get('foo').asInt(); // 1</code></pre>
     <p class="lede" style="margin-top: 32px; font-size: 15px;">
       Verify any download with <a href="/assets/downloads/SHA256SUMS">SHA256SUMS</a>
       (<code>sha256sum -c SHA256SUMS</code> in the folder holding the files). <code>SHA256SUMS</code>
-      lists every release, current first; <a href="/assets/downloads/SHA256SUMS-v0.13.1-rc">SHA256SUMS-v0.13.1-rc</a>
-      lists only this one (<code>SHA256SUMS-&lt;version&gt;</code> lists one release). The C library,
-      .NET, Python and anvil.js downloads report the version <code>0.13.1-rc+479</code>. The native
+      lists every release, current first; <a href="/assets/downloads/SHA256SUMS-v0.14.0-rc">SHA256SUMS-v0.14.0-rc</a>
+      lists only v0.14.0-rc (<code>SHA256SUMS-&lt;version&gt;</code> lists one release). The C library and anvil.js
+      downloads report the version <code>0.14.0-rc+554</code>; the .NET and Python downloads (v0.13.1-rc) report <code>0.13.1-rc+479</code>. The native
       downloads (C library, .NET and Python) are Linux x86_64 only; anvil.js runs wherever JavaScript does.
     </p>
     <p class="lede" style="margin-top: 16px; font-size: 15px;">
@@ -197,6 +202,11 @@ doc.get('foo').asInt(); // 1</code></pre>
     </p>
     <p class="lede" style="margin-top: 16px; font-size: 15px;">
       Previous releases:
+      v0.13.1-rc &mdash;
+      <a href="/assets/downloads/anvil-v0.13.1-rc-linux-x86_64.tar.gz">C library</a>,
+      <a href="/assets/downloads/anvil.js-v0.13.1-rc.tar.gz">anvil.js</a>
+      (the .NET and Python downloads above are the v0.13.1-rc ones)
+      (<a href="/assets/downloads/SHA256SUMS-v0.13.1-rc">SHA256SUMS-v0.13.1-rc</a>);
       v0.13.0-rc &mdash;
       <a href="/assets/downloads/anvil-v0.13.0-rc-linux-x86_64.tar.gz">C library</a>,
       <a href="/assets/downloads/anvil.js-v0.13.0-rc.tar.gz">anvil.js</a>,

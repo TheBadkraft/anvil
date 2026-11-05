@@ -3,6 +3,180 @@
 What changed in each release of Anvil, for people using it. Downloads are on the
 [download page](/download).
 
+## v0.14.0-rc
+
+Released 2026-11-05. This is a release candidate.
+
+v0.14.0-rc is a minor release with one breaking change. **Read it first if any of your documents put a base on a nested
+statement.** It also adds the block-form writer and builder, names the document an error occurred in, and positions include
+errors at the `include` keyword.
+
+### Breaking change: only a top-level statement may have a base
+
+A base (`a : b := { ... };` or `a : b { ... };`) is allowed on a **top-level statement only**. A base on a statement inside an
+object, in either form and at any depth, is now an error found while parsing, reported at the base name:
+`ANVL_ERR_PARSER_NESTED_BASE` (4022), "Only a top-level statement can have a base".
+
+Why: the implementation had accepted a nested base by accident, and the language never meant it. A nested statement based on
+its own enclosing top-level statement made the inheritance graph loop through containment. `s1 := { f3 : s1 { a := 1; }; };`
+loaded without an error, and then any walk over the resolved tree (a dump, a serialiser, a binding) never ended. It now fails
+at once with 4022.
+
+- **Reader.** 4022 wins over every later error: a nested base that names nothing is 4022 (not 4051), and a nested base on a
+  scalar is 4022 (not 4020). A `:` with no name after it (`{ a: 1; }`) is still "Expected identifier".
+- **Writer and builder.** They refuse the same thing with the new `ANVIL_WRITER_ERR_NESTED_BASE` (23), "only a top-level
+  statement can have a base". The writer gives it from `anvil_writer_statement` and `anvil_writer_statement_block` while an
+  object is open. The builder gives it at once from `anvil_builder_set_base` for a member added to an object, at any depth,
+  attached or not. In anvil.js: `WriterErrorCode.NESTED_BASE`, from `AnvilWriter#statement`, `AnvilWriter#statementBlock` and
+  `AnvilMember#setBase`.
+- **Documents that used a nested base no longer load.** Rewrite them with the base on a top-level statement. Nothing else
+  changed: top-level bases, chains, cycles (4050), missing bases (4051) and anonymous bases (4052) behave as before.
+
+### Also in this release
+
+- **Block-form writer and builder.** The anonymous, read-only block form `name [: base] [@[attributes]] { ... };` can now be
+  written. `anvil_writer_statement_block(writer, name, base)` starts such a statement; its value must be an object, so
+  `anvil_writer_begin_object` follows, and any other value is the new `ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT` (21). It is AML
+  only. `anvil_builder_set_block(builder, member, block)` marks a builder statement as block form (`false` restores
+  `name := { ... };`). A block-form statement is read-only and cannot be a base (the reader gives 4052), so the builder refuses
+  to emit or write a document whose base names a block-form member, and the streaming writer refuses a base that names a
+  block-form statement it has already written: `ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM` (22). In the vtables the new entries are
+  appended after the existing fields (`Writer.statement_block`, `Builder.set_block`), so the existing layout is unchanged.
+- **An error says which document it is in.** `anvil_error_get_source(error, buffer, length)` (and `Error.get_source` in the
+  vtable) gives the path the document was opened by: the including document's directory, a `/`, and the include string as written
+  (not normalised). It is empty for an error in the root document. Line and column were already positions inside the included
+  document; now the document is named. It covers syntax and header errors, include errors, an included document's own load
+  error (an invalid shebang), and resolve errors that have a position. `anvil-dump` prints it, and the dump format is now
+  version 2.
+- **Include errors are at the `include` keyword.** A missing file (4204), a cycle (4206) and a path of 1024 bytes or more (9002)
+  are reported at the line and column of the `include` keyword in the document that contains it, not at line 1, column 1 of the
+  root. Columns count bytes.
+- **The library now exports 174 functions** (171 before): `anvil_writer_statement_block`, `anvil_builder_set_block` and
+  `anvil_error_get_source`. Nothing was removed or changed.
+- **anvil.js has the same changes.** `lastError().source`; `AnvilWriter#statementBlock(name, base)` and
+  `AnvilMember#setBlock(block)`, with codes 21 and 22; code 23 and error 4022; include errors at the `include` keyword. It
+  matches the native conformance corpora on all of them: reader 1920, writer 851 (+ 16 C-API-only), builder 933 (+ 53 C-API-only)
+  and schema 561.
+
+### Known issue
+
+A `$` reference to the object that contains it (`s1 := { a := $s1; };`), directly or through other references, still loads
+without an error, and reading through such a value with an accessor that follows references never finishes. This was already the
+case before this release, it is not fixed here, and it is separate from the nested-base loop above. Avoid a `$` reference that
+points at one of its own enclosing objects.
+
+### Downloads
+
+The native download (core) is Linux x86_64 (glibc). anvil.js is plain JavaScript: it runs in Node 18 or later and in any
+browser. Both are built from the same source tag; the library reports exactly `0.14.0-rc+554`, and anvil.js reports the same
+string from `getVersion()`.
+
+| Download | What it is |
+|---|---|
+| `anvil-v0.14.0-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
+| `anvil.js-v0.14.0-rc.tar.gz` | The pure-JavaScript package for Node and browsers: reader, writer, builder, types and schema |
+
+**Python and .NET stay at v0.13.1-rc.** There is no v0.14.0-rc Python or .NET download; their v0.13.1-rc files stay current and
+do not have the changes above (they read and write the same documents as v0.13.1-rc, including nested bases). The Node
+(`anvil-node`) and WebAssembly (`anvil-wasm`) builds are not part of this release; their v0.11.0-rc downloads stay available at
+their existing addresses. The Java binding is not distributed.
+
+`SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.14.0-rc` lists this release only):
+
+<!-- example: fragment a release checksum list, not code -->
+```
+bfd7db7cc9cf04e32b865506354ef19c1d919a30e6c1ad392109716412e77070  anvil.js-v0.14.0-rc.tar.gz
+1e98cbacf9f6dc04753f1ee7856fcdf52d19fbcec8e52eaa80c2e239d4a743e9  anvil-v0.14.0-rc-linux-x86_64.tar.gz
+```
+
+Earlier releases' lines follow unchanged in `SHA256SUMS`; every earlier file stays available at its address.
+
+### Performance
+
+Every figure is time taken, as subject divided by baseline, so lower is faster. "Cold" is the first call in a fresh
+process; "warm" is the median of 101 calls after a warm-up. Measured on the packaged files, one machine, each side in its own
+fresh process, median of 10 or more processes unless stated.
+
+#### Native
+
+native v0.14.0-rc vs native v0.13.1-rc, warm, packaged static library, 9 interleaved runs, one CPU: parse 0.989x to 0.995x,
+validate 0.990x to 1.005x. Through `libanvil.so`: parse 1.001x to 1.004x, validate 0.998x to 1.000x. Loading 20,000 five-line
+documents: 1.003x (static library) and 1.010x (`libanvil.so`). The first load in a fresh process, cold: 0.98x (static library,
+14.7 against 15.0 microseconds) and 1.015x (`libanvil.so`, 18.2 against 17.9 microseconds).
+
+#### anvil.js against anvil.js v0.13.1-rc
+
+anvil.js v0.14.0-rc vs anvil.js v0.13.1-rc, reading FlyWire's per-request documents and the other reader workloads (22
+documents of 17 to 10,000 rows), 10 processes: cold 0.95x to 1.04x, warm 0.97x to 1.02x. Unchanged.
+
+`validateValue` on a 12-field record, same pair, microseconds per call: call 1 (cold) 0.95x to 1.00x, calls 20 to 120 0.99x to
+1.03x, calls 200 to 400 0.95x to 1.01x, steady state 0.87x to 1.02x. Unchanged.
+
+Schema load and validate, same pair: 0.97x to 1.00x. Parsing, and parsing plus reading every value (nine workloads): 0.90x to
+1.12x, with no consistent direction between the two arm orders. Build and emit (thirteen workloads): 0.98x to 1.23x in the
+arm order where the old version runs first and 0.68x to 1.13x in the other; the rows above 1.15x (two documents of one request or
+response) were 1.11x and 0.96x on a rerun.
+
+**Writing is slower for large documents.** anvil.js v0.14.0-rc vs anvil.js v0.13.1-rc, warm, writing 1,000 FlyWire-shaped
+requests (`kc-request-x1000`, about 0.68 ms against about 0.59 ms): 1.19x, 1.21x, 1.22x and 1.20x in the order where the old
+version runs first, 1.10x, 1.07x, 1.15x and 1.19x in the other order, on four runs; the same comparison of v0.13.1-rc against
+itself gives 0.93x to 1.03x in that order. Writing 1,000 responses is 1.14x and 1.12x on two runs. The other seven writing
+workloads, one to ten documents and the configuration and string workloads, are 0.76x to 1.25x with no consistent direction.
+This is not fixed in this release.
+
+#### Known performance gaps in anvil.js (not fixed; scheduled for a later release)
+
+Unchanged from v0.13.1-rc, because anvil.js v0.14.0-rc reads within the range above of v0.13.1-rc: small documents are where
+anvil.js is slower than anvil-node. These are not promises, and they are not fixed. They supersede the figures in the package's
+README.
+
+anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc, FlyWire's per-request documents, time ratio, lower is faster:
+
+| Document | Cold | Warm |
+|---|---|---|
+| small `@bin` read response, 1 / 5 / 17 rows | 1.38x / 1.35x / 1.59x | 2.09x / 2.64x / 1.42x |
+| small `@bin` poll response, 1 / 5 / 17 rows | 1.36x / 1.36x / 1.58x | 2.02x / 2.59x / 1.42x |
+| `@bin` envelope, 17 / 100 rows | 1.52x / 1.45x | 1.36x / 0.81x |
+| `@table` envelope, 17 / 100 rows | 1.42x / 1.15x | 0.77x / 0.34x |
+| error document | 1.65x | 1.91x |
+| raw table text, 17 rows | 1.12x | 0.44x |
+
+Every other document size measured, from 1,000 rows up, is at 0.19x to 0.93x.
+
+- `validateValue` on a 12-field record, anvil.js vs anvil-node v0.10.0-rc, calls 200 to 400 of a process: 1.28x
+  (create-valid), 1.18x (missing required field), 1.14x (type violation).
+- `Schema.load`, anvil.js vs anvil-node v0.10.0-rc: 11.1x (0.374 ms against 0.034 ms for FlyWire's assets schema).
+  Schema `validate` of one record: 1.06x to 1.08x; of 100 and 10,000 records: 0.40x to 0.42x.
+- Against v0.12.1-rc, warm small documents are slower: `amp-bin-read-1` 1.24x, `amp-bin-poll-1` 1.18x, `amp-bin-read-5` 1.74x,
+  `amp-bin-poll-5` 1.60x, `errdoc` 1.20x (anvil.js v0.13.0-rc vs anvil.js v0.12.1-rc). v0.14.0-rc and v0.13.1-rc are equal on
+  these rows.
+
+### Checks
+
+Every check ran on the packaged files, not on a build tree.
+
+- Two builds of each download from the tag are byte-identical.
+- Core: the reported version is `0.14.0-rc+554`; an `include` of a missing file gives an include-not-found error; 174 exported
+  functions and no internal symbol; every header compiles on its own and links from C++.
+- anvil.js, installed with `npm install` into an empty directory: `require` and `import` work; named imports; the version
+  matches; reader 1920, writer 851 + 16 C-API-only, builder 933 + 53 C-API-only and schema 561 conformance scripts match native
+  byte for byte through the installed copy; Chromium 156 and Firefox 157, in the ESM and the global build, 16 checks each.
+- For both: `s1 := { f3 : s1 { a := 1; }; };` fails with 4022 at once; the writer and the builder give 23 for a nested base; the
+  block form is written as `name { ... };` and reloads, with 21 and 22 for the two refusals; an error in an included file names
+  that file; an include error is at the `include` keyword.
+- Every code sample in the documentation was run against these downloads: 117 passed, none failed.
+
+### Licence
+
+Every download includes a `LICENSE.txt` with the ANVL Software Licence terms, which are still in progress: free for
+personal and educational use, free for commercial use by organizations with up to 3 developer seats, and no
+redistribution.
+
+### The version string
+
+The library reports its version as `0.14.0-rc+554`: the release, then the build number after a `+`. This is valid
+semver. The build number is the same in both downloads of this release.
+
 ## v0.13.1-rc
 
 Released 2026-10-31. This is a release candidate.
