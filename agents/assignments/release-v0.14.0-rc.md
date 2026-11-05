@@ -97,4 +97,4 @@ Steps 1 to 7 are as in `release-v0.13.0-rc.md`, with these changes:
 | 4. Checks on the packaged files | pass: `verify-staged.sh` (KINDS= V014=1), new `check-v014.sh` (RED on v0.13.1-rc), browsers 4 runs x 16 checks, docs samples 117 passed 0 failed |
 | 5. Benchmarks | native within 1.02x (worst 1.015x); anvil.js: reader/validate/schema unchanged; `kc-request-x1000` writing about 1.2x (reported) |
 | 6. Stage | done in `~/release-staging/v0.14.0-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
-| 7. Deploy and live check | owner go 2026-11-05 ("release and publish"); Technical Writer deploys, then the live check |
+| 7. Deploy and live check | done 2026-11-05: site 02241ed, Worker version 12e88de1; live downloads equal staged sha256, SHA256SUMS identical, 0.14.0-rc+554 in both, verify-staged + check-v014 on the live files pass, every earlier download 200 |
