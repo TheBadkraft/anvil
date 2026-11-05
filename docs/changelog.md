@@ -15,11 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v0.14.1-rc] — (2026-11-05)
+
+A patch release with one behaviour change: a `$` reference that leads back to a value that contains it (`s1 := { a := $s1; };`) is now resolver error 4054, and the builder refuses the same documents with writer code 24. Before, such a document loaded and then any walk through the accessors never ended. The plain chain cycle `a := $b; b := $a;` is unchanged (null). 174 exports, unchanged. Every artifact is built from this tag and reports `0.14.1-rc+<BUILD>`. Known: documents full of references load about 1.1x slower than in v0.14.0-rc (FR-2611-anvl-resolver-001); documents without references are unchanged.
+
 ### Changed
 
-- **BR-2611-anvl-docs-004 (docs).** The language reference (§4, the error tables and the writer and builder section), the
-  AML guide, the Bindings guide and the getting-started page state the 4054 reference-cycle rule and writer code 24, with
-  runnable samples; the site copies are updated to match.
 - **BR-2611-anvl-resolver-002 (BEHAVIOUR CHANGE: a `$` reference that leads back to a container holding it is an error).**
   `s1 := { a := $s1; };` used to load without an error and then any walk through the public accessors (which are transparent
   through a resolved reference) never ended. A document with such a reference now fails to load with the new resolver error
@@ -52,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   10000 in 7.7 ms and 12 MB, against 6.4 ms and 11 MB in v0.14.0-rc), the mixed message document with a reference in every row
   1.074x, a ring of 100000 statements (loaded clean before, refused now) 1.167x; a plain `$a0 := $a1;` chain of 3000, which has no
   container to walk, 0.997x. Refused as a cycle, the 100000-statement ring takes 42 ms.
+
+- **BR-2611-anvl-docs-004 (docs).** The language reference (§4, the error tables and the writer and builder section), the
+  AML guide, the Bindings guide and the getting-started page state the 4054 reference-cycle rule and writer code 24, with
+  runnable samples; the site copies are updated to match.
 
 ---
 
