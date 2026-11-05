@@ -34,7 +34,7 @@ allows them. Rivet has no token scopes yet, so this rule is enforced only by you
      scrub holds (STANDARDS §7).
 4. **ABI** (native): every new public function is in a header, the flat API, its vtable and
    `libanvil.exports`. No internal symbol is exported. Removals and renames match the ticket.
-5. **Downstream** (anvil.node/anvil.wasm changes): run FlyWire's guard,
+5. **Downstream** (anvil.js, anvil.node or anvil.wasm changes; FlyWire runs anvil.js in production): run FlyWire's guard,
    `~/Projects/repos/flywire/tests/test-anvl-binding-grammar.js`. Run it read-only, from a
    scratch copy whose binding dependency points at the branch build.
 6. **Performance.** For any change on a parse, write or validate path, native or binding, run the

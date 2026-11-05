@@ -55,5 +55,5 @@ Native code (`anvil` repo), other binding repos, `site/`, tags, the Linode box (
 ## Done means
 
 The binding's full suite is green, the changelog entry is committed, and the ticket is resolved in
-Rivet. Then report per STANDARDS §5. Say whether the change is visible downstream (FlyWire and
-Rivet consume anvil.node; FlyWire also consumes anvil.wasm).
+Rivet. Then report per STANDARDS §5. Say whether the change is visible downstream (FlyWire runs anvil.js in production since
+2026-10-31 and Rivet follows FlyWire; mcdeuce uses anvil.java; anvil.node and anvil.wasm are frozen).
