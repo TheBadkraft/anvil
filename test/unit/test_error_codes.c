@@ -679,6 +679,39 @@ static void test_p8_detection_is_linear(void) {
    free(t);
 }
 
+/* BR-2611-anvl-resolver-002 (F1): a base field is inherited by many statements; the pass must walk its subtree once, not
+ * once per deriving statement. Scaling m (the size of the inherited field) and n (the deriving statements) by 4 must cost
+ * about 4 times as much (linear), not 16 (quadratic). One resolved reference at the end turns the pass on. */
+static double p8_inherit_seconds(size_t m, bool nested) {
+   size_t cap = m * 24 + m * 24 + 256, at = 0;
+   char *t = malloc(cap + m * 40);
+   at += (size_t)snprintf(t + at, cap, "base := { big := %s", nested ? "{ " : "[ ");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, 40, nested ? "f%zu := 1; " : "1, ", i);
+   }
+   at += (size_t)snprintf(t + at, 8, nested ? "}; };\n" : " ]; };\n");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, 48, "d%zu : base := { x := 1; };\n", i);
+   }
+   at += (size_t)snprintf(t + at, 32, "t := 1;\nr := $t;\n");
+   clock_t c0 = clock();
+   anvil_document doc = anvil_load_buffer(t, at);
+   double s = (double)(clock() - c0) / CLOCKS_PER_SEC;
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.inherit-scale: the document loads");
+   anvil_dispose(doc);
+   free(t);
+   return s;
+}
+
+static void test_p8_inherited_subtrees_are_scanned_once(void) {
+   for (int nested = 0; nested < 2; nested++) {
+      double small = p8_inherit_seconds(4000, nested), big = p8_inherit_seconds(16000, nested);
+      char label[96];
+      snprintf(label, sizeof label, "P8.inherit-scale: 4x the work costs less than 9x the time (%s)", nested ? "object" : "array");
+      TestBit.is_true(big < 9.0 * (small > 0.01 ? small : 0.01), label);
+   }
+}
+
 int main(void) {
    TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
@@ -709,5 +742,6 @@ int main(void) {
    TestBit.run_ex("P8_which_reference_is_reported", NULL, test_p8_which_reference_is_reported, th);
    TestBit.run_ex("P8_across_included_documents", NULL, test_p8_across_included_documents, th);
    TestBit.run_ex("P8_detection_is_linear", NULL, test_p8_detection_is_linear, th);
+   TestBit.run_ex("P8_inherited_subtrees_are_scanned_once", NULL, test_p8_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }

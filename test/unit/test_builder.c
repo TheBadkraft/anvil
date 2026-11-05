@@ -1420,6 +1420,48 @@ static void test_b31_reference_checks_are_linear(void) {
    anvil_builder_dispose(b);
 }
 
+/* ---------------------------------------------------------------------- *
+ * B32 - BR-2611-anvl-resolver-002 (F1): a base field inherited by many members is walked once, not once per deriving
+ * member: 4x the members and 4x the field cost about 4x the time (linear), not 16x
+ * ---------------------------------------------------------------------- */
+static double inherit_seconds(size_t m, bool nested) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   char name[32];
+   anvil_node big = nested ? anvil_builder_object(b) : anvil_builder_array(b);
+   for (size_t i = 0; i < m; i++) {
+      if (nested) {
+         snprintf(name, sizeof name, "f%zu", i);
+         anvil_builder_add(b, big, name, anvil_builder_int(b, 1));
+      } else {
+         anvil_builder_append(b, big, anvil_builder_int(b, 1));
+      }
+   }
+   anvil_node base = anvil_builder_object(b);
+   anvil_builder_add(b, base, "big", big);
+   ADD(b, "base", base);
+   for (size_t i = 0; i < m; i++) {
+      snprintf(name, sizeof name, "d%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "x", anvil_builder_int(b, 1));
+      anvil_builder_set_base(b, ADD(b, name, o), "base");
+   }
+   ADD(b, "t", anvil_builder_int(b, 1));
+   ADD(b, "r", anvil_builder_varref(b, "t"));
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B32: the document emits");
+   double s = seconds_since(&t0);
+   anvil_builder_dispose(b);
+   return s;
+}
+
+static void test_b32_inherited_subtrees_are_scanned_once(void) {
+   for (int nested = 0; nested < 2; nested++) {
+      double small = inherit_seconds(4000, nested), big = inherit_seconds(16000, nested);
+      TestBit.is_true(big < 9.0 * (small > 0.01 ? small : 0.01), nested ? "B32: 4x the work costs less than 9x (object)" : "B32: 4x the work costs less than 9x (array)");
+   }
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -1452,5 +1494,6 @@ int main(void) {
    TestBit.run_ex("B30_references_between_members_are_refused", NULL, test_b30_references_between_members_are_refused, th);
    TestBit.run_ex("B30_inherited_references_are_refused", NULL, test_b30_inherited_references_are_refused, th);
    TestBit.run_ex("B31_reference_checks_are_linear", NULL, test_b31_reference_checks_are_linear, th);
+   TestBit.run_ex("B32_inherited_subtrees_are_scanned_once", NULL, test_b32_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }
