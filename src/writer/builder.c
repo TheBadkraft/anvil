@@ -835,48 +835,134 @@ static size_t member_by_name(const struct anvil_builder_t *b, const char *name) 
    return at ? at - 1 : SIZE_MAX;
 }
 
-// Whether the subtree of member i (fields and elements at any depth, not through another reference) holds a reference
-// to the member itself. A statement that is itself a reference (a := $a;) holds no container. Explicit stack, so any
-// depth is fine; *memory is set when it cannot grow.
-static bool ref_scan(const struct anvil_builder_t *b, size_t i, const struct anvil_node_t ***stack, size_t *cap, bool *memory) {
-   size_t count = 0;
-   if (b->members[i]->value->kind == NODE_VARREF) {
-      return false;
+typedef struct {
+   size_t *start; // n + 1 offsets into to
+   size_t *to;    // edge targets (member indices)
+   size_t count, cap;
+   const struct anvil_node_t **stack; // scratch for the subtree scan
+   size_t stack_cap;
+} ref_graph;
+
+static bool ref_edge(ref_graph *g, size_t target) {
+   if (g->count == g->cap) {
+      size_t cap = g->cap ? g->cap * 2 : 64;
+      size_t *bigger = realloc(g->to, cap * sizeof *bigger);
+      if (!bigger) {
+         return false;
+      }
+      g->to = bigger;
+      g->cap = cap;
    }
-   if (!reserve((void **)stack, count, cap, sizeof **stack)) {
+   g->to[g->count++] = target;
+   return true;
+}
+
+// Adds the edges of every reference in the subtree of `root`. Explicit stack, so any depth is fine.
+static bool ref_scan(const struct anvil_builder_t *b, ref_graph *g, const struct anvil_node_t *root) {
+   size_t top = 0;
+   g->stack[top++] = root;
+   while (top > 0) {
+      const struct anvil_node_t *n = g->stack[--top];
+      if (n->kind == NODE_VARREF) {
+         size_t t = member_by_name(b, n->text);
+         if (t != SIZE_MAX && b->members[t]->value->kind != NODE_VARREF && !ref_edge(g, t)) {
+            return false;
+         }
+         continue;
+      }
+      if (n->kind != NODE_ARRAY && n->kind != NODE_TUPLE && n->kind != NODE_OBJECT) {
+         continue;
+      }
+      if (top + n->count > g->stack_cap) {
+         size_t grown = (top + n->count) * 2;
+         const struct anvil_node_t **bigger = realloc((void *)g->stack, grown * sizeof *bigger);
+         if (!bigger) {
+            return false;
+         }
+         g->stack = bigger;
+         g->stack_cap = grown;
+      }
+      for (size_t i = 0; i < n->count; i++) {
+         g->stack[top++] = n->kind == NODE_OBJECT ? n->members[i]->value : n->elements[i];
+      }
+   }
+   return true;
+}
+
+// Whether the graph g has a cycle: iterative depth-first search with three colours (1 on the current path,
+// 2 done), each member visited once. `pos` is the cursor of a member on the path.
+static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
+   unsigned char *colour = calloc(n ? n : 1, 1);
+   size_t *pos = malloc((n ? n : 1) * sizeof *pos);
+   size_t *calls = malloc((n ? n : 1) * sizeof *calls);
+   if (!colour || !pos || !calls) {
+      free(colour);
+      free(pos);
+      free(calls);
       *memory = true;
       return false;
    }
-   (*stack)[count++] = b->members[i]->value;
-   while (count > 0) {
-      const struct anvil_node_t *n = (*stack)[--count];
-      if (n->kind == NODE_VARREF) {
-         if (member_by_name(b, n->text) == i) {
-            return true;
-         }
-      } else if (n->kind == NODE_ARRAY || n->kind == NODE_TUPLE || n->kind == NODE_OBJECT) {
-         for (size_t k = 0; k < n->count; k++) {
-            if (!reserve((void **)stack, count, cap, sizeof **stack)) {
-               *memory = true;
-               return false;
+   bool cycle = false;
+   for (size_t root = 0; !cycle && root < n; root++) {
+      if (colour[root]) {
+         continue;
+      }
+      size_t depth = 0;
+      calls[depth++] = root;
+      colour[root] = 1;
+      pos[root] = g->start[root];
+      while (!cycle && depth > 0) {
+         size_t v = calls[depth - 1];
+         if (pos[v] < g->start[v + 1]) {
+            size_t w = g->to[pos[v]++];
+            if (colour[w] == 1) {
+               cycle = true;
+            } else if (colour[w] == 0) {
+               colour[w] = 1;
+               pos[w] = g->start[w];
+               calls[depth++] = w;
             }
-            (*stack)[count++] = n->kind == NODE_OBJECT ? n->members[k]->value : n->elements[k];
+         } else {
+            colour[v] = 2;
+            depth--;
          }
       }
    }
-   return false;
+   free(colour);
+   free(pos);
+   free(calls);
+   return cycle;
 }
 
-// A member that holds a reference to itself is a cycle.
+// A cycle among the members' references: member S has an edge to member T for every reference in its fields and
+// elements, at any depth, that names T (whose value is not itself a reference).
 static anvil_writer_err_code check_references(anvil_builder b) {
-   const struct anvil_node_t **stack = NULL;
-   size_t cap = 0;
-   bool memory = false, cycle = false;
-   for (size_t i = 0; b->varref_count > 0 && !cycle && !memory && i < b->member_count; i++) {
-      cycle = ref_scan(b, i, &stack, &cap, &memory);
+   if (b->varref_count == 0 || b->member_count == 0) {
+      return ANVIL_WRITER_OK;
    }
-   free((void *)stack);
-   return memory ? ANVIL_WRITER_ERR_MEMORY : cycle ? ANVIL_WRITER_ERR_REFERENCE_CYCLE : ANVIL_WRITER_OK;
+   size_t n = b->member_count;
+   ref_graph g = {0};
+   g.start = malloc((n + 1) * sizeof *g.start);
+   g.stack_cap = 64;
+   g.stack = malloc(g.stack_cap * sizeof *g.stack);
+   anvil_writer_err_code result = g.start && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
+      g.start[i] = g.count;
+      if (b->members[i]->value->kind != NODE_VARREF && !ref_scan(b, &g, b->members[i]->value)) {
+         result = ANVIL_WRITER_ERR_MEMORY;
+      }
+   }
+   if (result == ANVIL_WRITER_OK) {
+      g.start[n] = g.count;
+      bool memory = false;
+      result = ref_graph_has_cycle(&g, n, &memory) ? ANVIL_WRITER_ERR_REFERENCE_CYCLE
+               : memory                           ? ANVIL_WRITER_ERR_MEMORY
+                                                  : ANVIL_WRITER_OK;
+   }
+   free(g.start);
+   free(g.to);
+   free((void *)g.stack);
+   return result;
 }
 
 bool anvil_builder_write(anvil_builder b, anvil_writer w) {
