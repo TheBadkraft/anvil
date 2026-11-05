@@ -366,21 +366,29 @@ static usize resolve_varrefs(module_context ctx) {
  * dump's `doc` records) and, inside a document, by byte offset. The rule does not depend on how the search
  * visits the statements.
  *
- * Cost: one pass over each statement's subtree and an iterative strongly-connected-components search over the
- * statements, both linear in the size of the merged document; nothing recurses, so a chain of 100000
- * statements is as safe as one of three. Documents with no resolved reference skip the pass.
+ * Cost: one pass over the statements' own subtrees, an inherited (aliased) field's subtree walked once however many
+ * statements derive from it (its edges are kept per field and copied), and an iterative strongly-connected-components
+ * search. That is linear in the size of the document plus, for each deriving statement, its member count and the
+ * references in the fields it inherits (the size of the merged member lists and of the graph); nothing recurses, so a
+ * chain of 100000 statements is as safe as one of three. Documents with no resolved reference skip the pass.
  * ---------------------------------------------------------------------- */
 #define RC_NONE UINT32_MAX
 
 typedef struct {
    anvl_value value; // a top-level statement's value
    uint32_t doc;     // index in ctx->docs
+   bool derived;     // the statement has a base: its member list holds aliased fields of its bases
 } rc_node;
 
 typedef struct {
    anvl_value ref;  // the VarRef value; its text.start is the `$`
    uint32_t target; // node index of the statement whose value the reference resolves to
 } rc_edge;
+
+typedef struct {
+   anvl_value key;       // a field's value
+   uint32_t start, count; // the edges of its subtree, as a range of the graph's edges
+} rc_cached;
 
 typedef struct {
    module_context ctx;
@@ -394,6 +402,8 @@ typedef struct {
    uint32_t *comp;   // node -> strongly connected component
    anvl_value best;  // the reference to report so far
    usize best_doc;
+   rc_cached *cache; // open addressing: a field's value -> where its edges are in `edges`, so an aliased field is walked once
+   usize cache_cap, cache_count;
 } rc_graph;
 
 static usize rc_hash(const void *p, usize cap) {
@@ -442,9 +452,9 @@ static bool rc_add_edge(rc_graph *g, anvl_value ref, uint32_t target) {
 
 // Adds an edge for each resolved reference in the walkable subtree of node i (members and elements at any depth,
 // inherited fields; not through another reference). `stack` is a reusable scratch; false means out of memory.
-static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
+static bool rc_scan_value(rc_graph *g, anvl_value root, anvl_value **stack, usize *cap) {
    usize top = 0;
-   (*stack)[top++] = g->nodes[i].value;
+   (*stack)[top++] = root;
    while (top > 0) {
       anvl_value v = (*stack)[--top];
       list items = NULL;
@@ -485,6 +495,74 @@ static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
          if (child) {
             (*stack)[top++] = child;
          }
+      }
+   }
+   return true;
+}
+
+// The slot for field value v: the one holding it, or the empty one where it belongs. NULL when the table is empty.
+static rc_cached *rc_cache_slot(const rc_graph *g, anvl_value v) {
+   if (!g->cache_cap) {
+      return NULL;
+   }
+   usize at = rc_hash(v, g->cache_cap);
+   while (g->cache[at].key && g->cache[at].key != v) {
+      at = (at + 1) & (g->cache_cap - 1);
+   }
+   return &g->cache[at];
+}
+
+static bool rc_cache_put(rc_graph *g, anvl_value v, uint32_t start, uint32_t count) {
+   if (g->cache_count * 2 >= g->cache_cap) {
+      rc_cached *old = g->cache;
+      usize old_cap = g->cache_cap;
+      g->cache_cap = old_cap ? old_cap * 2 : 64;
+      g->cache = calloc(g->cache_cap, sizeof *g->cache);
+      if (!g->cache) {
+         g->cache = old;
+         g->cache_cap = old_cap;
+         return false;
+      }
+      for (usize k = 0; k < old_cap; k++) {
+         if (old[k].key) {
+            *rc_cache_slot(g, old[k].key) = old[k];
+         }
+      }
+      free(old);
+   }
+   *rc_cache_slot(g, v) = (rc_cached){v, start, count};
+   g->cache_count++;
+   return true;
+}
+
+// Adds the edges of node i. A statement with a base lists fields it inherited, aliased: the same field value is in the
+// member list of every statement that derives from it. Each field's subtree is walked once, and the edges it gave are
+// copied for the next statement that holds it, so the cost is the inherited fields plus their references, not their size.
+static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
+   anvl_value root = g->nodes[i].value;
+   if (!g->nodes[i].derived || root->type != ANVL_VALUE_OBJECT || !root->object.statements) {
+      return rc_scan_value(g, root, stack, cap);
+   }
+   list fields = root->object.statements;
+   for (usize k = 0, n = List.size(fields); k < n; k++) {
+      anvl_statement f = NULL;
+      List.get(fields, k, (object *)&f);
+      if (!f || !f->value) {
+         continue;
+      }
+      rc_cached *c = rc_cache_slot(g, f->value);
+      if (c && c->key == f->value) {
+         for (uint32_t e = c->start; e < c->start + c->count; e++) {
+            rc_edge copy = g->edges[e];
+            if (!rc_add_edge(g, copy.ref, copy.target)) {
+               return false;
+            }
+         }
+         continue;
+      }
+      uint32_t start = (uint32_t)g->edge_count;
+      if (!rc_scan_value(g, f->value, stack, cap) || !rc_cache_put(g, f->value, start, (uint32_t)g->edge_count - start)) {
+         return false;
       }
    }
    return true;
@@ -572,7 +650,7 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
          if (!stmt || !stmt->value || Source.slice_length(stmt->name) == 0) {
             continue;
          }
-         g.nodes[g.n] = (rc_node){stmt->value, (uint32_t)d};
+         g.nodes[g.n] = (rc_node){stmt->value, (uint32_t)d, Source.slice_length(stmt->base) != 0};
          if (stmt->value->type != ANVL_VALUE_VARREF) { // a reference resolves to a concrete value, never to a reference
             usize at = rc_hash(stmt->value, g.table_cap);
             while (g.table[at]) {
@@ -611,6 +689,7 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    free(g.start);
    free(g.comp);
    free(g.edges);
+   free(g.cache);
    if (!ok) {
       anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
       *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
