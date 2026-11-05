@@ -353,6 +353,8 @@ usize mod_ctx_arena_size_hint(usize summed_source_length);
  * the full design.
  */
 anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code);
+/// Test hook: how many edges the reference-cycle pass of this thread's last load built (0 when the pass was skipped).
+extern _Thread_local usize anvl_resolver_last_edges;
 /**
  * @brief Clear all documents from the module context.
  * @param docs List of documents to clear.

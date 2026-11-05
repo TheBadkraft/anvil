@@ -712,6 +712,27 @@ static void test_p8_inherited_subtrees_are_scanned_once(void) {
    }
 }
 
+/* BR-2611-anvl-resolver-002 (F5): a base field holding m references, inherited by n statements. The pass must not copy the
+ * field's m edges into each deriving statement: the edges it builds are O(n + m), not n * m. */
+static void test_p8_inherited_references_are_not_copied(void) {
+   size_t m = 3000, n = 3000, cap = (m + n) * 40 + 256, at = 0;
+   char *t = malloc(cap);
+   at += (size_t)snprintf(t + at, cap - at, "t := 1;\nbase := { a := [ ");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "$t, ");
+   }
+   at += (size_t)snprintf(t + at, cap - at, "1 ]; };\n");
+   for (size_t i = 0; i < n; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "d%zu : base := { x := 1; };\n", i);
+   }
+   anvil_document doc = anvil_load_buffer(t, at);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.copies: the document loads");
+   TestBit.is_true(anvl_resolver_last_edges > 0, "P8.copies: the pass ran and counted its edges");
+   TestBit.is_true(anvl_resolver_last_edges <= 3 * (m + n) + 16, "P8.copies: the edges are O(n + m), not n * m");
+   anvil_dispose(doc);
+   free(t);
+}
+
 int main(void) {
    TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
@@ -742,6 +763,7 @@ int main(void) {
    TestBit.run_ex("P8_which_reference_is_reported", NULL, test_p8_which_reference_is_reported, th);
    TestBit.run_ex("P8_across_included_documents", NULL, test_p8_across_included_documents, th);
    TestBit.run_ex("P8_detection_is_linear", NULL, test_p8_detection_is_linear, th);
+   TestBit.run_ex("P8_inherited_references_are_not_copied", NULL, test_p8_inherited_references_are_not_copied, th);
    TestBit.run_ex("P8_inherited_subtrees_are_scanned_once", NULL, test_p8_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }

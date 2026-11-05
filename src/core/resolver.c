@@ -372,6 +372,8 @@ static usize resolve_varrefs(module_context ctx) {
  * references in the fields it inherits (the size of the merged member lists and of the graph); nothing recurses, so a
  * chain of 100000 statements is as safe as one of three. Documents with no resolved reference skip the pass.
  * ---------------------------------------------------------------------- */
+_Thread_local usize anvl_resolver_last_edges;
+
 #define RC_NONE UINT32_MAX
 
 typedef struct {
@@ -690,6 +692,7 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    free(g.comp);
    free(g.edges);
    free(g.cache);
+   anvl_resolver_last_edges = g.edge_count;
    if (!ok) {
       anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
       *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;

@@ -1462,6 +1462,33 @@ static void test_b32_inherited_subtrees_are_scanned_once(void) {
    }
 }
 
+/* B33 - F5: a base field holding m references inherited by n members: the edges are O(n + m), not n * m */
+extern _Thread_local size_t anvil_builder_last_ref_edges;
+
+static void test_b33_inherited_references_are_not_copied(void) {
+   size_t m = 3000, n = 3000;
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   char name[32];
+   ADD(b, "t", anvil_builder_int(b, 1));
+   anvil_node arr = anvil_builder_array(b);
+   for (size_t i = 0; i < m; i++) {
+      anvil_builder_append(b, arr, anvil_builder_varref(b, "t"));
+   }
+   anvil_node base = anvil_builder_object(b);
+   anvil_builder_add(b, base, "a", arr);
+   ADD(b, "base", base);
+   for (size_t i = 0; i < n; i++) {
+      snprintf(name, sizeof name, "d%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "x", anvil_builder_int(b, 1));
+      anvil_builder_set_base(b, ADD(b, name, o), "base");
+   }
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B33: the document emits");
+   TestBit.is_true(anvil_builder_last_ref_edges > 0, "B33: the check ran and counted its edges");
+   TestBit.is_true(anvil_builder_last_ref_edges <= 3 * (m + n) + 16, "B33: the edges are O(n + m), not n * m");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -1494,6 +1521,7 @@ int main(void) {
    TestBit.run_ex("B30_references_between_members_are_refused", NULL, test_b30_references_between_members_are_refused, th);
    TestBit.run_ex("B30_inherited_references_are_refused", NULL, test_b30_inherited_references_are_refused, th);
    TestBit.run_ex("B31_reference_checks_are_linear", NULL, test_b31_reference_checks_are_linear, th);
+   TestBit.run_ex("B33_inherited_references_are_not_copied", NULL, test_b33_inherited_references_are_not_copied, th);
    TestBit.run_ex("B32_inherited_subtrees_are_scanned_once", NULL, test_b32_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }

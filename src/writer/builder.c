@@ -848,6 +848,9 @@ static size_t member_by_name(const struct anvil_builder_t *b, const char *name) 
    return at ? at - 1 : SIZE_MAX;
 }
 
+// Test hook: how many edges the reference check of this thread's last emit or write built.
+_Thread_local size_t anvil_builder_last_ref_edges;
+
 typedef struct {
    size_t *final;         // member -> the member whose value its reference chain ends in, SIZE_MAX if none
    unsigned char *state;  // 0 not computed, 1 on the current chase, 2 done
@@ -1052,6 +1055,7 @@ static anvil_writer_err_code check_references(anvil_builder b) {
                : memory                           ? ANVIL_WRITER_ERR_MEMORY
                                                   : ANVIL_WRITER_OK;
    }
+   anvil_builder_last_ref_edges = g.count;
    free(g.final);
    free(g.state);
    free(g.path);
