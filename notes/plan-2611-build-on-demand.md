@@ -26,15 +26,15 @@ Found 2026-11-04.
 
 | Task | Work | Done when |
 |---|---|---|
-| B1 | Build the allocator from source inside native's build, with no `/usr/local` dependency | a clean clone builds on a machine without `/usr/local/packages` |
-| B2 | Platform-neutral exports: generate the version script, the exported-symbols list or the `.def` file from one list | `check-exports` passes per platform |
-| B3 | Windows file shim for `files.c` | native suite passes on Windows |
-| B4 | Cross-compile matrix with `zig cc` from the Linode box: linux-x64, linux-arm64, osx-arm64, osx-x64, win-x64 | reproducible `libanvil` per RID, built twice and byte-identical |
-| B5 | Test where runnable: linux-x64 and arm64 on Linode, macOS and Windows on real machines or hosted runners. **An artifact never tested on its platform is labelled untested.** | native suite plus binding suites per RID |
-| B6 | Packaging per binding: NuGet `runtimes/<rid>/native/`, Python platform wheels, jar resources per `os-arch` extracted at load (FR-2611-anvl-java-001) | each binding's release checks per RID |
-| B7 | Linode build worker: a request with whitelisted parameters (version tag, binding, RID), a queue, an isolated build, SHA256SUMS, and an artifact store | builds a requested combination unattended; parameters are never free text |
-| B8 | anvldata.com request flow: a form for the parameters, the request status, and a download link with checksum, keeping the published-downloads rules | a user gets a checksummed build without engineer involvement |
-| B9 | Security review: whitelist-only parameters, no user-supplied code, rate limits, auth or not (owner decision), and artifact retention | review signed off |
+| B1 (FR-2611-anvl-build-001) | Build the allocator from source inside native's build, with no `/usr/local` dependency | a clean clone builds on a machine without `/usr/local/packages` |
+| B2 (FR-2611-anvl-build-002) | Platform-neutral exports: generate the version script, the exported-symbols list or the `.def` file from one list | `check-exports` passes per platform |
+| B3 (FR-2611-anvl-build-003) | Windows file shim for `files.c` | native suite passes on Windows |
+| B4 (FR-2611-anvl-build-004) | Cross-compile matrix with `zig cc` from the Linode box: linux-x64, linux-arm64, osx-arm64, osx-x64, win-x64 | reproducible `libanvil` per RID, built twice and byte-identical |
+| B5 (FR-2611-anvl-build-005) | Test where runnable: linux-x64 and arm64 on Linode, macOS and Windows on real machines or hosted runners. **An artifact never tested on its platform is labelled untested.** | native suite plus binding suites per RID |
+| B6 (FR-2611-anvl-build-006) | Packaging per binding: NuGet `runtimes/<rid>/native/`, Python platform wheels, jar resources per `os-arch` extracted at load (FR-2611-anvl-java-001) | each binding's release checks per RID |
+| B7 (FR-2611-anvl-build-007) | Linode build worker: a request with whitelisted parameters (version tag, binding, RID), a queue, an isolated build, SHA256SUMS, and an artifact store | builds a requested combination unattended; parameters are never free text |
+| B8 (FR-2611-anvl-build-008) | anvldata.com request flow: a form for the parameters, the request status, and a download link with checksum, keeping the published-downloads rules | a user gets a checksummed build without engineer involvement |
+| B9 (FR-2611-anvl-build-009) | Security review: whitelist-only parameters, no user-supplied code, rate limits, auth or not (owner decision), and artifact retention | review signed off |
 
 ## Decisions for the owner
 

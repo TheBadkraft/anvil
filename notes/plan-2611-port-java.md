@@ -17,13 +17,13 @@ Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
 
 | Task | Work | Done when |
 |---|---|---|
-| JAVA-H0 | Bring the binding to its v0.14 mirror (drift test), so the reference passes against the native it pins | suite green |
-| JAVA-H1a-d | A conformance CLI (Gradle `application`, or a test-scoped main) with reader, writer, builder and schema modes, printing the four dump formats through the public API | reader 1902, writer, builder (C-API-only lists exact) and schema 561, byte-exact |
-| JAVA-H2 | A fuzz driver against `anvil-dump` | recorded seeds, 0 differences |
-| JAVA-H3 | Drift test against `conformance/drift-tables.txt` (the existing `VtableDriftTests` extended to codes, names and messages) | green |
-| JAVA-H4 | check-tdd **gradle adapter**: `./gradlew --no-daemon test` JUnit XML; `AssertionFailedError` vs other throwables; product `src/main`, tests `src/test` | the checker's fixtures prove it; one real range checked (for example, BR-2611-anvl-java-001) |
-| JAVA-H5 | Bench harness (JMH, or a plain harness matching the shared workloads), cold and warm, labelled | baseline numbers for the FFM binding |
-| JAVA-H6 | check-examples Java support (compile and run a sample against the jar) | Java samples in the docs run |
+| JAVA-H0 (FR-2611-anvl-java-002) | Bring the binding to its v0.14 mirror (drift test), so the reference passes against the native it pins | suite green |
+| JAVA-H1a-d (FR-2611-anvl-java-003) | A conformance CLI (Gradle `application`, or a test-scoped main) with reader, writer, builder and schema modes, printing the four dump formats through the public API | reader 1902, writer, builder (C-API-only lists exact) and schema 561, byte-exact |
+| JAVA-H2 (FR-2611-anvl-java-004) | A fuzz driver against `anvil-dump` | recorded seeds, 0 differences |
+| JAVA-H3 (FR-2611-anvl-java-005) | Drift test against `conformance/drift-tables.txt` (the existing `VtableDriftTests` extended to codes, names and messages) | green |
+| JAVA-H4 (FR-2611-anvl-java-006) | check-tdd **gradle adapter**: `./gradlew --no-daemon test` JUnit XML; `AssertionFailedError` vs other throwables; product `src/main`, tests `src/test` | the checker's fixtures prove it; one real range checked (for example, BR-2611-anvl-java-001) |
+| JAVA-H5 (FR-2611-anvl-java-007) | Bench harness (JMH, or a plain harness matching the shared workloads), cold and warm, labelled | baseline numbers for the FFM binding |
+| JAVA-H6 (FR-2611-anvl-java-008) | check-examples Java support (compile and run a sample against the jar) | Java samples in the docs run |
 
 **Harness gate:** JAVA-H1-H5 green against the FFM binding, independently verified.
 

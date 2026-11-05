@@ -16,11 +16,11 @@ Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
 | Task | Work | Done when |
 |---|---|---|
 | NET-H0 | Fix BR-2611-anvl-net-001, so the reference passes its own suite | suite green at the pin |
-| NET-H1a-d | A small console tool `tools/Anvil.Conformance` with `reader`, `writer`, `builder` and `schema` modes. It prints the four dump formats through the public API. | reader 1902, writer, builder (C-API-only lists exact) and schema 561, all byte-exact |
-| NET-H2 | A fuzz driver against `anvil-dump` (reader, writer, builder, schema) | recorded seeds, 0 differences |
-| NET-H3 | Drift test against `conformance/drift-tables.txt` | green |
-| NET-H4 | check-tdd **dotnet adapter**: `dotnet test` with a TRX logger; per-test pass, fail or error; `Assert` failures vs other exceptions; product `src/`, tests `test/`; `--disable-build-servers` | the checker's fixtures prove it; one real range checked |
-| NET-H5 | Bench harness, BenchmarkDotNet or a plain Stopwatch harness matching the shared workloads, cold and warm, labelled | baseline numbers for the P/Invoke binding |
+| NET-H1a-d (FR-2611-anvl-net-001) | A small console tool `tools/Anvil.Conformance` with `reader`, `writer`, `builder` and `schema` modes. It prints the four dump formats through the public API. | reader 1902, writer, builder (C-API-only lists exact) and schema 561, all byte-exact |
+| NET-H2 (FR-2611-anvl-net-002) | A fuzz driver against `anvil-dump` (reader, writer, builder, schema) | recorded seeds, 0 differences |
+| NET-H3 (FR-2611-anvl-net-003) | Drift test against `conformance/drift-tables.txt` | green |
+| NET-H4 (FR-2611-anvl-net-004) | check-tdd **dotnet adapter**: `dotnet test` with a TRX logger; per-test pass, fail or error; `Assert` failures vs other exceptions; product `src/`, tests `test/`; `--disable-build-servers` | the checker's fixtures prove it; one real range checked |
+| NET-H5 (FR-2611-anvl-net-005) | Bench harness, BenchmarkDotNet or a plain Stopwatch harness matching the shared workloads, cold and warm, labelled | baseline numbers for the P/Invoke binding |
 
 **Harness gate:** NET-H1-H5 green against the P/Invoke binding, independently verified.
 

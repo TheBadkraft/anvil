@@ -2,7 +2,7 @@
 
 **Status:** proposed, 2026-11-04. Nothing in the port phase is approved. The owner approves each language after
 its harness is proven.
-**Umbrella ticket:** see the Rivet FR named in "Tickets" below.
+**Umbrella ticket:** FR-2611-anvl-ports-001 (Rivet, project `anvil`).
 
 ## Owner direction (2026-11-04)
 
@@ -117,5 +117,5 @@ These happen **when a language's port phase starts**, never before, so no consum
 
 ## Tickets
 
-The umbrella FR is in project `anvil`. Each lane task is filed under it as its lane's harness phase begins. Port-phase
+The umbrella is FR-2611-anvl-ports-001. Every harness-phase and build-on-demand task is filed (2026-11-04) and related to it; the IDs are in each lane's table. Port-phase
 tickets are filed only after the owner approves that language.
