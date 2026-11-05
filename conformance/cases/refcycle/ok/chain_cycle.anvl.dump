@@ -1,0 +1,10 @@
+anvil-dump 2
+mode document
+input-bytes 18
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=18
+  stmt kind=ASSIGN name="a" name-span=0-1 base="" base-span=none attrs=0
+    value type=VARREF span=5-7 text="$b" target="b" public=NULL resolved=0
+  stmt kind=ASSIGN name="b" name-span=9-10 base="" base-span=none attrs=0
+    value type=VARREF span=14-16 text="$a" target="a" public=NULL resolved=0

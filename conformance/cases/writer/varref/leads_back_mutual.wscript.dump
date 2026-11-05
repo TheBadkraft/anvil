@@ -1,0 +1,4 @@
+anvil-writer-run 1
+steps 12
+status ok
+output bytes=51 text="#!aml\n\na := {\n   x := $b;\n};\nb := {\n   y := $a;\n};\n"

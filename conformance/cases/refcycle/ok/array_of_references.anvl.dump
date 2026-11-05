@@ -1,0 +1,18 @@
+anvil-dump 2
+mode document
+input-bytes 51
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=51
+  stmt kind=ASSIGN name="a" name-span=0-1 base="" base-span=none attrs=0
+    value type=ARRAY span=5-15 text="[ $b, $c ]" count=2
+      value type=VARREF span=7-9 text="$b" target="b" public=OBJECT resolved=1 resolved-doc=0 resolved-span=22-33
+      value type=VARREF span=11-13 text="$c" target="c" public=TUPLE resolved=1 resolved-doc=0 resolved-span=40-49
+  stmt kind=ASSIGN name="b" name-span=17-18 base="" base-span=none attrs=0
+    value type=OBJECT span=22-33 text="{ p := 1; }" count=1
+      stmt kind=ASSIGN name="p" name-span=24-25 base="" base-span=none attrs=0
+        value type=NUMERIC span=29-30 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="c" name-span=35-36 base="" base-span=none attrs=0
+    value type=TUPLE span=40-49 text="( 1, $b )" count=2
+      value type=NUMERIC span=42-43 text="1" kind=integer overflow=0 i64=1
+      value type=VARREF span=45-47 text="$b" target="b" public=OBJECT resolved=1 resolved-doc=0 resolved-span=22-33

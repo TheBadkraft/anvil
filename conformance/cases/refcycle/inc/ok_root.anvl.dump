@@ -1,0 +1,16 @@
+anvil-dump 2
+mode document
+input-bytes 46
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=46
+  include decl-span=0-23 decl="include \"ok_child.anvl\"" path-span=8-23 path="\"ok_child.anvl\"" resolved=1
+  stmt kind=ASSIGN name="use" name-span=25-28 base="" base-span=none attrs=0
+    value type=OBJECT span=32-44 text="{ x := $t; }" count=1
+      stmt kind=ASSIGN name="x" name-span=34-35 base="" base-span=none attrs=0
+        value type=VARREF span=39-41 text="$t" target="t" public=OBJECT resolved=1 resolved-doc=1 resolved-span=5-16
+doc 1 path="ok_child.anvl" dialect=AML bytes=18
+  stmt kind=ASSIGN name="t" name-span=0-1 base="" base-span=none attrs=0
+    value type=OBJECT span=5-16 text="{ v := 1; }" count=1
+      stmt kind=ASSIGN name="v" name-span=7-8 base="" base-span=none attrs=0
+        value type=NUMERIC span=12-13 text="1" kind=integer overflow=0 i64=1

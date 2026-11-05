@@ -1,0 +1,3 @@
+include "three_a.anvl";
+include "three_b.anvl";
+root := { x := $a; };

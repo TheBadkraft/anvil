@@ -1,0 +1,114 @@
+anvil-dump 2
+mode document
+input-bytes 675
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=675
+  stmt kind=ASSIGN name="start" name-span=0-5 base="" base-span=none attrs=0
+    value type=OBJECT span=9-22 text="{ x := $c0; }" count=1
+      stmt kind=ASSIGN name="x" name-span=11-12 base="" base-span=none attrs=0
+        value type=VARREF span=16-19 text="$c0" target="c0" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c0" name-span=24-26 base="" base-span=none attrs=0
+    value type=VARREF span=30-33 text="$c1" target="c1" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c1" name-span=35-37 base="" base-span=none attrs=0
+    value type=VARREF span=41-44 text="$c2" target="c2" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c2" name-span=46-48 base="" base-span=none attrs=0
+    value type=VARREF span=52-55 text="$c3" target="c3" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c3" name-span=57-59 base="" base-span=none attrs=0
+    value type=VARREF span=63-66 text="$c4" target="c4" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c4" name-span=68-70 base="" base-span=none attrs=0
+    value type=VARREF span=74-77 text="$c5" target="c5" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c5" name-span=79-81 base="" base-span=none attrs=0
+    value type=VARREF span=85-88 text="$c6" target="c6" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c6" name-span=90-92 base="" base-span=none attrs=0
+    value type=VARREF span=96-99 text="$c7" target="c7" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c7" name-span=101-103 base="" base-span=none attrs=0
+    value type=VARREF span=107-110 text="$c8" target="c8" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c8" name-span=112-114 base="" base-span=none attrs=0
+    value type=VARREF span=118-121 text="$c9" target="c9" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c9" name-span=123-125 base="" base-span=none attrs=0
+    value type=VARREF span=129-133 text="$c10" target="c10" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c10" name-span=135-138 base="" base-span=none attrs=0
+    value type=VARREF span=142-146 text="$c11" target="c11" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c11" name-span=148-151 base="" base-span=none attrs=0
+    value type=VARREF span=155-159 text="$c12" target="c12" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c12" name-span=161-164 base="" base-span=none attrs=0
+    value type=VARREF span=168-172 text="$c13" target="c13" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c13" name-span=174-177 base="" base-span=none attrs=0
+    value type=VARREF span=181-185 text="$c14" target="c14" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c14" name-span=187-190 base="" base-span=none attrs=0
+    value type=VARREF span=194-198 text="$c15" target="c15" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c15" name-span=200-203 base="" base-span=none attrs=0
+    value type=VARREF span=207-211 text="$c16" target="c16" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c16" name-span=213-216 base="" base-span=none attrs=0
+    value type=VARREF span=220-224 text="$c17" target="c17" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c17" name-span=226-229 base="" base-span=none attrs=0
+    value type=VARREF span=233-237 text="$c18" target="c18" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c18" name-span=239-242 base="" base-span=none attrs=0
+    value type=VARREF span=246-250 text="$c19" target="c19" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c19" name-span=252-255 base="" base-span=none attrs=0
+    value type=VARREF span=259-263 text="$c20" target="c20" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c20" name-span=265-268 base="" base-span=none attrs=0
+    value type=VARREF span=272-276 text="$c21" target="c21" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c21" name-span=278-281 base="" base-span=none attrs=0
+    value type=VARREF span=285-289 text="$c22" target="c22" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c22" name-span=291-294 base="" base-span=none attrs=0
+    value type=VARREF span=298-302 text="$c23" target="c23" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c23" name-span=304-307 base="" base-span=none attrs=0
+    value type=VARREF span=311-315 text="$c24" target="c24" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c24" name-span=317-320 base="" base-span=none attrs=0
+    value type=VARREF span=324-328 text="$c25" target="c25" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c25" name-span=330-333 base="" base-span=none attrs=0
+    value type=VARREF span=337-341 text="$c26" target="c26" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c26" name-span=343-346 base="" base-span=none attrs=0
+    value type=VARREF span=350-354 text="$c27" target="c27" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c27" name-span=356-359 base="" base-span=none attrs=0
+    value type=VARREF span=363-367 text="$c28" target="c28" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c28" name-span=369-372 base="" base-span=none attrs=0
+    value type=VARREF span=376-380 text="$c29" target="c29" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c29" name-span=382-385 base="" base-span=none attrs=0
+    value type=VARREF span=389-393 text="$c30" target="c30" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c30" name-span=395-398 base="" base-span=none attrs=0
+    value type=VARREF span=402-406 text="$c31" target="c31" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c31" name-span=408-411 base="" base-span=none attrs=0
+    value type=VARREF span=415-419 text="$c32" target="c32" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c32" name-span=421-424 base="" base-span=none attrs=0
+    value type=VARREF span=428-432 text="$c33" target="c33" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c33" name-span=434-437 base="" base-span=none attrs=0
+    value type=VARREF span=441-445 text="$c34" target="c34" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c34" name-span=447-450 base="" base-span=none attrs=0
+    value type=VARREF span=454-458 text="$c35" target="c35" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c35" name-span=460-463 base="" base-span=none attrs=0
+    value type=VARREF span=467-471 text="$c36" target="c36" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c36" name-span=473-476 base="" base-span=none attrs=0
+    value type=VARREF span=480-484 text="$c37" target="c37" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c37" name-span=486-489 base="" base-span=none attrs=0
+    value type=VARREF span=493-497 text="$c38" target="c38" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c38" name-span=499-502 base="" base-span=none attrs=0
+    value type=VARREF span=506-510 text="$c39" target="c39" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c39" name-span=512-515 base="" base-span=none attrs=0
+    value type=VARREF span=519-523 text="$c40" target="c40" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c40" name-span=525-528 base="" base-span=none attrs=0
+    value type=VARREF span=532-536 text="$c41" target="c41" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c41" name-span=538-541 base="" base-span=none attrs=0
+    value type=VARREF span=545-549 text="$c42" target="c42" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c42" name-span=551-554 base="" base-span=none attrs=0
+    value type=VARREF span=558-562 text="$c43" target="c43" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c43" name-span=564-567 base="" base-span=none attrs=0
+    value type=VARREF span=571-575 text="$c44" target="c44" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c44" name-span=577-580 base="" base-span=none attrs=0
+    value type=VARREF span=584-588 text="$c45" target="c45" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c45" name-span=590-593 base="" base-span=none attrs=0
+    value type=VARREF span=597-601 text="$c46" target="c46" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c46" name-span=603-606 base="" base-span=none attrs=0
+    value type=VARREF span=610-614 text="$c47" target="c47" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c47" name-span=616-619 base="" base-span=none attrs=0
+    value type=VARREF span=623-627 text="$c48" target="c48" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c48" name-span=629-632 base="" base-span=none attrs=0
+    value type=VARREF span=636-640 text="$c49" target="c49" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c49" name-span=642-645 base="" base-span=none attrs=0
+    value type=VARREF span=649-653 text="$c50" target="c50" public=OBJECT resolved=1 resolved-doc=0 resolved-span=662-673
+  stmt kind=ASSIGN name="c50" name-span=655-658 base="" base-span=none attrs=0
+    value type=OBJECT span=662-673 text="{ v := 1; }" count=1
+      stmt kind=ASSIGN name="v" name-span=664-665 base="" base-span=none attrs=0
+        value type=NUMERIC span=669-670 text="1" kind=integer overflow=0 i64=1

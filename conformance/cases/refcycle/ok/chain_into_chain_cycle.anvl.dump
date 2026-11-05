@@ -1,0 +1,14 @@
+anvil-dump 2
+mode document
+input-bytes 37
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=37
+  stmt kind=ASSIGN name="x" name-span=0-1 base="" base-span=none attrs=0
+    value type=OBJECT span=5-17 text="{ y := $a; }" count=1
+      stmt kind=ASSIGN name="y" name-span=7-8 base="" base-span=none attrs=0
+        value type=VARREF span=12-14 text="$a" target="a" public=NULL resolved=0
+  stmt kind=ASSIGN name="a" name-span=19-20 base="" base-span=none attrs=0
+    value type=VARREF span=24-26 text="$b" target="b" public=NULL resolved=0
+  stmt kind=ASSIGN name="b" name-span=28-29 base="" base-span=none attrs=0
+    value type=VARREF span=33-35 text="$a" target="a" public=NULL resolved=0

@@ -125,7 +125,7 @@ LIB_RELEASE = $(RELEASE_DIR)/libanvil.a
 SO_DEBUG   = $(DEBUG_DIR)/libanvil.so
 SO_RELEASE = $(RELEASE_DIR)/libanvil.so
 
-.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-builder-script check-builder-gen check-builder-roundtrip check-schema-script check-schema-gen check-dump-valgrind check-conformance update-conformance check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
+.PHONY: anvil-dump fuzz-memory-test fuzz-prove check-drift-tables check-writer-script check-writer-gen check-writer-roundtrip check-builder-script check-builder-gen check-builder-roundtrip check-schema-script check-schema-gen check-dump-valgrind check-conformance update-conformance check-walk-corpus anvil-walk check-numeric-fastpath all lib lib-debug lib-release so so-debug so-release clean check-reader-only check-exports check-cxx check-32bit check-tsan check-test-release-fresh check-version
 
 all: lib so
 
@@ -281,12 +281,26 @@ $(DUMP_BIN): tools/anvil-dump.c tools/writer-script.c tools/writer-script.h tool
 	@mkdir -p $(dir $@)
 	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-dump.c tools/writer-script.c tools/builder-script.c tools/schema-script.c tools/script-common.c $(DEBUG_OBJS) -o $@
 
+# anvil-walk (tools/anvil-walk.c): loads files and walks every document that loads clean through the public, transparent
+# accessors with a depth and a visit cap (BR-2611-anvl-resolver-002). anvil-dump does not follow resolved references.
+WALK_BIN = build/tools/anvil-walk
+anvil-walk: $(WALK_BIN)
+
+$(WALK_BIN): tools/anvil-walk.c $(DEBUG_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(filter-out -MMD -MP,$(DEBUG_CFLAGS)) tools/anvil-walk.c $(DEBUG_OBJS) -o $@
+
+# Walks the whole conformance corpus: no document that loads clean may loop. ANVIL_WALK=<path> checks another build.
+check-walk-corpus: $(WALK_BIN)
+	sh scripts/check-walk-corpus.sh $(or $(ANVIL_WALK),$(WALK_BIN))
+
 # Regenerates every expected dump and diffs it against the committed one; any difference fails.
 # ANVIL_DUMP=<path> checks another build of the dump tool (for example a deliberately altered one).
-check-conformance: $(DUMP_BIN) check-drift-tables
+check-conformance: $(DUMP_BIN) $(WALK_BIN) check-drift-tables
 	sh scripts/check-writer-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-writer-gen.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-conformance.sh check $(or $(ANVIL_DUMP),$(DUMP_BIN))
+	sh scripts/check-walk-corpus.sh $(or $(ANVIL_WALK),$(WALK_BIN))
 	sh scripts/check-writer-roundtrip.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-builder-script.sh $(or $(ANVIL_DUMP),$(DUMP_BIN))
 	sh scripts/check-builder-gen.sh

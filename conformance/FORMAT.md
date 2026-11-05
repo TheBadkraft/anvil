@@ -123,11 +123,40 @@ record below). The line and column are positions inside that document. Which doc
   whichever document held the include). A cycle is reported by the document that closes it: with `a` including `b` including
   `a`, the error is in `b`, at its `include "a"`. Where two includes share a line, the column tells them apart; it counts bytes;
 - an included document that fails to load for its own content (an invalid shebang, `2011`): that document, at `1`, `1`;
-- a resolve error that has a position (`4053`, `4020`): the document holding the statement at fault. Those without a position
-  (`4051`, `4052`, `4050`) have line and column `0` and the root as their source.
+- a resolve error that has a position (`4053`, `4020`, `4054`): the document holding the statement at fault. Those without a position
+  (`4051`, `4052`, `4050`) have line and column `0` and the root as their source;
+- a reference cycle (`4054`, `ANVL_ERR_RESOLVER_REFERENCE_CYCLE`, "A reference leads back to a value that contains it"): the document
+  holding the reported reference, at its `$`. See **Reference cycles** below for which reference.
 
 (`include after statements` `4201` and `include in AMP` `4202` were always positioned at their keyword.) Corpus:
 `coverage/includes/pos_*`, `src_*`.
+
+**Reference cycles** (BR-2611-anvl-resolver-002). A `$` reference that leads back to a container holding it is an error: the load fails
+with `4054` (public category `ANVIL_ERR_RESOLVE`) and nothing but the error is dumped. Treat the resolved document as a graph. A walker
+standing on a value reaches (1) a container's own members (object fields, array and tuple elements), (2) the fields it inherits from a
+base, which are aliased into the member list of the deriving statement unless it declares a field of that name itself (the nearest base
+wins), and (3) through a resolved `$` reference, the value of the target statement (a chain of references `a := $b; b := $c;` is followed
+to the first non-reference value). A cycle in that graph, any value that can reach a value it is already inside, is the error. It includes
+`s1 := { a := $s1; };`, `a := [ $a ];`, `a := { x := $b; }; b := { y := $a; };` and `a := { x := $b; }; b : a := { z := 1; };`. A reference to a
+scalar never loops. A plain chain cycle (`a := $b; b := $a;`), a reference to a missing name and any reference that ends in
+no value stay **unresolved** and valid, as before: they have no target value to walk into.
+
+*Which reference is reported.* The position is the `$` of one reference, chosen by this rule, which does not depend on how a search
+visits the statements: among all the references that **lie on a cycle**, the first in source order, taking the documents in load order
+(the `doc` numbers of **The walk**, the root first) and, inside one document, by byte offset. A reference lies on a cycle when some top-level
+statement S whose walkable subtree holds it (its own field or element at any depth, or a field S inherits, which is held by the base that
+declares it and by every statement that inherits it) refers, through that reference, to the value of a statement T from which S can be
+reached again (T may be S). A reference whose target cannot get back to the statement holding it is not on a cycle, however early it is
+written (`refcycle/err/pos_*`). Equivalent test for a port: build the graph with one node per top-level named
+statement and an edge S to T for each such reference, find the strongly connected components, and take the first reference, in the order
+above, with an edge whose two ends are in one component (a self edge counts). Corpus: `refcycle/` (`err/`, `inc/` across included
+documents, `ok/` what stays valid, `scale/`); the builder and writer halves are `builder/references/` and `writer/varref/leads_back_*`.
+
+**The walk check.** `anvil-dump` prints a resolved reference's target but does not walk into it, which is why the corpus and the fuzzer
+never saw such a loop on `main`. `make check-walk-corpus` (`tools/anvil-walk.c`, run by `make check-conformance`) loads every reader input
+of the corpus and, for each that loads clean, walks every statement and every included document through the public, transparent accessors
+(`anvil_flat.h`), noting the values it is inside; coming back into one, or passing a depth cap (4000) or a visit cap (5,000,000), fails. So
+no document that loads clean can loop.
 
 When a load fails, **nothing but the error is defined**: no tree is dumped, because the partial tree native
 leaves behind is an implementation artifact, not behaviour a port should copy. If native failed before it

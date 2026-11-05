@@ -1,0 +1,20 @@
+anvil-dump 2
+mode document
+input-bytes 80
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=80
+  include decl-span=0-39 decl="include \"ok_two_way_scalars_child.anvl\"" path-span=8-39 path="\"ok_two_way_scalars_child.anvl\"" resolved=1
+  stmt kind=ASSIGN name="n" name-span=41-42 base="" base-span=none attrs=0
+    value type=NUMERIC span=46-47 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="root" name-span=49-53 base="" base-span=none attrs=0
+    value type=OBJECT span=57-78 text="{ x := $c; y := $n; }" count=2
+      stmt kind=ASSIGN name="x" name-span=59-60 base="" base-span=none attrs=0
+        value type=VARREF span=64-66 text="$c" target="c" public=OBJECT resolved=1 resolved-doc=1 resolved-span=5-16
+      stmt kind=ASSIGN name="y" name-span=68-69 base="" base-span=none attrs=0
+        value type=VARREF span=73-75 text="$n" target="n" public=NUMERIC resolved=1 resolved-doc=0 resolved-span=46-47
+doc 1 path="ok_two_way_scalars_child.anvl" dialect=AML bytes=18
+  stmt kind=ASSIGN name="c" name-span=0-1 base="" base-span=none attrs=0
+    value type=OBJECT span=5-16 text="{ v := 2; }" count=1
+      stmt kind=ASSIGN name="v" name-span=7-8 base="" base-span=none attrs=0
+        value type=NUMERIC span=12-13 text="2" kind=integer overflow=0 i64=2

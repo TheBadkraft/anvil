@@ -1,0 +1,3 @@
+base := { r := $one; };
+one : base := { p := 1; };
+two : base := { q := 2; };

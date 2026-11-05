@@ -1,0 +1,2 @@
+// a comment
+s1 := { /* inline */ a := $s1; };

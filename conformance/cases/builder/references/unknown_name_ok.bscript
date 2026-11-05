@@ -1,0 +1,11 @@
+anvil-builder-script 1
+# a name the builder does not hold may be supplied by an include
+option on-error continue
+dialect AML
+include "x.anvl"
+let o_a = object
+let r_a = varref "from_the_include"
+add o_a "f" r_a
+let m_a = add NULL "a" o_a
+emit
+get_error

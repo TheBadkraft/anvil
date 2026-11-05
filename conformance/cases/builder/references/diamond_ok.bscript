@@ -1,0 +1,26 @@
+anvil-builder-script 1
+# two members share an inherited field: a diamond, not a cycle
+option on-error continue
+dialect AML
+let o_base = object
+let x_base = int 1
+add o_base "v" x_base
+let m_base = add NULL "base" o_base
+let o_a = object
+let x_a = int 2
+add o_a "p" x_a
+let m_a = add NULL "a" o_a
+set_base m_a "base"
+let o_b = object
+let x_b = int 3
+add o_b "q" x_b
+let m_b = add NULL "b" o_b
+set_base m_b "base"
+let c = object
+let ra = varref "a"
+let rb = varref "b"
+add c "x" ra
+add c "y" rb
+add NULL "c" c
+emit
+get_error
