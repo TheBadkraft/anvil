@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# s1 := { a := { b := $s1; }; };
+option on-error continue
+dialect AML
+let inner = object
+let r = varref "s1"
+add inner "b" r
+let outer = object
+add outer "a" inner
+add NULL "s1" outer
+emit
+get_error

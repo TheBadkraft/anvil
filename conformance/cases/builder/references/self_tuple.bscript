@@ -1,0 +1,11 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let a = tuple
+let x = int 1
+let r = varref "a"
+append a x
+append a r
+add NULL "a" a
+emit
+get_error

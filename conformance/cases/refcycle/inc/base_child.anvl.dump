@@ -1,0 +1,10 @@
+anvil-dump 2
+mode document
+input-bytes 25
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=25
+  stmt kind=ASSIGN name="base" name-span=0-4 base="" base-span=none attrs=0
+    value type=OBJECT span=8-23 text="{ r := $leaf; }" count=1
+      stmt kind=ASSIGN name="r" name-span=10-11 base="" base-span=none attrs=0
+        value type=VARREF span=15-20 text="$leaf" target="leaf" public=NULL resolved=0

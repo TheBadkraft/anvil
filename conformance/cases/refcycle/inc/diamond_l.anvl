@@ -1,0 +1,2 @@
+include "diamond_d.anvl";
+l := { x := $d; };

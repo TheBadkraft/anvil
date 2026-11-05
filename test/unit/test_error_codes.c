@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct {
    const char *name;
@@ -406,6 +407,332 @@ static void test_p5_unchanged(void) {
    RUN(cases);
 }
 
+/* ====================================================================== *
+ * Part 8: references that lead back to a container holding them
+ * (BR-2611-anvl-resolver-002). The error is 4054, category RESOLVE, at the `$` of one reference on the cycle:
+ * the first such reference in source order (documents in load order). A walk follows (1) a container's own
+ * members, (2) fields inherited from a base, (3) a resolved `$` reference to its target statement's value.
+ * ====================================================================== */
+// Documents that load clean and must keep doing so: a reference to a scalar, a reference with no way back,
+// the plain chain cycle (unresolved, null), an override that breaks the cycle, a diamond of aliased fields.
+static const char *const p8_valid_sources[] = {
+   "a := $b; b := $a;",
+   "a := $a;",
+   "a := $b; b := $a; c := [ $a ];",
+   "n := 1; a := { x := $n; y := [ $n, $n ]; };",
+   "a := { x := $b; }; b := { y := 1; };",
+   "a := { x := $b; }; b : a := { x := 1; };",
+   "a := { x := $c; }; b : a := { x := 1; }; c : b := { w := 2; };",
+   "base := { v := [ 1, 2 ]; }; a : base := { p := 1; }; b : base := { q := 2; }; c := { x := $a; y := $b; };",
+   "a := [ $nothing ];",
+   "a := { x := $b; }; b := $c; c := { y := 1; };",
+   "a := [ $b, $c ]; b := { p := 1; }; c := ( 1, $b );",
+   "a { x := 1; }; b := { y := $a; };",
+   "a := { x := $b; y := $c; }; b := { z := $c; }; c := { w := 1; };",
+};
+
+static void test_p8_references_that_stay_valid(void) {
+   for (size_t i = 0; i < sizeof p8_valid_sources / sizeof p8_valid_sources[0]; i++) {
+      char name[64];
+      snprintf(name, sizeof name, "P8.valid.%02zu", i + 1);
+      ec_case c = CASE_OK(name, "");
+      c.src = p8_valid_sources[i];
+      c.len = strlen(c.src);
+      check(&c);
+   }
+}
+
+// Walks a value through the public, transparent accessors. A document that loaded clean must never loop: the
+// walk stays under a depth and a visit cap. Returns false when a cap is hit.
+#define P8_WALK_DEPTH 200
+#define P8_WALK_VISITS 100000
+static bool p8_walk(anvil_value v, size_t depth, size_t *visits) {
+   if (!v) {
+      return true;
+   }
+   if (depth > P8_WALK_DEPTH || ++*visits > P8_WALK_VISITS) {
+      return false;
+   }
+   anvil_value_type t = anvil_value_get_type(v);
+   size_t n = (t == ANVIL_VALUE_ARRAY || t == ANVIL_VALUE_TUPLE || t == ANVIL_VALUE_OBJECT) ? anvil_value_get_count(v) : 0;
+   for (size_t i = 0; i < n; i++) {
+      anvil_value child = t == ANVIL_VALUE_OBJECT ? anvil_statement_get_value(anvil_value_get_statement(v, i))
+                                                  : anvil_value_get_element(v, i);
+      if (!p8_walk(child, depth + 1, visits)) {
+         return false;
+      }
+   }
+   return true;
+}
+
+static bool p8_walk_document(anvil_document doc) {
+   size_t visits = 0;
+   anvil_statement_iterator it = anvil_document_get_statements(doc);
+   anvil_statement st = NULL;
+   bool ok = true;
+   while (ok && anvil_statement_iterator_next(it, &st)) {
+      ok = p8_walk(anvil_statement_get_value(st), 0, &visits);
+   }
+   anvil_statement_iterator_dispose(it);
+   return ok;
+}
+
+static void test_p8_clean_documents_walk_without_looping(void) {
+   for (size_t i = 0; i < sizeof p8_valid_sources / sizeof p8_valid_sources[0]; i++) {
+      char label[96];
+      anvil_document doc = anvil_load_buffer(p8_valid_sources[i], strlen(p8_valid_sources[i]));
+      snprintf(label, sizeof label, "P8.walk.%02zu: loads clean", i + 1);
+      TestBit.is_true(doc && !anvil_has_errors(doc), label);
+      snprintf(label, sizeof label, "P8.walk.%02zu: the transparent walk ends", i + 1);
+      TestBit.is_true(doc && p8_walk_document(doc), label);
+      anvil_dispose(doc);
+   }
+}
+
+#define RC ANVL_ERR_RESOLVER_REFERENCE_CYCLE
+#define RCASE(name, src, line, col) CASE_ERR(name, src, RC, RES, line, col)
+
+static void test_p8_a_container_holding_a_reference_to_itself(void) {
+   static const ec_case cases[] = {
+      RCASE("P8.self.01 s1 := { a := $s1; };", "s1 := { a := $s1; };", 1, 14),
+      RCASE("P8.self.02 one object deeper", "s1 := { a := { b := $s1; }; };", 1, 21),
+      RCASE("P8.self.03 an array", "a := [ $a ];", 1, 8),
+      RCASE("P8.self.04 a tuple", "a := ( 1, $a );", 1, 11),
+      RCASE("P8.self.05 block form", "a { x := $a; };", 1, 10),
+      RCASE("P8.self.06 many containers down", "a := [ [ { x := ( 1, [ $a ] ); } ] ];", 1, 24),
+      RCASE("P8.self.07 the line of the reference", "s1 := {\n   a := 1;\n   b := $s1;\n};", 3, 9),
+   };
+   RUN(cases);
+}
+
+static void test_p8_references_that_refer_to_each_other(void) {
+   static const ec_case cases[] = {
+      RCASE("P8.mutual.01 two objects", "a := { x := $b; }; b := { y := $a; };", 1, 13),
+      RCASE("P8.mutual.02 declared the other way round", "b := { y := $a; }; a := { x := $b; };", 1, 13),
+      RCASE("P8.mutual.03 a ring of three", "c := { x := $a; }; a := { y := $b; }; b := { z := $c; };", 1, 13),
+      RCASE("P8.mutual.04 block form", "a { x := $b; }; b { y := $a; };", 1, 10),
+      RCASE("P8.mutual.05 through a chain: only the reference inside the container is on the cycle", "a := $b; b := { c := $a; };", 1, 22),
+      RCASE("P8.mutual.06 through a longer chain", "a := $b; b := $c; c := [ $a ];", 1, 26),
+      RCASE("P8.mutual.07 a scalar reference beside the cycle is not it", "r := { p := $a; q := $b; }; a := { x := $r; }; b := 1;", 1, 13),
+   };
+   RUN(cases);
+}
+
+static void test_p8_cycles_closed_through_inheritance(void) {
+   static const ec_case cases[] = {
+      RCASE("P8.inherit.01 the inherited field refers to the deriving statement", "a := { x := $b; }; b : a := { z := 1; };", 1, 13),
+      RCASE("P8.inherit.02 b only inherits the reference to c, c refers to b", "a := { x := $c; }; b : a := { y := 1; }; c := { z := $b; };", 1, 13),
+      RCASE("P8.inherit.03 the base refers to the statement that derives from it", "base := { r := $leaf; }; leaf : base := { q := 1; };", 1, 16),
+      RCASE("P8.inherit.04 three levels of bases", "a := { x := $d; }; b : a := { m := 1; }; c : b := { n := 2; }; d : c := { k := 3; };", 1, 13),
+      RCASE("P8.inherit.05 an own reference, no aliased field involved", "a := { x := 1; }; b : a := { y := $c; }; c := { z := $b; };", 1, 35),
+      RCASE("P8.inherit.06 a block-form deriving statement", "a := { x := $b; }; b : a { z := 1; };", 1, 13),
+   };
+   RUN(cases);
+}
+
+// The position is the `$` of the first reference, in source order (the documents in load order), that lies on a cycle.
+static void test_p8_which_reference_is_reported(void) {
+   static const ec_case cases[] = {
+      RCASE("P8.pos.01 the second statement, not the first valid one", "ok := 1;\nb := [ $b ];\na := [ $a ];", 2, 8),
+      RCASE("P8.pos.02 the first in source order, not where a walk starts", "c := { x := $a; };\na := { y := $b; };\nb := { z := $c; };", 1, 13),
+      RCASE("P8.pos.03 an earlier reference that is not on the cycle is skipped", "u := $r;\nr := [ $r ];", 2, 8),
+      RCASE("P8.pos.04 two separate cycles: the first", "a := [ $a ];\nb := [ $b ];", 1, 8),
+   };
+   RUN(cases);
+}
+
+static void test_p8_error_code_name_and_message(void) {
+   TestBit.is_equal_int(4054, ANVL_ERR_RESOLVER_REFERENCE_CYCLE, "P8: the code is 4054");
+   const char *m = anvl_error_code_message(ANVL_ERR_RESOLVER_REFERENCE_CYCLE);
+   TestBit.is_true(m && strcmp(m, "A reference leads back to a value that contains it") == 0, "P8: the message");
+   const char *n = anvl_error_code_name(ANVL_ERR_RESOLVER_REFERENCE_CYCLE);
+   TestBit.is_true(n && strcmp(n, "ANVL_ERR_RESOLVER_REFERENCE_CYCLE") == 0, "P8: the name is the enum identifier");
+}
+
+static void test_p8_public_error_for_a_cycle(void) {
+   const char *src = "s1 := { a := $s1; };";
+   anvil_document doc = anvil_load_buffer(src, strlen(src));
+   TestBit.is_true(doc && anvil_has_errors(doc), "P8: the load fails");
+   anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+   char msg[128] = {0};
+   anvil_error_get_message(err, msg, sizeof msg);
+   TestBit.is_equal_str("A reference leads back to a value that contains it", msg, "P8: the public message");
+   TestBit.is_equal_int(ANVIL_ERR_RESOLVE, anvil_get_error(doc), "P8: the category is RESOLVE");
+   anvil_dispose(doc);
+}
+
+// Includes: the documents are taken in load order (the dump's doc numbers), so the root's references come first.
+static void p8_file(const char *label, const char *path, size_t line, size_t col, const char *source_suffix) {
+   char l[160];
+   anvil_document doc = anvil_load(path);
+   snprintf(l, sizeof l, "%s: loads", label);
+   TestBit.is_not_null(doc, l);
+   if (!doc) {
+      return;
+   }
+   snprintf(l, sizeof l, "%s: fails", label);
+   TestBit.is_true(anvil_has_errors(doc), l);
+   anvil_error err = anvil_document_get_error(doc);
+   snprintf(l, sizeof l, "%s: category RESOLVE", label);
+   TestBit.is_equal_int(ANVIL_ERR_RESOLVE, anvil_get_error(doc), l);
+   char msg[128] = {0};
+   anvil_error_get_message(err, msg, sizeof msg);
+   snprintf(l, sizeof l, "%s: the message", label);
+   TestBit.is_equal_str("A reference leads back to a value that contains it", msg, l);
+   snprintf(l, sizeof l, "%s: line %zu", label, line);
+   TestBit.is_equal_int((long long)line, (long long)anvil_error_get_line(err), l);
+   snprintf(l, sizeof l, "%s: column %zu", label, col);
+   TestBit.is_equal_int((long long)col, (long long)anvil_error_get_column(err), l);
+   char src[256] = {0};
+   anvil_error_get_source(err, src, sizeof src);
+   size_t sl = strlen(src), xl = strlen(source_suffix);
+   snprintf(l, sizeof l, "%s: source '%s'", label, source_suffix);
+   TestBit.is_true(sl >= xl && strcmp(src + sl - xl, source_suffix) == 0 && (xl > 0 || sl == 0), l);
+   anvil_dispose(doc);
+}
+
+static void test_p8_across_included_documents(void) {
+   // root: include child; root := { x := $child; }   child: child := { y := $root; }
+   p8_file("P8.inc.01 two documents refer to each other: the root's reference", "../../conformance/cases/refcycle/inc/pair_root.anvl", 3, 16, "");
+   // the root only refers to a self-referring array of the child
+   p8_file("P8.inc.02 the cycle is in the included document", "../../conformance/cases/refcycle/inc/child_self_root.anvl", 1, 8, "child_self.anvl");
+   // the root's own reference to the cyclic statement is not on the cycle, the child's is
+   p8_file("P8.inc.03 an earlier root reference that is not on the cycle", "../../conformance/cases/refcycle/inc/skip_root.anvl", 1, 8, "skip_child.anvl");
+   // an included base refers to a statement of the root that derives from it
+   p8_file("P8.inc.04 closed through a base in another document", "../../conformance/cases/refcycle/inc/base_root.anvl", 1, 16, "base_child.anvl");
+   // a reference into an included document with no way back is fine
+   anvil_document doc = anvil_load("../../conformance/cases/refcycle/inc/ok_root.anvl");
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.inc.05 a reference into an included document, no way back: loads");
+   TestBit.is_true(doc && p8_walk_document(doc), "P8.inc.05: and walks");
+   anvil_dispose(doc);
+}
+
+// n top-level members s0..s(n-1) of one array each; member i refers to s(i+1) (and s(i+2) when `ladder`), the last to
+// s0 when `ring`, else it holds a scalar. The text is allocated; the caller frees it.
+static char *p8_chain_text(size_t n, bool ring, bool ladder, size_t *len) {
+   size_t cap = n * 64 + 64;
+   char *t = malloc(cap);
+   size_t at = 0;
+   for (size_t i = 0; i < n; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "s%zu := [ ", i);
+      bool any = false;
+      if (i + 1 < n || ring) {
+         at += (size_t)snprintf(t + at, cap - at, "$s%zu", (i + 1) % n);
+         any = true;
+      }
+      if (ladder && (i + 2 < n || ring)) {
+         at += (size_t)snprintf(t + at, cap - at, "%s$s%zu", any ? ", " : "", (i + 2) % n);
+         any = true;
+      }
+      if (!any) {
+         at += (size_t)snprintf(t + at, cap - at, "1");
+      }
+      at += (size_t)snprintf(t + at, cap - at, " ];\n");
+   }
+   *len = at;
+   return t;
+}
+
+static double p8_seconds_since(const struct timespec *t0) {
+   struct timespec t1;
+   clock_gettime(CLOCK_MONOTONIC, &t1);
+   return (double)(t1.tv_sec - t0->tv_sec) + (double)(t1.tv_nsec - t0->tv_nsec) / 1e9;
+}
+
+static void test_p8_detection_is_linear(void) {
+   struct { const char *name; bool ring; bool ladder; } shapes[] = {
+      {"chain", false, false}, {"ring", true, false}, {"ladder", false, true}, {"ladder ring", true, true},
+   };
+   for (size_t k = 0; k < 4; k++) {
+      size_t len = 0;
+      char *text = p8_chain_text(100000, shapes[k].ring, shapes[k].ladder, &len);
+      struct timespec t0;
+      clock_gettime(CLOCK_MONOTONIC, &t0);
+      anvil_document doc = anvil_load_buffer(text, len);
+      char label[96];
+      snprintf(label, sizeof label, "P8.scale: a 100000-statement %s %s", shapes[k].name, shapes[k].ring ? "is refused" : "loads");
+      TestBit.is_true(doc && anvil_has_errors(doc) == shapes[k].ring, label);
+      if (doc && shapes[k].ring) {
+         anvil_error e = anvil_document_get_error(doc);
+         TestBit.is_equal_int(1, (long long)anvil_error_get_line(e), "P8.scale: the ring is reported at the first reference");
+         TestBit.is_equal_int(9, (long long)anvil_error_get_column(e), "P8.scale: ... column 9");
+      }
+      snprintf(label, sizeof label, "P8.scale: the %s is done in well under 20 s", shapes[k].name);
+      TestBit.is_true(p8_seconds_since(&t0) < 20.0, label);
+      anvil_dispose(doc);
+      free(text);
+   }
+   // one container with 100000 references to one object
+   size_t cap = 100000 * 24 + 128, at = 0;
+   char *t = malloc(cap);
+   at += (size_t)snprintf(t + at, cap - at, "t := { v := 1; };\nhub := {\n");
+   for (size_t i = 0; i < 100000; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "f%zu := $t;\n", i);
+   }
+   at += (size_t)snprintf(t + at, cap - at, "};\n");
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   anvil_document doc = anvil_load_buffer(t, at);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.scale: a hub of 100000 references to one object loads");
+   TestBit.is_true(p8_seconds_since(&t0) < 20.0, "P8.scale: the hub is done in well under 20 s");
+   anvil_dispose(doc);
+   free(t);
+}
+
+/* BR-2611-anvl-resolver-002 (F1): a base field is inherited by many statements; the pass must walk its subtree once, not
+ * once per deriving statement. Scaling m (the size of the inherited field) and n (the deriving statements) by 4 must cost
+ * about 4 times as much (linear), not 16 (quadratic). One resolved reference at the end turns the pass on. */
+static double p8_inherit_seconds(size_t m, bool nested) {
+   size_t cap = m * 24 + m * 24 + 256, at = 0;
+   char *t = malloc(cap + m * 40);
+   at += (size_t)snprintf(t + at, cap, "base := { big := %s", nested ? "{ " : "[ ");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, 40, nested ? "f%zu := 1; " : "1, ", i);
+   }
+   at += (size_t)snprintf(t + at, 8, nested ? "}; };\n" : " ]; };\n");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, 48, "d%zu : base := { x := 1; };\n", i);
+   }
+   at += (size_t)snprintf(t + at, 32, "t := 1;\nr := $t;\n");
+   clock_t c0 = clock();
+   anvil_document doc = anvil_load_buffer(t, at);
+   double s = (double)(clock() - c0) / CLOCKS_PER_SEC;
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.inherit-scale: the document loads");
+   anvil_dispose(doc);
+   free(t);
+   return s;
+}
+
+static void test_p8_inherited_subtrees_are_scanned_once(void) {
+   for (int nested = 0; nested < 2; nested++) {
+      double small = p8_inherit_seconds(4000, nested), big = p8_inherit_seconds(16000, nested);
+      char label[96];
+      snprintf(label, sizeof label, "P8.inherit-scale: 4x the work costs less than 9x the time (%s)", nested ? "object" : "array");
+      TestBit.is_true(big < 9.0 * (small > 0.01 ? small : 0.01), label);
+   }
+}
+
+/* BR-2611-anvl-resolver-002 (F5): a base field holding m references, inherited by n statements. The pass must not copy the
+ * field's m edges into each deriving statement: the edges it builds are O(n + m), not n * m. */
+static void test_p8_inherited_references_are_not_copied(void) {
+   size_t m = 3000, n = 3000, cap = (m + n) * 40 + 256, at = 0;
+   char *t = malloc(cap);
+   at += (size_t)snprintf(t + at, cap - at, "t := 1;\nbase := { a := [ ");
+   for (size_t i = 0; i < m; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "$t, ");
+   }
+   at += (size_t)snprintf(t + at, cap - at, "1 ]; };\n");
+   for (size_t i = 0; i < n; i++) {
+      at += (size_t)snprintf(t + at, cap - at, "d%zu : base := { x := 1; };\n", i);
+   }
+   anvil_document doc = anvil_load_buffer(t, at);
+   TestBit.is_true(doc && !anvil_has_errors(doc), "P8.copies: the document loads");
+   TestBit.is_true(anvl_resolver_last_edges > 0, "P8.copies: the pass ran and counted its edges");
+   TestBit.is_true(anvl_resolver_last_edges <= 3 * (m + n) + 16, "P8.copies: the edges are O(n + m), not n * m");
+   anvil_dispose(doc);
+   free(t);
+}
+
 int main(void) {
    TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
@@ -426,5 +753,17 @@ int main(void) {
    TestBit.run_ex("P4_unexpected_char", NULL, test_p4_unexpected_char, th);
    TestBit.run_ex("P5_unchanged", NULL, test_p5_unchanged, th);
    TestBit.run_ex("P6_keywords_as_names", NULL, test_p6_keywords_as_names, th);
+   TestBit.run_ex("P8_references_that_stay_valid", NULL, test_p8_references_that_stay_valid, th);
+   TestBit.run_ex("P8_clean_documents_walk_without_looping", NULL, test_p8_clean_documents_walk_without_looping, th);
+   TestBit.run_ex("P8_error_code_name_and_message", NULL, test_p8_error_code_name_and_message, th);
+   TestBit.run_ex("P8_public_error_for_a_cycle", NULL, test_p8_public_error_for_a_cycle, th);
+   TestBit.run_ex("P8_a_container_holding_a_reference_to_itself", NULL, test_p8_a_container_holding_a_reference_to_itself, th);
+   TestBit.run_ex("P8_references_that_refer_to_each_other", NULL, test_p8_references_that_refer_to_each_other, th);
+   TestBit.run_ex("P8_cycles_closed_through_inheritance", NULL, test_p8_cycles_closed_through_inheritance, th);
+   TestBit.run_ex("P8_which_reference_is_reported", NULL, test_p8_which_reference_is_reported, th);
+   TestBit.run_ex("P8_across_included_documents", NULL, test_p8_across_included_documents, th);
+   TestBit.run_ex("P8_detection_is_linear", NULL, test_p8_detection_is_linear, th);
+   TestBit.run_ex("P8_inherited_references_are_not_copied", NULL, test_p8_inherited_references_are_not_copied, th);
+   TestBit.run_ex("P8_inherited_subtrees_are_scanned_once", NULL, test_p8_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }

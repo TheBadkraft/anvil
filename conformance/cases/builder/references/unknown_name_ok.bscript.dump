@@ -1,0 +1,5 @@
+anvil-builder-run 1
+emit bytes=63 text="#!aml\n\ninclude \"x.anvl\";\n\na := {\n   f := $from_the_include;\n};\n"
+get_error code=0 name=ANVIL_WRITER_OK
+steps 9
+status ok

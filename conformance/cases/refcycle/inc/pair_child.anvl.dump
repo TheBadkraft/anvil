@@ -1,0 +1,10 @@
+anvil-dump 2
+mode document
+input-bytes 26
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=26
+  stmt kind=ASSIGN name="child" name-span=0-5 base="" base-span=none attrs=0
+    value type=OBJECT span=9-24 text="{ y := $root; }" count=1
+      stmt kind=ASSIGN name="y" name-span=11-12 base="" base-span=none attrs=0
+        value type=VARREF span=16-21 text="$root" target="root" public=NULL resolved=0

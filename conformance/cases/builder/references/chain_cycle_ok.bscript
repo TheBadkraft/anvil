@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# a := $b; b := $a; stays valid: unresolved, no container
+option on-error continue
+dialect AML
+let r1 = varref "b"
+add NULL "a" r1
+let r2 = varref "a"
+add NULL "b" r2
+emit
+get_error

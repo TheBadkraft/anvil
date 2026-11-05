@@ -1412,6 +1412,28 @@ static void test_w28_nested_base(void) {
    TestBit.is_equal_int(23, ANVIL_WRITER_ERR_NESTED_BASE, "W28: NESTED_BASE is numbered 23, appended");
 }
 
+/* ---------------------------------------------------------------------- *
+ * W29 - BR-2611-anvl-resolver-002: the streaming writer cannot see a reference cycle (it holds no document), as
+ * it cannot see a base cycle; only the builder refuses it. The code exists, is appended as 24, and has a message.
+ * ---------------------------------------------------------------------- */
+static void test_w29_streaming_writer_does_not_see_reference_cycles(void) {
+   anvil_writer w = anvil_writer_new(ANVIL_WRITER_AML);
+   TestBit.is_true(anvil_writer_statement(w, "s1", NULL) && anvil_writer_begin_object(w) && anvil_writer_statement(w, "a", NULL) &&
+                      anvil_writer_varref(w, "s1") && anvil_writer_end_object(w),
+                   "W29: s1 := { a := $s1; }; is written");
+   TestBit.is_true(anvil_writer_finish(w), "W29: and finishes");
+   size_t len = 0;
+   const char *text = anvil_writer_data(w, &len);
+   TestBit.is_true(text && strstr(text, "$s1") != NULL, "W29: the reference is in the output");
+   anvil_writer_dispose(w);
+}
+
+static void test_w29_reference_cycle_code_and_message(void) {
+   TestBit.is_equal_int(24, ANVIL_WRITER_ERR_REFERENCE_CYCLE, "W29: REFERENCE_CYCLE is numbered 24, appended");
+   const char *m = anvil_writer_error_message(ANVIL_WRITER_ERR_REFERENCE_CYCLE);
+   TestBit.is_true(m && strcmp(m, "unknown error") != 0 && strstr(m, "reference") != NULL, "W29: the message says reference");
+}
+
 int main(void) {
    TestBit.run_ex("W01_lifecycle", NULL, test_w01_lifecycle, th);
    TestBit.run_ex("W02_scalars", NULL, test_w02_scalars, th);
@@ -1436,6 +1458,8 @@ int main(void) {
    TestBit.run_ex("W19_nameset_survives_growth", NULL, test_w19_nameset_survives_growth, th);
    TestBit.run_ex("W20_duplicate_fields", NULL, test_w20_duplicate_fields, th);
    TestBit.run_ex("W28_nested_base", NULL, test_w28_nested_base, th);
+   TestBit.run_ex("W29_streaming_writer_does_not_see_reference_cycles", NULL, test_w29_streaming_writer_does_not_see_reference_cycles, th);
+   TestBit.run_ex("W29_reference_cycle_code_and_message", NULL, test_w29_reference_cycle_code_and_message, th);
    TestBit.run_ex("W21_duplicate_attribute_keys", NULL, test_w21_duplicate_attribute_keys, th);
    TestBit.run_ex("W22_keyword_names", NULL, test_w22_keyword_names, th);
    TestBit.run_ex("W23_block_form_output", NULL, test_w23_block_form_output, th);

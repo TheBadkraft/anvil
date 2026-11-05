@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# a := $b; b := { f := $a; };
+option on-error continue
+dialect AML
+let r = varref "b"
+add NULL "a" r
+let o_b = object
+let r_b = varref "a"
+add o_b "f" r_b
+let m_b = add NULL "b" o_b
+emit
+get_error

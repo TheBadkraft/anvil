@@ -1,0 +1,17 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let o_c = object
+let r_c = varref "a"
+add o_c "f" r_c
+let m_c = add NULL "c" o_c
+let o_a = object
+let r_a = varref "b"
+add o_a "f" r_a
+let m_a = add NULL "a" o_a
+let o_b = object
+let r_b = varref "c"
+add o_b "f" r_b
+let m_b = add NULL "b" o_b
+emit
+get_error

@@ -1,0 +1,7 @@
+anvil-builder-script 1
+option on-error continue
+dialect AML
+let r = varref "a"
+add NULL "a" r
+emit
+get_error

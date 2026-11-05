@@ -1,0 +1,10 @@
+anvil-builder-script 1
+# a := [ $a ];
+option on-error continue
+dialect AML
+let a = array
+let r = varref "a"
+append a r
+add NULL "a" a
+emit
+get_error

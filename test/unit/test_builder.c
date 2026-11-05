@@ -1193,6 +1193,302 @@ static void test_b28_nested_member_base(void) {
    anvil_builder_dispose(b);
 }
 
+/* ---------------------------------------------------------------------- *
+ * B29 - BR-2611-anvl-resolver-002: references that do not lead back to a container holding them still emit
+ * ---------------------------------------------------------------------- */
+// A top-level object member `name := { f := $target; };`.
+static anvil_member ref_member(anvil_builder b, const char *name, const char *target) {
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "f", anvil_builder_varref(b, target));
+   return ADD(b, name, o);
+}
+
+static void test_b29_references_that_stay_valid(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "a", anvil_builder_varref(b, "b"));
+   ADD(b, "b", anvil_builder_varref(b, "a"));
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: the plain chain cycle a := $b; b := $a; still emits");
+   anvil_builder_dispose(b);
+
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "a", anvil_builder_varref(b, "a"));
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: a := $a; (an unresolved chain) still emits");
+   anvil_builder_dispose(b);
+
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "n", anvil_builder_int(b, 1));
+   ref_member(b, "a", "n");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: a reference to a scalar");
+   anvil_builder_dispose(b);
+
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   obj_member(b, "t");
+   ref_member(b, "a", "t");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: a reference to an object that has no way back");
+   anvil_builder_dispose(b);
+
+   // an inherited field replaced by the deriving member's own is not walked
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "a", "b");
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "f", anvil_builder_int(b, 1));
+   anvil_member bm = ADD(b, "b", o);
+   anvil_builder_set_base(b, bm, "a");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: an override replaces the inherited reference");
+   anvil_builder_dispose(b);
+
+   // a reference to a name the builder does not hold may be supplied by an include
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder_include(b, "x.anvl");
+   ref_member(b, "a", "from_the_include");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B29: a reference to a name an include may supply");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B30 - BR-2611-anvl-resolver-002: a reference that leads back to a container holding it is refused at
+ * write/emit with ANVIL_WRITER_ERR_REFERENCE_CYCLE, as a base cycle is; set_block and add themselves accept it
+ * ---------------------------------------------------------------------- */
+static void test_b30_self_references_are_refused(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_REFERENCE_CYCLE;
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "s1", "s1");
+   expect_emit_error(b, code, "B30: s1 := { f := $s1; };");
+   anvil_builder_dispose(b);
+
+   // nested deeper: s1 := { a := { b := $s1; }; };
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node inner = anvil_builder_object(b);
+   anvil_builder_add(b, inner, "b", anvil_builder_varref(b, "s1"));
+   anvil_node outer = anvil_builder_object(b);
+   anvil_builder_add(b, outer, "a", inner);
+   ADD(b, "s1", outer);
+   expect_emit_error(b, code, "B30: a reference two objects down");
+   anvil_builder_dispose(b);
+
+   // an array, then a tuple, holding a reference to the statement that holds them
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node arr = anvil_builder_array(b);
+   anvil_builder_append(b, arr, anvil_builder_varref(b, "a"));
+   ADD(b, "a", arr);
+   expect_emit_error(b, code, "B30: a := [ $a ];");
+   anvil_builder_dispose(b);
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_node tup = anvil_builder_tuple(b);
+   anvil_builder_append(b, tup, anvil_builder_int(b, 1));
+   anvil_builder_append(b, tup, anvil_builder_varref(b, "a"));
+   ADD(b, "a", tup);
+   expect_emit_error(b, code, "B30: a := ( 1, $a );");
+   anvil_builder_dispose(b);
+
+   // block form
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_member blk = ref_member(b, "a", "a");
+   anvil_builder_set_block(b, blk, true);
+   expect_emit_error(b, code, "B30: a { f := $a; };");
+   anvil_builder_dispose(b);
+
+   // an include does not excuse a cycle among the members the builder holds
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   anvil_builder_include(b, "x.anvl");
+   ref_member(b, "s", "s");
+   expect_emit_error(b, code, "B30: a cycle with an include");
+   anvil_builder_dispose(b);
+}
+
+static void test_b30_references_between_members_are_refused(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_REFERENCE_CYCLE;
+   anvil_builder b;
+   // two members that refer to each other, in either order of adding, and a ring of three
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "a", "b");
+   ref_member(b, "b", "a");
+   expect_emit_error(b, code, "B30: a := { f := $b; }; b := { f := $a; };");
+   anvil_builder_dispose(b);
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "c", "a");
+   ref_member(b, "a", "b");
+   ref_member(b, "b", "c");
+   expect_emit_error(b, code, "B30: a ring of three");
+   anvil_builder_dispose(b);
+
+   // a chain of references that ends in a container holding a reference to the chain's start
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "a", anvil_builder_varref(b, "b"));
+   ref_member(b, "b", "a");
+   expect_emit_error(b, code, "B30: a := $b; b := { f := $a; };");
+   anvil_builder_dispose(b);
+
+   // the base checks come first
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "a", "a");
+   anvil_member c = obj_member(b, "c");
+   anvil_builder_set_base(b, c, "nowhere");
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B30: refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_MISSING_BASE, anvil_builder_get_error(b), "B30: a missing base is reported before a reference cycle");
+   anvil_builder_dispose(b);
+}
+
+static void test_b30_inherited_references_are_refused(void) {
+   const anvil_writer_err_code code = ANVIL_WRITER_ERR_REFERENCE_CYCLE;
+   anvil_builder b;
+   // closed through inheritance: a := { f := $b; }; b : a := { g := 1; };
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "a", "b");
+   anvil_node o = anvil_builder_object(b);
+   anvil_builder_add(b, o, "g", anvil_builder_int(b, 1));
+   anvil_member bm = ADD(b, "b", o);
+   anvil_builder_set_base(b, bm, "a");
+   expect_emit_error(b, code, "B30: the inherited field refers to the deriving statement");
+   anvil_builder_dispose(b);
+
+   // ... through a longer base chain, and through a member that only inherits the reference
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   ref_member(b, "a", "c");
+   anvil_node o2 = anvil_builder_object(b);
+   anvil_builder_add(b, o2, "g", anvil_builder_int(b, 1));
+   anvil_member b2 = ADD(b, "b", o2);
+   anvil_builder_set_base(b, b2, "a");
+   anvil_node o3 = anvil_builder_object(b);
+   anvil_builder_add(b, o3, "h", anvil_builder_varref(b, "b"));
+   ADD(b, "c", o3);
+   expect_emit_error(b, code, "B30: b inherits a reference to c, c refers to b");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B31 - the reference check is linear: a ring of 100000 members, a chain, a ladder of two references per member
+ * and one member with 100000 fields, none of them recursing
+ * ---------------------------------------------------------------------- */
+// n top-level members m0..m(n-1) of one array each; member i refers to m(i+1), and the last to m0 when `ring`.
+static anvil_builder ref_chain_builder(size_t n, bool ring, bool ladder) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   char name[32], target[32];
+   for (size_t i = 0; i < n; i++) {
+      snprintf(name, sizeof name, "m%zu", i);
+      anvil_node arr = anvil_builder_array(b);
+      if (i + 1 < n || ring) {
+         snprintf(target, sizeof target, "m%zu", (i + 1) % n);
+         anvil_builder_append(b, arr, anvil_builder_varref(b, target));
+      }
+      if (ladder && (i + 2 < n || ring)) {
+         snprintf(target, sizeof target, "m%zu", (i + 2) % n);
+         anvil_builder_append(b, arr, anvil_builder_varref(b, target));
+      }
+      if (i + 1 >= n && !ring) {
+         anvil_builder_append(b, arr, anvil_builder_int(b, 1));
+      }
+      ADD(b, name, arr);
+   }
+   return b;
+}
+
+static void test_b31_reference_checks_are_linear(void) {
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   anvil_builder b = ref_chain_builder(100000, false, false);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B31: a 100000-member chain of references emits");
+   TestBit.is_true(seconds_since(&t0) < 10.0, "B31: ... in well under 10 s");
+   anvil_builder_dispose(b);
+
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   b = ref_chain_builder(100000, true, false);
+   TestBit.is_null(anvil_builder_emit(b, NULL), "B31: a 100000-member ring of references is refused");
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_REFERENCE_CYCLE, anvil_builder_get_error(b), "B31: the ring is a reference cycle");
+   TestBit.is_true(seconds_since(&t0) < 10.0, "B31: ... in well under 10 s");
+   anvil_builder_dispose(b);
+
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   b = ref_chain_builder(100000, false, true);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B31: a ladder (two references per member, 2^n paths) emits");
+   TestBit.is_true(seconds_since(&t0) < 10.0, "B31: ... in well under 10 s");
+   anvil_builder_dispose(b);
+
+   // one hub with 100000 fields, each a reference to the same object
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   b = anvil_builder_new(ANVIL_WRITER_AML);
+   obj_member(b, "t");
+   anvil_node hub = anvil_builder_object(b);
+   char name[32];
+   for (size_t i = 0; i < 100000; i++) {
+      snprintf(name, sizeof name, "f%zu", i);
+      anvil_builder_add(b, hub, name, anvil_builder_varref(b, "t"));
+   }
+   ADD(b, "hub", hub);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B31: a hub of 100000 references to one object emits");
+   TestBit.is_true(seconds_since(&t0) < 10.0, "B31: ... in well under 10 s");
+   anvil_builder_dispose(b);
+}
+
+/* ---------------------------------------------------------------------- *
+ * B32 - BR-2611-anvl-resolver-002 (F1): a base field inherited by many members is walked once, not once per deriving
+ * member: 4x the members and 4x the field cost about 4x the time (linear), not 16x
+ * ---------------------------------------------------------------------- */
+static double inherit_seconds(size_t m, bool nested) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   char name[32];
+   anvil_node big = nested ? anvil_builder_object(b) : anvil_builder_array(b);
+   for (size_t i = 0; i < m; i++) {
+      if (nested) {
+         snprintf(name, sizeof name, "f%zu", i);
+         anvil_builder_add(b, big, name, anvil_builder_int(b, 1));
+      } else {
+         anvil_builder_append(b, big, anvil_builder_int(b, 1));
+      }
+   }
+   anvil_node base = anvil_builder_object(b);
+   anvil_builder_add(b, base, "big", big);
+   ADD(b, "base", base);
+   for (size_t i = 0; i < m; i++) {
+      snprintf(name, sizeof name, "d%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "x", anvil_builder_int(b, 1));
+      anvil_builder_set_base(b, ADD(b, name, o), "base");
+   }
+   ADD(b, "t", anvil_builder_int(b, 1));
+   ADD(b, "r", anvil_builder_varref(b, "t"));
+   struct timespec t0;
+   clock_gettime(CLOCK_MONOTONIC, &t0);
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B32: the document emits");
+   double s = seconds_since(&t0);
+   anvil_builder_dispose(b);
+   return s;
+}
+
+static void test_b32_inherited_subtrees_are_scanned_once(void) {
+   for (int nested = 0; nested < 2; nested++) {
+      double small = inherit_seconds(4000, nested), big = inherit_seconds(16000, nested);
+      TestBit.is_true(big < 9.0 * (small > 0.01 ? small : 0.01), nested ? "B32: 4x the work costs less than 9x (object)" : "B32: 4x the work costs less than 9x (array)");
+   }
+}
+
+/* B33 - F5: a base field holding m references inherited by n members: the edges are O(n + m), not n * m */
+extern _Thread_local size_t anvil_builder_last_ref_edges;
+
+static void test_b33_inherited_references_are_not_copied(void) {
+   size_t m = 3000, n = 3000;
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   char name[32];
+   ADD(b, "t", anvil_builder_int(b, 1));
+   anvil_node arr = anvil_builder_array(b);
+   for (size_t i = 0; i < m; i++) {
+      anvil_builder_append(b, arr, anvil_builder_varref(b, "t"));
+   }
+   anvil_node base = anvil_builder_object(b);
+   anvil_builder_add(b, base, "a", arr);
+   ADD(b, "base", base);
+   for (size_t i = 0; i < n; i++) {
+      snprintf(name, sizeof name, "d%zu", i);
+      anvil_node o = anvil_builder_object(b);
+      anvil_builder_add(b, o, "x", anvil_builder_int(b, 1));
+      anvil_builder_set_base(b, ADD(b, name, o), "base");
+   }
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B33: the document emits");
+   TestBit.is_true(anvil_builder_last_ref_edges > 0, "B33: the check ran and counted its edges");
+   TestBit.is_true(anvil_builder_last_ref_edges <= 3 * (m + n) + 16, "B33: the edges are O(n + m), not n * m");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -1220,5 +1516,12 @@ int main(void) {
    TestBit.run_ex("B28_nested_member_base", NULL, test_b28_nested_member_base, th);
    TestBit.run_ex("B24_a_block_form_member_cannot_be_a_base", NULL, test_b24_a_block_form_member_cannot_be_a_base, th);
    TestBit.run_ex("B25_block_form_in_a_chain_and_a_cycle", NULL, test_b25_block_form_in_a_chain_and_a_cycle, th);
+   TestBit.run_ex("B29_references_that_stay_valid", NULL, test_b29_references_that_stay_valid, th);
+   TestBit.run_ex("B30_self_references_are_refused", NULL, test_b30_self_references_are_refused, th);
+   TestBit.run_ex("B30_references_between_members_are_refused", NULL, test_b30_references_between_members_are_refused, th);
+   TestBit.run_ex("B30_inherited_references_are_refused", NULL, test_b30_inherited_references_are_refused, th);
+   TestBit.run_ex("B31_reference_checks_are_linear", NULL, test_b31_reference_checks_are_linear, th);
+   TestBit.run_ex("B33_inherited_references_are_not_copied", NULL, test_b33_inherited_references_are_not_copied, th);
+   TestBit.run_ex("B32_inherited_subtrees_are_scanned_once", NULL, test_b32_inherited_subtrees_are_scanned_once, th);
    return TestBit.report();
 }

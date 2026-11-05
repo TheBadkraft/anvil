@@ -1,0 +1,2 @@
+include "ok_child.anvl";
+use := { x := $t; };

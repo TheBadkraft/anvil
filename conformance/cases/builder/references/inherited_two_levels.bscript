@@ -1,0 +1,19 @@
+anvil-builder-script 1
+# b inherits a reference to c, c refers to b
+option on-error continue
+dialect AML
+let o_a = object
+let r_a = varref "c"
+add o_a "f" r_a
+let m_a = add NULL "a" o_a
+let o_b = object
+let x_b = int 2
+add o_b "g" x_b
+let m_b = add NULL "b" o_b
+set_base m_b "a"
+let o_c = object
+let r_c = varref "b"
+add o_c "h" r_c
+let m_c = add NULL "c" o_c
+emit
+get_error

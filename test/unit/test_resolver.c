@@ -528,6 +528,39 @@ static void test_rsv14_inheritance_cycle_rejected(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * RSV15 — BR-2611-anvl-resolver-002: a reference that leads back to a
+ * container holding it is a hard error, unlike a plain VarRef chain cycle
+ * ---------------------------------------------------------------------- */
+static void test_rsv15_reference_cycle_rejected(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "a := { x := $b; };\n"
+                                       "b := { y := $a; };\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV15: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV15: body parses");
+
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   anvl_result res = mod_resolve_context(ctx, &err_code);
+   TestBit.is_equal_int(ANVL_RES_ERR, res, "RSV15: resolve returns ERR");
+   TestBit.is_equal_int(ANVL_ERR_RESOLVER_REFERENCE_CYCLE, err_code,
+                        "RSV15: err_code reports REFERENCE_CYCLE");
+   TestBit.is_true(List.size(ctx->errors) > 0, "RSV15: the error is recorded");
+   if (List.size(ctx->errors) > 0) {
+      anvl_error e = anvl_error_get(ctx->errors, 0);
+      TestBit.is_equal_int(ANVL_ERR_RESOLVER_REFERENCE_CYCLE, e ? (long long)e->code : -1,
+                           "RSV15: the recorded code");
+      TestBit.is_equal_int(2, e ? (long long)e->line : -1, "RSV15: the first reference, line 2 (after the shebang)");
+      TestBit.is_equal_int(13, e ? (long long)e->column : -1, "RSV15: column 13");
+   }
+
+   mod_ctx_dispose(ctx);
+}
+
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -555,6 +588,8 @@ int main(void) {
                   test_rsv13_object_block_derived_merges, th);
    TestBit.run_ex("RSV14_inheritance_cycle_rejected", NULL,
                   test_rsv14_inheritance_cycle_rejected, th);
+
+   TestBit.run_ex("RSV15_reference_cycle_rejected", NULL, test_rsv15_reference_cycle_rejected, th);
 
    return TestBit.report();
 }

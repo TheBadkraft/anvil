@@ -1,0 +1,2 @@
+base := { r := $leaf; };
+leaf : base := { q := 1; };

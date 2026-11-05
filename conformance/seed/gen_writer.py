@@ -35,7 +35,7 @@ ERRS = ["OK", "INVALID_ARGUMENT", "MEMORY", "STATE", "DIALECT", "INVALID_IDENTIF
         "INVALID_NUMERIC", "INVALID_BARE", "INVALID_BLOB", "INVALID_ATTRIBUTE_VALUE", "INVALID_INCLUDE_PATH",
         "EMPTY_COLLECTION", "INHERITANCE_REQUIRES_OBJECT", "UNFINISHED", "DUPLICATE_NAME", "DEPTH_EXCEEDED",
         "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY", "INHERITANCE_CYCLE", "MISSING_BASE", "BLOCK_REQUIRES_OBJECT",
-        "BASE_IS_BLOCK_FORM", "NESTED_BASE"]
+        "BASE_IS_BLOCK_FORM", "NESTED_BASE", "REFERENCE_CYCLE"]
 def ename(i): return "ANVIL_WRITER_OK" if i == 0 else "ANVIL_WRITER_ERR_" + ERRS[i]
 src = open(os.path.join(root, "src", "writer", "writer.c")).read()
 MSG = {}
@@ -645,6 +645,11 @@ doc(F, "in_object", "AML", [S1("a", Int(1)), S1("o", Obj(S1("x", Ref("a"))))])
 doc(F, "to_object", "AML", [S1("a", Obj(S1("x", Int(1)))), S1("b", Ref("a"))])
 doc(F, "forward", "AML", [S1("b", Ref("a")), S1("a", Int(1))], desc="the reference may precede the definition")
 doc(F, "underscore_name", "AML", [S1("_v", Int(1)), S1("b", Ref("_v"))])
+# BR-2611-anvl-resolver-002: the streaming writer holds no document, so it cannot see a reference that leads back to a
+# container holding it (the reader refuses these with 4054); only the builder refuses them. It writes them as it writes a base cycle.
+doc(F, "leads_back_self", "AML", [S1("s1", Obj(S1("a", Ref("s1"))))], desc="s1 := { a := $s1; }; is written: only the reader and the builder refuse it")
+doc(F, "leads_back_mutual", "AML", [S1("a", Obj(S1("x", Ref("b")))), S1("b", Obj(S1("y", Ref("a"))))], desc="two statements that refer to each other are written")
+doc(F, "leads_back_array", "AML", [S1("a", Arr(Ref("a")))])
 for i, n in enumerate(["", "1a", "a-b", "a.b", "a b", "$a", "@a", "caf\u00e9", "a\n"]):
     err(F, "bad_name_%02d" % i, "AML", ['statement "b" NULL', "varref %s" % q(n)], E("INVALID_IDENTIFIER"), desc="name %s" % dq(n))
 for w in ("true", "false", "null", "include", "import", "vars"):

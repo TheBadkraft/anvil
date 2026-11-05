@@ -1,0 +1,57 @@
+anvil-dump 2
+mode document
+input-bytes 262
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=262
+  stmt kind=ASSIGN name="x0" name-span=0-2 base="" base-span=none attrs=0
+    value type=ARRAY span=6-18 text="[ $x1, $x1 ]" count=2
+      value type=VARREF span=8-11 text="$x1" target="x1" public=ARRAY resolved=1 resolved-doc=0 resolved-span=26-38
+      value type=VARREF span=13-16 text="$x1" target="x1" public=ARRAY resolved=1 resolved-doc=0 resolved-span=26-38
+  stmt kind=ASSIGN name="x1" name-span=20-22 base="" base-span=none attrs=0
+    value type=ARRAY span=26-38 text="[ $x2, $x2 ]" count=2
+      value type=VARREF span=28-31 text="$x2" target="x2" public=ARRAY resolved=1 resolved-doc=0 resolved-span=46-58
+      value type=VARREF span=33-36 text="$x2" target="x2" public=ARRAY resolved=1 resolved-doc=0 resolved-span=46-58
+  stmt kind=ASSIGN name="x2" name-span=40-42 base="" base-span=none attrs=0
+    value type=ARRAY span=46-58 text="[ $x3, $x3 ]" count=2
+      value type=VARREF span=48-51 text="$x3" target="x3" public=ARRAY resolved=1 resolved-doc=0 resolved-span=66-78
+      value type=VARREF span=53-56 text="$x3" target="x3" public=ARRAY resolved=1 resolved-doc=0 resolved-span=66-78
+  stmt kind=ASSIGN name="x3" name-span=60-62 base="" base-span=none attrs=0
+    value type=ARRAY span=66-78 text="[ $x4, $x4 ]" count=2
+      value type=VARREF span=68-71 text="$x4" target="x4" public=ARRAY resolved=1 resolved-doc=0 resolved-span=86-98
+      value type=VARREF span=73-76 text="$x4" target="x4" public=ARRAY resolved=1 resolved-doc=0 resolved-span=86-98
+  stmt kind=ASSIGN name="x4" name-span=80-82 base="" base-span=none attrs=0
+    value type=ARRAY span=86-98 text="[ $x5, $x5 ]" count=2
+      value type=VARREF span=88-91 text="$x5" target="x5" public=ARRAY resolved=1 resolved-doc=0 resolved-span=106-118
+      value type=VARREF span=93-96 text="$x5" target="x5" public=ARRAY resolved=1 resolved-doc=0 resolved-span=106-118
+  stmt kind=ASSIGN name="x5" name-span=100-102 base="" base-span=none attrs=0
+    value type=ARRAY span=106-118 text="[ $x6, $x6 ]" count=2
+      value type=VARREF span=108-111 text="$x6" target="x6" public=ARRAY resolved=1 resolved-doc=0 resolved-span=126-138
+      value type=VARREF span=113-116 text="$x6" target="x6" public=ARRAY resolved=1 resolved-doc=0 resolved-span=126-138
+  stmt kind=ASSIGN name="x6" name-span=120-122 base="" base-span=none attrs=0
+    value type=ARRAY span=126-138 text="[ $x7, $x7 ]" count=2
+      value type=VARREF span=128-131 text="$x7" target="x7" public=ARRAY resolved=1 resolved-doc=0 resolved-span=146-158
+      value type=VARREF span=133-136 text="$x7" target="x7" public=ARRAY resolved=1 resolved-doc=0 resolved-span=146-158
+  stmt kind=ASSIGN name="x7" name-span=140-142 base="" base-span=none attrs=0
+    value type=ARRAY span=146-158 text="[ $x8, $x8 ]" count=2
+      value type=VARREF span=148-151 text="$x8" target="x8" public=ARRAY resolved=1 resolved-doc=0 resolved-span=166-178
+      value type=VARREF span=153-156 text="$x8" target="x8" public=ARRAY resolved=1 resolved-doc=0 resolved-span=166-178
+  stmt kind=ASSIGN name="x8" name-span=160-162 base="" base-span=none attrs=0
+    value type=ARRAY span=166-178 text="[ $x9, $x9 ]" count=2
+      value type=VARREF span=168-171 text="$x9" target="x9" public=ARRAY resolved=1 resolved-doc=0 resolved-span=186-200
+      value type=VARREF span=173-176 text="$x9" target="x9" public=ARRAY resolved=1 resolved-doc=0 resolved-span=186-200
+  stmt kind=ASSIGN name="x9" name-span=180-182 base="" base-span=none attrs=0
+    value type=ARRAY span=186-200 text="[ $x10, $x10 ]" count=2
+      value type=VARREF span=188-192 text="$x10" target="x10" public=ARRAY resolved=1 resolved-doc=0 resolved-span=209-223
+      value type=VARREF span=194-198 text="$x10" target="x10" public=ARRAY resolved=1 resolved-doc=0 resolved-span=209-223
+  stmt kind=ASSIGN name="x10" name-span=202-205 base="" base-span=none attrs=0
+    value type=ARRAY span=209-223 text="[ $x11, $x11 ]" count=2
+      value type=VARREF span=211-215 text="$x11" target="x11" public=ARRAY resolved=1 resolved-doc=0 resolved-span=232-246
+      value type=VARREF span=217-221 text="$x11" target="x11" public=ARRAY resolved=1 resolved-doc=0 resolved-span=232-246
+  stmt kind=ASSIGN name="x11" name-span=225-228 base="" base-span=none attrs=0
+    value type=ARRAY span=232-246 text="[ $x12, $x12 ]" count=2
+      value type=VARREF span=234-238 text="$x12" target="x12" public=ARRAY resolved=1 resolved-doc=0 resolved-span=255-260
+      value type=VARREF span=240-244 text="$x12" target="x12" public=ARRAY resolved=1 resolved-doc=0 resolved-span=255-260
+  stmt kind=ASSIGN name="x12" name-span=248-251 base="" base-span=none attrs=0
+    value type=ARRAY span=255-260 text="[ 1 ]" count=1
+      value type=NUMERIC span=257-258 text="1" kind=integer overflow=0 i64=1

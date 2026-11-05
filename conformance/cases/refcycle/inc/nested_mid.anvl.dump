@@ -1,0 +1,14 @@
+anvil-dump 2
+mode document
+input-bytes 36
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=36
+  include decl-span=0-26 decl="include \"nested_tail.anvl\"" path-span=8-26 path="\"nested_tail.anvl\"" resolved=1
+  stmt kind=ASSIGN name="m" name-span=28-29 base="" base-span=none attrs=0
+    value type=NUMERIC span=33-34 text="1" kind=integer overflow=0 i64=1
+doc 1 path="nested_tail.anvl" dialect=AML bytes=22
+  stmt kind=ASSIGN name="tail" name-span=0-4 base="" base-span=none attrs=0
+    value type=OBJECT span=8-20 text="{ y := $r; }" count=1
+      stmt kind=ASSIGN name="y" name-span=10-11 base="" base-span=none attrs=0
+        value type=VARREF span=15-17 text="$r" target="r" public=NULL resolved=0

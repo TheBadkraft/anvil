@@ -71,6 +71,7 @@ typedef enum {
    ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT,       // a block-form statement (name { ... };) must have an object value
    ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM,          // a statement's base is a block-form statement, which is read-only and cannot be a base (the reader's 4052)
    ANVIL_WRITER_ERR_NESTED_BASE,                 // a base on a statement inside an object: only a top-level statement may have one (the reader's 4022)
+   ANVIL_WRITER_ERR_REFERENCE_CYCLE,             // the builder's '$' references lead back to a container that holds them (s := { a := $s; };); the reader's 4054. The streaming writer cannot see it.
 } anvil_writer_err_code;
 
 #ifdef __cplusplus

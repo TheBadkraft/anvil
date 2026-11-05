@@ -108,6 +108,11 @@ typedef enum {
    // same name — ambiguous for both '$identifier' VarRef and 'base' lookup purposes, so this
    // is a hard error regardless of where the collision originates. See notes/resolution-phase.md.
    ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER = 4053,
+   // A '$' reference leads back to a container that holds it: `s1 := { a := $s1; };`, `a := [ $a ];`, two
+   // statements that refer to each other, a cycle closed through an inherited field. Reported at the '$' of the
+   // first reference on a cycle in source order (documents in load order). A plain chain cycle
+   // (`a := $b; b := $a;`) is not this error: it stays unresolved.
+   ANVL_ERR_RESOLVER_REFERENCE_CYCLE = 4054,
 
    // Vars Errors (41xx)
    ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101,

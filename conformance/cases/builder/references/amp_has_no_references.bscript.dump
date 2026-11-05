@@ -1,0 +1,6 @@
+anvil-builder-run 1
+failed line=5 code=4 name=ANVIL_WRITER_ERR_DIALECT call="let r = varref \"a\"" message="construct is forbidden in this dialect"
+failed line=6 code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT call="append a r" message="invalid argument"
+get_error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT
+steps 6
+status error code=1 name=ANVIL_WRITER_ERR_INVALID_ARGUMENT

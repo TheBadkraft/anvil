@@ -1,0 +1,34 @@
+anvil-dump 2
+mode document
+input-bytes 106
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=106
+  stmt kind=ASSIGN name="base" name-span=0-4 base="" base-span=none attrs=0
+    value type=OBJECT span=8-26 text="{ v := [ 1, 2 ]; }" count=1
+      stmt kind=ASSIGN name="v" name-span=10-11 base="" base-span=none attrs=0
+        value type=ARRAY span=15-23 text="[ 1, 2 ]" count=2
+          value type=NUMERIC span=17-18 text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC span=20-21 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="a" name-span=28-29 base="base" base-span=32-36 attrs=0
+    value type=OBJECT span=40-51 text="{ p := 1; }" count=2
+      stmt kind=ASSIGN name="p" name-span=42-43 base="" base-span=none attrs=0
+        value type=NUMERIC span=47-48 text="1" kind=integer overflow=0 i64=1
+      stmt kind=ASSIGN name="v" name-span=10-11 base="" base-span=none attrs=0
+        value type=ARRAY span=15-23 text="[ 1, 2 ]" count=2
+          value type=NUMERIC span=17-18 text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC span=20-21 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="b" name-span=53-54 base="base" base-span=57-61 attrs=0
+    value type=OBJECT span=65-76 text="{ q := 2; }" count=2
+      stmt kind=ASSIGN name="q" name-span=67-68 base="" base-span=none attrs=0
+        value type=NUMERIC span=72-73 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="v" name-span=10-11 base="" base-span=none attrs=0
+        value type=ARRAY span=15-23 text="[ 1, 2 ]" count=2
+          value type=NUMERIC span=17-18 text="1" kind=integer overflow=0 i64=1
+          value type=NUMERIC span=20-21 text="2" kind=integer overflow=0 i64=2
+  stmt kind=ASSIGN name="c" name-span=78-79 base="" base-span=none attrs=0
+    value type=OBJECT span=83-104 text="{ x := $a; y := $b; }" count=2
+      stmt kind=ASSIGN name="x" name-span=85-86 base="" base-span=none attrs=0
+        value type=VARREF span=90-92 text="$a" target="a" public=OBJECT resolved=1 resolved-doc=0 resolved-span=40-51
+      stmt kind=ASSIGN name="y" name-span=94-95 base="" base-span=none attrs=0
+        value type=VARREF span=99-101 text="$b" target="b" public=OBJECT resolved=1 resolved-doc=0 resolved-span=65-76

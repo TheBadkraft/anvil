@@ -124,6 +124,8 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "a base cannot be a block-form statement (it is read-only)";
    case ANVIL_WRITER_ERR_NESTED_BASE:
       return "only a top-level statement can have a base";
+   case ANVIL_WRITER_ERR_REFERENCE_CYCLE:
+      return "reference cycle: a '$' reference leads back to a value that contains it";
    }
    return "unknown error";
 }

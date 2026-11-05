@@ -15,7 +15,8 @@ while [ $r -lt $rounds ]; do
    r=$((r+1))
 done
 first=${1%%=*}
-for w in parse_floats parse_ints parse_mixed validate_floats validate_small; do
+# the workloads, in the order the first binary printed them
+for w in $(awk '{print $1}' "$out/$first.txt" | awk '!seen[$0]++'); do
    base=$(grep "^$w " "$out/$first.txt" | awk '{print $2}' | sort -n | awk '{a[NR]=$1} END{print a[int((NR+1)/2)]}')
    line=$(printf '%-16s' "$w")
    for spec in "$@"; do

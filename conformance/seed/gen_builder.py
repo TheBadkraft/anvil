@@ -703,6 +703,43 @@ case(FW, "flags_and_modules", ['attribute "module" "flywire.core"', 'attribute "
      let("v", 'string "1.2.3"'), let("m", 'add NULL "version" v'), 'member_attribute m "frozen" NULL', 'member_attribute m "since" "1.0"', "emit"])
 case(FW, "invalid_doc_dup_table", fw_schema() + [let("dup", "int 1"), 'add NULL "orders" dup', "get_error", "emit"], cont=True)
 
+# ============================================================================================ references
+# BR-2611-anvl-resolver-002: a '$' reference that leads back to a container holding it is refused at emit and write
+# with ANVIL_WRITER_ERR_REFERENCE_CYCLE (24), as the reader refuses it with 4054. The builder holds the top-level
+# members only; a name it does not hold may come from an include.
+RF = "references"
+def ref_obj(name, target, field="f", h=None):
+    """a top-level member `name := { field := $target; };`"""
+    h = h or "o_" + name
+    return [let(h, "object"), let("r_" + name, 'varref %s' % q(target)), 'add %s %s r_%s' % (h, q(field), name), let("m_" + name, 'add NULL %s %s' % (q(name), h))]
+def scalar_obj(name, field="f", value=1, h=None):
+    h = h or "o_" + name
+    return [let(h, "object"), let("x_" + name, "int %d" % value), 'add %s %s x_%s' % (h, q(field), name), let("m_" + name, 'add NULL %s %s' % (q(name), h))]
+case(RF, "self", ref_obj("s1", "s1") + ["emit", "get_error"], cont=True, desc="s1 := { f := $s1; };")
+case(RF, "self_write", ref_obj("s1", "s1") + ["write", "get_error"], cont=True, desc="write refuses it too")
+case(RF, "self_deeper", [let("inner", "object"), let("r", 'varref "s1"'), 'add inner "b" r', let("outer", "object"), 'add outer "a" inner', 'add NULL "s1" outer', "emit", "get_error"], cont=True, desc="s1 := { a := { b := $s1; }; };")
+case(RF, "self_array", [let("a", "array"), let("r", 'varref "a"'), "append a r", 'add NULL "a" a', "emit", "get_error"], cont=True, desc="a := [ $a ];")
+case(RF, "self_tuple", [let("a", "tuple"), let("x", "int 1"), let("r", 'varref "a"'), "append a x", "append a r", 'add NULL "a" a', "emit", "get_error"], cont=True)
+case(RF, "self_block_form", ref_obj("a", "a") + ['set_block m_a true', "emit", "get_error"], cont=True, desc="a { f := $a; };")
+case(RF, "mutual", ref_obj("a", "b") + ref_obj("b", "a") + ["emit", "get_error"], cont=True, desc="a := { f := $b; }; b := { f := $a; };")
+case(RF, "mutual_write", ref_obj("a", "b") + ref_obj("b", "a") + ["write", "get_error"], cont=True)
+case(RF, "ring_three", ref_obj("c", "a") + ref_obj("a", "b") + ref_obj("b", "c") + ["emit", "get_error"], cont=True)
+case(RF, "through_chain", [let("r", 'varref "b"'), 'add NULL "a" r'] + ref_obj("b", "a") + ["emit", "get_error"], cont=True, desc="a := $b; b := { f := $a; };")
+case(RF, "inherited_field", ref_obj("a", "b") + scalar_obj("b", "g", 2) + ['set_base m_b "a"', "emit", "get_error"], cont=True, desc="a := { f := $b; }; b : a := { g := 2; };")
+case(RF, "inherited_two_levels", ref_obj("a", "c") + scalar_obj("b", "g", 2) + ['set_base m_b "a"'] + ref_obj("c", "b", "h") + ["emit", "get_error"], cont=True, desc="b inherits a reference to c, c refers to b")
+case(RF, "inherited_override_ok", ref_obj("a", "b") + scalar_obj("b", "f", 2) + ['set_base m_b "a"', "emit", "get_error"], cont=True, desc="b overrides f, so a's reference is not walked from b")
+case(RF, "with_include_still_refused", ['include "x.anvl"'] + ref_obj("s", "s") + ["emit", "get_error"], cont=True)
+case(RF, "unknown_name_ok", ['include "x.anvl"'] + ref_obj("a", "from_the_include") + ["emit", "get_error"], cont=True, desc="a name the builder does not hold may be supplied by an include")
+case(RF, "chain_cycle_ok", [let("r1", 'varref "b"'), 'add NULL "a" r1', let("r2", 'varref "a"'), 'add NULL "b" r2', "emit", "get_error"], cont=True, desc="a := $b; b := $a; stays valid: unresolved, no container")
+case(RF, "self_chain_ok", [let("r", 'varref "a"'), 'add NULL "a" r', "emit", "get_error"], cont=True)
+case(RF, "scalar_target_ok", [let("n", "int 1"), 'add NULL "n" n'] + ref_obj("a", "n") + ["emit", "get_error"], cont=True)
+case(RF, "no_way_back_ok", scalar_obj("t", "v", 1) + ref_obj("a", "t") + ["emit", "get_error"], cont=True)
+case(RF, "diamond_ok", scalar_obj("base", "v", 1) + scalar_obj("a", "p", 2) + ['set_base m_a "base"'] + scalar_obj("b", "q", 3) + ['set_base m_b "base"'] +
+     [let("c", "object"), let("ra", 'varref "a"'), let("rb", 'varref "b"'), 'add c "x" ra', 'add c "y" rb', 'add NULL "c" c', "emit", "get_error"], cont=True, desc="two members share an inherited field: a diamond, not a cycle")
+case(RF, "base_error_first", ref_obj("a", "a") + scalar_obj("c", "f", 1) + ['set_base m_c "nowhere"', "emit", "get_error"], cont=True, desc="the base checks come before the reference check")
+case(RF, "amp_has_no_references", [let("a", "array"), let("r", 'varref "a"'), "append a r", "get_error"], "AMP", cont=True)
+case(RF, "refusal_repeats", ref_obj("a", "b") + ref_obj("b", "a") + ["emit", "get_error", "emit", "get_error"], cont=True, desc="the refusal repeats; the builder is unchanged")
+
 # ---- write ------------------------------------------------------------------------------------------------------------
 os.makedirs(out_dir, exist_ok=True)
 seen = set()

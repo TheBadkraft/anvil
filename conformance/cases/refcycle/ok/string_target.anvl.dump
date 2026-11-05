@@ -1,0 +1,12 @@
+anvil-dump 2
+mode document
+input-bytes 30
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=30
+  stmt kind=ASSIGN name="s" name-span=0-1 base="" base-span=none attrs=0
+    value type=STRING span=6-10 text="text" decoded="text"
+  stmt kind=ASSIGN name="a" name-span=13-14 base="" base-span=none attrs=0
+    value type=ARRAY span=18-28 text="[ $s, $s ]" count=2
+      value type=VARREF span=20-22 text="$s" target="s" public=STRING resolved=1 resolved-doc=0 resolved-span=6-10
+      value type=VARREF span=24-26 text="$s" target="s" public=STRING resolved=1 resolved-doc=0 resolved-span=6-10

@@ -1,0 +1,28 @@
+anvil-dump 2
+mode document
+input-bytes 82
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=82
+  stmt kind=ASSIGN name="t" name-span=0-1 base="" base-span=none attrs=0
+    value type=OBJECT span=5-16 text="{ v := 1; }" count=1
+      stmt kind=ASSIGN name="v" name-span=7-8 base="" base-span=none attrs=0
+        value type=NUMERIC span=12-13 text="1" kind=integer overflow=0 i64=1
+  stmt kind=ASSIGN name="a" name-span=18-19 base="" base-span=none attrs=0
+    value type=OBJECT span=23-35 text="{ x := $t; }" count=1
+      stmt kind=ASSIGN name="x" name-span=25-26 base="" base-span=none attrs=0
+        value type=VARREF span=30-32 text="$t" target="t" public=OBJECT resolved=1 resolved-doc=0 resolved-span=5-16
+  stmt kind=ASSIGN name="b" name-span=37-38 base="a" base-span=41-42 attrs=0
+    value type=OBJECT span=46-57 text="{ y := 2; }" count=2
+      stmt kind=ASSIGN name="y" name-span=48-49 base="" base-span=none attrs=0
+        value type=NUMERIC span=53-54 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="x" name-span=25-26 base="" base-span=none attrs=0
+        value type=VARREF span=30-32 text="$t" target="t" public=OBJECT resolved=1 resolved-doc=0 resolved-span=5-16
+  stmt kind=ASSIGN name="c" name-span=59-60 base="b" base-span=63-64 attrs=0
+    value type=OBJECT span=68-80 text="{ z := $b; }" count=3
+      stmt kind=ASSIGN name="z" name-span=70-71 base="" base-span=none attrs=0
+        value type=VARREF span=75-77 text="$b" target="b" public=OBJECT resolved=1 resolved-doc=0 resolved-span=46-57
+      stmt kind=ASSIGN name="y" name-span=48-49 base="" base-span=none attrs=0
+        value type=NUMERIC span=53-54 text="2" kind=integer overflow=0 i64=2
+      stmt kind=ASSIGN name="x" name-span=25-26 base="" base-span=none attrs=0
+        value type=VARREF span=30-32 text="$t" target="t" public=OBJECT resolved=1 resolved-doc=0 resolved-span=5-16

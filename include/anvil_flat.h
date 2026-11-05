@@ -265,8 +265,10 @@ size_t anvil_statement_get_name(anvil_statement stmt, char *buf, size_t buflen);
 /**
  * @brief A value's kind. Transparent through a resolved $identifier VarRef
  * — reports the target's own type, never a distinct "this was a reference"
- * kind. An unresolved VarRef (missing target, or a reference cycle) reports
- * as ANVIL_VALUE_NULL.
+ * kind. An unresolved VarRef (missing target, or a plain chain cycle such as
+ * `a := $b; b := $a;`) reports as ANVIL_VALUE_NULL. A reference that leads back
+ * to a container holding it never gets here: the load fails with
+ * ANVL_ERR_RESOLVER_REFERENCE_CYCLE (4054), so a walk through this accessor ends.
  * @param val The value to check. NULL returns ANVIL_VALUE_NULL.
  */
 anvil_value_type anvil_value_get_type(anvil_value val);

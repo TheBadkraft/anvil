@@ -1,0 +1,6 @@
+anvil-dump 2
+mode document
+input-bytes 5480
+status error
+dialect AML
+error code=4054 name=ANVL_ERR_RESOLVER_REFERENCE_CYCLE category=5 category-name=ANVIL_ERR_RESOLVE line=1 column=9 source="" message="A reference leads back to a value that contains it"

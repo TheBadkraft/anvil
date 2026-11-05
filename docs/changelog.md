@@ -15,6 +15,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BR-2611-anvl-resolver-002 (BEHAVIOUR CHANGE: a `$` reference that leads back to a container holding it is an error).**
+  `s1 := { a := $s1; };` used to load without an error and then any walk through the public accessors (which are transparent
+  through a resolved reference) never ended. A document with such a reference now fails to load with the new resolver error
+  `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` = 4054 ("A reference leads back to a value that contains it", public category
+  `ANVIL_ERR_RESOLVE`). The rule: a walk of the resolved document follows (1) a container's own members, (2) the fields a statement
+  inherits from a base (not those it overrides by name) and (3) a resolved `$` reference to its target statement's value; if any value
+  can reach a value it is already inside, the document is refused. That includes `s1 := { a := { b := $s1; }; };`, `a := [ $a ];`,
+  `a := { x := $b; }; b := { y := $a; };`, a cycle closed through inheritance (`a := { x := $b; }; b : a := { z := 1; };`) and a cycle
+  across included documents. Not refused, unchanged: a reference to a scalar, a reference with no way back, and the plain chain
+  cycle `a := $b; b := $a;` (still unresolved, `null`). **Position:** the `$` of the first reference that lies on a cycle, in source
+  order, the documents in load order (the root first, then the includes in the order of the dump's `doc` numbers), then by byte
+  offset inside a document; a reference whose target cannot get back to the statement holding it is skipped however early it is
+  written. Found with one pass (iterative strongly-connected components over the top-level statements and the fields they inherit: an inherited field is a vertex of its own that holds its references once, so many statements deriving one base cost one edge each, never a copy of the base's references; time and memory are O(the document + the merged member count)), so a ring of 100000
+  statements, a hub of 100000 references or a ladder of two references per statement load in tens of milliseconds. Documents
+  without a reference are not touched (load time 1.00x, see the figures below). The builder refuses the same documents at
+  `anvil_builder_write` and `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_REFERENCE_CYCLE` = 24 (appended, "reference cycle:
+  a '$' reference leads back to a value that contains it"), after the base checks; it follows the members it holds (a name it does
+  not hold may come from an include). The streaming writer (`anvil_writer_varref`) holds no document and cannot see it, as it cannot
+  see a base cycle; the headers say so. Corpus: `refcycle/` (reader: 46 refusals with positions, 15 across included documents, 7 at scale, 37 that
+  stay valid), `builder/references/`, `writer/varref/leads_back_*`; the drift tables
+  list both codes. `make check-walk-corpus` (new tool `anvil-walk`, run by `make check-conformance`) walks every corpus document that
+  loads clean through the public accessors and fails on a loop, which `anvil-dump` could not see; run against v0.14.0-rc it reports a loop in exactly the 68 documents of `refcycle/` that this
+  change refuses. Speed, native with this change vs native v0.14.0-rc (e2d8700), median time per load of the
+  bench/parse_validate workloads, 15 interleaved rounds pinned to one core, lower is faster (ratio < 1.00x is faster than v0.14.0-rc):
+  no reference in the document, so the pass is skipped: parse_floats 0.997x, parse_ints 0.993x, parse_mixed 1.000x, validate_floats
+  1.001x, validate_small 0.999x. Documents full of references pay for the extra walk over each statement: a chain of 100000
+  statements 1.130x, a ladder of two references per statement 1.139x, one object with 100000 references 1.107x, a base inherited by
+  20000 statements 1.094x, a base whose one big field (an array, or an object, of 5000) is inherited by 5000 statements 1.093x and
+  1.074x, a base whose one field holds 5000 references inherited by 5000 statements 1.122x (3000 x 3000 loads in 2.4 ms and 5 MB; 10000 x
+  10000 in 7.7 ms and 12 MB, against 6.4 ms and 11 MB in v0.14.0-rc), the mixed message document with a reference in every row
+  1.074x, a ring of 100000 statements (loaded clean before, refused now) 1.167x; a plain `$a0 := $a1;` chain of 3000, which has no
+  container to walk, 0.997x. Refused as a cycle, the 100000-statement ring takes 42 ms.
+
 ---
 
 ## [v0.14.0-rc] — (2026-11-05)

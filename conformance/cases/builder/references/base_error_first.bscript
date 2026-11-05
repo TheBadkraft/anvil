@@ -1,0 +1,15 @@
+anvil-builder-script 1
+# the base checks come before the reference check
+option on-error continue
+dialect AML
+let o_a = object
+let r_a = varref "a"
+add o_a "f" r_a
+let m_a = add NULL "a" o_a
+let o_c = object
+let x_c = int 1
+add o_c "f" x_c
+let m_c = add NULL "c" o_c
+set_base m_c "nowhere"
+emit
+get_error

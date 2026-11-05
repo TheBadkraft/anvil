@@ -1,7 +1,7 @@
 # Conformance error-code coverage (FR-2610-anvl-conformance-002)
 
-`include/errors.h` declares 107 internal error codes (`anvl_err_code`). The conformance corpus (`conformance/cases/`)
-reaches **56** of them (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 51 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
+`include/errors.h` declares 108 internal error codes (`anvl_err_code`). The conformance corpus (`conformance/cases/`)
+reaches **57** of them (4054 added by BR-2611-anvl-resolver-002) (BR-2610-anvl-parser-005 raised it from 41; see the section at the end). The other 51 cannot be produced by any input to the reader as built (`WITH_ASL=0`). This was
 established three ways: (1) a search of `src/` for a site that records each code finds none for most of them (the
 rest are listed with their reason below); (2) 200000 generated and mutated documents and fragments
 (`conformance/fuzz` generator, seed 7, one 200k chunk under the memory cap) reached no code outside the 40 the corpus held
@@ -80,6 +80,7 @@ record what native does today, and a port must match it.
 | 4051 | `ANVL_ERR_RESOLVER_MISSING_BASE` | yes (4 dumps) | `coverage/errors/inherit_unknown_base.anvl` |
 | 4052 | `ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS` | yes (2 dumps) | `coverage/errors/inherit_from_anonymous.anvl` |
 | 4053 | `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` | yes (17 dumps) | `coverage/errors/document_duplicate_name.anvl` |
+| 4054 | `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` | yes (68 dumps) | `refcycle/err/self_object.anvl` (BR-2611-anvl-resolver-002; a `$` reference that leads back to a container holding it) |
 | 4101 | `ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |
 | 4102 | `ANVL_ERR_VARS_NOT_FIRST` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |
 | 4103 | `ANVL_ERR_VARS_DUPLICATE_KEY` | no | For the `vars` block, an AnvilScript feature: with WITH_ASL=0 `vars` is a reserved word and `vars { ... }` is 4003 (`errors/vars_block_is_keyword.anvl`). Nothing records it. |

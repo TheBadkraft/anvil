@@ -73,6 +73,7 @@ struct anvil_member_t {
    bool block; // emitted as the block form `name { ... };`, which cannot be a base
    attr_list attrs;
    struct anvil_node_t *value;
+   size_t cache_gen, cache_node; // the reference check number cache_gen: this field's vertex in the graph (SIZE_MAX: it holds no reference)
 };
 
 // A module-header entry: an attribute, or (is_include) an include whose path is item.key.
@@ -92,6 +93,8 @@ struct anvil_builder_t {
    size_t member_cap;
    wg_nameset names; // document-level statement names; each name's value is its member's position + 1 in members
    size_t base_count; // members that have a base
+   size_t ref_checks; // reference checks run so far (numbers the caches in the members)
+   size_t varref_count; // '$' reference nodes created; zero lets the reference check be skipped
    struct anvil_node_t **nodes; // every node, for disposal
    size_t node_count;
    size_t node_cap;
@@ -402,7 +405,11 @@ anvil_node anvil_builder_varref(anvil_builder b, const char *name) {
       outcome(b, ANVIL_WRITER_ERR_DIALECT);
       return NULL;
    }
-   return scalar_node(b, NODE_VARREF, wg_check_name(name), name, name ? strlen(name) : 0);
+   anvil_node n = scalar_node(b, NODE_VARREF, wg_check_name(name), name, name ? strlen(name) : 0);
+   if (n) {
+      b->varref_count++;
+   }
+   return n;
 }
 
 anvil_node anvil_builder_array(anvil_builder b) { return b ? new_node(b, NODE_ARRAY) : NULL; }
@@ -820,6 +827,279 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
    return result;
 }
 
+/* ----------------------------------------------------------------------- *
+ * Reference cycles (BR-2611-anvl-resolver-002). The reader refuses a document where a '$' reference leads back
+ * to a container holding it (4054); the builder refuses it at emit or write, as it does a base cycle. The
+ * streaming writer cannot, for the same reason it cannot see a base cycle: it holds no document.
+ *
+ * The rule is the reader's (src/core/resolver.c, "Reference cycles"), on the top-level members: member S has an
+ * edge to member T for every reference in S's walkable subtree - its fields and elements at any depth, and the
+ * fields it inherits from its bases that it does not override by name, but not through another reference - that
+ * resolves, through any chain of references, to the value of T. A cycle in that graph is the error. A plain chain
+ * cycle (a := $b; b := $a;) resolves to nothing, so it has no edge. A reference to a name the builder does not
+ * hold (an include may supply it) has no edge either, and neither does a base it does not hold.
+ *
+ * Cost: time and memory O(the document + the merged member count). An inherited field is a vertex of its own, holding
+ * the references of its subtree once; a member that inherits it has one edge to it, never a copy of its references.
+ * ----------------------------------------------------------------------- */
+static size_t member_by_name(const struct anvil_builder_t *b, const char *name) {
+   size_t at = wg_nameset_get(&b->names, name);
+   return at ? at - 1 : SIZE_MAX;
+}
+
+// Test hook: how many edges the reference check of this thread's last emit or write built.
+_Thread_local size_t anvil_builder_last_ref_edges;
+
+typedef struct {
+   size_t *final;         // member -> the member whose value its reference chain ends in, SIZE_MAX if none
+   unsigned char *state;  // 0 not computed, 1 on the current chase, 2 done
+   size_t *path;          // scratch of n entries
+   size_t gen;    // the number of this check
+   size_t total;  // vertices: the members, then the inherited fields that hold a reference
+   size_t cur;    // the vertex the edges being added leave
+   size_t *start; // total + 1 offsets into sorted
+   size_t *from;  // edge sources, in the order the edges were added
+   size_t *to;    // edge targets (vertex indices), in the order the edges were added
+   size_t *sorted; // the targets grouped by source
+   size_t count, cap;
+   const struct anvil_node_t **stack; // scratch for the subtree scan
+   size_t stack_cap;
+} ref_graph;
+
+static size_t ref_final(const struct anvil_builder_t *b, ref_graph *g, size_t j) {
+   size_t depth = 0, result = SIZE_MAX;
+   for (;;) {
+      if (g->state[j] == 2) {
+         result = g->final[j];
+         break;
+      }
+      if (g->state[j] == 1) {
+         break; // a chain cycle: unresolved
+      }
+      g->state[j] = 1;
+      g->path[depth++] = j;
+      const struct anvil_node_t *v = b->members[j]->value;
+      if (v->kind != NODE_VARREF) {
+         result = j;
+         break;
+      }
+      size_t next = member_by_name(b, v->text);
+      if (next == SIZE_MAX) {
+         break;
+      }
+      j = next;
+   }
+   while (depth > 0) {
+      size_t k = g->path[--depth];
+      g->final[k] = result;
+      g->state[k] = 2;
+   }
+   return result;
+}
+
+static bool ref_edge(ref_graph *g, size_t target) {
+   if (g->count == g->cap) {
+      size_t cap = g->cap ? g->cap * 2 : 64;
+      size_t *bigger_to = realloc(g->to, cap * sizeof *bigger_to);
+      if (!bigger_to) {
+         return false;
+      }
+      g->to = bigger_to;
+      size_t *bigger_from = realloc(g->from, cap * sizeof *bigger_from);
+      if (!bigger_from) {
+         return false;
+      }
+      g->from = bigger_from;
+      g->cap = cap;
+   }
+   g->from[g->count] = g->cur;
+   g->to[g->count++] = target;
+   return true;
+}
+
+// Adds the edges of every reference in the subtree of `root`. Explicit stack, so any depth is fine.
+static bool ref_scan(const struct anvil_builder_t *b, ref_graph *g, const struct anvil_node_t *root) {
+   size_t top = 0;
+   g->stack[top++] = root;
+   while (top > 0) {
+      const struct anvil_node_t *n = g->stack[--top];
+      if (n->kind == NODE_VARREF) {
+         size_t t = member_by_name(b, n->text);
+         size_t fin = t == SIZE_MAX ? SIZE_MAX : ref_final(b, g, t);
+         if (fin != SIZE_MAX && !ref_edge(g, fin)) {
+            return false;
+         }
+         continue;
+      }
+      if (n->kind != NODE_ARRAY && n->kind != NODE_TUPLE && n->kind != NODE_OBJECT) {
+         continue;
+      }
+      if (top + n->count > g->stack_cap) {
+         size_t grown = (top + n->count) * 2;
+         const struct anvil_node_t **bigger = realloc((void *)g->stack, grown * sizeof *bigger);
+         if (!bigger) {
+            return false;
+         }
+         g->stack = bigger;
+         g->stack_cap = grown;
+      }
+      for (size_t i = 0; i < n->count; i++) {
+         g->stack[top++] = n->kind == NODE_OBJECT ? n->members[i]->value : n->elements[i];
+      }
+   }
+   return true;
+}
+
+// The edges of member i: its own subtree, then the inherited fields it does not override, nearest base first.
+static bool ref_member_edges(const struct anvil_builder_t *b, ref_graph *g, size_t i) {
+   const struct anvil_member_t *m = b->members[i];
+   g->cur = i;
+   if (!ref_scan(b, g, m->value)) {
+      return false;
+   }
+   size_t cur = m->base ? member_by_name(b, m->base) : SIZE_MAX;
+   if (cur == SIZE_MAX) {
+      return true;
+   }
+   wg_nameset seen = {0};
+   bool ok = true;
+   for (size_t k = 0; ok && k < m->value->count; k++) {
+      ok = wg_nameset_add(&seen, m->value->members[k]->name) >= 0;
+   }
+   // The chain is acyclic: check_bases has run.
+   while (ok && cur != SIZE_MAX) {
+      const struct anvil_member_t *ancestor = b->members[cur];
+      for (size_t k = 0; ok && k < ancestor->value->count; k++) {
+         const struct anvil_member_t *field = ancestor->value->members[k];
+         int added = wg_nameset_add(&seen, field->name);
+         struct anvil_member_t *cached = (struct anvil_member_t *)field;
+         if (added <= 0) {
+            ok = added == 0;
+            continue;
+         }
+         // an inherited field is a vertex of its own, holding the references of its subtree (walked once); a member
+         // that inherits it has one edge to it, not a copy of its references. A field with no reference has no vertex.
+         if (cached->cache_gen != g->gen) {
+            size_t before = g->count;
+            cached->cache_node = g->total++;
+            g->cur = cached->cache_node;
+            ok = ref_scan(b, g, field->value);
+            if (g->count == before) {
+               g->total--;
+               cached->cache_node = SIZE_MAX;
+            }
+            cached->cache_gen = g->gen;
+            g->cur = i;
+         }
+         ok = ok && (cached->cache_node == SIZE_MAX || ref_edge(g, cached->cache_node));
+      }
+      cur = ancestor->base ? member_by_name(b, ancestor->base) : SIZE_MAX;
+   }
+   wg_nameset_free(&seen);
+   return ok;
+}
+
+// Whether the graph g has a cycle: iterative depth-first search with three colours (1 on the current path,
+// 2 done), each member visited once. `pos` is the cursor of a member on the path.
+static bool ref_graph_has_cycle(ref_graph *g, bool *memory) {
+   size_t n = g->total;
+   unsigned char *colour = calloc(n ? n : 1, 1);
+   size_t *pos = malloc((n ? n : 1) * sizeof *pos);
+   size_t *calls = malloc((n ? n : 1) * sizeof *calls);
+   if (!colour || !pos || !calls) {
+      free(colour);
+      free(pos);
+      free(calls);
+      *memory = true;
+      return false;
+   }
+   bool cycle = false;
+   for (size_t root = 0; !cycle && root < n; root++) {
+      if (colour[root]) {
+         continue;
+      }
+      size_t depth = 0;
+      calls[depth++] = root;
+      colour[root] = 1;
+      pos[root] = g->start[root];
+      while (!cycle && depth > 0) {
+         size_t v = calls[depth - 1];
+         if (pos[v] < g->start[v + 1]) {
+            size_t w = g->sorted[pos[v]++];
+            if (colour[w] == 1) {
+               cycle = true;
+            } else if (colour[w] == 0) {
+               colour[w] = 1;
+               pos[w] = g->start[w];
+               calls[depth++] = w;
+            }
+         } else {
+            colour[v] = 2;
+            depth--;
+         }
+      }
+   }
+   free(colour);
+   free(pos);
+   free(calls);
+   return cycle;
+}
+
+static anvil_writer_err_code check_references(anvil_builder b) {
+   if (b->varref_count == 0 || b->member_count == 0) {
+      return ANVIL_WRITER_OK;
+   }
+   size_t n = b->member_count;
+   ref_graph g = {0};
+   g.gen = ++b->ref_checks;
+   g.final = malloc(n * sizeof *g.final);
+   g.state = calloc(n, 1);
+   g.path = malloc(n * sizeof *g.path);
+   g.total = n;
+   g.stack_cap = 64;
+   g.stack = malloc(g.stack_cap * sizeof *g.stack);
+   anvil_writer_err_code result = g.final && g.state && g.path && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
+      if (!ref_member_edges(b, &g, i)) {
+         result = ANVIL_WRITER_ERR_MEMORY;
+      }
+   }
+   if (result == ANVIL_WRITER_OK) { // group the targets by source (counting sort)
+      g.start = calloc(g.total + 1, sizeof *g.start);
+      g.sorted = malloc((g.count ? g.count : 1) * sizeof *g.sorted);
+      result = g.start && g.sorted ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   }
+   if (result == ANVIL_WRITER_OK) {
+      for (size_t e = 0; e < g.count; e++) {
+         g.start[g.from[e] + 1]++;
+      }
+      for (size_t v = 0; v < g.total; v++) {
+         g.start[v + 1] += g.start[v];
+      }
+      for (size_t e = 0; e < g.count; e++) {
+         g.sorted[g.start[g.from[e]]++] = g.to[e];
+      }
+      for (size_t v = g.total; v > 0; v--) {
+         g.start[v] = g.start[v - 1];
+      }
+      g.start[0] = 0;
+      bool memory = false;
+      result = ref_graph_has_cycle(&g, &memory) ? ANVIL_WRITER_ERR_REFERENCE_CYCLE
+               : memory                           ? ANVIL_WRITER_ERR_MEMORY
+                                                  : ANVIL_WRITER_OK;
+   }
+   anvil_builder_last_ref_edges = g.count;
+   free(g.final);
+   free(g.state);
+   free(g.path);
+   free(g.start);
+   free(g.sorted);
+   free(g.from);
+   free(g.to);
+   free((void *)g.stack);
+   return result;
+}
+
 bool anvil_builder_write(anvil_builder b, anvil_writer w) {
    if (!b) {
       return false;
@@ -834,6 +1114,10 @@ bool anvil_builder_write(anvil_builder b, anvil_writer w) {
    anvil_writer_err_code depth = check_depth(b);
    if (depth != ANVIL_WRITER_OK) {
       return outcome(b, depth);
+   }
+   anvil_writer_err_code refs = check_references(b);
+   if (refs != ANVIL_WRITER_OK) {
+      return outcome(b, refs);
    }
    bool ok = true;
    // The reader requires every include before the module attributes (BR-2610-anvl-writer-003), so the
