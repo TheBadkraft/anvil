@@ -18,9 +18,9 @@ Part of `notes/plan-2611-portable-ports.md`. Status: proposed (2026-11-04).
 |---|---|---|
 | PY-H0 | Fix BR-2611-anvl-py-001 first, so the reference passes its own suite | suite green at the pin |
 | PY-H1a (FR-2611-anvl-py-001) | `tests/conformance/reader_run.py`: prints `anvil-dump 2` for a corpus input, through the public API only | 1902/1902 byte-exact against native's dumps |
-| PY-H1b | `writer_run.py` for `anvil-writer-script 1` | writer corpus byte-exact; C-API-only list exact and enforced |
-| PY-H1c | `builder_run.py` for `anvil-builder-script 1` | builder corpus byte-exact; C-API-only list exact |
-| PY-H1d | `schema_run.py` for `anvil-schema-script 1` | 561/561 |
+| PY-H1b (FR-2611-anvl-py-001) | `writer_run.py` for `anvil-writer-script 1` | writer corpus byte-exact; C-API-only list exact and enforced |
+| PY-H1c (FR-2611-anvl-py-001) | `builder_run.py` for `anvil-builder-script 1` | builder corpus byte-exact; C-API-only list exact |
+| PY-H1d (FR-2611-anvl-py-001) | `schema_run.py` for `anvil-schema-script 1` | 561/561 |
 | PY-H2 (FR-2611-anvl-py-002) | `scripts/fuzz.py`: reader fragments, writer, builder and schema scripts, compared with `anvil-dump` | recorded seeds, 0 differences, minimised repros on any |
 | PY-H3 (FR-2611-anvl-py-003) | Drift test against `conformance/drift-tables.txt`: codes, names, messages, enums | green |
 | PY-H4 (FR-2611-anvl-py-004) | check-tdd **python package adapter**: product is `src/`, tests are `tests/`, pytest per-test outcomes, AssertionError vs any other error | the checker's own fixtures prove it; one real pytest range checked |
