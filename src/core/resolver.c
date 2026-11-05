@@ -28,7 +28,9 @@
 #include <sigma/list.h>
 #include <sigma/map.h>
 #include <sigma/types.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // Builds ctx->identifiers: top-level statement name -> anvl_statement, across every document
@@ -326,7 +328,8 @@ static anvl_value resolve_varref_chain(module_context ctx, anvl_slice target) {
 // Finds every ANVL_VALUE_VARREF in one flat pass over ctx->values (already indexes every
 // anvl_value at any nesting depth - see mod_ctx_dispose's own use of the same index) and sets
 // .varref.resolved on each. Never fails - see resolve_varref_chain.
-static void resolve_varrefs(module_context ctx) {
+static usize resolve_varrefs(module_context ctx) {
+   usize resolved = 0;
    usize value_count = List.size(ctx->values);
    for (usize i = 0; i < value_count; i++) {
       anvl_value v = NULL;
@@ -335,7 +338,116 @@ static void resolve_varrefs(module_context ctx) {
          continue;
       }
       v->varref.resolved = resolve_varref_chain(ctx, v->varref.target);
+      resolved += v->varref.resolved != NULL;
    }
+   return resolved;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Reference cycles (BR-2611-anvl-resolver-002): a `$` reference that leads back to a container holding it is
+ * an error. A walk follows a container's members, the fields it inherits (aliased by the merge) and, through
+ * a resolved reference, the target statement's value.
+ * ---------------------------------------------------------------------- */
+#define RC_NONE UINT32_MAX
+
+typedef struct {
+   anvl_value value; // a top-level statement's value
+} rc_node;
+
+typedef struct {
+   module_context ctx;
+   rc_node *nodes;
+   uint32_t n;
+   anvl_value best; // the reference to report so far
+} rc_graph;
+
+// Visits the references in the walkable subtree of node i (members and elements at any depth, inherited fields; not
+// through another reference) and keeps in g->best the one that comes first in the source among those that resolve to
+// the value of node i itself. `stack` is a reusable scratch; false means out of memory.
+static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
+   usize top = 0;
+   (*stack)[top++] = g->nodes[i].value;
+   while (top > 0) {
+      anvl_value v = (*stack)[--top];
+      list items = NULL;
+      bool is_object = false;
+      switch (v->type) {
+      case ANVL_VALUE_VARREF:
+         if (v->varref.resolved == g->nodes[i].value && (!g->best || v->text.start < g->best->text.start)) {
+            g->best = v;
+         }
+         continue;
+      case ANVL_VALUE_ARRAY:
+      case ANVL_VALUE_TUPLE:
+         items = v->collection.items;
+         break;
+      case ANVL_VALUE_OBJECT:
+         items = v->object.statements;
+         is_object = true;
+         break;
+      default:
+         continue;
+      }
+      usize count = items ? List.size(items) : 0;
+      if (top + count > *cap) {
+         usize grown = (top + count) * 2;
+         anvl_value *bigger = realloc(*stack, grown * sizeof **stack);
+         if (!bigger) {
+            return false;
+         }
+         *stack = bigger;
+         *cap = grown;
+      }
+      for (usize k = 0; k < count; k++) {
+         object item = NULL;
+         List.get(items, k, (object *)&item);
+         anvl_value child = !item ? NULL : is_object ? ((anvl_statement)item)->value : (anvl_value)item;
+         if (child) {
+            (*stack)[top++] = child;
+         }
+      }
+   }
+   return true;
+}
+
+// ANVL_RES_ERR with *out_err_code set when a statement of the root document holds a reference to itself, or on running
+// out of memory. The error is at the `$` of the first such reference.
+static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out_err_code) {
+   rc_graph g = {.ctx = ctx};
+   anvl_value *stack = NULL;
+   usize stack_cap = 64;
+   module_document doc = NULL;
+   List.get(ctx->docs, 0, (object *)&doc);
+   usize capacity = doc && doc->body ? (usize)FArray.capacity(doc->body, sizeof(anvl_statement)) : 0;
+   g.nodes = malloc((capacity ? capacity : 1) * sizeof *g.nodes);
+   stack = malloc(stack_cap * sizeof *stack);
+   bool ok = g.nodes && stack;
+   for (usize i = 0; ok && i < capacity; i++) {
+      anvl_statement stmt = NULL;
+      FArray.get(doc->body, (int)i, sizeof(anvl_statement), (object *)&stmt);
+      if (stmt && stmt->value && Source.slice_length(stmt->name) != 0) {
+         g.nodes[g.n++] = (rc_node){stmt->value};
+      }
+   }
+   for (uint32_t i = 0; ok && i < g.n; i++) {
+      ok = rc_scan(&g, i, &stack, &stack_cap);
+   }
+   free(stack);
+   free(g.nodes);
+   if (!ok) {
+      anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
+      *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+      return ANVL_RES_ERR;
+   }
+   if (!g.best) {
+      return ANVL_RES_OK;
+   }
+   usize line = 0, col = 0;
+   const char *file = NULL;
+   (void)locate_in_sources(ctx, g.best->text.start, &line, &col, &file);
+   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_REFERENCE_CYCLE, line, col, file, NULL);
+   *out_err_code = ANVL_ERR_RESOLVER_REFERENCE_CYCLE;
+   return ANVL_RES_ERR;
 }
 
 anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code) {
@@ -372,7 +484,14 @@ anvl_result mod_resolve_context(module_context ctx, anvl_err_code *out_err_code)
       return ANVL_RES_ERR;
    }
 
-   resolve_varrefs(ctx);
+   // A reference that leads back to a container holding it is an error. With no resolved reference there is
+   // nothing to follow, so the check is skipped.
+   if (resolve_varrefs(ctx) > 0 && ANVL_RES_OK != check_reference_cycles(ctx, &err_code)) {
+      if (out_err_code) {
+         *out_err_code = err_code;
+      }
+      return ANVL_RES_ERR;
+   }
 
    if (out_err_code) {
       *out_err_code = err_code;
