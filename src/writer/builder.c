@@ -92,6 +92,7 @@ struct anvil_builder_t {
    size_t member_cap;
    wg_nameset names; // document-level statement names; each name's value is its member's position + 1 in members
    size_t base_count; // members that have a base
+   size_t varref_count; // '$' reference nodes created; zero lets the reference check be skipped
    struct anvil_node_t **nodes; // every node, for disposal
    size_t node_count;
    size_t node_cap;
@@ -402,7 +403,11 @@ anvil_node anvil_builder_varref(anvil_builder b, const char *name) {
       outcome(b, ANVIL_WRITER_ERR_DIALECT);
       return NULL;
    }
-   return scalar_node(b, NODE_VARREF, wg_check_name(name), name, name ? strlen(name) : 0);
+   anvil_node n = scalar_node(b, NODE_VARREF, wg_check_name(name), name, name ? strlen(name) : 0);
+   if (n) {
+      b->varref_count++;
+   }
+   return n;
 }
 
 anvil_node anvil_builder_array(anvil_builder b) { return b ? new_node(b, NODE_ARRAY) : NULL; }
@@ -820,6 +825,60 @@ static anvil_writer_err_code check_bases(anvil_builder b) {
    return result;
 }
 
+/* ----------------------------------------------------------------------- *
+ * Reference cycles (BR-2611-anvl-resolver-002). The reader refuses a document where a '$' reference leads back to a
+ * container holding it (4054); the builder refuses it at emit or write, as it does a base cycle. The streaming writer
+ * cannot, for the same reason it cannot see a base cycle: it holds no document.
+ * ----------------------------------------------------------------------- */
+static size_t member_by_name(const struct anvil_builder_t *b, const char *name) {
+   size_t at = wg_nameset_get(&b->names, name);
+   return at ? at - 1 : SIZE_MAX;
+}
+
+// Whether the subtree of member i (fields and elements at any depth, not through another reference) holds a reference
+// to the member itself. A statement that is itself a reference (a := $a;) holds no container. Explicit stack, so any
+// depth is fine; *memory is set when it cannot grow.
+static bool ref_scan(const struct anvil_builder_t *b, size_t i, const struct anvil_node_t ***stack, size_t *cap, bool *memory) {
+   size_t count = 0;
+   if (b->members[i]->value->kind == NODE_VARREF) {
+      return false;
+   }
+   if (!reserve((void **)stack, count, cap, sizeof **stack)) {
+      *memory = true;
+      return false;
+   }
+   (*stack)[count++] = b->members[i]->value;
+   while (count > 0) {
+      const struct anvil_node_t *n = (*stack)[--count];
+      if (n->kind == NODE_VARREF) {
+         if (member_by_name(b, n->text) == i) {
+            return true;
+         }
+      } else if (n->kind == NODE_ARRAY || n->kind == NODE_TUPLE || n->kind == NODE_OBJECT) {
+         for (size_t k = 0; k < n->count; k++) {
+            if (!reserve((void **)stack, count, cap, sizeof **stack)) {
+               *memory = true;
+               return false;
+            }
+            (*stack)[count++] = n->kind == NODE_OBJECT ? n->members[k]->value : n->elements[k];
+         }
+      }
+   }
+   return false;
+}
+
+// A member that holds a reference to itself is a cycle.
+static anvil_writer_err_code check_references(anvil_builder b) {
+   const struct anvil_node_t **stack = NULL;
+   size_t cap = 0;
+   bool memory = false, cycle = false;
+   for (size_t i = 0; b->varref_count > 0 && !cycle && !memory && i < b->member_count; i++) {
+      cycle = ref_scan(b, i, &stack, &cap, &memory);
+   }
+   free((void *)stack);
+   return memory ? ANVIL_WRITER_ERR_MEMORY : cycle ? ANVIL_WRITER_ERR_REFERENCE_CYCLE : ANVIL_WRITER_OK;
+}
+
 bool anvil_builder_write(anvil_builder b, anvil_writer w) {
    if (!b) {
       return false;
@@ -834,6 +893,10 @@ bool anvil_builder_write(anvil_builder b, anvil_writer w) {
    anvil_writer_err_code depth = check_depth(b);
    if (depth != ANVIL_WRITER_OK) {
       return outcome(b, depth);
+   }
+   anvil_writer_err_code refs = check_references(b);
+   if (refs != ANVIL_WRITER_OK) {
+      return outcome(b, refs);
    }
    bool ok = true;
    // The reader requires every include before the module attributes (BR-2610-anvl-writer-003), so the
