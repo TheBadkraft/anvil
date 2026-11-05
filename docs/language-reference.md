@@ -91,10 +91,66 @@ AnvilScript; with the AML reader they are simply reserved.
 | Tuple | `coords := (10, 20);` | At least 2 elements; `(1)` is invalid |
 | Object | `config := { host := localhost; port := 8080; };` | Nested statements |
 | Bare/identifier literal | `status := active;` | An unquoted symbol — a literal string value, no implicit resolution |
-| `$identifier` (VarRef) | `alias := $name;` | Resolve-once static alias in AML — see §7's note below. Transparent through the public API: reading `alias`'s value reports whatever `name` itself resolved to, never a distinct "this was a reference" kind. |
+| `$identifier` (VarRef) | `alias := $name;` | Resolve-once static alias in AML — see §7's note below. Transparent through the public API: reading `alias`'s value reports whatever `name` itself resolved to, never a distinct "this was a reference" kind. A reference that leads back to a value containing it is error 4054 (below). |
 
 Anvil's default is a **weak type system** — nothing above requires or infers a declared shape.
 `foo := 42;` is simply a numeric value.
+
+### References that lead back (error 4054)
+
+A `$` reference may not lead back to a value that contains it. The load fails with `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` (4054, public
+category `ANVIL_ERR_RESOLVE`, "A reference leads back to a value that contains it"), and nothing but the error is reported:
+
+<!-- example: error 4054 -->
+```anvl
+#!aml
+s1 := { a := $s1; };
+```
+
+The rule follows what reading the document reaches. From a value you reach the members of an object, array or tuple, the fields a
+statement inherits from its base (unless it declares a field of that name itself), and, through a `$` reference, the value of the
+statement it names. A document is refused when some value can reach a value it is already inside. All of these are 4054:
+
+<!-- example: error 4054 -->
+```anvl
+#!aml
+a := { x := $b; };
+b := { y := $a; };
+```
+
+<!-- example: error 4054 -->
+```anvl
+#!aml
+a := [ $a ];
+```
+
+<!-- example: error 4054 -->
+```anvl
+#!aml
+a := { x := $b; };
+b : a := { z := 1; };
+```
+
+The last one closes the loop through inheritance: `b` inherits `x` from `a`, and `x` refers to `b`. A cycle closed through an
+`include` is refused the same way.
+
+These stay valid:
+
+- A reference to a scalar never loops: `n := 1; m := { v := $n; };`.
+- A plain chain cycle, `a := $b; b := $a;`, has no value to walk into. Both names stay unresolved and read as `null`, as before.
+- A reference with nothing behind it (`x := $missing;`) is `null`, as before.
+- An override that breaks the loop keeps the document valid, because the inherited field is replaced:
+
+```anvl
+#!aml
+a := { x := $b; };
+b : a := { x := 1; z := 2; };
+```
+
+**Where it is reported.** The error is at the `$` of the first reference that lies on a cycle, in source order (the root document
+first, then its includes in load order). A reference whose target cannot get back to the statement holding it is not on a cycle,
+however early it is written. The writer and builder side is in §13: the builder refuses the same documents with writer code 24; the
+streaming writer cannot see a cycle, so it can write a document the reader then refuses.
 
 ## 5. Attributes
 
@@ -311,6 +367,7 @@ behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code
 | 4020 | `ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT` | a base that is not an object value (category `ANVIL_ERR_RESOLVE`) |
 | 4022 | `ANVL_ERR_PARSER_NESTED_BASE` | a base on a statement nested inside an object, in either form and at any depth; wins over 4051, 4020 and 4052 |
 | 4053 | `ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER` | a top-level name repeated (including across includes) |
+| 4054 | `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` | a `$` reference that leads back to a value that contains it (category `ANVIL_ERR_RESOLVE`; §4) |
 | 4201 | `ANVL_ERR_INCLUDE_NOT_FIRST` | `include` after a statement |
 | 4204 | `ANVL_ERR_INCLUDE_FILE_NOT_FOUND` | an `include` of a file that does not exist, or of a directory |
 | 4206 | `ANVL_ERR_INCLUDE_CYCLIC` | an include cycle, found by normalised path |
@@ -372,9 +429,12 @@ These cover the grammar rules above:
 | `ANVIL_WRITER_ERR_BLOCK_REQUIRES_OBJECT` | 21 | a block-form statement, `name { ... };`, whose value is not an object |
 | `ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM` | 22 | a base that names a block-form statement (the reader's 4052) |
 | `ANVIL_WRITER_ERR_NESTED_BASE` | 23 | a base on a statement inside an object, at any depth; the writer refuses it at `statement` / `statement_block`, the builder at `set_base` (the reader's 4022) |
+| `ANVIL_WRITER_ERR_REFERENCE_CYCLE` | 24 | the builder's `$` references lead back to a container that holds them (`s := { a := $s; };`, `a := [ $a ];`, two members that refer to each other; the reader's 4054). Checked when the builder is written or emitted, after the base checks |
 
-Codes 17 to 23 were appended (23 is the newest), so the existing values keep their numbers. The builder reports 19 and 20 when it is written or emitted; with any `include` a base that names nothing in the document is accepted, because the included file may declare it. The writer can't see names that an
+Codes 17 to 24 were appended (24 is the newest), so the existing values keep their numbers. The builder reports 19 and 20 when it is written or emitted; with any `include` a base that names nothing in the document is accepted, because the included file may declare it. The writer can't see names that an
 `include` brings in, so a collision with an included name is found only when the document is read.
+
+The same holds for reference cycles. The builder follows the members it holds, so it cannot see a cycle that is closed only through an `include` (it does not hold the included names), and the streaming writer (`anvil_writer_varref`) holds no document at all, so it writes `s := { a := $s; };` without complaint and the reader then refuses it with 4054. A reference to a scalar, a plain chain cycle (`a := $b; b := $a;`) and a name the builder does not hold are not refused.
 
 ### Real language bindings today
 

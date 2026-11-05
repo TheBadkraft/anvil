@@ -203,6 +203,8 @@ tags:
 
 A resolved `$identifier` VarRef needs no special case here — `anvil_value_get_type` reports
 whatever the reference resolved *to*, transparently (see `language-reference.md`'s §4).
+A document whose references lead back to a value that contains them is refused at load (error 4054), so a walk
+through references always ends.
 
 ## 6. Looking Up a Statement by Name
 

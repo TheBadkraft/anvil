@@ -205,6 +205,13 @@ Rules:
   `foo := $missing;` parses fine; `foo`'s value is `null`.
 - A circular reference (`a := $b; b := $a;`) also resolves to `null` for
   both names, without hanging.
+- A reference that leads back to a value that contains it is an error,
+  not a `null`: `s := { a := $s; };`, `a := [ $a ];`, and
+  `a := { x := $b; }; b := { y := $a; };` fail to load with error 4054
+  (`ANVL_ERR_RESOLVER_REFERENCE_CYCLE`), reported at the `$` of the first
+  reference on the cycle. A reference to a scalar, and the plain chain cycle
+  above, are not affected. See the
+  [language reference](language-reference.md#references-that-lead-back-error-4054).
 - `$identifier` is strictly bare — no `$foo.bar`, no `$foo(...)`. Both are
   parse errors (`MALFORMED_VARREF`).
 - `$` with no following identifier, or whitespace between `$` and the

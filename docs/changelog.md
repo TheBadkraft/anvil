@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BR-2611-anvl-docs-004 (docs).** The language reference (§4, the error tables and the writer and builder section), the
+  AML guide, the Bindings guide and the getting-started page state the 4054 reference-cycle rule and writer code 24, with
+  runnable samples; the site copies are updated to match.
 - **BR-2611-anvl-resolver-002 (BEHAVIOUR CHANGE: a `$` reference that leads back to a container holding it is an error).**
   `s1 := { a := $s1; };` used to load without an error and then any walk through the public accessors (which are transparent
   through a resolved reference) never ended. A document with such a reference now fails to load with the new resolver error
