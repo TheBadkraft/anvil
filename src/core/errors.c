@@ -76,6 +76,7 @@ static const char *error_messages[] = {
    [ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT] =
       "Inheritance requires an object value — scalars, arrays, tuples, and blobs are not inheritable",
    [ANVL_ERR_PARSER_INVALID_BARE_LITERAL] = "'@'/'`' are not valid inside a bare literal",
+   [ANVL_ERR_PARSER_NESTED_BASE] = "Only a top-level statement can have a base",
    [ANVL_ERR_PARSER_TUPLE_TOO_SHORT] = "Tuple requires minimum 2 values",
    [ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE] = "Missing ',' in tuple",
    [ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT] = "Missing element in tuple",
@@ -213,6 +214,7 @@ static const char *error_names[] = {
    [ANVL_ERR_PARSER_INVALID_BLOB_TAG] = "ANVL_ERR_PARSER_INVALID_BLOB_TAG",
    [ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT] = "ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT",
    [ANVL_ERR_PARSER_INVALID_BARE_LITERAL] = "ANVL_ERR_PARSER_INVALID_BARE_LITERAL",
+   [ANVL_ERR_PARSER_NESTED_BASE] = "ANVL_ERR_PARSER_NESTED_BASE",
    [ANVL_ERR_PARSER_TUPLE_TOO_SHORT] = "ANVL_ERR_PARSER_TUPLE_TOO_SHORT",
    [ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE] = "ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE",
    [ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT] = "ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT",

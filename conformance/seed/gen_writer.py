@@ -35,7 +35,7 @@ ERRS = ["OK", "INVALID_ARGUMENT", "MEMORY", "STATE", "DIALECT", "INVALID_IDENTIF
         "INVALID_NUMERIC", "INVALID_BARE", "INVALID_BLOB", "INVALID_ATTRIBUTE_VALUE", "INVALID_INCLUDE_PATH",
         "EMPTY_COLLECTION", "INHERITANCE_REQUIRES_OBJECT", "UNFINISHED", "DUPLICATE_NAME", "DEPTH_EXCEEDED",
         "DUPLICATE_FIELD", "DUPLICATE_ATTRIBUTE_KEY", "INHERITANCE_CYCLE", "MISSING_BASE", "BLOCK_REQUIRES_OBJECT",
-        "BASE_IS_BLOCK_FORM"]
+        "BASE_IS_BLOCK_FORM", "NESTED_BASE"]
 def ename(i): return "ANVIL_WRITER_OK" if i == 0 else "ANVIL_WRITER_ERR_" + ERRS[i]
 src = open(os.path.join(root, "src", "writer", "writer.c")).read()
 MSG = {}
@@ -222,9 +222,9 @@ for d in ("AML", "AMP"):
 raw(L, "get_error_ok", "AML", ["get_error", "finish", "get_error"], lambda n: (
     ["get_error code=0 name=ANVIL_WRITER_OK"] * 2, 4, 0, HDR["AML"]))
 # error_message for every code and out-of-range values
-steps = ["error_message %d" % c for c in list(range(0, 23)) + [100, -1, -2147483648, 2147483647]]
+steps = ["error_message %d" % c for c in list(range(0, 24)) + [100, -1, -2147483648, 2147483647]]
 raw(L, "error_message_all", "AML", steps, lambda n: (
-    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 23)) + [100, -1, -2147483648, 2147483647]],
+    ["error_message code=%d text=%s" % (c, dq(msg(c))) for c in list(range(0, 24)) + [100, -1, -2147483648, 2147483647]],
     len(steps) + 1, 0, None), desc="every code, and values outside the enum (no finish: no output)")
 # invalid dialect: the writer is NULL
 for dv in (2, 7, -1, 255):
@@ -568,7 +568,17 @@ doc(M, "names_amp", "AMP", [S1(n, Int(1)) for n in ("utid", "seq", "payload")], 
 doc(M, "keyword_like_names", "AML", [S1(n, Int(1)) for n in ("trueish", "nullable", "included", "Include", "TRUE", "Null", "vars1", "importer")])
 doc(M, "base_object", "AML", [S1("base", Obj(S1("x", Int(1)))), S1("child", Obj(S1("y", Int(2))), base="base")])
 doc(M, "base_chain", "AML", [S1("a", Obj(S1("x", Int(1)))), S1("b", Obj(S1("y", Int(2))), base="a"), S1("c", Obj(S1("z", Int(3))), base="b")])
-doc(M, "base_in_object", "AML", [S1("base", Obj(S1("x", Int(1)))), S1("o", Obj(S1("inner", Obj(S1("y", Int(2))), base="base")))])
+# only a top-level statement has a base (BR-2611-anvl-resolver-001; the reader's 4022): the writer refuses one inside an object
+TOPBASE = ['statement "base" NULL', "begin_object", 'statement "x" NULL', "int 1", "end_object"]
+err(M, "base_in_object", "AML", TOPBASE + ['statement "o" NULL', "begin_object", 'statement "inner" "base"'], E("NESTED_BASE"), desc="a base inside an object is refused, whatever it names")
+err(M, "base_in_object_block_form", "AML", TOPBASE + ['statement "o" NULL', "begin_object", 'statement_block "inner" "base"'], E("NESTED_BASE"))
+err(M, "base_in_object_depth3", "AML", TOPBASE + ['statement "o" NULL', "begin_object", 'statement "p" NULL', "begin_object", 'statement "q" NULL', "begin_object", 'statement "inner" "base"'], E("NESTED_BASE"))
+err(M, "base_in_object_missing_name", "AML", ['statement "o" NULL', "begin_object", 'statement "inner" "nothere"'], E("NESTED_BASE"), desc="the name need not exist: found at the statement, as the reader finds it at parse time")
+err(M, "base_in_object_enclosing", "AML", ['statement "s1" NULL', "begin_object", 'statement_block "f3" "s1"'], E("NESTED_BASE"), desc="the reproduction of BR-2611-anvl-resolver-001")
+err(M, "base_in_object_in_array", "AML", TOPBASE + ['statement "x2" NULL', "begin_array", "begin_object", 'statement "inner" "base"'], E("NESTED_BASE"))
+err(M, "base_in_object_after_fields", "AML", TOPBASE + ['statement "o" NULL', "begin_object", 'statement "a" NULL', "int 1", 'statement "inner" "base"'], E("NESTED_BASE"))
+err(M, "base_in_object_bad_name", "AML", ['statement "o" NULL', "begin_object", 'statement "inner" "1b"'], E("INVALID_IDENTIFIER"), desc="the base name is checked first")
+err(M, "base_in_object_dup_field", "AML", ['statement "o" NULL', "begin_object", 'statement "a" NULL', "int 1", 'statement "a" "base"'], E("DUPLICATE_FIELD"), desc="a repeated field is found first, as the reader reads the name before the base")
 doc(M, "same_name_in_two_objects", "AML", [S1("a", Obj(S1("x", Int(1)))), S1("b", Obj(S1("x", Int(2))))])
 doc(M, "same_name_nested_levels", "AML", [S1("x", Obj(S1("x", Obj(S1("x", Int(1))))))], desc="a field may reuse an outer name")
 for i, n in enumerate(["", "1a", "a-b", "a.b", "a b", "a:b", "a$", "@a", "$a", "caf\u00e9", "a\n", " a", "-", "a=b", "a;"]):
@@ -729,8 +739,10 @@ doc(BF, "nested_first_and_last", "AML", [S1("o", Obj(S1("a", Int(1)), BS("b", Ob
 doc(BF, "block_in_block", "AML", [BS("outer", Obj(BS("inner", Obj(S1("x", Int(1))))))])
 doc(BF, "block_in_block_deep", "AML", [BS("a", Obj(BS("b", Obj(BS("c", Obj(BS("d", Obj(S1("x", Int(1)))))))))), S1("after", Int(1))])
 doc(BF, "block_in_assign_in_block", "AML", [BS("a", Obj(S1("b", Obj(BS("c", Obj(S1("x", Int(1))))))))])
-doc(BF, "nested_with_base_and_attrs", "AML", [S1("base", Obj(S1("z", Int(0)))), S1("o", Obj(BS("inner", Obj(S1("x", Int(1))), base="base", attrs=[("k", "v")])))],
-    desc="a nested block may have a base and attributes; the base is looked up among the top-level names")
+doc(BF, "nested_with_attrs", "AML", [S1("base", Obj(S1("z", Int(0)))), S1("o", Obj(BS("inner", Obj(S1("x", Int(1))), attrs=[("k", "v")])))],
+    desc="a nested block may have attributes, but no base (only a top-level statement has a base)")
+err(BF, "nested_with_base_and_attrs", "AML", TOPBASE + ['statement "o" NULL', "begin_object", 'statement_block "inner" "base"'], E("NESTED_BASE"),
+    desc="a nested block may not have a base; this used to be written")
 doc(BF, "array_of_objects_inside", "AML", [BS("p", Obj(S1("a", Arr(Obj(S1("k", Int(1))), Obj(S1("k", Int(2)))))))])
 doc(BF, "object_field_inside", "AML", [BS("p", Obj(S1("o", Obj(S1("q", Int(1))))))])
 doc(BF, "same_name_in_block_and_assign", "AML", [BS("a", Obj(S1("x", Int(1)))), S1("b", Obj(S1("a", Int(2))))], desc="a field may reuse a top-level block name")
@@ -779,8 +791,8 @@ err(BF, "attr_bad_value", "AML", ['statement_block "a" NULL', 'attribute "k" "a,
 BLK = ['statement_block "blk" NULL', "begin_object", 'statement "f" NULL', "int 1", "end_object"]
 err(BF, "base_is_block", "AML", BLK + ['statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"), desc="the reader rejects a block as a base (4052)")
 err(BF, "block_base_is_block", "AML", BLK + ['statement_block "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
-err(BF, "nested_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"), desc="a base is looked up among the top-level names, at any depth")
-err(BF, "nested_block_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement_block "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
+err(BF, "nested_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement "d" "blk"'], E("NESTED_BASE"), desc="a nested base is refused before its target is looked at")
+err(BF, "nested_block_base_is_block", "AML", BLK + ['statement "o" NULL', "begin_object", 'statement_block "d" "blk"'], E("NESTED_BASE"))
 err(BF, "base_is_block_after_others", "AML", ['statement "a" NULL', "int 1"] + BLK + ['statement "b" NULL', "int 2", 'statement "d" "blk"'], E("BASE_IS_BLOCK_FORM"))
 
 # ---- write the scripts (never a dump) ---------------------------------------------------------------------------

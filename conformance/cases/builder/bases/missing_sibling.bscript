@@ -1,5 +1,5 @@
 anvil-builder-script 1
-# bases are looked up among the top-level names only
+# a base on a member of an object is refused, whatever it names
 option on-error continue
 dialect AML
 let outer = object

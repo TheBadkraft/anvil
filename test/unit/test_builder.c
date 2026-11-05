@@ -393,6 +393,13 @@ static void test_b16_attribute_values_are_scalars(void) {
    anvil_builder_dispose(b);
 }
 
+// A nested member (added to an object) takes no base: set_base refuses at once, and the member is
+// left as it was (BR-2611-anvl-resolver-001; the reader's 4022).
+static void expect_nested_base_refused(anvil_builder b, anvil_member m, const char *base, const char *msg) {
+   TestBit.is_false(anvil_builder_set_base(b, m, base), msg);
+   TestBit.is_equal_int(ANVIL_WRITER_ERR_NESTED_BASE, anvil_builder_get_error(b), msg);
+}
+
 /* ---------------------------------------------------------------------- *
  * B17 - BR-2610-anvl-writer-002: a same-document non-object base fails at write/emit
  * ---------------------------------------------------------------------- */
@@ -426,12 +433,10 @@ static void test_b17_base_must_be_object_at_emit(void) {
    anvil_node inner = anvil_builder_object(c);
    anvil_builder_add(c, inner, "g", anvil_builder_int(c, 1));
    anvil_member nested = anvil_builder_add(c, outer, "inner", inner);
-   anvil_builder_set_base(c, nested, "later");
+   expect_nested_base_refused(c, nested, "later", "B17: a nested member's base, even a scalar one declared later");
    ADD(c, "outer", outer);
    ADD(c, "later", anvil_builder_int(c, 3));
-   TestBit.is_null(anvil_builder_emit(c, NULL), "B17: a nested member's scalar base, declared later");
-   TestBit.is_equal_int(ANVIL_WRITER_ERR_INHERITANCE_REQUIRES_OBJECT, anvil_builder_get_error(c),
-                        "B17: nested, late-declared base is refused too");
+   TestBit.is_not_null(anvil_builder_emit(c, NULL), "B17: the refused base left nothing behind");
    anvil_builder_dispose(c);
 
    // a base the builder does not hold (from an include) is accepted
@@ -836,11 +841,9 @@ static void test_b19_missing_base(void) {
    anvil_node inner = anvil_builder_object(b);
    anvil_builder_add(b, inner, "g", anvil_builder_int(b, 1));
    anvil_member nested = anvil_builder_add(b, outer, "inner", inner);
-   anvil_builder_set_base(b, nested, "later");
+   expect_nested_base_refused(b, nested, "later", "B19: nested member, base declared nowhere");
    ADD(b, "outer", outer);
-   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: nested member, base declared nowhere");
-   obj_member(b, "later");
-   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B19: the base declared later is found");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B19: nothing was set, so nothing is missing");
    anvil_builder_dispose(b);
 
    // a sibling is not in scope: the reader looks bases up among the top-level names only
@@ -852,9 +855,9 @@ static void test_b19_missing_base(void) {
    anvil_node der = anvil_builder_object(b);
    anvil_builder_add(b, der, "g", anvil_builder_int(b, 1));
    anvil_member dm = anvil_builder_add(b, o, "der", der);
-   anvil_builder_set_base(b, dm, "sib");
+   expect_nested_base_refused(b, dm, "sib", "B19: a sibling base");
    ADD(b, "o", o);
-   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: a sibling base");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B19: a sibling base left nothing behind");
    anvil_builder_dispose(b);
 
    // a member of an object that is never attached counts too
@@ -863,8 +866,7 @@ static void test_b19_missing_base(void) {
    anvil_node ld = anvil_builder_object(b);
    anvil_builder_add(b, ld, "g", anvil_builder_int(b, 1));
    anvil_member lm = anvil_builder_add(b, loose, "ld", ld);
-   anvil_builder_set_base(b, lm, "nothere");
-   expect_emit_error(b, ANVIL_WRITER_ERR_MISSING_BASE, "B19: an unattached member with a missing base");
+   expect_nested_base_refused(b, lm, "nothere", "B19: an unattached object's member is nested too");
    anvil_builder_dispose(b);
 
    // the non-object check comes before the missing-base check
@@ -1100,10 +1102,9 @@ static void test_b24_a_block_form_member_cannot_be_a_base(void) {
    TestBit.is_not_null(anvil_builder_emit(b, NULL), "B24: a block-form member with an ordinary base");
    anvil_node outer = anvil_builder_object(b);
    anvil_member nested = anvil_builder_add(b, outer, "n", object_with(b, "g", 2));
-   anvil_builder_set_base(b, nested, "blk");
+   expect_nested_base_refused(b, nested, "blk", "B24: a nested member whose base is a top-level block form");
    ADD(b, "outer", outer);
-   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: a nested member whose base is a top-level block form");
-   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: refused as well");
+   TestBit.is_not_null(anvil_builder_emit(b, NULL), "B24: the block form is not even looked at, nothing was set");
    anvil_builder_dispose(b);
 
    // an include does not excuse it: the builder holds the member, so it knows
@@ -1123,9 +1124,7 @@ static void test_b24_a_block_form_member_cannot_be_a_base(void) {
    anvil_builder_set_block(b, blk4, true);
    anvil_node loose = anvil_builder_object(b);
    anvil_member lm = anvil_builder_add(b, loose, "n", object_with(b, "g", 2));
-   anvil_builder_set_base(b, lm, "blk");
-   TestBit.is_null(anvil_builder_emit(b, NULL), "B24: a detached object's member with a block-form base");
-   TestBit.is_equal_int(code, anvil_builder_get_error(b), "B24: refused");
+   expect_nested_base_refused(b, lm, "blk", "B24: a detached object's member with a block-form base");
    anvil_builder_dispose(b);
 
    // the block must have a scalar-free object value to be a base target at all: a scalar base is still
@@ -1166,6 +1165,34 @@ static void test_b25_block_form_in_a_chain_and_a_cycle(void) {
    anvil_builder_dispose(b);
 }
 
+/* ---------------------------------------------------------------------- *
+ * B28 - BR-2611-anvl-resolver-001: only a top-level member has a base; set_base refuses a nested one
+ * ---------------------------------------------------------------------- */
+static void test_b28_nested_member_base(void) {
+   anvil_builder b = anvil_builder_new(ANVIL_WRITER_AML);
+   ADD(b, "a", object_with(b, "q", 1));
+   anvil_node o = anvil_builder_object(b);
+   anvil_member d = anvil_builder_add(b, o, "d", object_with(b, "g", 2));
+   expect_nested_base_refused(b, d, "a", "B28: a member of an object, base naming a top-level object");
+   anvil_member e = anvil_builder_add(b, o, "e", object_with(b, "g", 2));
+   anvil_builder_set_block(b, e, true);
+   expect_nested_base_refused(b, e, "a", "B28: a block-form member of an object");
+   expect_nested_base_refused(b, d, "nothere", "B28: a missing name is still NESTED_BASE");
+   anvil_node deep = anvil_builder_object(b);
+   anvil_member z = anvil_builder_add(b, deep, "z", object_with(b, "g", 3));
+   anvil_builder_add(b, o, "deep", deep);
+   expect_nested_base_refused(b, z, "a", "B28: depth 2");
+   anvil_member top = ADD(b, "top", object_with(b, "h", 4));
+   TestBit.is_true(anvil_builder_set_base(b, top, "a"), "B28: a top-level member still takes a base");
+   ADD(b, "outer", o);
+   size_t len = 0;
+   const char *text = anvil_builder_emit(b, &len);
+   TestBit.is_not_null(text, "B28: the document emits");
+   TestBit.is_true(text && strstr(text, "d : a") == NULL && strstr(text, "e : a") == NULL && strstr(text, "top : a") != NULL,
+                   "B28: only the top-level base is in the text");
+   anvil_builder_dispose(b);
+}
+
 int main(void) {
    TestBit.run_ex("B01_lifecycle", NULL, test_b01_lifecycle, th);
    TestBit.run_ex("B02_scalars", NULL, test_b02_scalars, th);
@@ -1190,6 +1217,7 @@ int main(void) {
    TestBit.run_ex("B21_base_checks_are_linear", NULL, test_b21_base_checks_are_linear, th);
    TestBit.run_ex("B22_block_form_emit", NULL, test_b22_block_form_emit, th);
    TestBit.run_ex("B23_set_block_errors", NULL, test_b23_set_block_errors, th);
+   TestBit.run_ex("B28_nested_member_base", NULL, test_b28_nested_member_base, th);
    TestBit.run_ex("B24_a_block_form_member_cannot_be_a_base", NULL, test_b24_a_block_form_member_cannot_be_a_base, th);
    TestBit.run_ex("B25_block_form_in_a_chain_and_a_cycle", NULL, test_b25_block_form_in_a_chain_and_a_cycle, th);
    return TestBit.report();

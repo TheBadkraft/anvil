@@ -1,0 +1,12 @@
+anvil-builder-script 1
+# the name need not exist: NESTED_BASE is found at set_base, before any lookup (MISSING_BASE never arises)
+option on-error continue
+dialect AML
+let outer = object
+let d = object
+let x = int 2
+add d "j" x
+let dm = add outer "derived" d
+set_base dm "nothere"
+add NULL "outer" outer
+emit

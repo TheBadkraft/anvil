@@ -1,0 +1,5 @@
+anvil-writer-run 1
+failed line=14 code=23 name=ANVIL_WRITER_ERR_NESTED_BASE call="statement \"inner\" \"base\"" message="only a top-level statement can have a base"
+steps 13
+status error code=23 name=ANVIL_WRITER_ERR_NESTED_BASE
+output none

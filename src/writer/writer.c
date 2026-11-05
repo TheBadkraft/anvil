@@ -122,6 +122,8 @@ const char *anvil_writer_error_message(anvil_writer_err_code code) {
       return "a block-form statement must have an object value";
    case ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM:
       return "a base cannot be a block-form statement (it is read-only)";
+   case ANVIL_WRITER_ERR_NESTED_BASE:
+      return "only a top-level statement can have a base";
    }
    return "unknown error";
 }

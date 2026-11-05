@@ -317,7 +317,21 @@ case(BS, "chain", obj_member("a") + [let("b", "object"), let("x", "int 2"), 'add
 case(BS, "several_derived", obj_member("base") + sum([[let("d%d" % i, "object"), let("x%d" % i, "int %d" % i), 'add d%d "j" x%d' % (i, i), let("m%d" % i, 'add NULL "d%d" d%d' % (i, i)), 'set_base m%d "base"' % i] for i in range(4)], []) + ["emit"])
 case(BS, "base_with_attributes", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', 'member_attribute dm "k" "v"', 'member_attribute_string dm "s" "text"', "emit"])
 case(BS, "base_set_after_attributes", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'member_attribute dm "k" "v"', 'set_base dm "base"', "emit"])
-case(BS, "nested_member_base", obj_member("base") + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "base"', 'add NULL "outer" outer', "emit"])
+case(BS, "nested_member_base", obj_member("base") + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "base"', 'add NULL "outer" outer', "emit"], cont=True,
+     desc="only a top-level member has a base (BR-2611-anvl-resolver-001, the reader's 4022): set_base on a member of an object is refused with NESTED_BASE")
+case(BS, "nested_member_base_block_form", obj_member("base") + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_block dm true', 'set_base dm "base"', 'add NULL "outer" outer', "emit"], cont=True,
+     desc="the block form makes no difference: a member of an object takes no base")
+case(BS, "nested_member_base_depth2", obj_member("base") + [let("outer", "object"), let("mid", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add mid "derived" d'), 'add outer "mid" mid', 'set_base dm "base"', 'add NULL "outer" outer', "emit"], cont=True,
+     desc="at any depth")
+case(BS, "nested_member_base_missing_name", [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "nothere"', 'add NULL "outer" outer', "emit"], cont=True,
+     desc="the name need not exist: NESTED_BASE is found at set_base, before any lookup (MISSING_BASE never arises)")
+case(BS, "nested_member_base_own_enclosing", [let("s1", "object"), let("f3", "object"), let("x", "int 1"), 'add f3 "a" x', let("fm", 'add s1 "f3" f3'), 'set_base fm "s1"', 'add NULL "s1" s1', "emit"], cont=True,
+     desc="the reproduction of BR-2611-anvl-resolver-001: a member based on its own enclosing top-level statement")
+case(BS, "nested_member_base_refused_keeps_old", obj_member("base") + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "base"', 'set_base dm "base"', 'add NULL "outer" outer', "emit", "get_error"], cont=True,
+     desc="a refusal changes nothing, however often it is repeated")
+case(BS, "nested_member_base_then_top_level", obj_member("base") + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "base"', let("t", "object"), let("tx", "int 3"), 'add t "z" tx', let("tm", 'add NULL "top" t'), 'set_base tm "base"', 'add NULL "outer" outer', "emit"], cont=True,
+     desc="the refusal is per member: a top-level member still takes a base")
+case(BS, "nested_member_base_in_array_object", obj_member("base") + [let("arr", "array"), let("o", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add o "derived" d'), 'set_base dm "base"', "append arr o", 'add NULL "list" arr', "emit"], cont=True)
 for bi, bad in enumerate(("", "1", "a-b", "a.b", "a b", "true", "null", "include", "café")):
     case(BS, "bad_base_%02d" % bi, obj_member("base") + ['set_base m %s' % q(bad), "get_error"], cont=True, desc="base %s" % q(bad))
 case(BS, "bad_base_null", obj_member("base") + ["set_base m NULL", "get_error"], cont=True)
@@ -336,13 +350,14 @@ case(BS, "cycle_with_include", ['include "x.anvl"'] + two_objs() + ['set_base ma
 case(BS, "cycle_broken_by_replace", two_objs() + ['set_base ma "b"', 'set_base mb "a"', "emit", 'set_base mb "nothing"', "emit"], cont=True, desc="replacing a base in the cycle by one that names nothing gives MISSING_BASE instead")
 case(BS, "cycle_repaired", two_objs() + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "c" oc'), 'set_base ma "b"', 'set_base mb "a"', "emit", 'set_base mb "c"', "emit"], cont=True, desc="repointing b at c ends the cycle")
 case(BS, "cycle_vs_scalar_first", [let("n", "int 1"), 'add NULL "n" n'] + two_objs("p", "q") + [let("oc", "object"), let("xc", "int 3"), 'add oc "f" xc', let("mc", 'add NULL "r" oc'), 'set_base ma "q"', 'set_base mb "p"', 'set_base mc "n"', "emit"], cont=True, desc="the scalar base is reported before the cycle")
-case(BS, "cycle_nested_member_not_part", two_objs() + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "d" d'), 'set_base dm "a"', 'add NULL "outer" outer', 'set_base ma "b"', "emit"], desc="a nested member named like a top-level one is not part of a chain")
+case(BS, "cycle_nested_member_not_part", two_objs() + [let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "d" d'), 'set_base dm "a"', 'add NULL "outer" outer', 'set_base ma "b"', "emit"], cont=True,
+     desc="a nested member named like a top-level one is not part of a chain: its base is refused, the top-level one is kept")
 case(BS, "missing_no_include", two_objs() + ['set_base ma "nothere"', "emit", "write", "get_error"], cont=True, desc="no include: the reader would reject MISSING_BASE")
 case(BS, "missing_with_include", ['include "x.anvl"'] + two_objs() + ['set_base ma "nothere"', "emit", "write"], desc="an include may supply the base")
 case(BS, "missing_include_added_later", two_objs() + ['set_base ma "nothere"', "emit", 'include "x.anvl"', "emit"], cont=True, desc="the check looks at the includes held at emit time")
 case(BS, "missing_declared_later", two_objs() + ['set_base ma "later"', let("ol", "object"), let("xl", "int 3"), 'add ol "f" xl', 'add NULL "later" ol', "emit"], desc="a base declared after the statement is found")
-case(BS, "missing_sibling", [let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"], cont=True, desc="bases are looked up among the top-level names only")
-case(BS, "missing_sibling_with_include", ['include "x.anvl"', let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"])
+case(BS, "missing_sibling", [let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"], cont=True, desc="a base on a member of an object is refused, whatever it names")
+case(BS, "missing_sibling_with_include", ['include "x.anvl"', let("outer", "object"), let("s", "object"), let("sx", "int 1"), 'add s "f" sx', 'add outer "sib" s', let("d", "object"), let("dx", "int 2"), 'add d "f" dx', let("dm", 'add outer "der" d'), 'set_base dm "sib"', 'add NULL "outer" outer', "emit"], cont=True)
 case(BS, "missing_replaced_by_valid", two_objs() + ['set_base ma "nothere"', "emit", 'set_base ma "b"', "emit"], cont=True)
 case(BS, "missing_vs_scalar_first", [let("n", "int 1"), 'add NULL "n" n'] + two_objs("p", "q") + ['set_base ma "gone"', 'set_base mb "n"', "emit"], cont=True, desc="the scalar base is reported before the missing one")
 case(BS, "missing_nested_non_object_with_include", ['include "x.anvl"', let("o", "object"), let("n", "int 1"), 'add o "target" n', 'add NULL "outer" o', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"])
@@ -362,12 +377,12 @@ case(BS, "target_non_object_declared_later", [let("d", "object"), let("x", "int 
 case(BS, "target_only_nested_missing", [let("o", "object"), let("n", "int 1"), 'add o "target" n', 'add NULL "outer" o', let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "target"', "emit"],
      desc="a name that exists only inside an object (a scalar there) is not a top-level name: MISSING_BASE, not the non-object error")
 # nested and unattached members: the check runs over every member the builder created
-case(BS, "nested_member_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "target"', 'add NULL "outer" outer', "emit"])
+case(BS, "nested_member_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("outer", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add outer "derived" d'), 'set_base dm "target"', 'add NULL "outer" outer', "emit"], cont=True)
 case(BS, "unattached_member_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "target"', "emit", "write", "get_error"], cont=True,
-     desc="a member of an object that is never attached still fails the check")
-case(BS, "unattached_member_missing_target", [let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "nothere"', "emit"])
-case(BS, "unattached_member_valid_target", obj_member("base") + [let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "base"', "emit"])
-case(BS, "unattached_member_in_array_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("arr", "array"), let("o", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add o "derived" d'), 'set_base dm "target"', "append arr o", "emit"],
+     desc="a member of an object that is never attached is nested too: its base is refused")
+case(BS, "unattached_member_missing_target", [let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "nothere"', "emit"], cont=True)
+case(BS, "unattached_member_valid_target", obj_member("base") + [let("loose", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add loose "derived" d'), 'set_base dm "base"', "emit"], cont=True)
+case(BS, "unattached_member_in_array_target_non_object", [let("t", "int 1"), 'add NULL "target" t', let("arr", "array"), let("o", "object"), let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add o "derived" d'), 'set_base dm "target"', "append arr o", "emit"], cont=True,
      desc="the array holding the object is never attached")
 case(BS, "target_becomes_non_object_later", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', "emit", let("s", "int 5"), 'add NULL "base2" s', 'set_base dm "base2"', "emit"], cont=True)
 case(BS, "failed_set_base_keeps_old", obj_member("base") + [let("d", "object"), let("x", "int 2"), 'add d "j" x', let("dm", 'add NULL "derived" d'), 'set_base dm "base"', 'set_base dm "1x"', "emit"], cont=True)
@@ -403,7 +418,9 @@ case(BK, "nested_member", [let("v", "int 1"), let("inner", "object"), 'add inner
 case(BK, "nested_in_nested", [let("v", "int 1"), let("c", "object"), 'add c "x" v', let("b", "object"), let("cm", 'add b "c" c'), 'set_block cm true', let("a", "object"), let("bm", 'add a "b" b'), 'set_block bm true',
                               let("am", 'add NULL "a" a'), 'set_block am true', "emit"])
 case(BK, "nested_with_base", blk("base", "ob", "mb") + [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true', 'set_base im "base"',
-                                                      'member_attribute im "k" "v"', 'add NULL "outer" outer', "emit"], desc="a nested block form has a base looked up among the top-level names")
+                                                      'member_attribute im "k" "v"', 'add NULL "outer" outer', "emit"], cont=True, desc="a nested block form has no base (only a top-level statement has one): refused, the rest is kept")
+case(BK, "nested_with_attributes", [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true',
+                                    'member_attribute im "k" "v"', 'add NULL "outer" outer', "emit"], desc="a nested block form may have attributes")
 case(BK, "array_of_objects_inside", [let("a", "array"), let("o1", "object"), let("k1", "int 1"), 'add o1 "k" k1', let("o2", "object"), let("k2", "int 2"), 'add o2 "k" k2', "append a o1", "append a o2",
                                      let("p", "object"), 'add p "list" a', let("pm", 'add NULL "p" p'), 'set_block pm true', "emit"])
 case(BK, "with_header", ['attribute "doc" NULL', 'include "inc.anvl"'] + blk() + ['set_block m true', "emit"])
@@ -447,7 +464,7 @@ case(BK, "two_blocks_on_each_other", blk("p", "op", "mp") + blk("q", "oq", "mq")
 case(BK, "self_base_block", blk("p", "op", "mp") + ['set_block mp true', 'set_base mp "p"', "emit"], cont=True)
 case(BK, "nested_member_base_is_block", blk() + [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block m true', 'set_base im "blk"', 'add NULL "outer" outer', "emit"], cont=True)
 case(BK, "unattached_member_base_is_block", blk() + [let("v", "int 1"), let("loose", "object"), let("inner", "object"), 'add inner "x" v', let("lm", 'add loose "n" inner'), 'set_block m true', 'set_base lm "blk"', "emit"], cont=True,
-     desc="a member of an object that is never attached is checked too")
+     desc="a member of an object that is never attached is nested too: its base is refused")
 case(BK, "base_is_block_with_include", ['include "x.anvl"'] + blk() + derived() + ['set_block m true', 'set_base dm "blk"', "emit"], cont=True,
      desc="an include does not excuse it: the builder holds the member")
 case(BK, "base_is_nested_block_name_only", [let("v", "int 1"), let("inner", "object"), 'add inner "x" v', let("outer", "object"), let("im", 'add outer "inner" inner'), 'set_block im true', 'add NULL "outer" outer'] + derived() + ['set_base dm "inner"', "emit"], cont=True,

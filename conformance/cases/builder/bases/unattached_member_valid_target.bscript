@@ -1,4 +1,5 @@
 anvil-builder-script 1
+option on-error continue
 dialect AML
 let o_v = int 1
 let o = object

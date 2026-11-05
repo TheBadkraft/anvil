@@ -1,5 +1,6 @@
 anvil-builder-script 1
-# a nested member named like a top-level one is not part of a chain
+# a nested member named like a top-level one is not part of a chain: its base is refused, the top-level one is kept
+option on-error continue
 dialect AML
 let oa = object
 let xa = int 1

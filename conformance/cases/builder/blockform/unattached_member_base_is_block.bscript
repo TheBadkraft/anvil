@@ -1,5 +1,5 @@
 anvil-builder-script 1
-# a member of an object that is never attached is checked too
+# a member of an object that is never attached is nested too: its base is refused
 option on-error continue
 dialect AML
 let o_v = int 1
