@@ -54,6 +54,26 @@ JS
 else
   echo "FAIL browser: FlyWire files not found in $fw"; exit 1
 fi
+# v0.14.0-rc overlay: the nested-base rule in the packaged dist/ (reader 4022 at once, writer 23, builder setBase 23).
+node - "$work/test-browser/checks.js" <<'JS' || { echo "FAIL browser: could not add the nested-base check"; exit 1; }
+const fs = require('fs');
+const target = process.argv[2];
+const snippet = `   check('v0.14 nested base: reader 4022 at once, writer code 23, builder setBase code 23', () => {
+      eq(anvl.parse('#!aml\\ns1 := { f3 : s1 { a := 1; }; };\\n'), null, 'the loop reproduction does not load');
+      eq(anvl.lastError().code, 4022, 'code 4022'); eq(anvl.lastError().name, 'ANVL_ERR_PARSER_NESTED_BASE', 'name');
+      eq(anvl.parse('#!aml\\nb := { a := 1; };\\nd : b := { c := 2; };\\n') === null, false, 'a top-level base loads');
+      let code = -1; try { anvl.AnvilWriter.create(anvl.AnvilDialect.AML).statement('o').beginObject().statement('x', 'b'); } catch (e) { code = e.code; }
+      eq(code, 23, 'writer nested base is 23');
+      const b = anvl.AnvilBuilder.create(anvl.AnvilDialect.AML); const o = b.object(); const m = o.add('f', b.value(1)); b.add('o', o);
+      code = -1; try { m.setBase('o'); } catch (e) { code = e.code; }
+      eq(code, 23, 'builder setBase on a nested member is 23');
+   });
+`;
+let s = fs.readFileSync(target, 'utf8');
+const mark = '   const descriptions = {};';
+if (!s.includes(mark)) throw new Error('no insertion point in checks.js');
+fs.writeFileSync(target, s.replace(mark, snippet + mark));
+JS
 cd "$work"
 "$wasm/test-browser/prove-harness.sh" >"$work/prove.log" 2>&1 || { tail -20 "$work/prove.log"; echo "FAIL browser: prove-harness.sh failed; no browser was started"; exit 1; }
 echo "PASS browser: harness proof (no browser started)"
