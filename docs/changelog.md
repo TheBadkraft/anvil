@@ -41,11 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loads clean through the public accessors and fails on a loop, which `anvil-dump` could not see; run against v0.14.0-rc it reports a loop in exactly the 68 documents of `refcycle/` that this
   change refuses. Speed, native with this change vs native v0.14.0-rc (e2d8700), median time per load of the
   bench/parse_validate workloads, 15 interleaved rounds pinned to one core, lower is faster (ratio < 1.00x is faster than v0.14.0-rc):
-  no reference in the document, so the pass is skipped: parse_floats 1.004x, parse_ints 1.010x, parse_mixed 1.002x, validate_floats
-  1.001x, validate_small 0.995x. Documents full of references pay for the extra walk over each statement: a chain of 100000
-  statements 1.136x, a ladder of two references per statement 1.143x, one object with 100000 references 1.105x, a base inherited by
-  20000 statements 1.080x, the mixed message document with a reference in every row 1.079x, a ring of 100000 statements (loaded clean
-  before, refused now) 1.168x; a plain `$a0 := $a1;` chain of 3000, which has no container to walk, 1.009x. Refused as a cycle, the
+  no reference in the document, so the pass is skipped: parse_floats 0.998x, parse_ints 1.002x, parse_mixed 1.008x, validate_floats
+  1.001x, validate_small 0.991x. Documents full of references pay for the extra walk over each statement: a chain of 100000
+  statements 1.138x, a ladder of two references per statement 1.136x, one object with 100000 references 1.111x, a base inherited by
+  20000 statements 1.109x, a base whose one big field (an array, or an object, of 5000) is inherited by 5000 statements 1.111x and
+  1.095x, the mixed message document with a reference in every row 1.088x, a ring of 100000 statements (loaded clean before, refused
+  now) 1.178x; a plain `$a0 := $a1;` chain of 3000, which has no container to walk, 1.006x. Refused as a cycle, the
   100000-statement ring takes 42 ms.
 
 ---
