@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cycle `a := $b; b := $a;` (still unresolved, `null`). **Position:** the `$` of the first reference that lies on a cycle, in source
   order, the documents in load order (the root first, then the includes in the order of the dump's `doc` numbers), then by byte
   offset inside a document; a reference whose target cannot get back to the statement holding it is skipped however early it is
-  written. Found with one pass over the statements (iterative strongly-connected components over the top-level statements; an inherited field's subtree is walked once however many statements derive from it, so the cost is linear in the document plus, per deriving statement, its member count and the references it inherits), so a ring of 100000
+  written. Found with one pass (iterative strongly-connected components over the top-level statements and the fields they inherit: an inherited field is a vertex of its own that holds its references once, so many statements deriving one base cost one edge each, never a copy of the base's references; time and memory are O(the document + the merged member count)), so a ring of 100000
   statements, a hub of 100000 references or a ladder of two references per statement load in tens of milliseconds. Documents
   without a reference are not touched (load time 1.00x, see the figures below). The builder refuses the same documents at
   `anvil_builder_write` and `anvil_builder_emit` with the new `ANVIL_WRITER_ERR_REFERENCE_CYCLE` = 24 (appended, "reference cycle:

@@ -207,6 +207,23 @@ static char *gen_ref_inherit_wide(size_t m, int nested, size_t *len) {
    return b;
 }
 
+/* one big field holding m references to one value, inherited by m statements: the cost must be about the document's
+ * size, not m times the number of references (BR-2611-anvl-resolver-002, F5) */
+static char *gen_ref_inherit_refs(size_t m, size_t *len) {
+   size_t cap = 256 + m * 48;
+   char *b = malloc(cap);
+   size_t p = (size_t)snprintf(b, cap, "#!aml\nt := 1;\nbase := { a := [ ");
+   for (size_t i = 0; i < m; i++) {
+      p += (size_t)snprintf(b + p, cap - p, "$t, ");
+   }
+   p += (size_t)snprintf(b + p, cap - p, "1 ]; };\n");
+   for (size_t i = 0; i < m; i++) {
+      p += (size_t)snprintf(b + p, cap - p, "d%zu : base := { x := 1; };\n", i);
+   }
+   *len = p;
+   return b;
+}
+
 /* a plain chain a0 := $a1; ... (each resolves by chasing the whole chain: the resolver's own cost, not the cycle check's) */
 static char *gen_ref_plain_chain(size_t n, size_t *len) {
    size_t cap = 64 + n * 32;
@@ -259,6 +276,9 @@ static void bench_references(void) {
    free(t);
    t = gen_ref_inherit_wide(5000, 1, &len);
    bench_load("refs_inherit_wide_object_5k", t, len);
+   free(t);
+   t = gen_ref_inherit_refs(5000, &len);
+   bench_load("refs_inherit_refs_5k", t, len);
    free(t);
    t = gen_ref_plain_chain(3000, &len);
    bench_load("refs_plain_chain_3k", t, len);
