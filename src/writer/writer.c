@@ -331,8 +331,9 @@ static bool statement_begin(anvil_writer w, const char *name, const char *base, 
    if (!check(w, wg_check_name(name)) || (base && !check(w, wg_check_name(base)))) {
       return false;
    }
-   // A base names a top-level statement, and the reader rejects a block-form one there (4052).
-   if (base && wg_nameset_get(&w->block_names, base)) {
+   // A base names a top-level statement, and the reader rejects a block-form one there (4052). (A base
+   // inside an object is refused below as a nested base, whatever it names.)
+   if (base && w->depth == 0 && wg_nameset_get(&w->block_names, base)) {
       return fail(w, ANVIL_WRITER_ERR_BASE_IS_BLOCK_FORM);
    }
    if (w->depth == 0) {
@@ -354,6 +355,11 @@ static bool statement_begin(anvil_writer w, const char *name, const char *base, 
       }
       if (added == 0) {
          return fail(w, ANVIL_WRITER_ERR_DUPLICATE_FIELD);
+      }
+      // Only a top-level statement may have a base; the reader rejects one inside an object (4022),
+      // after the name (so a repeated field is still the duplicate-field error).
+      if (base) {
+         return fail(w, ANVIL_WRITER_ERR_NESTED_BASE);
       }
    }
    wg_nameset_free(&w->stmt_keys); // a new statement starts with no attribute keys
