@@ -836,12 +836,46 @@ static size_t member_by_name(const struct anvil_builder_t *b, const char *name) 
 }
 
 typedef struct {
+   size_t *final;         // member -> the member whose value its reference chain ends in, SIZE_MAX if none
+   unsigned char *state;  // 0 not computed, 1 on the current chase, 2 done
+   size_t *path;          // scratch of n entries
    size_t *start; // n + 1 offsets into to
    size_t *to;    // edge targets (member indices)
    size_t count, cap;
    const struct anvil_node_t **stack; // scratch for the subtree scan
    size_t stack_cap;
 } ref_graph;
+
+static size_t ref_final(const struct anvil_builder_t *b, ref_graph *g, size_t j) {
+   size_t depth = 0, result = SIZE_MAX;
+   for (;;) {
+      if (g->state[j] == 2) {
+         result = g->final[j];
+         break;
+      }
+      if (g->state[j] == 1) {
+         break; // a chain cycle: unresolved
+      }
+      g->state[j] = 1;
+      g->path[depth++] = j;
+      const struct anvil_node_t *v = b->members[j]->value;
+      if (v->kind != NODE_VARREF) {
+         result = j;
+         break;
+      }
+      size_t next = member_by_name(b, v->text);
+      if (next == SIZE_MAX) {
+         break;
+      }
+      j = next;
+   }
+   while (depth > 0) {
+      size_t k = g->path[--depth];
+      g->final[k] = result;
+      g->state[k] = 2;
+   }
+   return result;
+}
 
 static bool ref_edge(ref_graph *g, size_t target) {
    if (g->count == g->cap) {
@@ -865,7 +899,8 @@ static bool ref_scan(const struct anvil_builder_t *b, ref_graph *g, const struct
       const struct anvil_node_t *n = g->stack[--top];
       if (n->kind == NODE_VARREF) {
          size_t t = member_by_name(b, n->text);
-         if (t != SIZE_MAX && b->members[t]->value->kind != NODE_VARREF && !ref_edge(g, t)) {
+         size_t fin = t == SIZE_MAX ? SIZE_MAX : ref_final(b, g, t);
+         if (fin != SIZE_MAX && !ref_edge(g, fin)) {
             return false;
          }
          continue;
@@ -935,17 +970,20 @@ static bool ref_graph_has_cycle(ref_graph *g, size_t n, bool *memory) {
 }
 
 // A cycle among the members' references: member S has an edge to member T for every reference in its fields and
-// elements, at any depth, that names T (whose value is not itself a reference).
+// elements, at any depth, that resolves to the value of T (through any chain of references: a := $b; b := $c;).
 static anvil_writer_err_code check_references(anvil_builder b) {
    if (b->varref_count == 0 || b->member_count == 0) {
       return ANVIL_WRITER_OK;
    }
    size_t n = b->member_count;
    ref_graph g = {0};
+   g.final = malloc(n * sizeof *g.final);
+   g.state = calloc(n, 1);
+   g.path = malloc(n * sizeof *g.path);
    g.start = malloc((n + 1) * sizeof *g.start);
    g.stack_cap = 64;
    g.stack = malloc(g.stack_cap * sizeof *g.stack);
-   anvil_writer_err_code result = g.start && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
+   anvil_writer_err_code result = g.final && g.state && g.path && g.start && g.stack ? ANVIL_WRITER_OK : ANVIL_WRITER_ERR_MEMORY;
    for (size_t i = 0; result == ANVIL_WRITER_OK && i < n; i++) {
       g.start[i] = g.count;
       if (b->members[i]->value->kind != NODE_VARREF && !ref_scan(b, &g, b->members[i]->value)) {
@@ -959,6 +997,9 @@ static anvil_writer_err_code check_references(anvil_builder b) {
                : memory                           ? ANVIL_WRITER_ERR_MEMORY
                                                   : ANVIL_WRITER_OK;
    }
+   free(g.final);
+   free(g.state);
+   free(g.path);
    free(g.start);
    free(g.to);
    free((void *)g.stack);
