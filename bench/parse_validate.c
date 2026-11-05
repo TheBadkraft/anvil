@@ -8,7 +8,7 @@
  * FlyWire-style message x 10k: strings, ints, floats, bools, nested object, array), and
  * validate (schema validation of the floats document). The refs_* workloads (BR-2611-anvl-resolver-002) are documents
  * full of '$' references, acyclic and adversarial: a chain of 100k statements, a ladder of two references each, a hub
- * of 100k references to one object, a base inherited by 20k statements, a chain of plain references, mixed rows that
+ * of 100k references to one object, a base inherited by 20k statements, a base whose one big field (array or object of 5k) is inherited by 5k statements, a chain of plain references, mixed rows that
  * each hold a reference, and a ring of 100k statements (a reference cycle: loaded clean before BR-2611-anvl-resolver-002,
  * refused since; timed either way, so the cost of finding it is in the number). Each is timed as the median of SAMPLES
  * samples; one sample is REPS back-to-back calls. Output: "name median_ms_per_call".
@@ -189,6 +189,24 @@ static char *gen_ref_inherit(size_t n, size_t *len) {
    return b;
 }
 
+/* a base holding one big field (an array of m elements, or an object of m fields) inherited by m statements, and one
+ * reference that turns the cycle check on: the cost must not be m times the size of the field */
+static char *gen_ref_inherit_wide(size_t m, int nested, size_t *len) {
+   size_t cap = 256 + m * 56;
+   char *b = malloc(cap);
+   size_t p = (size_t)snprintf(b, cap, "#!aml\nbase := { big := %s", nested ? "{ " : "[ ");
+   for (size_t i = 0; i < m; i++) {
+      p += (size_t)snprintf(b + p, cap - p, nested ? "f%zu := 1; " : "1, ", i);
+   }
+   p += (size_t)snprintf(b + p, cap - p, nested ? "}; };\n" : " ]; };\n");
+   for (size_t i = 0; i < m; i++) {
+      p += (size_t)snprintf(b + p, cap - p, "d%zu : base := { x := 1; };\n", i);
+   }
+   p += (size_t)snprintf(b + p, cap - p, "t := 1;\nr := $t;\n");
+   *len = p;
+   return b;
+}
+
 /* a plain chain a0 := $a1; ... (each resolves by chasing the whole chain: the resolver's own cost, not the cycle check's) */
 static char *gen_ref_plain_chain(size_t n, size_t *len) {
    size_t cap = 64 + n * 32;
@@ -235,6 +253,12 @@ static void bench_references(void) {
    free(t);
    t = gen_ref_inherit(20000, &len);
    bench_load("refs_inherit_20k", t, len);
+   free(t);
+   t = gen_ref_inherit_wide(5000, 0, &len);
+   bench_load("refs_inherit_wide_array_5k", t, len);
+   free(t);
+   t = gen_ref_inherit_wide(5000, 1, &len);
+   bench_load("refs_inherit_wide_object_5k", t, len);
    free(t);
    t = gen_ref_plain_chain(3000, &len);
    bench_load("refs_plain_chain_3k", t, len);
