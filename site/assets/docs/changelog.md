@@ -3,6 +3,197 @@
 What changed in each release of Anvil, for people using it. Downloads are on the
 [download page](/download).
 
+## v0.14.1-rc
+
+Released 2026-11-05. This is a release candidate.
+
+v0.14.1-rc is a patch release with one behaviour change: **a `$` reference that leads back to a value that contains it is now
+an error.** **Read it first if any of your documents has a `$` reference that points at one of its own enclosing objects.** It
+is also the first release of the Python and .NET packages since v0.13.1-rc, so they now include everything in v0.14.0-rc.
+
+### Behaviour change: a reference that leads back to a container is an error (4054)
+
+`s1 := { a := $s1; };` used to load without an error, and then any walk over the resolved document (a dump, a serialiser, a
+binding reading through accessors that follow references) never finished. Such a document now fails to load with the new
+resolver error `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` (4054), "A reference leads back to a value that contains it" (public
+category `ANVIL_ERR_RESOLVE`).
+
+- **The rule.** A walk of the resolved document follows a container's own members, the fields a statement inherits from its
+  base (not those it overrides by name) and a resolved `$` reference to its target statement's value. If any value can reach a
+  value it is already inside, the document is refused. That covers `s1 := { a := { b := $s1; }; };`, `a := [ $a ];`,
+  `a := { x := $b; }; b := { y := $a; };`, a cycle closed through inheritance (`a := { x := $b; }; b : a := { z := 1; };`) and a
+  cycle across included documents.
+- **Not refused, unchanged.** A reference to a scalar, a reference with no way back, and the plain chain cycle
+  `a := $b; b := $a;`, which still resolves to null.
+- **Position.** The error is reported at the `$` of the first reference that lies on a cycle, in source order (included
+  documents in load order, then byte offset inside a document). `s1 := { a := $s1; };` is at line 2, column 14.
+- **Writer and builder.** The builder refuses the same documents at `anvil_builder_write` and `anvil_builder_emit` with the new
+  `ANVIL_WRITER_ERR_REFERENCE_CYCLE` (24), "reference cycle: a '$' reference leads back to a value that contains it". The
+  streaming writer holds no document and cannot see it, in the same way it cannot see a base cycle. In anvil.js:
+  `WriterErrorCode.REFERENCE_CYCLE`, from `AnvilBuilder#emit`, `emitBytes` and `write`.
+- **Documents that had such a reference no longer load.** Point the reference at something that does not contain it. Nothing
+  else changed.
+- **Cost.** The check is one pass, linear in the document: a ring of 100,000 statements is refused in about 42 ms. Documents with
+  no `$` reference skip it. See the performance section for what documents full of references pay.
+- **The library still exports 174 functions**, unchanged.
+- **anvil.js has the same rule and codes**, and matches the native conformance corpora: reader 2039, writer 854 + 16
+  C-API-only (870), builder 955 + 54 C-API-only (1009) and schema 561.
+
+### Python and .NET are back
+
+The Python and .NET packages had no v0.14.0-rc release, so v0.14.1-rc is the first since v0.13.1-rc. They now include
+everything from v0.14.0-rc and this release:
+
+- **A base on a nested statement is an error:** reader 4022, writer and builder code 23. This is a breaking change from
+  v0.13.1-rc, where such a document loaded (and could loop). Rewrite it with the base on a top-level statement.
+- **Block-form writer and builder:** Python `statement_block` and `set_block`; .NET `StatementBlock` and `SetBlock`; writer codes 21
+  and 22.
+- **An error names its document:** Python `AnvilError.source`; .NET `AnvilError.Source`. Include errors are reported at the
+  `include` keyword.
+- **Writer codes 17 to 24** are mirrored, including the reference-cycle code 24 above.
+
+Their full test suites pass against this release's library (Python 217, .NET 199), including the checks that every native
+structure and error code is mirrored.
+
+### Known issues
+
+- **Very deep nesting can crash the parser.** A document nested deeper than the parser can follow can bring the process down.
+  Not fixed in this release.
+- **Long inheritance chains load slowly.** Resolving a very long chain of bases takes time that grows faster than the length of
+  the chain. Not fixed in this release.
+- **Documents full of `$` references load slower than in v0.14.0-rc** (see below).
+- **The first load in a new process is about 1 microsecond slower** than in v0.14.0-rc (see below).
+
+### Downloads
+
+The native download (core) is Linux x86_64 (glibc). The Python and .NET downloads are Linux x64 and carry the same
+`libanvil.so` as the core download, byte for byte. anvil.js is plain JavaScript: it runs in Node 18 or later and in any
+browser. All four are built from the same source tag; the library reports exactly `0.14.1-rc+585`, and every binding reports the
+same string.
+
+| Download | What it is |
+|---|---|
+| `anvil-v0.14.1-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
+| `anvil.js-v0.14.1-rc.tar.gz` | The pure-JavaScript package for Node and browsers: reader, writer, builder, types and schema |
+| `anvil-py-v0.14.1-rc-linux-x64.tar.gz` | The Python package, over the bundled `libanvil.so` |
+| `anvil-net-v0.14.1-rc-linux-x64.tar.gz` | The .NET package, over the bundled `libanvil.so` |
+
+The Node (`anvil-node`) and WebAssembly (`anvil-wasm`) builds are not part of this release; their v0.11.0-rc downloads stay
+available at their existing addresses. The Java binding is not distributed.
+
+`SHA256SUMS` lists every published download, this release and the earlier ones (`SHA256SUMS-v0.14.1-rc` lists this release
+only):
+
+<!-- example: fragment a release checksum list, not code -->
+```
+602ccd9a07408e7f64958693d0e09beb1d9faf78bc172b41397441f9abcd2794  anvil.js-v0.14.1-rc.tar.gz
+a6cb0036d04e607953b36d446f2a0234d3183476aadd413aeaf95269d9ac3a42  anvil-net-v0.14.1-rc-linux-x64.tar.gz
+74ff114b3df084e2a7aac04d0546154a6f72eba0b9629ecd91c03cb0673b6a22  anvil-py-v0.14.1-rc-linux-x64.tar.gz
+b44727e036c0b34e84df906b65ec01d0aa931e41819805793c0a979f03076baa  anvil-v0.14.1-rc-linux-x86_64.tar.gz
+```
+
+Earlier releases' lines follow unchanged in `SHA256SUMS`; every earlier file stays available at its address.
+
+### Performance
+
+Every figure is time taken, as subject divided by baseline, so lower is faster. Measured on the packaged files' source, one
+machine, one or two pinned CPUs, each side in its own fresh process unless stated.
+
+#### Native: v0.14.1-rc against v0.14.0-rc
+
+Documents without a `$` reference are unchanged when parsed repeatedly (warm; 15 interleaved rounds, static library): parse_floats
+1.000x, parse_ints 0.993x, parse_mixed 1.000x, validate_floats 0.995x, validate_small 0.999x. Through `libanvil.so` (3 rounds):
+1.002x, 1.003x, 1.005x, 1.008x and 0.982x. Loading 20,000 five-line documents: 1.006x and 0.996x (static library, two runs) and
+0.994x (`libanvil.so`).
+
+**The first load in a new process is about 1 microsecond slower.** Cold, the first load in a fresh process, median of 31
+processes: 15.7 against 16.7 microseconds (1.063x, static library; a second run 1.068x), and 18.7 against 19.8 microseconds
+(1.058x, `libanvil.so`). It is a one-time cost per process, it does not show in repeated loads, and it is not fixed in this
+release.
+
+**Documents full of `$` references load about 1.1x slower** (warm, static library, 15 rounds): a chain of 100,000 references
+1.132x, a ladder of two references per statement 1.135x, one object with 100,000 references 1.106x, a base inherited by 20,000
+statements 1.100x, a base with one field of 5,000 references inherited by 5,000 statements 1.116x, a base with a big array or
+object field inherited by 5,000 statements 1.092x and 1.075x, and a ring of 100,000 statements (loaded before, refused now)
+1.170x. A plain `$a0 := $a1;` chain of 3,000 is 1.005x, and a mixed message document with a reference in every row was 0.866x.
+Through `libanvil.so` (3 rounds) the rows are 1.086x to 1.172x. This is not fixed in this release.
+
+#### anvil.js: v0.14.1-rc against anvil.js v0.14.0-rc
+
+`parse()` time, warm, median of 101 calls per process, median over 6 rounds, each arm in its own process, both arm orders
+(baseline first / new first):
+
+| Document | Baseline first | New first |
+|---|---|---|
+| FlyWire message x2000 | 0.974x | 1.003x |
+| plain, 5000 statements | 0.983x | 1.010x |
+| attributed, 5000 | 1.008x | 0.984x |
+| tagged blobs, 5000 | 1.006x | 0.986x |
+| untagged blobs, 5000 | 1.010x | 1.018x |
+| floats, 3000 | 0.965x | 1.005x |
+| floats 10k x 10 | 2.027x (0.992x and 0.944x on a rerun of 6 rounds) | 0.997x |
+| table, 10,000 rows | 0.979x | 1.001x |
+| mixed, about 1 MB | 0.998x | 1.010x |
+| inherit x2000, no references | 1.009x | 1.020x |
+| **reference to a scalar x5000** | **1.974x** | **2.049x** |
+| **reference chain x5000** | **1.888x** | **1.896x** |
+| **inherit with 100 references x 2000** | **1.566x** | **1.485x** |
+
+Documents with no `$` reference are unchanged. **Documents with `$` references parse about 1.5x to 2x slower in anvil.js** (the
+bold rows) because of the new check. This is not fixed in this release. The check is linear in the document: a ring or a hub of
+100,000 statements still loads in a fraction of a second.
+
+#### Known performance gaps in anvil.js against anvil-node (not fixed; scheduled for a later release)
+
+Unchanged from v0.14.0-rc and v0.13.1-rc, because anvil.js reads documents without references within the ranges above of the
+previous release. Small documents are where anvil.js is slower than anvil-node. These are not promises, and they are not fixed.
+They supersede the figures in the package's README.
+
+anvil.js v0.13.1-rc vs anvil-node v0.10.0-rc, FlyWire's per-request documents, time ratio, lower is faster:
+
+| Document | Cold | Warm |
+|---|---|---|
+| small `@bin` read response, 1 / 5 / 17 rows | 1.38x / 1.35x / 1.59x | 2.09x / 2.64x / 1.42x |
+| small `@bin` poll response, 1 / 5 / 17 rows | 1.36x / 1.36x / 1.58x | 2.02x / 2.59x / 1.42x |
+| `@bin` envelope, 17 / 100 rows | 1.52x / 1.45x | 1.36x / 0.81x |
+| `@table` envelope, 17 / 100 rows | 1.42x / 1.15x | 0.77x / 0.34x |
+| error document | 1.65x | 1.91x |
+| raw table text, 17 rows | 1.12x | 0.44x |
+
+Every other document size measured, from 1,000 rows up, is at 0.19x to 0.93x. `Schema.load` is 11.1x slower than anvil-node (0.374
+ms against 0.034 ms for FlyWire's assets schema). Writing 1,000 FlyWire-shaped requests in anvil.js v0.14.0-rc was about 1.2x
+slower than v0.13.1-rc, and v0.14.1-rc is the same as v0.14.0-rc there.
+
+### Checks
+
+Every check ran on the packaged files, not on a build tree.
+
+- Two builds of each download from the tag are byte-identical.
+- Core: the reported version is `0.14.1-rc+585`; an `include` of a missing file gives an include-not-found error; 174 exported
+  functions and no internal symbol; every header compiles on its own and links from C++; valgrind, thread-sanitizer and
+  reader-only checks pass on the source tag.
+- anvil.js, installed with `npm install` into an empty directory: `require` and `import` work; the version matches;
+  the reader, writer, builder and schema conformance scripts match native byte for byte through the installed copy; Chromium 156
+  and Firefox 157, in the ESM and the global build, 16 checks each.
+- Python and .NET: the reported version, the grammar checks and the README examples pass; the libraries export the public
+  functions and no internal symbol.
+- For all four: `s1 := { a := $s1; };` is refused at once with 4054 at line 2, column 14, and four more shapes at their documented
+  positions; the plain chain cycle and a reference to a scalar still load; the builder gives code 24 at emit and at write.
+- The corpus walker (every conformance document that loads clean, followed through the public accessors) finds no loop against
+  the packaged core: 1,899 files, 1,054 loaded and walked, 845 refused.
+- Every code sample in the documentation was run against these four downloads: 127 passed, none failed.
+
+### Licence
+
+Every download includes a `LICENSE.txt` with the ANVL Software Licence terms, which are still in progress: free for
+personal and educational use, free for commercial use by organizations with up to 3 developer seats, and no
+redistribution.
+
+### The version string
+
+The library reports its version as `0.14.1-rc+585`: the release, then the build number after a `+`. This is valid
+semver. The build number is the same in all four downloads of this release.
+
 ## v0.14.0-rc
 
 Released 2026-11-05. This is a release candidate.
@@ -60,7 +251,7 @@ at once with 4022.
 
 ### Known issue
 
-A `$` reference to the object that contains it (`s1 := { a := $s1; };`), directly or through other references, still loads
+*Fixed in v0.14.1-rc: such a reference is now error 4054.* A `$` reference to the object that contains it (`s1 := { a := $s1; };`), directly or through other references, still loads
 without an error, and reading through such a value with an accessor that follows references never finishes. This was already the
 case before this release, it is not fixed here, and it is separate from the nested-base loop above. Avoid a `$` reference that
 points at one of its own enclosing objects.
@@ -76,7 +267,7 @@ string from `getVersion()`.
 | `anvil-v0.14.0-rc-linux-x86_64.tar.gz` | The C library: `libanvil.a`, `libanvil.so` and every public header |
 | `anvil.js-v0.14.0-rc.tar.gz` | The pure-JavaScript package for Node and browsers: reader, writer, builder, types and schema |
 
-**Python and .NET stay at v0.13.1-rc.** There is no v0.14.0-rc Python or .NET download; their v0.13.1-rc files stay current and
+**Python and .NET stay at v0.13.1-rc.** (Superseded: v0.14.1-rc carries the v0.14 changes in all four downloads.) There is no v0.14.0-rc Python or .NET download; their v0.13.1-rc files stay current and
 do not have the changes above (they read and write the same documents as v0.13.1-rc, including nested bases). The Node
 (`anvil-node`) and WebAssembly (`anvil-wasm`) builds are not part of this release; their v0.11.0-rc downloads stay available at
 their existing addresses. The Java binding is not distributed.
