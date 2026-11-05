@@ -115,7 +115,9 @@ library on all 561 native schema cases. Two documented differences:
   Node.js binding's do; two handles for one statement are not `===`, so compare by what they hold, not by identity.
 
 The builder's inheritance-cycle and missing-base errors are builder codes 19 and 20, and a base on a nested statement is code 23, refused at `set_base` (see the
-[language reference](language-reference.md#12-errors)). `TypeRegistry` `fromIncludes` merges the root document's own
+[language reference](language-reference.md#12-errors)). A builder whose `$` references lead back to a container that holds them
+(`s := { a := $s; };`) is refused when it is written or emitted with code 24, the reader's 4054; the streaming writer's
+`varref` cannot see this, so it can write a document the reader then refuses. `TypeRegistry` `fromIncludes` merges the root document's own
 `@[types]` last, so they override included ones.
 
 ### Load errors and the exported error codes
