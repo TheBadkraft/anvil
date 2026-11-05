@@ -57,6 +57,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **BR-2611-anvl-resolver-001 (BREAKING: only a top-level statement may have a base).** `s1 := { f3 : s1 { a := 1; }; };`
+  loaded without an error and then any walk over the resolved tree (a dump, a serialiser, a binding) never ended: a nested
+  statement based on its own enclosing top-level statement makes the inheritance graph loop through containment. The language
+  never meant a nested statement to have a base (the implementation allowed it by accident), so the rule is now the grammar's:
+  **a base (`a : b := { ... };` or `a : b { ... };`) is allowed on a top-level statement only.** A base on a statement inside an
+  object, in either form and at any depth, is an error, found while parsing and reported at the base name: `ANVL_ERR_PARSER_NESTED_BASE`
+  = 4022 ("Only a top-level statement can have a base", public category `ANVIL_ERR_SYNTAX`). It wins over every later error
+  (a base that names nothing is 4022, not 4051; a nested base on a scalar is 4022, not 4020), and a `:` with no name after it
+  (`{ a: 1; }`) is still "Expected identifier". Documents that relied on a nested base no longer load; no `.anvl` file in our own
+  projects used one. The writer refuses the same thing: `ANVIL_WRITER_ERR_NESTED_BASE` = 23 (appended, "only a top-level statement
+  can have a base") from `anvil_writer_statement` and `anvil_writer_statement_block` when an object is open (a repeated field is
+  still reported first, as the reader reads the name first), and the builder refuses it at once in `anvil_builder_set_base` for a
+  member added to an object, at any depth, attached or not (a member never moves, so the answer cannot change); the emit-time
+  checks of nested members' bases are gone because such a base can no longer exist. Nothing else changes: top-level bases,
+  chains, cycles (4050), missing bases (4051) and anonymous bases (4052) behave as before. Corpus: the cases that used a nested
+  base are re-expected, not removed (`grammar/coll_object_inherit`, `coverage/errors/inherit_from_{scalar,anonymous}_nested`,
+  `inherit_from_nested_sibling`, `writer/statements/base_in_object`, `writer/blockform/nested_*`, `builder/bases/*` and
+  `builder/blockform/*` nested cases), with 18 new reader cases (the reproduction, both forms, depth 3 and 50, a base naming
+  an existing and a missing name, in a block-form statement, in an array's object, in an included document), 9 writer cases and
+  8 builder cases; the drift tables and the fuzz generator are updated. anvil.js follows in a separate round.
+
 - **FR-2611-anvl-docs-001 (docs).** The first run of the example check over the current docs found and fixed:
   the AMP guide named four error codes that do not exist (`AMP_OBJECT_FORBIDDEN`, `AMP_VARREF_FORBIDDEN`,
   `AMP_ATTRIBUTE_FORBIDDEN`, `AMP_INHERITANCE_FORBIDDEN`) and said an object inside a tuple is `AMP_OBJECT_FORBIDDEN`: native and
