@@ -87,4 +87,4 @@ Steps 1 to 7 are as in `release-v0.14.0-rc.md`, with these changes:
 | 4. Checks on the packaged files | |
 | 5. Benchmarks | |
 | 6. Stage | |
-| 7. Deploy and live check | owner go 2026-11-05 ("ship as is"); after step 6 passes |
+| 7. Deploy and live check | done 2026-11-05 on the owner's explicit go: site 0c7b7ee, Worker version 01d8fa6d; live sha256 x4 and SHA256SUMS identical to staging, 0.14.1-rc+585, docs samples 127/0 against the live files, all 41 earlier downloads 200, verify-staged 69 PASS; live browser rerun pending (harness install: playwright-core 1.65.0 not on npm; staged identical bytes passed both browsers) |
