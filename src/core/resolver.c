@@ -344,14 +344,37 @@ static usize resolve_varrefs(module_context ctx) {
 }
 
 /* ---------------------------------------------------------------------- *
- * Reference cycles (BR-2611-anvl-resolver-002): a `$` reference that leads back to a container holding it is
- * an error. A walk follows a container's members, the fields it inherits (aliased by the merge) and, through
- * a resolved reference, the target statement's value.
+ * Reference cycles (BR-2611-anvl-resolver-002)
+ *
+ * A `$` reference that leads back to a container holding it is an error. Treat the resolved document as a
+ * graph. A walker standing on a value reaches (1) a container's own members (object fields, array and tuple
+ * elements), (2) the fields it inherits from a base, which merge_inherited_fields aliased into the member list
+ * so they are members too, and (3) through a resolved `$` reference, the target statement's value. A cycle in
+ * that graph is the error. A plain reference chain cycle (`a := $b; b := $a;`) is not part of it: it stays
+ * unresolved (`.resolved` NULL), so a walker has no edge to follow.
+ *
+ * The graph collapses to the top-level statements. A reference always resolves to the value of one top-level
+ * statement (the end of its chain), so a cycle must run through such values: statement S has an edge to
+ * statement T for every resolved reference in S's walkable subtree (members and inherited fields, but not
+ * through another reference) whose final target is T's value. A cycle exists exactly when some edge S -> T has
+ * T able to reach S again (T == S included): both ends then lie in one strongly connected component.
+ *
+ * WHICH REFERENCE IS REPORTED. The error is at the `$` of one reference, chosen by this rule: among all the
+ * references that lie on a cycle (a reference counts when some statement S whose walkable subtree holds it,
+ * its own or through an inherited field, has the edge S -> T on a cycle), the first in source order, the
+ * documents taken in load order (ctx->docs: the root is document 0, then the includes in the pre-order of the
+ * dump's `doc` records) and, inside a document, by byte offset. The rule does not depend on how the search
+ * visits the statements.
+ *
+ * Cost: one pass over each statement's subtree and an iterative strongly-connected-components search over the
+ * statements, both linear in the size of the merged document; nothing recurses, so a chain of 100000
+ * statements is as safe as one of three. Documents with no resolved reference skip the pass.
  * ---------------------------------------------------------------------- */
 #define RC_NONE UINT32_MAX
 
 typedef struct {
    anvl_value value; // a top-level statement's value
+   uint32_t doc;     // index in ctx->docs
 } rc_node;
 
 typedef struct {
@@ -370,6 +393,7 @@ typedef struct {
    usize edge_count, edge_cap;
    uint32_t *comp;   // node -> strongly connected component
    anvl_value best;  // the reference to report so far
+   usize best_doc;
 } rc_graph;
 
 static usize rc_hash(const void *p, usize cap) {
@@ -382,6 +406,21 @@ static uint32_t rc_node_of(const rc_graph *g, const void *value) {
    for (usize at = rc_hash(value, g->table_cap); g->table[at]; at = (at + 1) & (g->table_cap - 1)) {
       if (g->nodes[g->table[at] - 1].value == value) {
          return g->table[at] - 1;
+      }
+   }
+   return RC_NONE;
+}
+
+// Index in ctx->docs of the document whose source buffer holds p. `hint` is tried first.
+static usize rc_doc_of(module_context ctx, const char *p, usize hint) {
+   usize count = List.size(ctx->docs);
+   for (usize k = 0; k < count; k++) {
+      usize d = k == 0 ? hint : (k - 1 < hint ? k - 1 : k);
+      module_document doc = NULL;
+      List.get(ctx->docs, d, (object *)&doc);
+      const char *base = doc && doc->source ? (const char *)Source.data(doc->source) : NULL;
+      if (base && p >= base && p <= base + Source.length(doc->source)) {
+         return d;
       }
    }
    return RC_NONE;
@@ -502,15 +541,19 @@ static bool rc_components(rc_graph *g) {
    return true;
 }
 
-// ANVL_RES_ERR with *out_err_code set when a reference in the root document leads back to a container holding it, or on
-// running out of memory. The error is at the `$` of the first reference that lies on a cycle.
+// ANVL_RES_ERR with *out_err_code set when a reference leads back to a container holding it, or on running out of
+// memory. The error is at the `$` of the first reference that lies on a cycle: the documents in load order, then the
+// byte offset in a document.
 static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out_err_code) {
    rc_graph g = {.ctx = ctx};
    anvl_value *stack = NULL;
    usize stack_cap = 64;
-   module_document doc = NULL;
-   List.get(ctx->docs, 0, (object *)&doc);
-   usize capacity = doc && doc->body ? (usize)FArray.capacity(doc->body, sizeof(anvl_statement)) : 0;
+   usize capacity = 0, doc_count = List.size(ctx->docs);
+   for (usize d = 0; d < doc_count; d++) {
+      module_document doc = NULL;
+      List.get(ctx->docs, d, (object *)&doc);
+      capacity += doc && doc->body ? (usize)FArray.capacity(doc->body, sizeof(anvl_statement)) : 0;
+   }
    for (g.table_cap = 16; g.table_cap < capacity * 2;) {
       g.table_cap *= 2;
    }
@@ -520,21 +563,25 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    g.comp = malloc((capacity ? capacity : 1) * sizeof *g.comp);
    stack = malloc(stack_cap * sizeof *stack);
    bool ok = g.nodes && g.table && g.start && g.comp && stack;
-   for (usize i = 0; ok && i < capacity; i++) {
-      anvl_statement stmt = NULL;
-      FArray.get(doc->body, (int)i, sizeof(anvl_statement), (object *)&stmt);
-      if (!stmt || !stmt->value || Source.slice_length(stmt->name) == 0) {
-         continue;
-      }
-      g.nodes[g.n] = (rc_node){stmt->value};
-      if (stmt->value->type != ANVL_VALUE_VARREF) { // a reference resolves to a concrete value, never to a reference
-         usize at = rc_hash(stmt->value, g.table_cap);
-         while (g.table[at]) {
-            at = (at + 1) & (g.table_cap - 1);
+   for (usize d = 0; ok && d < doc_count; d++) {
+      module_document doc = NULL;
+      List.get(ctx->docs, d, (object *)&doc);
+      for (usize i = 0; doc && doc->body && i < (usize)FArray.capacity(doc->body, sizeof(anvl_statement)); i++) {
+         anvl_statement stmt = NULL;
+         FArray.get(doc->body, (int)i, sizeof(anvl_statement), (object *)&stmt);
+         if (!stmt || !stmt->value || Source.slice_length(stmt->name) == 0) {
+            continue;
          }
-         g.table[at] = g.n + 1;
+         g.nodes[g.n] = (rc_node){stmt->value, (uint32_t)d};
+         if (stmt->value->type != ANVL_VALUE_VARREF) { // a reference resolves to a concrete value, never to a reference
+            usize at = rc_hash(stmt->value, g.table_cap);
+            while (g.table[at]) {
+               at = (at + 1) & (g.table_cap - 1);
+            }
+            g.table[at] = g.n + 1;
+         }
+         g.n++;
       }
-      g.n++;
    }
    for (uint32_t i = 0; ok && i < g.n; i++) {
       g.start[i] = (uint32_t)g.edge_count;
@@ -548,8 +595,13 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    for (uint32_t i = 0; ok && i < g.n; i++) {
       for (usize e = g.start[i]; e < g.start[i + 1]; e++) {
          anvl_value ref = g.edges[e].ref;
-         if (g.comp[i] == g.comp[g.edges[e].target] && (!g.best || ref->text.start < g.best->text.start)) {
+         if (g.comp[i] != g.comp[g.edges[e].target]) {
+            continue;
+         }
+         usize d = rc_doc_of(ctx, ref->text.start, g.nodes[i].doc);
+         if (!g.best || d < g.best_doc || (d == g.best_doc && ref->text.start < g.best->text.start)) {
             g.best = ref;
+            g.best_doc = d;
          }
       }
    }
