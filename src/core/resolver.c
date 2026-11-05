@@ -366,11 +366,15 @@ static usize resolve_varrefs(module_context ctx) {
  * dump's `doc` records) and, inside a document, by byte offset. The rule does not depend on how the search
  * visits the statements.
  *
- * Cost: one pass over the statements' own subtrees, an inherited (aliased) field's subtree walked once however many
- * statements derive from it (its edges are kept per field and copied), and an iterative strongly-connected-components
- * search. That is linear in the size of the document plus, for each deriving statement, its member count and the
- * references in the fields it inherits (the size of the merged member lists and of the graph); nothing recurses, so a
- * chain of 100000 statements is as safe as one of three. Documents with no resolved reference skip the pass.
+ * Cost: time and memory O(size of the document + the merged member lists). Every reference is visited once for its
+ * statement and once for each inherited field that holds it; a field a statement inherits from a base is a vertex of
+ * its own (the same field value is in the member list of every statement that derives from it), holding the references
+ * of its subtree once, and a deriving statement has one edge to it, never a copy of its references. The vertices are the
+ * statements and those fields; the edges are the references (at most twice) and one per inherited field per deriving
+ * statement, so at most the document plus the merged member count. The components are found iteratively (Tarjan);
+ * nothing recurses, so a chain of 100000 statements is as safe as one of three. The counts are 32 bits and checked: a
+ * graph of 4 billion vertices or edges is refused as out of memory, never wrapped. Documents with no resolved
+ * reference skip the pass.
  * ---------------------------------------------------------------------- */
 _Thread_local usize anvl_resolver_last_edges;
 
@@ -383,28 +387,31 @@ typedef struct {
 } rc_node;
 
 typedef struct {
-   anvl_value ref;  // the VarRef value; its text.start is the `$`
-   uint32_t target; // node index of the statement whose value the reference resolves to
+   anvl_value ref;  // the VarRef value (its text.start is the `$`), or NULL for an edge from a statement to a field it inherits
+   uint32_t from;   // graph index of the statement, or of the inherited field, that holds the reference
+   uint32_t target; // graph index of the statement whose value the reference resolves to, or of the inherited field
 } rc_edge;
 
 typedef struct {
-   anvl_value key;       // a field's value
-   uint32_t start, count; // the edges of its subtree, as a range of the graph's edges
+   anvl_value key; // the value of a field of a statement that has a base
+   uint32_t node;  // its graph index (a vertex of its own, holding the references of its subtree), RC_NONE if it holds none
 } rc_cached;
 
 typedef struct {
    module_context ctx;
    rc_node *nodes;
-   uint32_t n;
+   uint32_t n;      // statements; the vertices after them are inherited fields
+   uint32_t total;  // statements + field vertices
+   uint32_t *adj;   // edge indices grouped by `from`; start[v] .. start[v + 1] are the edges out of vertex v
    uint32_t *table;  // open addressing: a concrete (non-reference) value -> its node index + 1, 0 for a free slot
    usize table_cap;  // a power of two
-   uint32_t *start;  // n + 1 offsets into edges
+   uint32_t *start;  // total + 1 offsets into adj
    rc_edge *edges;
    usize edge_count, edge_cap;
    uint32_t *comp;   // node -> strongly connected component
    anvl_value best;  // the reference to report so far
    usize best_doc;
-   rc_cached *cache; // open addressing: a field's value -> where its edges are in `edges`, so an aliased field is walked once
+   rc_cached *cache; // open addressing: a field's value -> its vertex, so an aliased field is walked once
    usize cache_cap, cache_count;
 } rc_graph;
 
@@ -438,7 +445,10 @@ static usize rc_doc_of(module_context ctx, const char *p, usize hint) {
    return RC_NONE;
 }
 
-static bool rc_add_edge(rc_graph *g, anvl_value ref, uint32_t target) {
+static bool rc_add_edge(rc_graph *g, uint32_t from, anvl_value ref, uint32_t target) {
+   if (g->edge_count >= UINT32_MAX - 1) {
+      return false; // the counts are 32 bits: a graph this size is refused as out of memory, never wrapped
+   }
    if (g->edge_count == g->edge_cap) {
       usize cap = g->edge_cap ? g->edge_cap * 2 : 64;
       rc_edge *bigger = realloc(g->edges, cap * sizeof *bigger);
@@ -448,13 +458,13 @@ static bool rc_add_edge(rc_graph *g, anvl_value ref, uint32_t target) {
       g->edges = bigger;
       g->edge_cap = cap;
    }
-   g->edges[g->edge_count++] = (rc_edge){ref, target};
+   g->edges[g->edge_count++] = (rc_edge){ref, from, target};
    return true;
 }
 
 // Adds an edge for each resolved reference in the walkable subtree of node i (members and elements at any depth,
 // inherited fields; not through another reference). `stack` is a reusable scratch; false means out of memory.
-static bool rc_scan_value(rc_graph *g, anvl_value root, anvl_value **stack, usize *cap) {
+static bool rc_scan_value(rc_graph *g, uint32_t from, anvl_value root, anvl_value **stack, usize *cap) {
    usize top = 0;
    (*stack)[top++] = root;
    while (top > 0) {
@@ -464,7 +474,7 @@ static bool rc_scan_value(rc_graph *g, anvl_value root, anvl_value **stack, usiz
       switch (v->type) {
       case ANVL_VALUE_VARREF: {
          uint32_t t = v->varref.resolved ? rc_node_of(g, v->varref.resolved) : RC_NONE;
-         if (t != RC_NONE && !rc_add_edge(g, v, t)) {
+         if (t != RC_NONE && !rc_add_edge(g, from, v, t)) {
             return false;
          }
          continue;
@@ -514,7 +524,7 @@ static rc_cached *rc_cache_slot(const rc_graph *g, anvl_value v) {
    return &g->cache[at];
 }
 
-static bool rc_cache_put(rc_graph *g, anvl_value v, uint32_t start, uint32_t count) {
+static bool rc_cache_put(rc_graph *g, anvl_value v, uint32_t node) {
    if (g->cache_count * 2 >= g->cache_cap) {
       rc_cached *old = g->cache;
       usize old_cap = g->cache_cap;
@@ -532,18 +542,19 @@ static bool rc_cache_put(rc_graph *g, anvl_value v, uint32_t start, uint32_t cou
       }
       free(old);
    }
-   *rc_cache_slot(g, v) = (rc_cached){v, start, count};
+   *rc_cache_slot(g, v) = (rc_cached){v, node};
    g->cache_count++;
    return true;
 }
 
-// Adds the edges of node i. A statement with a base lists fields it inherited, aliased: the same field value is in the
-// member list of every statement that derives from it. Each field's subtree is walked once, and the edges it gave are
-// copied for the next statement that holds it, so the cost is the inherited fields plus their references, not their size.
+// Adds the edges of statement i. A statement with a base lists fields it inherited, aliased: the same field value is in
+// the member list of every statement that derives from it. Each such field is a vertex of its own, holding the
+// references of its subtree (walked once); a deriving statement has one edge to it, not a copy of its references. A
+// field with no reference has no vertex.
 static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
    anvl_value root = g->nodes[i].value;
    if (!g->nodes[i].derived || root->type != ANVL_VALUE_OBJECT || !root->object.statements) {
-      return rc_scan_value(g, root, stack, cap);
+      return rc_scan_value(g, i, root, stack, cap);
    }
    list fields = root->object.statements;
    for (usize k = 0, n = List.size(fields); k < n; k++) {
@@ -553,17 +564,27 @@ static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
          continue;
       }
       rc_cached *c = rc_cache_slot(g, f->value);
+      uint32_t node = RC_NONE;
       if (c && c->key == f->value) {
-         for (uint32_t e = c->start; e < c->start + c->count; e++) {
-            rc_edge copy = g->edges[e];
-            if (!rc_add_edge(g, copy.ref, copy.target)) {
-               return false;
-            }
+         node = c->node;
+      } else {
+         usize before = g->edge_count;
+         if (g->total >= UINT32_MAX - 2) {
+            return false;
          }
-         continue;
+         node = g->total++;
+         if (!rc_scan_value(g, node, f->value, stack, cap)) {
+            return false;
+         }
+         if (g->edge_count == before) { // no reference in it: no vertex
+            g->total--;
+            node = RC_NONE;
+         }
+         if (!rc_cache_put(g, f->value, node)) {
+            return false;
+         }
       }
-      uint32_t start = (uint32_t)g->edge_count;
-      if (!rc_scan_value(g, f->value, stack, cap) || !rc_cache_put(g, f->value, start, (uint32_t)g->edge_count - start)) {
+      if (node != RC_NONE && !rc_add_edge(g, i, NULL, node)) {
          return false;
       }
    }
@@ -573,7 +594,7 @@ static bool rc_scan(rc_graph *g, uint32_t i, anvl_value **stack, usize *cap) {
 // Fills g->comp with the strongly connected components: Tarjan's algorithm, iterative (an explicit call stack), so a
 // chain of 100000 statements does not recurse. Two nodes are in one component exactly when each can reach the other.
 static bool rc_components(rc_graph *g) {
-   usize n = g->n;
+   usize n = g->total;
    uint32_t *mem = calloc(n ? 5 * n : 1, sizeof *mem);
    if (!mem) {
       return false;
@@ -595,7 +616,7 @@ static bool rc_components(rc_graph *g) {
       while (depth > 0) {
          uint32_t v = calls[depth - 1];
          if (cursor[v] < g->start[v + 1]) {
-            uint32_t w = g->edges[cursor[v]++].target;
+            uint32_t w = g->edges[g->adj[cursor[v]++]].target;
             if (!order[w]) {
                order[w] = low[w] = next_order++;
                cursor[w] = g->start[w];
@@ -639,10 +660,8 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
    }
    g.nodes = malloc((capacity ? capacity : 1) * sizeof *g.nodes);
    g.table = calloc(g.table_cap, sizeof *g.table);
-   g.start = malloc((capacity + 1) * sizeof *g.start);
-   g.comp = malloc((capacity ? capacity : 1) * sizeof *g.comp);
    stack = malloc(stack_cap * sizeof *stack);
-   bool ok = g.nodes && g.table && g.start && g.comp && stack;
+   bool ok = g.nodes && g.table && stack;
    for (usize d = 0; ok && d < doc_count; d++) {
       module_document doc = NULL;
       List.get(ctx->docs, d, (object *)&doc);
@@ -663,32 +682,49 @@ static anvl_result check_reference_cycles(module_context ctx, anvl_err_code *out
          g.n++;
       }
    }
+   g.total = g.n;
    for (uint32_t i = 0; ok && i < g.n; i++) {
-      g.start[i] = (uint32_t)g.edge_count;
       ok = rc_scan(&g, i, &stack, &stack_cap);
    }
+   // group the edges by the vertex they leave (counting sort), then find the components of statements and inherited fields
+   g.start = ok ? calloc((usize)g.total + 1, sizeof *g.start) : NULL;
+   g.adj = ok ? malloc((g.edge_count ? g.edge_count : 1) * sizeof *g.adj) : NULL;
+   g.comp = ok ? malloc((g.total ? g.total : 1) * sizeof *g.comp) : NULL;
+   ok = ok && g.start && g.adj && g.comp;
+   for (usize e = 0; ok && e < g.edge_count; e++) {
+      g.start[g.edges[e].from + 1]++;
+   }
+   for (usize v = 0; ok && v < g.total; v++) {
+      g.start[v + 1] += g.start[v];
+   }
+   for (usize e = 0; ok && e < g.edge_count; e++) {
+      g.adj[g.start[g.edges[e].from]++] = (uint32_t)e;
+   }
+   for (usize v = g.total; ok && v > 0; v--) { // the fill moved every start[v] to the end of its group: shift back
+      g.start[v] = g.start[v - 1];
+   }
    if (ok) {
-      g.start[g.n] = (uint32_t)g.edge_count;
+      g.start[0] = 0;
       ok = rc_components(&g);
    }
-   // an edge whose two ends are in one component closes a cycle (a self edge included)
-   for (uint32_t i = 0; ok && i < g.n; i++) {
-      for (usize e = g.start[i]; e < g.start[i + 1]; e++) {
-         anvl_value ref = g.edges[e].ref;
-         if (g.comp[i] != g.comp[g.edges[e].target]) {
-            continue;
-         }
-         usize d = rc_doc_of(ctx, ref->text.start, g.nodes[i].doc);
-         if (!g.best || d < g.best_doc || (d == g.best_doc && ref->text.start < g.best->text.start)) {
-            g.best = ref;
-            g.best_doc = d;
-         }
+   // a reference whose holder (its statement, or the inherited field that holds it) is in the component of its target
+   // closes a cycle (a self edge included)
+   for (usize e = 0; ok && e < g.edge_count; e++) {
+      anvl_value ref = g.edges[e].ref;
+      if (!ref || g.comp[g.edges[e].from] != g.comp[g.edges[e].target]) {
+         continue;
+      }
+      usize d = rc_doc_of(ctx, ref->text.start, g.edges[e].from < g.n ? g.nodes[g.edges[e].from].doc : 0);
+      if (!g.best || d < g.best_doc || (d == g.best_doc && ref->text.start < g.best->text.start)) {
+         g.best = ref;
+         g.best_doc = d;
       }
    }
    free(stack);
    free(g.nodes);
    free(g.table);
    free(g.start);
+   free(g.adj);
    free(g.comp);
    free(g.edges);
    free(g.cache);
