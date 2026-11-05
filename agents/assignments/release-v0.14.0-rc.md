@@ -97,4 +97,4 @@ Steps 1 to 7 are as in `release-v0.13.0-rc.md`, with these changes:
 | 4. Checks on the packaged files | |
 | 5. Benchmarks | |
 | 6. Stage | |
-| 7. Deploy and live check | needs the owner's go |
+| 7. Deploy and live check | owner go 2026-11-05 ("release and publish"); after step 6 passes |
