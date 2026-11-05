@@ -91,10 +91,10 @@ Steps 1 to 7 are as in `release-v0.13.0-rc.md`, with these changes:
 
 | Step | State |
 |---|---|
-| 1. Cut core `0.14.0-rc` | |
-| 2. anvil.js pin | |
-| 3. Build twice | |
-| 4. Checks on the packaged files | |
-| 5. Benchmarks | |
-| 6. Stage | |
-| 7. Deploy and live check | owner go 2026-11-05 ("release and publish"); after step 6 passes |
+| 1. Cut core `0.14.0-rc` | done; tag `v0.14.0-rc` on `952c26a`, BUILD 554, pushed |
+| 2. anvil.js pin | `release/v0.14.0-rc` `153f1be` (pin `952c26a`, version `0.14.0-rc`): reader 1920, writer 851+16, builder 933+53, schema 561, `npm test` 275, compat 231; waiting for the merge |
+| 3. Build twice | byte-identical (2 tarballs) |
+| 4. Checks on the packaged files | pass: `verify-staged.sh` (KINDS= V014=1), new `check-v014.sh` (RED on v0.13.1-rc), browsers 4 runs x 16 checks, docs samples 117 passed 0 failed |
+| 5. Benchmarks | native within 1.02x (worst 1.015x); anvil.js: reader/validate/schema unchanged; `kc-request-x1000` writing about 1.2x (reported) |
+| 6. Stage | done in `~/release-staging/v0.14.0-rc/` (notes, handoff, SHA256SUMS); nothing deployed |
+| 7. Deploy and live check | owner go 2026-11-05 ("release and publish"); Technical Writer deploys, then the live check |

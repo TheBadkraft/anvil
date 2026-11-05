@@ -4,7 +4,8 @@
 # real-browser check of anvil.js dist/ and the FlyWire guard (when the v0.11 node/wasm tarballs are at hand). On success writes
 # SHA256SUMS-v<version> (this release only) and the cumulative SHA256SUMS: the published downloads' SHA256SUMS (which names
 # every earlier tarball, each verified against the file on disk) plus this release.
-# anvil.node and anvil.wasm are frozen and not released: nothing here builds or checks them.
+# KINDS (default "py net") names the bindings released with this version; v0.14.0-rc sets KINDS= (core and anvil.js only) and V014=1
+# (the nested-base, block-form, source and include-position checks). anvil.node and anvil.wasm are frozen and not released: nothing here builds or checks them.
 set -u
 dir=$(cd "${1:?staging dir}" && pwd); ver=${2:?version}; build=${3:?build}
 pub=${4:-$HOME/Projects/repos/anvil/site/assets/downloads}
@@ -17,9 +18,10 @@ x() { mkdir -p "$work/$1" && tar -xzf "$dir/$2" -C "$work/$1" && find "$work/$1"
 core=$(x core anvil-v$ver-linux-x86_64.tar.gz)
 run "$here/check-grammar.sh" core "$core" "$ver" "$build"
 run "$here/check-readme.sh" "$core"
+[ -x "$here/check-v014.sh" ] && [ "${V014:-0}" = 1 ] && run "$here/check-v014.sh" core "$core"
 run sh "$here/../check-exports.sh" "$core/lib/libanvil.so" "$core/include"
 run sh "$here/../check-cxx.sh" "$core/include" "$core/lib" "$here/../../test/infra/cxx"
-for k in py net; do
+for k in ${KINDS-py net}; do
   p=$(x $k anvil-$k-v$ver-linux-x64.tar.gz)
   run "$here/check-grammar.sh" $k "$p" "$ver" "$build"
   run "$here/check-readme.sh" "$p"
@@ -27,10 +29,11 @@ for k in py net; do
   run sh "$here/../check-exports.sh" "$so" "$core/include"
   cmp -s "$so" "$core/lib/libanvil.so" && echo "note: $k libanvil.so is byte-identical to core's" || echo "note: $k libanvil.so differs from core's (built separately; version and exports checked above)"
 done
-run "$here/check-license.sh" "$dir" "$ver"
+run env KINDS="${KINDS-py net}" "$here/check-license.sh" "$dir" "$ver"
 js=$(x js anvil.js-v$ver.tar.gz)
 run "$here/check-grammar.sh" js "$js" "$ver" "$build"
 run "$here/check-readme.sh" "$js"
+[ "${V014:-0}" = 1 ] && run "$here/check-v014.sh" js "$dir/anvil.js-v$ver.tar.gz"
 run "$here/check-js-package.sh" "$dir/anvil.js-v$ver.tar.gz" "${JS_REPO:-$HOME/Projects/repos/anvil.js}" "${CORE_REPO:-$HOME/Projects/repos/anvil}" "v$ver"
 run "$here/check-browser-js.sh" "$js" "${JS_REPO:-$HOME/Projects/repos/anvil.js}"
 if [ $fail -eq 0 ]; then
