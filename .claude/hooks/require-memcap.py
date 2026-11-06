@@ -3,18 +3,23 @@
 
 Agents run inside VS Code's process group. Twice (a 28 GB fuzzer, a 26 GB node profile) one
 uncapped command was OOM-killed and took VS Code and every agent with it. This hook refuses a
-Bash command that starts node, python3, npm, npx, make or dotnet on a script or target, or runs
-a shell script (`bash x.sh`, `./x.sh`: heavy work hides in scripts), unless that very command is
+Bash command that starts node, python3, npm, npx, make, dotnet or gradle (`gradle`, `gradlew`,
+`./gradlew`) on a script or target, or runs a shell script (`bash x.sh`, `./x.sh`: heavy work hides in scripts), unless that very command is
 wrapped by `systemd-run ... -p MemoryMax=...` (agents/STANDARDS.md section 8). Only a
 `-p MemoryMax=` or `--property=MemoryMax=` counts, not any text that mentions it.
-Small inline checks (node -e/-p, python3 -c, bash -n) and version queries stay allowed. There
-is no allowlist of light scripts: run one under the cap, as the others.
+Small inline checks (node -e/-p, python3 -c, bash -n) and version queries stay allowed. A bare
+`make` (no target, no option) is heavy: it runs the default target, which builds; `make -n`, `make -q`
+and `make --version` stay allowed. A `MemoryMax=0`, `infinity`, `max` or empty value limits nothing and
+is not a cap. `env -S "STRING"` and a command named by a `which`/`command -v` substitution are followed.
+There is no allowlist of light scripts: run one under the cap, as the others.
 It is a guardrail against a slip, not a security boundary: aliases, `eval "$x"` and `source`
 are out of scope.
 """
 import json, re, shlex, sys
 
-HEAVY = {"node", "nodejs", "python", "python3", "npm", "npx", "make", "dotnet"}
+HEAVY = {"node", "nodejs", "python", "python3", "npm", "npx", "make", "dotnet", "gradle", "gradlew"}
+# gradle's -q, -p and -c are quiet, project dir and settings file, so only these leave it light.
+GRADLE_SAFE_FLAGS = {"-v", "-V", "--version", "-h", "--help", "-?", "--stop", "--status"}
 WRAPPERS = {"taskset", "nice", "ionice", "timeout", "env", "exec", "time", "command", "stdbuf", "sudo", "nohup", "setsid", "builtin", "chrt"}
 SAFE_FLAGS = {"-", "-e", "-p", "-c", "--eval", "--print", "-v", "-V", "--version", "-h", "--help", "-n", "-q"}
 # Options of a wrapper that take a value, and how many bare positionals it takes (timeout DURATION, taskset MASK,
@@ -70,7 +75,8 @@ def split_segments(command):
 
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-HEAVY_NAME = re.compile(r"^(node|nodejs|python[0-9.]*|npm|npx|make|dotnet)$")
+HEAVY_NAME = re.compile(r"^(node|nodejs|python[0-9.]*|npm|npx|make|dotnet|gradle|gradlew)$")
+LOCATORS = {"which", "command", "type", "whereis", "readlink", "realpath"}
 KEYWORDS = {"{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!"}
 
 
@@ -98,9 +104,9 @@ def _close_paren(text, i):
     return len(text)
 
 
-def substitutions(text):
-    """Bodies of every `$( )` and backtick substitution that the shell will run: outside quotes and inside double
-    quotes, but not inside single quotes or after a backslash."""
+def substitution_spans(text):
+    """[(start, end, body)] of every `$( )` and backtick substitution that the shell will run, `text[start:end]` being the
+    whole substitution: outside quotes and inside double quotes, but not inside single quotes or after a backslash."""
     out, i, single, double = [], 0, False, False
     while i < len(text):
         c = text[i]
@@ -114,16 +120,46 @@ def substitutions(text):
             double = not double
         elif c == "$" and text.startswith("(", i + 1):
             end = _close_paren(text, i + 2)
-            out.append(text[i + 2:end])
+            out.append((i, min(end + 1, len(text)), text[i + 2:end]))
             i = end
         elif c == "`":
             j = i + 1
             while j < len(text) and text[j] != "`":
                 j += 2 if text[j] == "\\" else 1
-            out.append(text[i + 1:j])
+            out.append((i, min(j + 1, len(text)), text[i + 1:j]))
             i = j
         i += 1
     return out
+
+
+def substitutions(text):
+    """Bodies of every `$( )` and backtick substitution that the shell will run."""
+    return [body for _, _, body in substitution_spans(text)]
+
+
+def locate_heavy(body):
+    """The runtime a substitution body such as `which node`, `command -v python3` or `readlink -f $(which node)` locates,
+    else None: `$(which node) x.js` runs node."""
+    words = _words(name_located_commands(body).strip())
+    if len(words) > 1 and words[0].rsplit("/", 1)[-1] in LOCATORS:
+        for w in words[1:]:
+            if not w.startswith("-") and HEAVY_NAME.match(w.rsplit("/", 1)[-1]):
+                return w.rsplit("/", 1)[-1]
+    return None
+
+
+def name_located_commands(text):
+    """The text with every substitution that locates a runtime replaced by that runtime's name, so that
+    `$(which node) x.js` reads as `node x.js` (and `echo $(which node)` as `echo node`, which is harmless)."""
+    out, last = [], 0
+    for start, end, body in substitution_spans(text):
+        name = locate_heavy(body)
+        if name:
+            out.append(text[last:start])
+            out.append(name)
+            last = end
+    out.append(text[last:])
+    return "".join(out)
 
 
 def _words(seg):
@@ -162,15 +198,27 @@ def systemd_run_command(words, i):
     return j + 1 if j < len(words) and words[j] == "--" else j
 
 
+def limits_memory(value):
+    """A MemoryMax value that limits: not empty, `0`, `infinity` or `max`, which leave the memory unlimited (or nothing)."""
+    value = value.strip().lower()
+    if value in ("", "infinity", "max"):
+        return False
+    m = re.match(r"^([0-9]+(?:\.[0-9]+)?)[kmgtpe%]?b?$", value)
+    return not (m and float(m.group(1)) == 0)
+
+
 def caps_memory(options):
-    """Only `-p MemoryMax=...`, `-pMemoryMax=...`, `--property MemoryMax=...` or `--property=MemoryMax=...` caps: a
-    description or any other text that mentions MemoryMax does not."""
+    """Only `-p MemoryMax=...`, `-pMemoryMax=...`, `--property MemoryMax=...` or `--property=MemoryMax=...` caps, and
+    only with a value that limits (the last assignment wins, as in systemd): a description or any other text that
+    mentions MemoryMax does not, nor does `MemoryMax=0` or `MemoryMax=infinity`."""
+    last = None
     for k, w in enumerate(options):
-        if re.match(r"^(?:-p|--property=)MemoryMax=", w):
-            return True
-        if w in ("-p", "--property") and k + 1 < len(options) and options[k + 1].startswith("MemoryMax="):
-            return True
-    return False
+        m = re.match(r"^(?:-p|--property=)MemoryMax=(.*)$", w)
+        if m:
+            last = m.group(1)
+        elif w in ("-p", "--property") and k + 1 < len(options) and options[k + 1].startswith("MemoryMax="):
+            last = options[k + 1][len("MemoryMax="):]
+    return last is not None and limits_memory(last)
 
 
 def runs_script(base, args):
@@ -190,6 +238,22 @@ def runs_script(base, args):
     return base.endswith(".sh")
 
 
+def env_split(words, i):
+    """For `env [options] -S "STRING" [more]` at words[i]: the words of the command line that STRING and the rest make
+    (assignments before -S are kept), else None."""
+    j = i + 1
+    while j < len(words) and (words[j].startswith("-") or ASSIGNMENT.match(words[j])):
+        w = words[j]
+        if w in ("-S", "--split-string") and j + 1 < len(words):
+            return [x for x in words[i + 1:j] if ASSIGNMENT.match(x)] + _words(words[j + 1]) + words[j + 2:]
+        if w.startswith("--split-string="):
+            return [x for x in words[i + 1:j] if ASSIGNMENT.match(x)] + _words(w.split("=", 1)[1]) + words[j + 1:]
+        if w.startswith("-S") and len(w) > 2:
+            return [x for x in words[i + 1:j] if ASSIGNMENT.match(x)] + _words(w[2:]) + words[j + 1:]
+        j += 2 if w in WRAPPER_VALUE_OPTIONS["env"] else 1
+    return None
+
+
 def simple_command(words, depth):
     """Yield (name, args) of the command a simple command runs, after assignments, keywords and wrappers.
     A `systemd-run ... -p MemoryMax=...` wrapper in this very command caps it: nothing is yielded."""
@@ -204,6 +268,9 @@ def simple_command(words, depth):
             if caps_memory(words[i + 1:end]):
                 return
             i = end
+        elif base == "env" and env_split(words, i) is not None:
+            yield from simple_command(env_split(words, i), depth + 1)
+            return
         elif base in WRAPPERS:
             i = skip_wrapper(words, i)
         else:
@@ -250,14 +317,16 @@ def commands(command, depth=0):
         return
     for inner in substitutions(command):
         yield from commands(inner, depth + 1)
-    for seg in split_segments(command):
+    for seg in split_segments(name_located_commands(command)):
         yield from simple_command(_words(seg.strip()), depth)
 
 
 def heavy_use(command):
     for base, args in commands(command):
-        if HEAVY_NAME.match(base) and args and args[0] not in SAFE_FLAGS:
-            return base
+        if HEAVY_NAME.match(base):
+            safe = GRADLE_SAFE_FLAGS if base.startswith("gradle") else SAFE_FLAGS
+            if (args and args[0] not in safe) or (not args and base == "make"):
+                return base
         if runs_script(base, args):
             return base
     return None
