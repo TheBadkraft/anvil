@@ -197,6 +197,7 @@ typedef enum {
 
 typedef struct anvl_statement_t {
    anvl_stmt_kind kind;
+   uint8_t merge_state; // resolver scratch for a statement with a base: 0 not merged yet (the arena hands out zeroed memory), 1 being merged, 2 merged
    anvl_slice span;  // full source span of the statement
    anvl_slice name;  // declared identifier; empty only for VARS/IMPORT
    anvl_slice base;  // inheritance base; empty when absent

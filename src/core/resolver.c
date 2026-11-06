@@ -209,9 +209,17 @@ static list own_fields(anvl_statement stmt) {
    return NULL;
 }
 
-// True if `fields` already has a statement named `name`.
-static bool fields_has_name(list fields, anvl_slice name) {
-   usize count = List.size(fields);
+typedef struct {
+   anvl_statement stmt, base;
+} mg_step;
+
+typedef struct {
+   mg_step *walk;
+   usize walk_cap;
+} mg_state;
+
+// True if `fields` has a statement named `name`, scanning the first `count` of them.
+static bool fields_has_name(list fields, usize count, anvl_slice name) {
    for (usize i = 0; i < count; i++) {
       anvl_statement s = NULL;
       List.get(fields, i, (object *)&s);
@@ -222,76 +230,92 @@ static bool fields_has_name(list fields, anvl_slice name) {
    return false;
 }
 
-// Merges inherited fields into `stmt`'s own field list, in place — appending an *aliased*
-// pointer (never a copy) for each of an ancestor's fields not already present by name in
-// `stmt`'s current set, walking the base chain nearest-ancestor-first so a closer override
-// always wins over a farther one, and a transitive chain (`c : b : a`) falls out naturally
-// without needing recursion. Mutating `stmt`'s own list directly, rather than building a
-// separate merged view, was a deliberate call: two representations of the same field (an
-// original and a shadow copy in some other list) is exactly the risk to avoid, not something
-// to introduce here — after this runs, `stmt`'s own field list *is* its complete, correct
-// field set.
-//
-// Cycle-safe via the same hop-counter technique resolve_varref_chain uses: since `base` is a
-// single slice per statement, the "inherits from" relation never branches, so with N distinct
-// names in `identifiers`, a non-cyclic chain can't need more than N hops — exceeding that is a
-// cycle. Unlike a VarRef, an inheritance cycle is a hard error here (ANVL_ERR_RESOLVER_CYCLE_
-// DETECTED) — a cyclic chain can't produce a sensible merged object at all, matching the
-// legacy anvl.bak resolver's own policy on inheritance cycles specifically.
-static anvl_result merge_inherited_fields(module_context ctx, anvl_statement stmt,
-                                          anvl_err_code *out_err_code) {
-   list fields = own_fields(stmt);
-   if (!fields) {
-      return ANVL_RES_OK;
-   }
-
-   usize max_hops = Map.count(ctx->identifiers) + 1;
-   anvl_slice current_base = stmt->base;
-
-   for (usize hop = 0; hop < max_hops; hop++) {
-      usize len = Source.slice_length(current_base);
-      addr val = 0;
-      if (!Map.get(ctx->identifiers, current_base.start, len, &val)) {
-         return ANVL_RES_OK; // unreachable - validate_bases already confirmed this exists
+// Merges `stmt` and, first, every ancestor not merged yet; iterative. 4050 when the chain leads back to the walk.
+static anvl_result mg_merge_chain(module_context ctx, mg_state *m, mg_step *stack_walk, anvl_statement stmt,
+                                  anvl_err_code *out_err_code) {
+   usize depth = 0;
+   anvl_statement cur = stmt;
+   for (;;) {
+      if (cur->merge_state == 2) {
+         break;
       }
-      anvl_statement ancestor = (anvl_statement)val;
-      list ancestor_fields = own_fields(ancestor);
-      if (ancestor_fields) {
-         usize count = List.size(ancestor_fields);
-         for (usize i = 0; i < count; i++) {
-            anvl_statement field = NULL;
-            List.get(ancestor_fields, i, (object *)&field);
-            if (field && !fields_has_name(fields, field->name)) {
-               List.append(fields, field);
-            }
-         }
-      }
-      if (Source.slice_length(ancestor->base) == 0) {
-         return ANVL_RES_OK; // reached the root of the chain
-      }
-      current_base = ancestor->base;
-   }
-
-   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, NULL, NULL);
-   *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
-   return ANVL_RES_ERR;
-}
-
-// Runs merge_inherited_fields for every statement in the context that has a non-empty base (only
-// top-level statements do; the parser rejects a base on a nested one).
-static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
-   usize stmt_count = List.size(ctx->statements);
-   for (usize i = 0; i < stmt_count; i++) {
-      anvl_statement stmt = NULL;
-      List.get(ctx->statements, i, (object *)&stmt);
-      if (!stmt || Source.slice_length(stmt->base) == 0) {
-         continue;
-      }
-      if (ANVL_RES_OK != merge_inherited_fields(ctx, stmt, out_err_code)) {
+      if (cur->merge_state == 1) {
+         anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, NULL, NULL);
+         *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
          return ANVL_RES_ERR;
       }
+      addr val = 0;
+      if (!Map.get(ctx->identifiers, cur->base.start, Source.slice_length(cur->base), &val)) {
+         cur->merge_state = 2; // unreachable - validate_bases already confirmed this exists
+         break;
+      }
+      anvl_statement base_stmt = (anvl_statement)val;
+      if (depth == m->walk_cap) {
+         usize cap = m->walk_cap * 2;
+         mg_step *grown = malloc(cap * sizeof *grown);
+         if (!grown) {
+            anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
+            *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+            return ANVL_RES_ERR;
+         }
+         memcpy(grown, m->walk, depth * sizeof *grown);
+         if (m->walk != stack_walk) {
+            free(m->walk);
+         }
+         m->walk = grown;
+         m->walk_cap = cap;
+      }
+      cur->merge_state = 1;
+      m->walk[depth++] = (mg_step){cur, base_stmt};
+      if (Source.slice_length(base_stmt->base) == 0) {
+         break; // the root of the chain
+      }
+      cur = base_stmt;
+   }
+   while (depth > 0) {
+      mg_step step = m->walk[--depth];
+      list fields = own_fields(step.stmt);
+      anvl_statement from = step.base;
+      list base_fields = own_fields(from);
+      while (!base_fields && Source.slice_length(from->base) != 0) {
+         addr val = 0;
+         if (!Map.get(ctx->identifiers, from->base.start, Source.slice_length(from->base), &val)) {
+            break;
+         }
+         from = (anvl_statement)val;
+         base_fields = own_fields(from);
+      }
+      usize count = fields && base_fields ? List.size(base_fields) : 0;
+      for (usize i = 0; i < count; i++) {
+         anvl_statement field = NULL;
+         List.get(base_fields, i, (object *)&field);
+         if (field && !fields_has_name(fields, List.size(fields), field->name)) {
+            List.append(fields, field);
+         }
+      }
+      step.stmt->merge_state = 2;
    }
    return ANVL_RES_OK;
+}
+
+// Merges the inherited fields into every statement of the context that has a non-empty base (only top-level statements
+// do; the parser rejects a base on a nested one), bases first. See the comment above.
+static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
+   mg_step stack_walk[32];
+   mg_state m = {.walk = stack_walk, .walk_cap = 32};
+   anvl_result res = ANVL_RES_OK;
+   usize stmt_count = List.size(ctx->statements);
+   for (usize i = 0; res == ANVL_RES_OK && i < stmt_count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(ctx->statements, i, (object *)&stmt);
+      if (stmt && Source.slice_length(stmt->base) != 0) {
+         res = mg_merge_chain(ctx, &m, stack_walk, stmt, out_err_code);
+      }
+   }
+   if (m.walk != stack_walk) {
+      free(m.walk);
+   }
+   return res;
 }
 
 // Chases a VarRef target to its final concrete value, following a chain of VarRefs
@@ -348,7 +372,7 @@ static usize resolve_varrefs(module_context ctx) {
  *
  * A `$` reference that leads back to a container holding it is an error. Treat the resolved document as a
  * graph. A walker standing on a value reaches (1) a container's own members (object fields, array and tuple
- * elements), (2) the fields it inherits from a base, which merge_inherited_fields aliased into the member list
+ * elements), (2) the fields it inherits from a base, which merge_all_inheritance aliased into the member list
  * so they are members too, and (3) through a resolved `$` reference, the target statement's value. A cycle in
  * that graph is the error. A plain reference chain cycle (`a := $b; b := $a;`) is not part of it: it stays
  * unresolved (`.resolved` NULL), so a walker has no edge to follow.
