@@ -209,14 +209,47 @@ static list own_fields(anvl_statement stmt) {
    return NULL;
 }
 
+/* ---------------------------------------------------------------------- *
+ * Inheritance merge (BR-2611-anvl-resolver-003)
+ *
+ * A statement with a base gets, appended to its own field list in place, the fields of its ancestors: own fields first,
+ * then each ancestor's fields nearest ancestor first, a field skipped when a field of that name is already in the list.
+ * The result for one statement is the same whether the ancestor's own list is read before or after the ancestor itself
+ * was merged (the ancestor's merged list is its own fields followed by exactly the fields the walk up the chain would
+ * add, and the names the deriving statement already holds filter both alike). So the statements are merged base first
+ * and each one reads only its base's finished list: the cost is the size of the own fields plus the size of the base's
+ * merged list, and the total is O(the document + the merged members). Before, every statement walked the whole chain
+ * and searched its growing list for each candidate name, which was quadratic in the fields and cubic along a chain.
+ *
+ * Names already present are found by a linear scan when the lists are short (the common case: no allocation, no
+ * hashing) and by a stamped open-addressing table otherwise. A chain of bases that leads back to itself is
+ * ANVL_ERR_RESOLVER_CYCLE_DETECTED (4050), found while walking up to the first merged ancestor.
+ * ---------------------------------------------------------------------- */
+typedef struct {
+   const char *key;
+   usize len;
+   uint32_t stamp;
+} mg_slot;
+
 typedef struct {
    anvl_statement stmt, base;
 } mg_step;
 
 typedef struct {
-   mg_step *walk;
+   mg_step *walk; // the statements on the walk up a chain, derived first (stack_walk until it is outgrown)
    usize walk_cap;
+   mg_slot *slots; // names present in the list being merged
+   usize slot_cap;
+   uint32_t stamp;
 } mg_state;
+
+static usize mg_hash_name(const char *s, usize len) {
+   unsigned long long h = 1469598103934665603ull;
+   for (usize i = 0; i < len; i++) {
+      h = (h ^ (unsigned char)s[i]) * 1099511628211ull;
+   }
+   return (usize)(h ^ (h >> 29));
+}
 
 // True if `fields` has a statement named `name`, scanning the first `count` of them.
 static bool fields_has_name(list fields, usize count, anvl_slice name) {
@@ -230,7 +263,71 @@ static bool fields_has_name(list fields, usize count, anvl_slice name) {
    return false;
 }
 
-// Merges `stmt` and, first, every ancestor not merged yet; iterative. 4050 when the chain leads back to the walk.
+// Returns true when `name` is in the table; otherwise inserts it and returns false. `mask` is the table size in use.
+static bool mg_seen_or_add(mg_state *m, usize mask, anvl_slice name) {
+   usize len = Source.slice_length(name);
+   usize at = mg_hash_name(name.start, len) & mask;
+   while (m->slots[at].stamp == m->stamp) {
+      if (m->slots[at].len == len && (len == 0 || memcmp(m->slots[at].key, name.start, len) == 0)) {
+         return true;
+      }
+      at = (at + 1) & mask;
+   }
+   m->slots[at] = (mg_slot){name.start, len, m->stamp};
+   return false;
+}
+
+// Appends to `fields` the fields of `from` whose names it does not hold. ANVL_RES_ERR on running out of memory.
+static anvl_result mg_merge_one(mg_state *m, list fields, list from) {
+   usize own = List.size(fields), count = List.size(from);
+   if (own + count <= 16) {
+      for (usize i = 0; i < count; i++) {
+         anvl_statement field = NULL;
+         List.get(from, i, (object *)&field);
+         if (field && !fields_has_name(fields, List.size(fields), field->name)) {
+            List.append(fields, field);
+         }
+      }
+      return ANVL_RES_OK;
+   }
+   usize need = 16;
+   while (need < (own + count) * 2) {
+      need *= 2;
+   }
+   if (need > m->slot_cap) {
+      free(m->slots);
+      m->slots = calloc(need, sizeof *m->slots);
+      m->slot_cap = m->slots ? need : 0;
+      m->stamp = 0;
+      if (!m->slots) {
+         return ANVL_RES_ERR;
+      }
+   }
+   if (++m->stamp == 0) { // wrapped: no slot may keep a stamp from 2^32 merges ago
+      memset(m->slots, 0, m->slot_cap * sizeof *m->slots);
+      m->stamp = 1;
+   }
+   usize mask = need - 1;
+   for (usize i = 0; i < own; i++) {
+      anvl_statement s = NULL;
+      List.get(fields, i, (object *)&s);
+      if (s) {
+         (void)mg_seen_or_add(m, mask, s->name);
+      }
+   }
+   for (usize i = 0; i < count; i++) {
+      anvl_statement field = NULL;
+      List.get(from, i, (object *)&field);
+      if (field && !mg_seen_or_add(m, mask, field->name)) {
+         List.append(fields, field);
+      }
+   }
+   return ANVL_RES_OK;
+}
+
+// Merges `stmt` and, first, every ancestor that is not merged yet. A statement's own field list is its merged list once
+// it is merged, so a statement reads its base's own list. Iterative: a chain of 100000 is as safe as one of three.
+// ANVL_ERR_RESOLVER_CYCLE_DETECTED when the chain leads back to a statement on the walk.
 static anvl_result mg_merge_chain(module_context ctx, mg_state *m, mg_step *stack_walk, anvl_statement stmt,
                                   anvl_err_code *out_err_code) {
    usize depth = 0;
@@ -275,6 +372,7 @@ static anvl_result mg_merge_chain(module_context ctx, mg_state *m, mg_step *stac
    while (depth > 0) {
       mg_step step = m->walk[--depth];
       list fields = own_fields(step.stmt);
+      // a base without a field list (not reachable: a base is an object) contributes what its own base does
       anvl_statement from = step.base;
       list base_fields = own_fields(from);
       while (!base_fields && Source.slice_length(from->base) != 0) {
@@ -285,13 +383,10 @@ static anvl_result mg_merge_chain(module_context ctx, mg_state *m, mg_step *stac
          from = (anvl_statement)val;
          base_fields = own_fields(from);
       }
-      usize count = fields && base_fields ? List.size(base_fields) : 0;
-      for (usize i = 0; i < count; i++) {
-         anvl_statement field = NULL;
-         List.get(base_fields, i, (object *)&field);
-         if (field && !fields_has_name(fields, List.size(fields), field->name)) {
-            List.append(fields, field);
-         }
+      if (fields && base_fields && ANVL_RES_OK != mg_merge_one(m, fields, base_fields)) {
+         anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
+         *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         return ANVL_RES_ERR;
       }
       step.stmt->merge_state = 2;
    }
@@ -315,6 +410,7 @@ static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_
    if (m.walk != stack_walk) {
       free(m.walk);
    }
+   free(m.slots);
    return res;
 }
 
