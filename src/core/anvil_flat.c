@@ -437,6 +437,19 @@ size_t anvil_error_get_message(anvil_error err, char *buf, size_t buflen) {
    return copy_to_buffer(e->message, strlen(e->message), buf, buflen);
 }
 
+// RED stubs (FR-2611-anvl-errors-002)
+anvl_err_code anvil_error_get_code(anvil_error err) {
+   (void)err;
+   return ANVL_ERR_NONE;
+}
+
+size_t anvil_error_get_name(anvil_error err, char *buf, size_t buflen) {
+   (void)err;
+   (void)buf;
+   (void)buflen;
+   return 0;
+}
+
 size_t anvil_error_get_line(anvil_error err) {
    struct anvil_error_t *e = (struct anvil_error_t *)err;
    return e ? (size_t)e->line : 0;

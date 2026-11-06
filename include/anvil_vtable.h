@@ -104,6 +104,8 @@ typedef struct anvil_error_i {
    size_t (*get_line)(anvil_error err);
    size_t (*get_column)(anvil_error err);
    size_t (*get_source)(anvil_error err, char *buf, size_t buflen);
+   anvl_err_code (*get_code)(anvil_error err);                      // appended: existing offsets unchanged
+   size_t (*get_name)(anvil_error err, char *buf, size_t buflen);  // appended: existing offsets unchanged
 } anvil_error_i;
 extern const anvil_error_i Error;
 

@@ -19,6 +19,7 @@
 #include "anvil_flat.h"
 #include "anvil_types.h"
 #include "errors.h"
+#include "error_code_pins.h" // generated from conformance/drift-tables.txt by test/unit/Makefile
 #include "internal/flat_internal.h"
 #include "internal/module.h"
 #include "testbit.h"
@@ -733,6 +734,110 @@ static void test_p8_inherited_references_are_not_copied(void) {
    free(t);
 }
 
+
+/* ---------------------------------------------------------------------- *
+ * FR-2611-anvl-errors-002 (option B): the specific code is stable public ABI. anvil_error_get_code() and
+ * anvil_error_get_name() read it from the error handle. Buffer convention as anvil_error_get_message.
+ * ---------------------------------------------------------------------- */
+static anvil_error failed_error(const char *src, anvil_document *out) {
+   *out = anvil_load_buffer(src, strlen(src));
+   return *out ? anvil_document_get_error(*out) : NULL;
+}
+
+static void expect_code_and_name(const char *src, int code, const char *name, int category, const char *tag) {
+   anvil_document doc;
+   anvil_error err = failed_error(src, &doc);
+   TestBit.is_not_null(err, tag);
+   TestBit.is_equal_int(code, (long long)anvil_error_get_code(err), tag);
+   char buf[96] = {0};
+   size_t n = anvil_error_get_name(err, buf, sizeof buf);
+   TestBit.is_equal_str(name, buf, tag);
+   TestBit.is_equal_int((long long)strlen(name), (long long)n, tag);
+   TestBit.is_equal_int(category, anvil_get_error(doc), tag);
+   anvil_dispose(doc);
+}
+
+static void test_e1_code_and_name_of_a_resolver_error(void) {
+   expect_code_and_name("s1 := { a := $s1; };", 4054, "ANVL_ERR_RESOLVER_REFERENCE_CYCLE", ANVIL_ERR_RESOLVE,
+                        "E1: a reference cycle");
+   expect_code_and_name("a := 1;\na := 2;", 4053, "ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER", ANVIL_ERR_RESOLVE,
+                        "E1: a repeated name");
+}
+
+static void test_e2_code_and_name_of_a_syntax_error(void) {
+   expect_code_and_name("s1 := { f3 : s1 { a := 1; }; };", 4022, "ANVL_ERR_PARSER_NESTED_BASE", ANVIL_ERR_SYNTAX,
+                        "E2: a nested base");
+}
+
+static void test_e3_code_and_name_of_a_file_error(void) {
+   anvil_document doc = anvil_load("does-not-exist-error-code-abi.anvl");
+   anvil_error err = doc ? anvil_document_get_error(doc) : NULL;
+   TestBit.is_not_null(err, "E3: the load fails with a detail object");
+   TestBit.is_equal_int(1002, (long long)anvil_error_get_code(err), "E3: the code");
+   char buf[64] = {0};
+   anvil_error_get_name(err, buf, sizeof buf);
+   TestBit.is_equal_str("ANVL_ERR_IO_FILE_NOT_FOUND", buf, "E3: the name");
+   anvil_dispose(doc);
+}
+
+static void test_e4_a_null_error_has_no_code_and_an_empty_name(void) {
+   TestBit.is_equal_int(ANVL_ERR_NONE, (long long)anvil_error_get_code(NULL), "E4: NULL code is ANVL_ERR_NONE");
+   char buf[8] = {'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'};
+   TestBit.is_equal_int(0, (long long)anvil_error_get_name(NULL, buf, sizeof buf), "E4: NULL returns 0");
+   TestBit.is_equal_int(0, buf[0], "E4: NULL writes an empty string");
+   TestBit.is_equal_int(0, (long long)anvil_error_get_name(NULL, NULL, 0), "E4: NULL with no buffer");
+}
+
+static void test_e5_name_follows_the_buffer_convention(void) {
+   anvil_document doc;
+   anvil_error err = failed_error("s1 := { a := $s1; };", &doc);
+   const char *full = "ANVL_ERR_RESOLVER_REFERENCE_CYCLE";
+   size_t len = strlen(full);
+   TestBit.is_equal_int((long long)len, (long long)anvil_error_get_name(err, NULL, 0), "E5: size query");
+   char small[8];
+   memset(small, 'x', sizeof small);
+   TestBit.is_equal_int((long long)len, (long long)anvil_error_get_name(err, small, sizeof small),
+                        "E5: truncated call returns the full length");
+   TestBit.is_equal_int(0, strcmp(small, "ANVL_ER"), "E5: truncated to buflen-1 and NUL-terminated");
+   char one[1] = {'x'};
+   TestBit.is_equal_int((long long)len, (long long)anvil_error_get_name(err, one, 1), "E5: buflen 1 size");
+   TestBit.is_equal_int(0, one[0], "E5: buflen 1 writes only the NUL");
+   char zero[2] = {'x', 'y'};
+   TestBit.is_equal_int((long long)len, (long long)anvil_error_get_name(err, zero, 0), "E5: buflen 0 size");
+   TestBit.is_true(zero[0] == 'x' && zero[1] == 'y', "E5: buflen 0 writes nothing");
+   char exact[64] = {0};
+   anvil_error_get_name(err, exact, len + 1);
+   TestBit.is_equal_str(full, exact, "E5: exact fit");
+   anvil_dispose(doc);
+}
+
+static void test_e6_every_code_has_its_name_through_the_api(void) {
+   // Each table entry: the public enum constant has the pinned value and anvl_error_code_name (which the
+   // accessor returns) the pinned name. Entries the build cannot produce are checked by name only.
+   size_t n = sizeof ERROR_CODE_PINS / sizeof ERROR_CODE_PINS[0];
+   for (size_t i = 0; i < n; i++) {
+      char tag[128];
+      snprintf(tag, sizeof tag, "E6: %s", ERROR_CODE_PINS[i].name);
+      const char *got = anvl_error_code_name((anvl_err_code)ERROR_CODE_PINS[i].value);
+      TestBit.is_true(got && strcmp(got, ERROR_CODE_PINS[i].name) == 0, tag);
+   }
+   TestBit.is_true(n >= 109, "E6: the pinned table keeps its 109 entries (codes are never removed)");
+}
+
+static void test_e7_pinned_codes_keep_their_numbers(void) {
+   // The numbers are the enum constants as the public header declares them; the pins come from the committed
+   // conformance/drift-tables.txt. Moving a number makes this fail until the table (and every binding that
+   // mirrors it) is deliberately changed.
+   size_t n = sizeof ERROR_CODE_PINS / sizeof ERROR_CODE_PINS[0];
+   int moved = 0;
+   for (size_t i = 0; i < n; i++) {
+      if ((long long)ERROR_CODE_PINS[i].constant != ERROR_CODE_PINS[i].value) {
+         moved++;
+      }
+   }
+   TestBit.is_equal_int(0, moved, "E7: no pinned code changed its number");
+}
+
 int main(void) {
    TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
@@ -765,5 +870,12 @@ int main(void) {
    TestBit.run_ex("P8_detection_is_linear", NULL, test_p8_detection_is_linear, th);
    TestBit.run_ex("P8_inherited_references_are_not_copied", NULL, test_p8_inherited_references_are_not_copied, th);
    TestBit.run_ex("P8_inherited_subtrees_are_scanned_once", NULL, test_p8_inherited_subtrees_are_scanned_once, th);
+   TestBit.run_ex("E1_code_and_name_of_a_resolver_error", NULL, test_e1_code_and_name_of_a_resolver_error, th);
+   TestBit.run_ex("E2_code_and_name_of_a_syntax_error", NULL, test_e2_code_and_name_of_a_syntax_error, th);
+   TestBit.run_ex("E3_code_and_name_of_a_file_error", NULL, test_e3_code_and_name_of_a_file_error, th);
+   TestBit.run_ex("E4_a_null_error_has_no_code_and_an_empty_name", NULL, test_e4_a_null_error_has_no_code_and_an_empty_name, th);
+   TestBit.run_ex("E5_name_follows_the_buffer_convention", NULL, test_e5_name_follows_the_buffer_convention, th);
+   TestBit.run_ex("E6_every_code_has_its_name_through_the_api", NULL, test_e6_every_code_has_its_name_through_the_api, th);
+   TestBit.run_ex("E7_pinned_codes_keep_their_numbers", NULL, test_e7_pinned_codes_keep_their_numbers, th);
    return TestBit.report();
 }

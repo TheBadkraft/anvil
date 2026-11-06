@@ -406,9 +406,18 @@ test_attribute_grammar: $(BIN)/test_version $(BIN)/test_attribute_grammar
 		$(BIN)/test_version; \
 	fi
 
-$(BIN)/test_error_codes: test_error_codes.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+# The pin table: every anvl_err_code in the committed conformance/drift-tables.txt as {name, the enum constant,
+# the pinned number}. The test compares the constant (what the public header declares) with the pinned number.
+$(BIN)/error_code_pins.h: $(ANVL)/conformance/drift-tables.txt
 	@mkdir -p $(BIN)
-	$(CC) $(CFLAGS) $^ -o $@
+	@awk 'BEGIN { print "static const struct { const char *name; long long constant; long long value; } ERROR_CODE_PINS[] = {" } \
+	     /^table enum:anvl_err_code$$/ { f = 1; next } /^table/ { f = 0 } \
+	     f && NF == 2 { printf "   {\"%s\", (long long)%s, %s},\n", $$1, $$1, $$2 } \
+	     END { print "};" }' $< > $@
+
+$(BIN)/test_error_codes: test_error_codes.c $(BIN)/error_code_pins.h $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+	@mkdir -p $(BIN)
+	$(CC) $(CFLAGS) -I$(BIN) $(filter-out %.h,$^) -o $@
 
 build_test_error_codes: $(BIN)/test_error_codes
 
