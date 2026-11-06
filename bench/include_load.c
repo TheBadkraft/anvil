@@ -45,7 +45,7 @@ static void put(const char *name, const char *text, int append) {
 static void cleanup(void) {
    char p[400];
    for (int i = 0; i < made; i++) {
-      snprintf(p, sizeof p, "%s/%s", dir, made_names[i]);
+      snprintf(p, sizeof p, "%.255s/%.63s", dir, made_names[i]);
       unlink(p);
    }
    rmdir(dir);
