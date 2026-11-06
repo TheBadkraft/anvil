@@ -838,6 +838,72 @@ static void test_e7_pinned_codes_keep_their_numbers(void) {
    TestBit.is_equal_int(0, moved, "E7: no pinned code changed its number");
 }
 
+/* ----------------------------------------------------------------------- *
+ * The lock (FR-2611-anvl-errors-002): the pin table test/unit/error_code_pins.h is committed and edited only by
+ * hand. It is not generated from conformance/drift-tables.txt, so regenerating that table can never move a pin.
+ * ----------------------------------------------------------------------- */
+static bool file_contains(const char *path, const char *needle) {
+   FILE *f = fopen(path, "rb");
+   if (!f) {
+      return false;
+   }
+   char line[512];
+   bool found = false;
+   while (!found && fgets(line, sizeof line, f)) {
+      found = strstr(line, needle) != NULL;
+   }
+   fclose(f);
+   return found;
+}
+
+static void test_e8_the_pin_table_is_committed_and_hand_maintained(void) {
+   TestBit.is_true(file_contains("error_code_pins.h", "edited only by hand"),
+                   "E8: test/unit/error_code_pins.h is committed and says it is edited only by hand");
+   TestBit.is_true(file_contains("error_code_pins.h", "ABI break"), "E8: the table says a changed line is an ABI break");
+   TestBit.is_true(!file_contains("Makefile", "error_code_pins.h: $(ANVL)"), "E8: no Makefile rule generates the pins");
+}
+
+static void test_e9_every_code_in_the_public_header_is_pinned(void) {
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   TestBit.is_not_null(f, "E9: anvil_error_codes.h readable");
+   if (!f) {
+      return;
+   }
+   char line[256];
+   int seen = 0;
+   size_t n = sizeof ERROR_CODE_PINS / sizeof ERROR_CODE_PINS[0];
+   while (fgets(line, sizeof line, f)) {
+      char name[96];
+      long long value;
+      const char *p = strstr(line, "ANVL_ERR_");
+      int got = p ? sscanf(p, "%95[A-Z0-9_] = %lld", name, &value) : 0;
+      if (p && got == 1 && fgets(line, sizeof line, f)) { // the number wrapped onto the next line
+         got = sscanf(line, " %lld", &value) == 1 ? 2 : 0;
+      }
+      if (got == 2) {
+         bool pinned = false;
+         for (size_t i = 0; i < n; i++) {
+            if (strcmp(ERROR_CODE_PINS[i].name, name) == 0 && ERROR_CODE_PINS[i].value == value) {
+               pinned = true;
+            }
+         }
+         if (!pinned) {
+            printf("    E9: %s = %lld is in the header but not pinned (add it to test/unit/error_code_pins.h)\n", name, value);
+         }
+         TestBit.is_true(pinned, name);
+         seen++;
+      }
+   }
+   fclose(f);
+   TestBit.is_true(seen >= 108, "E9: the header scan found the codes");
+   TestBit.is_equal_int(seen, (long long)n, "E9: the pins hold exactly the header codes (no pin without a code)");
+}
+
+static void test_e10_the_stale_table_message_protects_the_pinned_codes(void) {
+   TestBit.is_true(file_contains("../../scripts/check-drift-tables.sh", "stable ABI"),
+                   "E10: check-drift-tables says pinned codes are stable ABI instead of inviting regeneration");
+}
+
 int main(void) {
    TestBit.run_ex("P4_attribute_value_message", NULL, test_p4_attribute_value_message, th);
    TestBit.run_ex("P1_duplicate_object_fields", NULL, test_p1_duplicate_object_fields, th);
@@ -877,5 +943,8 @@ int main(void) {
    TestBit.run_ex("E5_name_follows_the_buffer_convention", NULL, test_e5_name_follows_the_buffer_convention, th);
    TestBit.run_ex("E6_every_code_has_its_name_through_the_api", NULL, test_e6_every_code_has_its_name_through_the_api, th);
    TestBit.run_ex("E7_pinned_codes_keep_their_numbers", NULL, test_e7_pinned_codes_keep_their_numbers, th);
+   TestBit.run_ex("E8_the_pin_table_is_committed_and_hand_maintained", NULL, test_e8_the_pin_table_is_committed_and_hand_maintained, th);
+   TestBit.run_ex("E9_every_code_in_the_public_header_is_pinned", NULL, test_e9_every_code_in_the_public_header_is_pinned, th);
+   TestBit.run_ex("E10_the_stale_table_message_protects_the_pinned_codes", NULL, test_e10_the_stale_table_message_protects_the_pinned_codes, th);
    return TestBit.report();
 }

@@ -221,34 +221,6 @@ static void test_reg09_ownerless_source_is_handled_cleanly(void) {
    Debug.dispose_ctx(ctx);
 }
 
-// The headers that may hold the anvl_err_code enum, read in this order as one stream of lines.
-static const char *const ERROR_CODE_HEADERS[] = {"../../include/errors.h", "../../include/anvil_error_codes.h"};
-static size_t error_code_header_index;
-
-static FILE *open_error_code_header(void) {
-   for (error_code_header_index = 0; error_code_header_index < 2; error_code_header_index++) {
-      FILE *f = fopen(ERROR_CODE_HEADERS[error_code_header_index], "rb");
-      if (f) {
-         return f;
-      }
-   }
-   return NULL;
-}
-
-// Next line of the stream; at the end of one header moves to the next that exists. *f is NULL at the end.
-static bool next_header_line(FILE **f, char *line, size_t cap) {
-   while (*f) {
-      if (fgets(line, (int)cap, *f)) {
-         return true;
-      }
-      fclose(*f);
-      *f = NULL;
-      while (++error_code_header_index < 2 && !(*f = fopen(ERROR_CODE_HEADERS[error_code_header_index], "rb"))) {
-      }
-   }
-   return false;
-}
-
 // 1 when the header file holds a line containing every one of the (NULL-terminated) fragments.
 static bool public_header_has(const char *const *needles) {
    FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
@@ -288,24 +260,21 @@ static bool errors_h_defines_the_enum(void) {
 }
 
 /* REG10 (BR-2610-anvl-errors-001) - the message and name tables are COMPLETE: every anvl_err_code
- * declared in errors.h has a specific message and a name. The errors analogue of VT11: the codes are
+ * declared in anvil_error_codes.h has a specific message and a name. The errors analogue of VT11: the codes are
  * read from the header, so a code added without a table entry fails here. */
 static void test_reg10_error_tables_are_complete(void) {
-   // The codes are declared in errors.h or (public, stable ABI) in anvil_error_codes.h, in one enum or in
-   // several while they move: read every "ANVL_ERR_x = n" line of the two headers.
-   FILE *f = open_error_code_header();
-   TestBit.is_not_null(f, "REG10: the headers readable");
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   TestBit.is_not_null(f, "REG10: anvil_error_codes.h readable");
    if (!f) {
       return;
    }
    char line[256];
    int checked = 0;
-   const bool in_enum = true;
-   while (next_header_line(&f, line, sizeof(line))) {
+   while (fgets(line, sizeof(line), f)) {
       char name[96];
       unsigned long value;
       const char *p = strstr(line, "ANVL_ERR_");
-      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+      if (p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
          const char *msg = anvl_error_code_message((anvl_err_code)value);
          const char *nm = anvl_error_code_name((anvl_err_code)value);
          bool ok = msg && *msg && strcmp(msg, "Unknown error") != 0 && nm &&
@@ -318,9 +287,7 @@ static void test_reg10_error_tables_are_complete(void) {
          checked++;
       }
    }
-   if (f) {
-      fclose(f);
-   }
+   fclose(f);
    TestBit.is_true(checked > 90, "REG10: the header scan found the whole enum");
    TestBit.is_true(strcmp(anvl_error_code_message((anvl_err_code)123456), "Unknown error") == 0,
                    "REG10: a genuinely unknown code still reads \"Unknown error\" (defensive)");
@@ -328,21 +295,18 @@ static void test_reg10_error_tables_are_complete(void) {
 
 /* REG11 - every code's name string is its enum identifier, spelled exactly (BR-2610-anvl-errors-002). */
 static void test_reg11_error_names_are_the_identifiers(void) {
-   // The codes are declared in errors.h or (public, stable ABI) in anvil_error_codes.h, in one enum or in
-   // several while they move: read every "ANVL_ERR_x = n" line of the two headers.
-   FILE *f = open_error_code_header();
-   TestBit.is_not_null(f, "REG11: the headers readable");
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   TestBit.is_not_null(f, "REG11: anvil_error_codes.h readable");
    if (!f) {
       return;
    }
    char line[256];
    int checked = 0;
-   const bool in_enum = true;
-   while (next_header_line(&f, line, sizeof(line))) {
+   while (fgets(line, sizeof(line), f)) {
       char name[96];
       unsigned long value;
       const char *p = strstr(line, "ANVL_ERR_");
-      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+      if (p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
          const char *nm = anvl_error_code_name((anvl_err_code)value);
          bool ok = nm && strcmp(nm, name) == 0;
          if (!ok) {
@@ -352,9 +316,7 @@ static void test_reg11_error_names_are_the_identifiers(void) {
          checked++;
       }
    }
-   if (f) {
-      fclose(f);
-   }
+   fclose(f);
    TestBit.is_true(checked > 90, "REG11: the header scan found the whole enum");
 }
 
