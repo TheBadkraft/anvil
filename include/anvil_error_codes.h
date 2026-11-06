@@ -48,3 +48,46 @@ enum {
    ANVL_ERR_PARSER_UNEXPECTED_TOKEN = 3100,
 
 };
+
+enum {
+   // Semantic Errors (400x)
+   ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT = 4001,
+   ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT = 4002,
+   ANVL_ERR_PARSER_IDENTIFIER_IS_KEYWORD = 4003,
+   ANVL_ERR_PARSER_ATTRIBUTE_IS_KEYWORD = 4004,
+   ANVL_ERR_PARSER_TUPLE_TOO_SHORT = 4005,
+   ANVL_ERR_PARSER_EXPECTED_COMMA_IN_TUPLE = 4006,
+   ANVL_ERR_PARSER_EMPTY_TUPLE_ELEMENT = 4007,
+   ANVL_ERR_PARSER_ROCKET_OP_NOT_VALID = 4008,
+   ANVL_ERR_PARSER_ARRAY_CANNOT_BE_EMPTY = 4009,
+   ANVL_ERR_PARSER_ASSIGNMENT_NOT_ALLOWED_HERE = 4010,
+   ANVL_ERR_PARSER_INVALID_ATTRIBUTE_BLOCK = 4011,
+   ANVL_ERR_PARSER_INVALID_ATTRIBUTE = 4012,
+   ANVL_ERR_PARSER_DUPLICATE_ATTRIBUTE_KEY = 4013,
+   ANVL_ERR_PARSER_ATTRIBUTES_NOT_ALLOWED_ON_TYPE = 4014,
+   ANVL_ERR_ANON_BLOCK_REDECLARATION = 4015,
+   ANVL_ERR_PARSER_UNTERMINATED_COMMENT = 4016,
+   ANVL_ERR_PARSER_UNTERMINATED_STATEMENT = 4017,
+   ANVL_ERR_PARSER_VALUE_IS_KEYWORD = 4018,
+   ANVL_ERR_PARSER_INVALID_BLOB_TAG = 4019,
+   ANVL_ERR_PARSER_INHERITANCE_REQUIRES_OBJECT = 4020,
+   ANVL_ERR_PARSER_INVALID_BARE_LITERAL = 4021,
+   // A base (`a : b := { ... };` or `a : b { ... };`) on a statement inside an object, at any depth.
+   // Only a top-level statement may have a base.
+   ANVL_ERR_PARSER_NESTED_BASE = 4022,
+
+   // Resolver Errors (405x)
+   ANVL_ERR_RESOLVER_CYCLE_DETECTED = 4050,
+   ANVL_ERR_RESOLVER_MISSING_BASE = 4051,
+   ANVL_ERR_CANNOT_INHERIT_FROM_ANONYMOUS = 4052,
+   // Two top-level statements (in the same document, or across merged includes) declare the
+   // same name — ambiguous for both '$identifier' VarRef and 'base' lookup purposes, so this
+   // is a hard error regardless of where the collision originates. See notes/resolution-phase.md.
+   ANVL_ERR_RESOLVER_DUPLICATE_IDENTIFIER = 4053,
+   // A '$' reference leads back to a container that holds it: `s1 := { a := $s1; };`, `a := [ $a ];`, two
+   // statements that refer to each other, a cycle closed through an inherited field. Reported at the '$' of the
+   // first reference on a cycle in source order (documents in load order). A plain chain cycle
+   // (`a := $b; b := $a;`) is not this error: it stays unresolved.
+   ANVL_ERR_RESOLVER_REFERENCE_CYCLE = 4054,
+
+};
