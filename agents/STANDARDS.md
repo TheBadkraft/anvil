@@ -57,6 +57,18 @@ sub-agents it starts for single tasks. See `agents/README.md` for the roles.
    (build and run), `make test_header build`, `make test_header val`. A bare `make test` does
    nothing.
 7. VM and bytecode work uses larger, functional test cases. The RED-first ordering still applies.
+8. **check-tdd is mandatory (since 2026-11-02) and the merge guard enforces it (since 2026-11-06).**
+   - Before you report a branch, run the checker over its whole range, in the foreground under the
+     cap: `systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -p RuntimeMaxSec=900 --
+     taskset -c <your cores> python3 scripts/tdd/check-tdd.py <worktree> <base>..HEAD`
+     (it picks the adapter, native, python or node, from the repo). Report its verdict line.
+   - Commit shape: a RED commit adds failing tests (stubs only); the GREEN that follows names the tests
+     it flips in `[tests: name, name]` and flips at most 10. Test names contain no commas. Other
+     commits touch no tests.
+   - A PASS writes `<git-common-dir>/check-tdd/pass/<head>.json`. `.claude/hooks/require-tdd-pass.py`
+     refuses `git merge` / `git pull` of a branch whose tip has no such record. Never write a record or
+     an override by hand: an override (`check-tdd/override/<sha>`) is written only by the Principal
+     Engineer, only on the owner's explicit words.
 
 ## 4. Tickets (Rivet only)
 
