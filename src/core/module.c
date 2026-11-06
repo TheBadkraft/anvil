@@ -17,6 +17,7 @@
 
 #include "internal/asl_parser.h"
 #include "internal/constants.h"
+#include "internal/files.h"
 #include "internal/module.h"
 #include "internal/source.h"
 #include "internal/source_registry.h"
@@ -518,9 +519,17 @@ void mod_ctx_dispose_arena(bump_allocator arena) {
  * ----------------------------------------------------------------------- */
 #define INCLUDE_PATH_MAX 1024
 
+// The file identity (st_dev, st_ino) of a document still being loaded, chained through the recursion
+// on the C stack (BR-2611-anvl-include-001). ino 0 = no file (a buffer): no identity.
+typedef struct include_file_frame {
+   uint64_t dev, ino;
+   const struct include_file_frame *up;
+} include_file_frame;
+
 static anvl_result include_load_dependencies(module_context ctx, module_document doc,
-                                             const char *identity, list stack, usize *out_size,
-                                             anvl_err_code *out_err_code);
+                                             const char *identity, uint64_t dev, uint64_t ino,
+                                             const include_file_frame *up, list stack,
+                                             usize *out_size, anvl_err_code *out_err_code);
 
 static void include_resolve_dir(const char *path, char *out_dir, usize out_size) {
    if (!path || out_size == 0) {
@@ -661,6 +670,20 @@ static bool include_path_on_stack(list stack, const char *normalized) {
    return false;
 }
 
+// Whether the file with identity (dev, ino) is the file of a document still being loaded: the same
+// (st_dev, st_ino), taken from the descriptor each file was read through, so no path is walked. It
+// catches the spellings the lexical test cannot equate (absolute, "../" past the root's own name,
+// symbolic links, hard links). Two distinct files with equal bytes are distinct here. A document
+// with no file (a buffer) has ino 0, no identity, and is never matched.
+static bool include_file_on_stack(const include_file_frame *top, uint64_t dev, uint64_t ino) {
+   for (; top && ino != 0; top = top->up) {
+      if (top->ino == ino && top->dev == dev) {
+         return true;
+      }
+   }
+   return false;
+}
+
 // The 1-based line and column of the `include` keyword of `inc` in `parent`'s source, counted in
 // bytes (a line break is `\n` alone): where an include error is reported (BR-2611-anvl-errors-001).
 static void include_error_position(module_document parent, anvl_include inc, usize *line,
@@ -682,7 +705,8 @@ static void include_error_position(module_document parent, anvl_include inc, usi
 }
 
 static anvl_result include_load_child(module_context ctx, module_document parent,
-                                      anvl_include inc, list stack, usize *out_size,
+                                      anvl_include inc, const include_file_frame *files, list stack,
+                                      usize *out_size,
                                       anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
    const char *child_path = NULL; // set when the failure is in the child document's own content
@@ -749,6 +773,15 @@ static anvl_result include_load_child(module_context ctx, module_document parent
       goto error_child;
    }
 
+   // The file just read is a document still being loaded: a cycle, whatever path led to it.
+   uint64_t child_dev = 0, child_ino = 0;
+   child_dev = anvl_last_file_id.dev; // the file doc_load_source just read
+   child_ino = anvl_last_file_id.ino;
+   if (include_file_on_stack(files, child_dev, child_ino)) {
+      err_code = ANVL_ERR_INCLUDE_CYCLIC;
+      goto error_child;
+   }
+
    // Try to register. If the source hash is already registered, this is a diamond: reuse the
    // existing document and discard the freshly loaded duplicate.
    res = mod_ctx_register_doc(ctx, child, resolved, &err_code);
@@ -778,7 +811,8 @@ static anvl_result include_load_child(module_context ctx, module_document parent
 
    inc->resolved = child;
 
-   res = include_load_dependencies(ctx, child, resolved_id, stack, out_size, &err_code);
+   res = include_load_dependencies(ctx, child, resolved_id, child_dev, child_ino, files, stack, out_size,
+                                  &err_code);
    if (res != ANVL_RES_OK) {
       goto error;
    }
@@ -805,8 +839,9 @@ error:
 
 // `identity` is the normalised path of `doc`, owned by the caller for the duration of the call.
 static anvl_result include_load_dependencies(module_context ctx, module_document doc,
-                                             const char *identity, list stack, usize *out_size,
-                                             anvl_err_code *out_err_code) {
+                                             const char *identity, uint64_t dev, uint64_t ino,
+                                             const include_file_frame *up, list stack,
+                                             usize *out_size, anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
 
    if (!doc || !doc->filepath) {
@@ -816,6 +851,7 @@ static anvl_result include_load_dependencies(module_context ctx, module_document
 
    // Push this document's normalised path onto the recursion stack for cycle detection.
    List.append(stack, (object)identity);
+   const include_file_frame frame = {dev, ino, up};
 
    for (usize i = 0; i < List.size(doc->header->includes); i++) {
       anvl_include inc = NULL;
@@ -824,7 +860,7 @@ static anvl_result include_load_dependencies(module_context ctx, module_document
          continue;
       }
 
-      if (ANVL_RES_OK != include_load_child(ctx, doc, inc, stack, out_size, &err_code)) {
+      if (ANVL_RES_OK != include_load_child(ctx, doc, inc, &frame, stack, out_size, &err_code)) {
          goto error_pop;
       }
    }
@@ -863,9 +899,14 @@ anvl_result mod_load_includes(module_context ctx, module_document root, usize *o
       goto error;
    }
 
+   // The root's file identity is the one its load just left (nothing reads a file between the root's
+   // load and this call); taken here, so a load with no includes never needs it.
+   uint64_t root_dev = 0, root_ino = 0;
+   root_dev = anvl_last_file_id.dev;
+   root_ino = anvl_last_file_id.ino;
    char root_buf[INCLUDE_PATH_MAX];
    const char *root_id = include_normalize_path(root->filepath, root_buf, sizeof(root_buf));
-   anvl_result res = include_load_dependencies(ctx, root, root_id, stack, &total, &err_code);
+   anvl_result res = include_load_dependencies(ctx, root, root_id, root_dev, root_ino, NULL, stack, &total, &err_code);
 
    List.dispose(stack);
 

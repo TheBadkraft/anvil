@@ -22,6 +22,7 @@
 #include "internal/source.h"
 #include "internal/source_registry.h"
 //
+#include "internal/files.h"
 #include <sigma.core/allocator.h>
 #include <sigma/strings.h>
 
@@ -593,6 +594,7 @@ anvl_result doc_load_source(module_document doc, anvl_source_origin origin, cons
       if (ANVL_RES_OK != Source.from_buffer(&doc->source, source, len, &err_code)) {
          goto error;
       }
+      anvl_last_file_id = (struct anvl_file_id){0, 0}; // a buffer has no file identity
       break;
    default:
       err_code = ANVL_ERR_INVALID_ARGUMENT;

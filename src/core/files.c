@@ -21,6 +21,10 @@
 // -------------------------
 #include <sigma.core/allocator.h>
 
+// The identity (st_dev, st_ino) of the file the last successful files_load on this thread read, taken
+// from the descriptor it read through: no path walk, no extra syscall (BR-2611-anvl-include-001).
+_Thread_local struct anvl_file_id anvl_last_file_id;
+
 static anvl_result files_load(const char *path, const char **out_source, size_t *out_len,
                               anvl_err_code *out_err_code) {
    anvl_err_code err_code = ANVL_ERR_NONE;
@@ -47,6 +51,9 @@ static anvl_result files_load(const char *path, const char **out_source, size_t 
       err_code = ANVL_ERR_IO_FILE_READ;
       goto error;
    }
+
+   anvl_last_file_id.dev = (uint64_t)st.st_dev;
+   anvl_last_file_id.ino = (uint64_t)st.st_ino;
 
    long len;
    if (S_ISREG(st.st_mode)) {

@@ -14,6 +14,7 @@
 #include "types.h"
 // -------------------------
 #include <stdbool.h>
+#include <stdint.h>
 #include <stddef.h>
 
 typedef struct anvl_files_i {
@@ -47,3 +48,13 @@ typedef struct anvl_files_i {
 } anvl_files_i;
 
 extern const anvl_files_i Files;
+
+/**
+ * @brief The identity (st_dev, st_ino) of the file the last document load on this thread read, taken from the
+ * descriptor it was read through (no path walk, no extra syscall). ino 0 means the last load was not a file.
+ * BR-2611-anvl-include-001.
+ */
+struct anvl_file_id {
+   uint64_t dev, ino;
+};
+extern _Thread_local struct anvl_file_id anvl_last_file_id;
