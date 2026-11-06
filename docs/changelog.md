@@ -42,15 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself by its absolute path loaded with status ok, and the include tree then contained itself, so a walker over it never
   ended; the relative spelling gave `ANVL_ERR_INCLUDE_CYCLIC` (4206). Cycle detection compared lexically normalised paths,
   so a root named `root.anvl` and the same file reached as `/abs/dir/root.anvl`, as `../dir/root.anvl` or through a symbolic
-  link were different documents. An include whose file has the same content as a document still being loaded (the root
-  included) is now that document, whatever path or symbolic link led to it, so it is a cycle (the registry already knew the
-  document by its content hash and used to hand it back as a shared include). The lexical check stays for the cheap case;
-  no `realpath` is made (it slowed every load 1.7x). A missing file still fails as "include file not found". Every spelling now reports what the plain one does: error 4206, public category `ANVIL_ERR_INCLUDE`,
-  positioned at the `include` keyword. A diamond whose branches spell the shared document differently is still no cycle, and
-  the same file name in two directories is still two documents. No public API change. New reader corpus cases under
-  `conformance/cases/canon*` (`conformance/seed/gen_canon.py`; absolute and symbolic-link spellings cannot be held by a
-  relative, regular-file corpus and are unit tests ANV86-ANV91). Documentation affected: the language reference's statement
-  on include cycles (identity is the canonical path, not the spelling).
+  link were different documents. A loaded file's identity is now also its (device, inode), read with the `fstat` the
+  loader already makes on the descriptor it reads through (no path walk, no `realpath`: that slowed every load 1.7x), and an
+  include whose file is the file of a document still being loaded (the root included) is a cycle, whatever path or symbolic
+  link led to it. The lexical path test stays as the cheap first check. Two distinct files with equal bytes remain two
+  documents. A document loaded from a buffer has no file and no identity; it is never matched. Every spelling now reports
+  what the plain one does: error 4206, public category `ANVIL_ERR_INCLUDE`, positioned at the `include` keyword. No public
+  API change. New reader corpus cases under `conformance/cases/canon*` (`conformance/seed/gen_canon.py`; absolute and
+  symbolic-link spellings cannot be held by a relative, regular-file corpus and are unit tests ANV86-ANV91 and ANV94).
+  Windows is not a native target (no `_WIN32` code in the library); a port would use `GetFileInformationByHandle`.
 
 ### Added
 

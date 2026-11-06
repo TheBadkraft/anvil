@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Seeds the canonical-identity reader cases (BR-2611-anvl-include-001): inputs under conformance/cases/canon/.
 
-An include whose file has the content of a document still being loaded (the root included) is that document, by
-whatever path or symbolic link it was reached. A document that reaches itself by any spelling of its own path is an include cycle (4206), at the
+An include whose file is the file of a document still being loaded (the root included) is a cycle, by whatever path
+or symbolic link it was reached. A document that reaches itself by any spelling of its own path is an include cycle
+(4206), at the
 position of the include keyword, exactly as the plain spelling reports. The corpus runs every input from
 conformance/cases by its relative path (a root `canon/x.anvl`, or `x.anvl` at the top), so the spellings here are
 the ones a relative corpus can hold: bare, ./, ../ (up and back down by the directory's name), a/../ and doubled
