@@ -15,6 +15,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **BR-2611-anvl-resolver-003 (the inheritance merge is linear).** A `b_i : b_(i-1)` chain of 200 statements loaded in 0.8 s and one of 400 in
+  13 s; a base with 2000 reference fields inherited by 2000 statements took 22.7 s; 300 levels over a 300-reference field about
+  4 s; 1500 inherited fields x 1500 statements about 9.7 s (all v0.14.0-rc and v0.14.1-rc, release builds). Every derived statement
+  walked its whole chain and searched its growing field list once per candidate field. The statements are now merged base first and
+  each reads only its base's finished list, with the names already present found by a stamped hash table (a linear scan while the
+  lists are short), so the merge costs O(the document + the merged members). Nothing observable changes: the same fields in the
+  same order (own first, then each ancestor nearest first), the same aliased field statements, the same error codes and positions
+  (4050 inheritance cycle, 4022 nested base, 4051, 4052, 4020, and 4054 at the first on-cycle `$` in source order); over 70000 generated
+  documents (forward and cyclic bases, overrides, references into inherited fields) dump byte for byte the same as v0.14.1-rc.
+- **FR-2611-anvl-resolver-001, part 2 (a plain reference chain is linear).** `a0 := $a1; a1 := $a2; ...` of N statements chased the whole
+  chain for every reference (20000 statements: 5.3 s in the debug build). The end of each chain is now remembered, so each statement
+  is walked once. A plain chain cycle (`a := $b; b := $a;`), a chain into a cycle and a chain to a missing name still resolve to null.
+  Part 1 of that ticket (the cost of the reference-cycle check) is not done in this change.
+- **Speed** (native at this branch vs native v0.14.1-rc 064831d, time per load, release builds, pinned to one CPU; lower is faster, a
+  ratio below 1 is a speedup): inheritance chain 200 deep 824 ms to 0.33 ms (0.0004x); chain 400 deep 12.8 s to 1.3 ms (0.0001x);
+  300-deep chain over a 300-reference field 4.0 s to 1.0 ms (0.0003x); base with 2000 reference fields x 2000 derived statements
+  24.3 s to 148 ms (0.0061x; 4 million merged members); 1500 inherited fields x 1500 derived statements 10.1 s to 87 ms (0.0086x); plain
+  reference chain of 20000 statements 3.6 s to 5.1 ms (0.0014x), of 3000 statements 55.3 ms to 0.63 ms (0.011x). The existing workloads,
+  same labels: parse floats 1.006x, ints 1.008x, mixed 0.995x, validate floats 0.991x, validate small 0.989x, reference chain of 100k
+  1.001x, ladder 0.996x, hub 0.986x, base inherited by 20k statements 0.971x, wide array 0.998x, wide object 1.000x, inherited
+  references 1.001x, mixed rows with a reference 1.001x, ring of 100k 1.004x.
+
+### Added
+
+- `bench/parse_validate.c`: the `shapes_*` workloads (`BENCH_SHAPES=1`) for the shapes above, and `RSV16`-`RSV24` in `test/unit/test_resolver.c`
+  (merge order, 4022, 4054 positions, plain chains, 4050, and four time bounds).
+
 ---
 
 ## [v0.14.1-rc] — (2026-11-05)

@@ -445,21 +445,135 @@ static anvl_value resolve_varref_chain(module_context ctx, anvl_slice target) {
    return NULL; // exceeded max_hops without terminating - a cycle
 }
 
+// The end of the reference chain through a top-level statement whose value is a reference, remembered
+// (FR-2611-anvl-resolver-001, part 2). The end of a chain is the same for every reference on it, so a plain chain of N
+// statements is chased once, not N times; a chain that leads into a cycle ends in NULL for every statement on or before it.
+typedef struct {
+   anvl_statement stmt; // a statement whose value is a VarRef
+   anvl_value end;      // the concrete value at the end of its chain, NULL for a cycle, a miss or nothing to alias
+   uint8_t state;       // 1 on the walk being made, 2 known
+} vc_entry;
+
+typedef struct {
+   vc_entry *entries; // open addressing by statement pointer
+   usize cap, count;  // cap is a power of two, or 0 before the first reference to a reference
+   anvl_statement *walk;
+   usize walk_cap;
+   bool failed; // out of memory: the caller falls back to resolve_varref_chain
+} vc_memo;
+
+static vc_entry *vc_find(vc_memo *m, anvl_statement stmt, bool insert) {
+   if (insert && (m->count + 1) * 2 > m->cap) {
+      usize cap = m->cap ? m->cap * 2 : 64;
+      vc_entry *grown = calloc(cap, sizeof *grown);
+      if (!grown) {
+         m->failed = true;
+         return NULL;
+      }
+      for (usize i = 0; i < m->cap; i++) {
+         if (m->entries[i].stmt) {
+            usize at = (usize)((((unsigned long long)(usize)m->entries[i].stmt >> 4) * 0x9E3779B97F4A7C15ull) >> 24) & (cap - 1);
+            while (grown[at].stmt) {
+               at = (at + 1) & (cap - 1);
+            }
+            grown[at] = m->entries[i];
+         }
+      }
+      free(m->entries);
+      m->entries = grown;
+      m->cap = cap;
+   }
+   if (!m->cap) {
+      return NULL;
+   }
+   usize at = (usize)((((unsigned long long)(usize)stmt >> 4) * 0x9E3779B97F4A7C15ull) >> 24) & (m->cap - 1);
+   while (m->entries[at].stmt && m->entries[at].stmt != stmt) {
+      at = (at + 1) & (m->cap - 1);
+   }
+   if (m->entries[at].stmt == stmt) {
+      return &m->entries[at];
+   }
+   if (!insert) {
+      return NULL;
+   }
+   m->entries[at].stmt = stmt;
+   m->count++;
+   return &m->entries[at];
+}
+
+// resolve_varref_chain with the ends of the chains remembered. Same result for every reference.
+static anvl_value resolve_varref_chain_memo(module_context ctx, vc_memo *m, anvl_slice target) {
+   usize depth = 0;
+   anvl_value end = NULL;
+   anvl_slice current = target;
+   for (;;) {
+      addr val = 0;
+      if (!Map.get(ctx->identifiers, current.start, Source.slice_length(current), &val)) {
+         break; // missing target
+      }
+      anvl_statement stmt = (anvl_statement)val;
+      if (!stmt->value) {
+         break; // nothing to alias
+      }
+      if (stmt->value->type != ANVL_VALUE_VARREF) {
+         end = stmt->value; // final concrete value
+         break;
+      }
+      vc_entry *known = vc_find(m, stmt, false);
+      if (known) {
+         if (known->state == 2) {
+            end = known->end;
+         }
+         break; // known end, or a statement already on this walk: a cycle
+      }
+      if (depth == m->walk_cap) {
+         usize cap = m->walk_cap ? m->walk_cap * 2 : 64;
+         anvl_statement *grown = realloc(m->walk, cap * sizeof *grown);
+         if (!grown) {
+            m->failed = true;
+            return NULL;
+         }
+         m->walk = grown;
+         m->walk_cap = cap;
+      }
+      vc_entry *e = vc_find(m, stmt, true);
+      if (!e) {
+         return NULL;
+      }
+      e->state = 1;
+      m->walk[depth++] = stmt;
+      current = stmt->value->varref.target; // keep chasing
+   }
+   while (depth > 0) {
+      vc_entry *e = vc_find(m, m->walk[--depth], false);
+      e->end = end;
+      e->state = 2;
+   }
+   return end;
+}
+
 // Finds every ANVL_VALUE_VARREF in one flat pass over ctx->values (already indexes every
 // anvl_value at any nesting depth - see mod_ctx_dispose's own use of the same index) and sets
 // .varref.resolved on each. Never fails - see resolve_varref_chain.
 static usize resolve_varrefs(module_context ctx) {
    usize resolved = 0;
    usize value_count = List.size(ctx->values);
+   vc_memo memo = {0};
    for (usize i = 0; i < value_count; i++) {
       anvl_value v = NULL;
       List.get(ctx->values, i, (object *)&v);
       if (!v || v->type != ANVL_VALUE_VARREF) {
          continue;
       }
-      v->varref.resolved = resolve_varref_chain(ctx, v->varref.target);
+      v->varref.resolved = memo.failed ? resolve_varref_chain(ctx, v->varref.target)
+                                       : resolve_varref_chain_memo(ctx, &memo, v->varref.target);
+      if (memo.failed && !v->varref.resolved) { // the memo gave up part-way: redo this one without it
+         v->varref.resolved = resolve_varref_chain(ctx, v->varref.target);
+      }
       resolved += v->varref.resolved != NULL;
    }
+   free(memo.entries);
+   free(memo.walk);
    return resolved;
 }
 
