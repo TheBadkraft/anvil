@@ -561,6 +561,381 @@ static void test_rsv15_reference_cycle_rejected(void) {
 }
 
 /* ---------------------------------------------------------------------- *
+ * BR-2611-anvl-resolver-003 and FR-2611-anvl-resolver-001 part 2: the merge and the reference chase are linear.
+ * RSV16-RSV20 pin what the resolver returns (they hold before and after the rewrite); RSV21-RSV24 bound the time.
+ * ---------------------------------------------------------------------- */
+#include <stdio.h>
+#include <time.h>
+
+static double now_secs(void) {
+   struct timespec ts;
+   clock_gettime(CLOCK_MONOTONIC, &ts);
+   return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
+/* Valgrind runs the client about 50 times slower: the sizes shrink and the budgets grow, so a run under it checks memory
+ * only and a native run checks the time. */
+static bool under_valgrind(void) {
+   const char *pre = getenv("LD_PRELOAD");
+   return pre && strstr(pre, "vgpreload");
+}
+
+static anvl_statement stmt_named(module_context ctx, const char *name) {
+   addr val = 0;
+   if (!ctx->identifiers || !Map.get(ctx->identifiers, name, strlen(name), &val)) {
+      return NULL;
+   }
+   return (anvl_statement)val;
+}
+
+/* The field names of a statement's merged list, comma separated, in list order. */
+static void field_names(anvl_statement stmt, char *out, usize cap) {
+   out[0] = 0;
+   if (!stmt || !stmt->value || stmt->value->type != ANVL_VALUE_OBJECT) {
+      snprintf(out, cap, "<none>");
+      return;
+   }
+   list fields = stmt->value->object.statements;
+   usize n = List.size(fields), at = 0;
+   for (usize i = 0; i < n && at + 80 < cap; i++) {
+      anvl_statement f = NULL;
+      List.get(fields, i, (object *)&f);
+      at += (usize)snprintf(out + at, cap - at, "%s%.*s", i ? "," : "", (int)Source.slice_length(f->name), f->name.start);
+   }
+}
+
+static void expect_fields(module_context ctx, const char *stmt, const char *expected, const char *what) {
+   char got[512];
+   field_names(stmt_named(ctx, stmt), got, sizeof got);
+   TestBit.is_equal_str(expected, got, what);
+}
+
+/* RSV16 - the merged field order and the field chosen for a name: own fields first, then each ancestor nearest first;
+ * a name already present is skipped. A base may be declared after the statements deriving from it, and a statement may
+ * derive from one that is itself derived. */
+static void test_rsv16_merge_order_and_overrides(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "e : d := { e1 := 1; a := 5; };\n"
+                                       "d : c := { d1 := 1; b := 4; };\n"
+                                       "c : b := { c1 := 1; a := 3; };\n"
+                                       "b : a := { b1 := 1; x := 2; b := 2; };\n"
+                                       "a := { a1 := 1; x := 1; a := 1; b := 1; };\n"
+                                       "lonely := { q := 1; };\n"
+                                       "dbl : lonely := { q := 9; };\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV16: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV16: body parses");
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, mod_resolve_context(ctx, &err_code), "RSV16: resolve returns OK");
+   expect_fields(ctx, "a", "a1,x,a,b", "RSV16: the root is untouched");
+   expect_fields(ctx, "b", "b1,x,b,a1,a", "RSV16: b: own, then a's a1 and a (x and b are overridden)");
+   expect_fields(ctx, "c", "c1,a,b1,x,b,a1", "RSV16: c: own, then b's, then a's");
+   expect_fields(ctx, "d", "d1,b,c1,a,b1,x,a1", "RSV16: d: own, then c's");
+   expect_fields(ctx, "e", "e1,a,d1,b,c1,b1,x,a1", "RSV16: e, four deep");
+   expect_fields(ctx, "dbl", "q", "RSV16: a field overridden by name is not duplicated");
+   /* the inherited field is the ancestor's own statement (aliased), not a copy */
+   anvl_statement d = stmt_named(ctx, "d"), c = stmt_named(ctx, "c");
+   anvl_statement f = NULL;
+   List.get(d->value->object.statements, 2, (object *)&f);
+   anvl_statement g = NULL;
+   List.get(c->value->object.statements, 0, (object *)&g);
+   TestBit.is_true(f == g, "RSV16: d's inherited c1 is c's own statement");
+   anvl_statement t = stmt_named(ctx, "dbl"), l = stmt_named(ctx, "lonely");
+   List.get(t->value->object.statements, 0, (object *)&f);
+   List.get(l->value->object.statements, 0, (object *)&g);
+   TestBit.is_true(f != g, "RSV16: dbl keeps its own q");
+   mod_ctx_dispose(ctx);
+}
+
+/* RSV17 - a base on a nested statement stays 4022, wherever it is written. */
+static void test_rsv17_nested_base_stays_4022(void) {
+   const char *docs[] = {"#!aml\nb := { x := 1; };\na := { n : b := { y := 1; }; };\n",
+                         "#!aml\nb := { x := 1; };\na := [ { n : b := { y := 1; }; } ];\n"};
+   for (int i = 0; i < 2; i++) {
+      module_context ctx = NULL;
+      module_document doc = setup_amp_doc(docs[i], &ctx);
+      TestBit.is_not_null(doc, "RSV17: document loaded");
+      if (!doc) {
+         continue;
+      }
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      (void)doc_parse_body(doc, &err_code);
+      TestBit.is_equal_int(ANVL_ERR_PARSER_NESTED_BASE, err_code, "RSV17: err_code reports NESTED_BASE");
+      mod_ctx_dispose(ctx);
+   }
+}
+
+static void expect_ref_cycle_at(const char *src, long line, long col, const char *what) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc(src, &ctx);
+   TestBit.is_not_null(doc, what);
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), what);
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_ERR, mod_resolve_context(ctx, &err_code), what);
+   TestBit.is_equal_int(ANVL_ERR_RESOLVER_REFERENCE_CYCLE, err_code, what);
+   anvl_error e = List.size(ctx->errors) ? anvl_error_get(ctx->errors, 0) : NULL;
+   TestBit.is_equal_int(line, e ? (long long)e->line : -1, what);
+   TestBit.is_equal_int(col, e ? (long long)e->column : -1, what);
+   mod_ctx_dispose(ctx);
+}
+
+/* RSV18 - 4054 is reported at the first on-cycle `$` in source order, also when the cycle runs through inherited fields
+ * and when other references, earlier in the text, are not on a cycle. */
+static void test_rsv18_reference_cycle_position(void) {
+   /* line 2 holds a harmless reference; the cycle a -> b -> a is first closed at line 4's `$b` */
+   expect_ref_cycle_at("#!aml\n"
+                       "t := 1; p := { v := $t; };\n"
+                       "z := { n := $p; };\n"
+                       "a := { x := $b; };\n"
+                       "b := { y := $a; };\n",
+                       4, 13, "RSV18: first on-cycle reference");
+   /* the cycle is closed through a field the derived statement inherits: s derives from base, whose field holds the reference */
+   expect_ref_cycle_at("#!aml\n"
+                       "base := { r := $s; };\n"
+                       "s : base := { w := 1; };\n",
+                       2, 16, "RSV18: through an inherited field");
+   /* two cycles; the one written first by position is reported, though the later one is built from earlier statements */
+   expect_ref_cycle_at("#!aml\n"
+                       "m := { k := $n; };\n"
+                       "n := { k := $m; };\n"
+                       "a := { x := $b; };\n"
+                       "b := { y := $a; };\n",
+                       2, 13, "RSV18: the earlier of two cycles");
+   /* a chain of derived statements, every level holding the reference to the last */
+   expect_ref_cycle_at("#!aml\n"
+                       "last : mid := { z := 1; };\n"
+                       "mid : root := { m := 1; };\n"
+                       "root := { r := $last; };\n",
+                       4, 16, "RSV18: through a three-deep chain");
+}
+
+/* RSV19 - a plain chain resolves to the value at its end for every reference on it; a plain cycle, a chain into a
+ * cycle and a chain to a missing name stay unresolved (null); the order of the statements does not matter. */
+static void test_rsv19_plain_chain_ends(void) {
+   module_context ctx = NULL;
+   module_document doc = setup_amp_doc("#!aml\n"
+                                       "r0 := $r1;\n"
+                                       "r1 := $r2;\n"
+                                       "r2 := $r3;\n"
+                                       "r3 := { v := 1; };\n"
+                                       "r4 := $r2;\n"
+                                       "c1 := $c2;\n"
+                                       "c2 := $c1;\n"
+                                       "in := $c1;\n"
+                                       "self := $self;\n"
+                                       "gone := $nowhere;\n"
+                                       "viagone := $gone;\n"
+                                       "late := $r0;\n"
+                                       "holder := { a := $r0; b := $r4; c := $c1; d := $in; e := $viagone; f := $late; };\n",
+                                       &ctx);
+   TestBit.is_not_null(doc, "RSV19: document loaded");
+   if (!doc) {
+      return;
+   }
+   TestBit.is_true(parse_all_docs(ctx), "RSV19: body parses");
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   TestBit.is_equal_int(ANVL_RES_OK, mod_resolve_context(ctx, &err_code), "RSV19: resolve returns OK");
+   anvl_value end = stmt_named(ctx, "r3")->value;
+   const char *names[] = {"r0", "r1", "r2", "r4", "late"};
+   for (int i = 0; i < 5; i++) {
+      anvl_statement s = stmt_named(ctx, names[i]);
+      TestBit.is_true(s && s->value->type == ANVL_VALUE_VARREF && s->value->varref.resolved == end,
+                      "RSV19: a plain chain resolves to the value at its end");
+   }
+   const char *nulls[] = {"c1", "c2", "in", "self", "gone", "viagone"};
+   for (int i = 0; i < 6; i++) {
+      anvl_statement s = stmt_named(ctx, nulls[i]);
+      TestBit.is_true(s && s->value->type == ANVL_VALUE_VARREF && s->value->varref.resolved == NULL,
+                      "RSV19: a cycle, a chain into one or a missing name stays unresolved");
+   }
+   list fields = stmt_named(ctx, "holder")->value->object.statements;
+   bool expect_end[] = {true, true, false, false, false, true};
+   for (usize i = 0; i < List.size(fields); i++) {
+      anvl_statement f = NULL;
+      List.get(fields, i, (object *)&f);
+      TestBit.is_true((f->value->varref.resolved == end) == expect_end[i],
+                      "RSV19: a reference inside an object resolves like a top-level one");
+   }
+   mod_ctx_dispose(ctx);
+}
+
+/* RSV20 - an inheritance cycle is 4050 however it is reached: a tail into the cycle, a self base. */
+static void test_rsv20_inheritance_cycles(void) {
+   const char *docs[] = {"#!aml\nt : a := { x := 1; };\na : b := { y := 1; };\nb : a := { z := 1; };\n",
+                         "#!aml\ns : s := { x := 1; };\n",
+                         "#!aml\nok : root := { x := 1; };\nroot := { r := 1; };\nu : v := { x := 1; };\nv : w := { x := 1; };\nw : u := { x := 1; };\n"};
+   for (int i = 0; i < 3; i++) {
+      module_context ctx = NULL;
+      module_document doc = setup_amp_doc(docs[i], &ctx);
+      TestBit.is_not_null(doc, "RSV20: document loaded");
+      if (!doc) {
+         continue;
+      }
+      TestBit.is_true(parse_all_docs(ctx), "RSV20: body parses");
+      anvl_err_code err_code = ANVL_ERR_NONE;
+      TestBit.is_equal_int(ANVL_RES_ERR, mod_resolve_context(ctx, &err_code), "RSV20: resolve returns ERR");
+      TestBit.is_equal_int(ANVL_ERR_RESOLVER_CYCLE_DETECTED, err_code, "RSV20: err_code reports CYCLE_DETECTED");
+      mod_ctx_dispose(ctx);
+   }
+}
+
+/* The time of one resolve of a generated document, in seconds, and the result. */
+static double time_resolve(const char *src, module_context *out_ctx, bool *ok) {
+   module_document doc = setup_amp_doc(src, out_ctx);
+   *ok = doc && parse_all_docs(*out_ctx);
+   if (!*ok) {
+      return 0;
+   }
+   anvl_err_code err_code = ANVL_ERR_NONE;
+   double t0 = now_secs();
+   anvl_result res = mod_resolve_context(*out_ctx, &err_code);
+   double dt = now_secs() - t0;
+   *ok = res == ANVL_RES_OK;
+   return dt;
+}
+
+#define BUDGET(secs) (under_valgrind() ? (secs) * 60.0 : (secs))
+#define SCALE(n) (under_valgrind() ? (n) / 4 : (n))
+
+static char *grow(char *buf, usize *cap, usize *at, usize need) {
+   if (*at + need + 1 > *cap) {
+      *cap = (*at + need + 1) * 2;
+      buf = realloc(buf, *cap);
+   }
+   return buf;
+}
+
+#define APPEND(...) \
+   do { \
+      char tmp_[160]; \
+      int n_ = snprintf(tmp_, sizeof tmp_, __VA_ARGS__); \
+      buf = grow(buf, &cap, &at, (usize)n_); \
+      memcpy(buf + at, tmp_, (usize)n_ + 1); \
+      at += (usize)n_; \
+   } while (0)
+
+/* RSV21 - BR-2611-anvl-resolver-003: a 400-deep chain b_i : b_(i-1), one own field each (13 s before). */
+static void test_rsv21_deep_chain_merge_is_linear(void) {
+   int n = SCALE(400);
+   usize cap = 4096, at = 0;
+   char *buf = malloc(cap);
+   buf[0] = 0;
+   APPEND("#!aml\nb0 := { f0 := 0; };\n");
+   for (int i = 1; i < n; i++) {
+      APPEND("b%d : b%d := { f%d := %d; };\n", i, i - 1, i, i);
+   }
+   module_context ctx = NULL;
+   bool ok = false;
+   double dt = time_resolve(buf, &ctx, &ok);
+   TestBit.is_true(ok, "RSV21: resolves");
+   char last_name[32];
+   snprintf(last_name, sizeof last_name, "b%d", n - 1);
+   anvl_statement last = ok ? stmt_named(ctx, last_name) : NULL;
+   TestBit.is_equal_int(n, last ? (long long)List.size(last->value->object.statements) : -1,
+                        "RSV21: the last statement holds every field of the chain");
+   TestBit.is_true(dt < BUDGET(3.0), "RSV21: a 400-deep chain merges within 3 s");
+   if (ctx) {
+      mod_ctx_dispose(ctx);
+   }
+   free(buf);
+}
+
+/* RSV22 - a base with 1500 reference fields inherited by 1500 statements (9.7 s before). */
+static void test_rsv22_wide_base_many_derived_is_linear(void) {
+   int n = SCALE(1500);
+   usize cap = 4096, at = 0;
+   char *buf = malloc(cap);
+   buf[0] = 0;
+   APPEND("#!aml\nt := 1;\nbase := {\n");
+   for (int i = 0; i < n; i++) {
+      APPEND("r%d := $t;\n", i);
+   }
+   APPEND("};\n");
+   for (int i = 0; i < n; i++) {
+      APPEND("d%d : base := { p := %d; };\n", i, i);
+   }
+   module_context ctx = NULL;
+   bool ok = false;
+   double dt = time_resolve(buf, &ctx, &ok);
+   TestBit.is_true(ok, "RSV22: resolves");
+   char last_name[32];
+   snprintf(last_name, sizeof last_name, "d%d", n - 1);
+   anvl_statement last = ok ? stmt_named(ctx, last_name) : NULL;
+   TestBit.is_equal_int(n + 1, last ? (long long)List.size(last->value->object.statements) : -1,
+                        "RSV22: a derived statement holds its own field and every base field");
+   TestBit.is_true(dt < BUDGET(4.0), "RSV22: 1500 x 1500 merges within 4 s");
+   if (ctx) {
+      mod_ctx_dispose(ctx);
+   }
+   free(buf);
+}
+
+/* RSV23 - a 300-deep chain with a 300-reference field at its root (4.0 s before). */
+static void test_rsv23_chain_with_reference_root_is_linear(void) {
+   int n = SCALE(300);
+   usize cap = 4096, at = 0;
+   char *buf = malloc(cap);
+   buf[0] = 0;
+   APPEND("#!aml\nt := 1;\nc0 := { refs := [ ");
+   for (int i = 0; i < n; i++) {
+      APPEND("$t, ");
+   }
+   APPEND("1 ]; };\n");
+   for (int i = 1; i < n; i++) {
+      APPEND("c%d : c%d := { m%d := %d; };\n", i, i - 1, i, i);
+   }
+   module_context ctx = NULL;
+   bool ok = false;
+   double dt = time_resolve(buf, &ctx, &ok);
+   TestBit.is_true(ok, "RSV23: resolves");
+   char last_name[32];
+   snprintf(last_name, sizeof last_name, "c%d", n - 1);
+   anvl_statement last = ok ? stmt_named(ctx, last_name) : NULL;
+   TestBit.is_equal_int(n, last ? (long long)List.size(last->value->object.statements) : -1,
+                        "RSV23: the last statement holds the root field and every level's own");
+   TestBit.is_true(dt < BUDGET(2.0), "RSV23: the chain with a reference root merges within 2 s");
+   if (ctx) {
+      mod_ctx_dispose(ctx);
+   }
+   free(buf);
+}
+
+/* RSV24 - FR-2611-anvl-resolver-001 part 2: a plain chain a0 := $a1; ... of 20000 statements (5.3 s before). */
+static void test_rsv24_plain_chain_is_linear(void) {
+   int n = SCALE(20000);
+   usize cap = 4096, at = 0;
+   char *buf = malloc(cap);
+   buf[0] = 0;
+   APPEND("#!aml\n");
+   for (int i = 0; i + 1 < n; i++) {
+      APPEND("a%d := $a%d;\n", i, i + 1);
+   }
+   APPEND("a%d := { v := 1; };\n", n - 1);
+   module_context ctx = NULL;
+   bool ok = false;
+   double dt = time_resolve(buf, &ctx, &ok);
+   TestBit.is_true(ok, "RSV24: resolves");
+   anvl_statement first = ok ? stmt_named(ctx, "a0") : NULL;
+   char last_name[32];
+   snprintf(last_name, sizeof last_name, "a%d", n - 1);
+   anvl_statement last = ok ? stmt_named(ctx, last_name) : NULL;
+   TestBit.is_true(first && last && first->value->varref.resolved == last->value,
+                   "RSV24: the first reference resolves to the value at the end");
+   TestBit.is_true(dt < BUDGET(1.5), "RSV24: a plain chain of 20000 resolves within 1.5 s");
+   if (ctx) {
+      mod_ctx_dispose(ctx);
+   }
+   free(buf);
+}
+
+/* ---------------------------------------------------------------------- *
  * Test runner
  * ---------------------------------------------------------------------- */
 int main(void) {
@@ -590,6 +965,17 @@ int main(void) {
                   test_rsv14_inheritance_cycle_rejected, th);
 
    TestBit.run_ex("RSV15_reference_cycle_rejected", NULL, test_rsv15_reference_cycle_rejected, th);
+
+   TestBit.run_ex("RSV16_merge_order_and_overrides", NULL, test_rsv16_merge_order_and_overrides, th);
+   TestBit.run_ex("RSV17_nested_base_stays_4022", NULL, test_rsv17_nested_base_stays_4022, th);
+   TestBit.run_ex("RSV18_reference_cycle_position", NULL, test_rsv18_reference_cycle_position, th);
+   TestBit.run_ex("RSV19_plain_chain_ends", NULL, test_rsv19_plain_chain_ends, th);
+   TestBit.run_ex("RSV20_inheritance_cycles", NULL, test_rsv20_inheritance_cycles, th);
+   TestBit.run_ex("RSV21_deep_chain_merge_is_linear", NULL, test_rsv21_deep_chain_merge_is_linear, th);
+   TestBit.run_ex("RSV22_wide_base_many_derived_is_linear", NULL, test_rsv22_wide_base_many_derived_is_linear, th);
+   TestBit.run_ex("RSV23_chain_with_reference_root_is_linear", NULL,
+                  test_rsv23_chain_with_reference_root_is_linear, th);
+   TestBit.run_ex("RSV24_plain_chain_is_linear", NULL, test_rsv24_plain_chain_is_linear, th);
 
    return TestBit.report();
 }
