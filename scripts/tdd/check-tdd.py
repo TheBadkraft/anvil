@@ -602,7 +602,9 @@ class Runner:
         dest = os.path.join(self.work, "vendor", "anvil")
         os.makedirs(dest, exist_ok=True)
         if not src:
-            return "vendor/anvil pin %s not available" % out[2][:7]
+            return ("vendor/anvil pin %s not available: give the repo a pin source, either by copying the owner's .git/modules "
+                    "(cp -r <anvil>/.git/modules <repo>/.git/modules, so .git/modules/vendor/anvil exists) or by putting a "
+                    "checkout of anvil beside it as ../anvil" % out[2][:7])
         shutil.rmtree(dest, ignore_errors=True)
         c = subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", src, dest], capture_output=True)
         if c.returncode == 0:
