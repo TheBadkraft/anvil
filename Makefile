@@ -206,7 +206,7 @@ check-32bit:
 # prebuilt (uninstrumented) allocator object are otherwise invisible. BR-2610-anvl-registry-001.
 SIGMA_CORE ?= ../sigma.core
 TSAN_DIR    = build/tsan
-TSAN_MODES ?= different identical diamond
+TSAN_MODES ?= different identical diamond cycle
 ifeq ($(WITH_ASL),1)
 TSAN_MODES += asl
 endif
