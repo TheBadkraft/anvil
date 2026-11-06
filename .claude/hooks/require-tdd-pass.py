@@ -12,6 +12,11 @@ This is a guardrail against a plausible slip by an agent, not a security boundar
 or tag that is the tip of a guarded branch, and `git pull <remote> <branch>` / `git pull . <branch>`.
 
 Out of scope, on purpose:
+  - a script FILE run by a shell (`bash m.sh`, `./m.sh`, `bash < m.sh`): the file can be written by the same command line
+    or changed between the check and the run, so reading it when the hook runs proves nothing, and refusing every script
+    run would refuse most work. The merge inside a script is the author's to check; the pass record is the control.
+    (`xargs -a FILE git merge` and `xargs git merge < FILE` are different: the refs cannot be known, so they are refused
+    as computed refs, like `$( )`.)
   - git aliases and shell aliases or functions;
   - `$'...'` strings and variable expansion of the subcommand or the ref (`git $cmd`, `git merge $b`);
   - cherry-pick, rebase and `reset --hard`, and `git fetch . x:main`, which move a branch without `git merge`;
@@ -225,6 +230,67 @@ def _git_targets(words, here, aliases, stdin_refs=()):
     return out
 
 
+ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "f": "\f", "v": "\v", "e": "\x1b", "E": "\x1b",
+           "\\": "\\", "'": "'", '"': '"'}
+
+
+def _unescape(text):
+    """printf / echo -e backslash escapes: \\n \\t ..., \\xHH, \\NNN and \\0NNN (octal), \\uHHHH. Anything else is kept."""
+    out, i = [], 0
+    while i < len(text):
+        c = text[i]
+        if c != "\\" or i + 1 >= len(text):
+            out.append(c)
+            i += 1
+            continue
+        d = text[i + 1]
+        m = re.match(r"x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|0?([0-7]{1,3})", text[i + 1:])
+        if m and d != "0" or (m and d == "0"):
+            out.append(chr(int(m.group(1) or m.group(2) or m.group(3), 16 if m.group(1) or m.group(2) else 8)))
+            i += 1 + len(m.group(0))
+        elif d in ESCAPES:
+            out.append(ESCAPES[d])
+            i += 2
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _printf(args):
+    """The text `printf FORMAT ARG...` prints: escapes decoded, %s / %b / %d filled from the arguments, the format
+    repeated while arguments are left over (as printf does)."""
+    if args and args[0] == "--":
+        args = args[1:]
+    if not args:
+        return ""
+    fmt, rest, out = _unescape(args[0]), list(args[1:]), []
+    while True:
+        used, pos = False, 0
+        for m in re.finditer(r"%(%|[-+ #0-9.*]*[a-zA-Z])", fmt):
+            out.append(fmt[pos:m.start()])
+            pos = m.end()
+            if m.group(1) == "%":
+                out.append("%")
+            else:
+                arg = rest.pop(0) if rest else ""
+                out.append(_unescape(arg) if m.group(1).endswith("b") else arg)
+                used = True
+        out.append(fmt[pos:])
+        if not (used and rest):
+            return "".join(out)
+
+
+def _echo(args):
+    """The text `echo [-neE] ARG...` prints; -e decodes escapes."""
+    escapes = False
+    while args and re.match(r"^-[neE]+$", args[0]):
+        escapes = escapes or ("e" in args[0] and args[0].rfind("e") > args[0].rfind("E"))
+        args = args[1:]
+    text = " ".join(args)
+    return _unescape(text) if escapes else text
+
+
 def _shell_strings(words, name, piped_from):
     """Command lines a shell (or eval) is given: `-c STRING`, a herestring, or the text piped in by echo/printf."""
     if name == "eval":
@@ -235,20 +301,28 @@ def _shell_strings(words, name, piped_from):
             strings.append(w[3:] or (words[k + 1] if k + 1 < len(words) else ""))
     bare = not strings and all(w.startswith("-") for w in words[1:])  # reads its commands from standard input
     if bare and piped_from and piped_from[0].rsplit("/", 1)[-1] in ("echo", "printf"):
-        strings.append(" ".join(piped_from[1:]))
-        strings += piped_from[1:]
+        if piped_from[0].rsplit("/", 1)[-1] == "printf":
+            strings.append(_printf(piped_from[1:]))
+        else:
+            strings.append(_echo(piped_from[1:]))
+
     return list(dict.fromkeys(strings))
 
 
 def _xargs_git(words, here, aliases, piped_from):
     """`xargs [options] git merge ...`: the refs come from the pipe (echo/printf: its words; else unknown)."""
-    k, value_options = 1, (_MEMCAP.XARGS_VALUE_OPTIONS if _MEMCAP else set())
+    k, value_options, from_file = 1, (_MEMCAP.XARGS_VALUE_OPTIONS if _MEMCAP else set()), False
     while k < len(words) and words[k].startswith("-") and words[k] != "--":
-        k += 2 if words[k] in value_options else 1
+        w = words[k]
+        from_file = from_file or w in ("-a", "--arg-file") or w.startswith("--arg-file=") or (w.startswith("-a") and not w.startswith("--"))
+        k += 2 if w in value_options else 1
     sub = _strip(words[k + (1 if k < len(words) and words[k] == "--" else 0):])
     if not sub or sub[0].rsplit("/", 1)[-1] != "git":
         return []
-    if piped_from and piped_from[0].rsplit("/", 1)[-1] in ("echo", "printf"):
+    from_file = from_file or any(w == "<" or (w.startswith("<") and not w.startswith("<<")) for w in words)
+    if from_file:
+        stdin = [SUBST_MARK]  # the refs are in a file: unknown
+    elif piped_from and piped_from[0].rsplit("/", 1)[-1] in ("echo", "printf"):
         stdin = [w for w in piped_from[1:] if not w.startswith("-")]
     else:
         stdin = [SUBST_MARK] if piped_from else []  # something other than echo feeds it: unknown refs
