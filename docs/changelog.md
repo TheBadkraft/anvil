@@ -31,9 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parsing, 4xxx semantic and resolver, 41xx vars, 42xx include, 43xx import, 44xx AMP, 45xx serializer, 46xx schema, 47xx
   AnvilScript functions, 50xx lexer, 51xx AnvilScript, 70xx memory, 90xx generic). The public category enum (`anvil_err_code`)
   is unchanged and stays the coarse answer. This reverses the 2026-09-05 decision that the codes were internal, which anvil.js,
-  the language reference's code tables and `conformance/drift-tables.txt` had already overtaken. The unit suite now pins all 109
-  numbers and names against `conformance/drift-tables.txt`, so moving one fails the build until the table is deliberately changed.
-  Names match anvil.js (`lastError().name`) and the language reference for all 109 codes. No parse path changed.
+  the language reference's code tables and `conformance/drift-tables.txt` had already overtaken. The numbers are locked by a committed, hand-maintained pin table, `test/unit/error_code_pins.h`: the unit suite fails when a header constant differs from its pin (E7), when the name table differs (E6), or when the header has a code that is not pinned (E9), so a new code must be added to the pins on purpose. The pins are never generated, so regenerating `conformance/drift-tables.txt` cannot move one, and `check-drift-tables` (also `make update-conformance`) now refuses to proceed when a pinned code was changed or removed. Names match anvil.js (`lastError().name`) and the language reference for all 109 codes. No parse path changed.
 
 ---
 
