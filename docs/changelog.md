@@ -76,8 +76,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     is exempt only when a `systemd-run` wrapper in the same command carries `-p MemoryMax=...` or
     `--property=MemoryMax=...`; a description or any other text that mentions it does not count. A table of 166
     commands records the expected verdict for each.
-  - **Tests:** `scripts/tdd/test_check_tdd.py` (106 cases) builds tiny fixture repos with scripted commits;
-    `.claude/hooks/test_require_tdd_pass.py` (46 cases) and `.claude/hooks/test_require_memcap.py` (16 cases) cover
+  - **Verifier follow-ups (FR-2611-anvl-tooling-001).**
+    - *RED weakening:* every open RED's pending tests must still exist **and still fail**. A later RED that turns one
+      into a test that passes (`assertTrue(True)`) is refused. A later RED that changes a pending test's expectation but
+      leaves it failing is allowed on purpose: the checker sees outcomes, not intent, a RED may correct a wrong
+      expectation, and the test diff is what the reviewer reads. A RED that weakens a test that already passes is out of
+      scope (it belongs to no open RED).
+    - *Memory-cap hook:* `gradle`, `gradlew` and `./gradlew` are heavy (only `--version`, `-v`, `--help`, `--stop` and
+      `--status` stay light: gradle's `-q`, `-p`, `-c` are not inline checks). A bare `make` is heavy, because it runs the
+      default target, which builds; `make -n`, `make -q` and `make --version` stay allowed. `MemoryMax=0`, `infinity`, `max`
+      and an empty value are not a cap (the last assignment wins, as in systemd). `env -S "node x.js"` and a command named by
+      `$(which node)` / `` `command -v python3` `` are followed. STANDARDS section 8 lists the runtimes.
+    - *Merge guard:* `printf` and `echo -e` escapes (`\n`, `\xHH`, octal) and `%s` / `%b` fill are decoded before the piped
+      command line is read, so `printf 'git merge feat/x\n' | bash` is judged. `xargs -a FILE git merge` and `xargs git
+      merge < FILE` are refused as computed refs. Running a script file (`bash m.sh`) is out of scope, on purpose: its
+      content can be written by the same command line or changed after the check, so reading it proves nothing, and refusing
+      every script run would refuse most work.
+    - *Setup:* a missing `vendor/anvil` pin source now says how to fix it: copy `.git/modules` into the repo, or keep a
+      checkout of anvil beside it as `../anvil`.
+  - **Tests:** `scripts/tdd/test_check_tdd.py` (109 cases) builds tiny fixture repos with scripted commits;
+    `.claude/hooks/test_require_tdd_pass.py` (50 cases) and `.claude/hooks/test_require_memcap.py` (21 cases) cover
     the hooks. Tooling only; no product code changed.
 
 - **Schema and type-registry conformance corpus (FR-2610-anvl-001).** The type registry and AnvilSchema now have a
