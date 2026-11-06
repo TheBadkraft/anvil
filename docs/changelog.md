@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **FR-2611-anvl-errors-002 (the specific error code is public, stable ABI).** A failed load's `anvil_error` now reports the
+  specific reason, not only its category: `anvil_error_get_code(error)` returns the `anvl_err_code` value (for example 4054) and
+  `anvil_error_get_name(error, buf, buflen)` the symbolic name, exactly the enum identifier (for example
+  `ANVL_ERR_RESOLVER_REFERENCE_CYCLE`); both are also `Error.get_code` and `Error.get_name`, appended after `get_source` in the
+  `anvil_error_i` vtable (existing offsets unchanged). `get_name` follows the buffer convention of `anvil_error_get_message`: the full
+  length is returned whatever the buffer size, the text is truncated to `buflen - 1` bytes and NUL-terminated, `NULL` or a zero
+  `buflen` writes nothing, and a `NULL` error returns `ANVL_ERR_NONE` / an empty string. When no specific reason was recorded the code
+  is `ANVL_ERR_NONE` (0) and the name `"ANVL_ERR_NONE"`. Exports: 174 to 176.
+- **The codes are now stable public ABI.** `anvl_err_code` moved to the public header `include/anvil_error_codes.h` (included by
+  `anvil_types.h`), so a consumer can compare against `ANVL_ERR_*`. The rule: a shipped code is never renumbered, never reused
+  for another reason and never removed; new codes are only appended inside their category's range (1xxx file I/O, 2xxx-3xxx
+  parsing, 4xxx semantic and resolver, 41xx vars, 42xx include, 43xx import, 44xx AMP, 45xx serializer, 46xx schema, 47xx
+  AnvilScript functions, 50xx lexer, 51xx AnvilScript, 70xx memory, 90xx generic). The public category enum (`anvil_err_code`)
+  is unchanged and stays the coarse answer. This reverses the 2026-09-05 decision that the codes were internal, which anvil.js,
+  the language reference's code tables and `conformance/drift-tables.txt` had already overtaken. The unit suite now pins all 109
+  numbers and names against `conformance/drift-tables.txt`, so moving one fails the build until the table is deliberately changed.
+  Names match anvil.js (`lastError().name`) and the language reference for all 109 codes. No parse path changed.
+
 ---
 
 ## [v0.14.1-rc] — (2026-11-05)
