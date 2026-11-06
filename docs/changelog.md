@@ -38,6 +38,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same labels: parse floats 1.006x, ints 1.008x, mixed 0.995x, validate floats 0.991x, validate small 0.989x, reference chain of 100k
   1.001x, ladder 0.996x, hub 0.986x, base inherited by 20k statements 0.971x, wide array 0.998x, wide object 1.000x, inherited
   references 1.001x, mixed rows with a reference 1.001x, ring of 100k 1.004x.
+- **BR-2611-anvl-include-001 (an include cycle is found whatever the spelling of the path).** A root document that included
+  itself by its absolute path loaded with status ok, and the include tree then contained itself, so a walker over it never
+  ended; the relative spelling gave `ANVL_ERR_INCLUDE_CYCLIC` (4206). Cycle detection compared lexically normalised paths,
+  so a root named `root.anvl` and the same file reached as `/abs/dir/root.anvl`, as `../dir/root.anvl` or through a symbolic
+  link were different documents. A document's identity is now its canonical path (`realpath`: `.`, `..` and symbolic links
+  resolved), the root's included; a file that does not exist still falls back to the lexical form and fails as "include file
+  not found" as before. Every spelling now reports what the plain one does: error 4206, public category `ANVIL_ERR_INCLUDE`,
+  positioned at the `include` keyword. A diamond whose branches spell the shared document differently is still no cycle, and
+  the same file name in two directories is still two documents. No public API change. New reader corpus cases under
+  `conformance/cases/canon*` (`conformance/seed/gen_canon.py`; absolute and symbolic-link spellings cannot be held by a
+  relative, regular-file corpus and are unit tests ANV86-ANV91). Documentation affected: the language reference's statement
+  on include cycles (identity is the canonical path, not the spelling).
 
 ### Added
 
