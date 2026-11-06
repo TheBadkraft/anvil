@@ -721,6 +721,23 @@ class AccidentClass(Base):
         self.fx.commit("T-1: RED. drop", {"test/ops.test.js": TESTJS + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);"), "test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
         self.assertFails(b, "weakens an open RED")
 
+    def test_a_red_that_turns_a_failing_test_of_an_open_red_into_one_that_passes_weakens_it(self):
+        b = red_then(self.fx)
+        self.fx.commit("T-1: RED. neutered", {
+            "test/ops.test.js": TESTJS + case("mul", "assert.ok(true);") + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);"),
+            "test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
+        rec = self.assertFails(b, "weakens an open RED")
+        self.assertIn("pass", " ".join(rec["reasons"]))
+
+    def test_a_red_that_changes_the_expectation_of_a_failing_test_of_an_open_red_is_allowed(self):
+        # Documented, on purpose: the test still exists and still fails, and the checker sees outcomes, not intent.
+        # A RED may correct a wrong expectation; the test diff is what the reviewer reads.
+        b = red_then(self.fx)
+        self.fx.commit("T-1: RED. corrected", {
+            "test/ops.test.js": TESTJS + case("mul", "assert.strictEqual(lib.mul(2, 3), 7);") + case("sub", "assert.strictEqual(lib.sub(5, 3), 2);"),
+            "test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
+        self.assertPasses(b)
+
     def test_a_red_that_adds_a_failing_test_beside_an_open_red_is_fine(self):
         b = red_then(self.fx)
         self.fx.commit("T-1: RED. more", {"test/extra.test.js": TESTJS + case("extra", "assert.strictEqual(lib.mul(1, 1), 2);")})
