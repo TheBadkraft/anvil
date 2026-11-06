@@ -52,6 +52,7 @@ struct anvil_document_t {
 
 struct anvil_error_t {
    anvil_err_code category;
+   anvl_err_code code; // the specific reason (stable public ABI); ANVL_ERR_NONE when none was recorded
    const char *message; // static message text; NULL if nothing was recorded internally
    usize line;
    usize column;
@@ -85,6 +86,7 @@ static anvil_error make_error_detail(module_context ctx, anvil_err_code category
    memcpy(text, file, file_len + 1);
    detail->source = text;
    detail->category = category;
+   detail->code = ANVL_ERR_NONE;
    detail->message = NULL;
    detail->line = 0;
    detail->column = 0;
@@ -92,6 +94,7 @@ static anvil_error make_error_detail(module_context ctx, anvil_err_code category
    if (ctx && ctx->errors && List.size(ctx->errors) > 0) {
       anvl_error recorded = anvl_error_get(ctx->errors, 0);
       if (recorded) {
+         detail->code = recorded->code;
          detail->message = recorded->message;
          detail->line = recorded->line;
          detail->column = recorded->column;
@@ -437,17 +440,18 @@ size_t anvil_error_get_message(anvil_error err, char *buf, size_t buflen) {
    return copy_to_buffer(e->message, strlen(e->message), buf, buflen);
 }
 
-// RED stubs (FR-2611-anvl-errors-002)
 anvl_err_code anvil_error_get_code(anvil_error err) {
-   (void)err;
-   return ANVL_ERR_NONE;
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   return e ? e->code : ANVL_ERR_NONE;
 }
 
 size_t anvil_error_get_name(anvil_error err, char *buf, size_t buflen) {
-   (void)err;
-   (void)buf;
-   (void)buflen;
-   return 0;
+   struct anvil_error_t *e = (struct anvil_error_t *)err;
+   if (!e) {
+      return copy_to_buffer("", 0, buf, buflen);
+   }
+   const char *name = anvl_error_code_name(e->code);
+   return copy_to_buffer(name, strlen(name), buf, buflen);
 }
 
 size_t anvil_error_get_line(anvil_error err) {

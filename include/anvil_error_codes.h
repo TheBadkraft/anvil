@@ -1,6 +1,20 @@
 /* anvil_error_codes.h - the specific error codes (public, stable ABI); SPDX-License-Identifier: Proprietary */
 #pragma once
 
+/**
+ * @brief The specific error codes (stable public ABI).
+ *
+ * Every reason the reader, resolver, writer and builder can fail has one code here. Read the code of a
+ * failed load with anvil_error_get_code() and its symbolic name with anvil_error_get_name().
+ *
+ * Stability rule: a code that has shipped is never renumbered, never reused for another reason and never
+ * removed. New codes are only appended, inside the range of their category (100x file I/O, 2xxx to 3xxx
+ * parsing, 4xxx semantic and resolver, 41xx vars, 42xx include, 43xx import, 44xx AMP, 45xx serializer,
+ * 46xx schema, 47xx AnvilScript functions, 50xx lexer, 51xx AnvilScript, 70xx memory, 90xx generic). A
+ * code may be reserved (declared, never reported); it stays declared. conformance/drift-tables.txt pins
+ * every number and name, and the unit suite fails if one moves. The public category (anvil_err_code) is
+ * separate: it is the coarse phase, this is the reason.
+ */
 typedef enum {
    ANVL_ERR_NONE = 0,
 
