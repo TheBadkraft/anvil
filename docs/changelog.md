@@ -51,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API change. New reader corpus cases under `conformance/cases/canon*` (`conformance/seed/gen_canon.py`; absolute and
   symbolic-link spellings cannot be held by a relative, regular-file corpus and are unit tests ANV86-ANV91 and ANV94).
   Windows is not a native target (no `_WIN32` code in the library); a port would use `GetFileInformationByHandle`.
+  Also pinned by tests ANV95-ANV97 (a buffer load after a file load, a hard-link self-include, a failed read leaves no stale
+  identity) and a `cycle` mode of `make check-tsan` (concurrent cycle and diamond loads). New `bench/include_load.c`
+  measures file loads with includes (the other benches load buffers and never reach include processing). Subject (this
+  branch) vs baseline v0.14.1-rc (064831d), ms per load, lower is faster, median of 9 runs pinned to one CPU: file load with
+  no include 0.00180 vs 0.00179 (1.006x), 10 includes 0.01983 vs 0.01978 (1.003x), 100 includes 0.18128 vs 0.18038
+  (1.005x), a 20-deep chain 0.03815 vs 0.03796 (1.005x). The 15 `bench/parse_validate.c` workloads, ms per run, are
+  between 0.994x and 1.022x of v0.14.1-rc (validate_small 0.994x, validate_floats 0.996x), apart from the plain-chain row,
+  which is 0.011x because of the linear `$` chain (FR-2611-anvl-resolver-001), not this change.
 
 ### Added
 
