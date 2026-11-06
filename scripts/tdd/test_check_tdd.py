@@ -815,6 +815,16 @@ class SetupErrors(Base):
         self.assertEqual((rc, commits), (2, []))
         self.assertIn("vendor/anvil", err.getvalue())
 
+    def test_the_missing_pin_message_says_how_to_find_a_pin_source(self):
+        b = self.fx.base()
+        self.fx.run("update-index", "--add", "--cacheinfo", "160000,%s,vendor/anvil" % ("a" * 40))
+        self.fx.run("commit", "-q", "-m", "T-1: REFACTOR. pin")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.check(b)
+        self.assertIn(".git/modules", err.getvalue())
+        self.assertIn("../anvil", err.getvalue())
+
 
 class PassRecordOptions(Base):
     def good_chain(self):
