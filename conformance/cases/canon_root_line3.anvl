@@ -1,0 +1,4 @@
+#!aml
+
+include "./../cases/canon_root_line3.anvl";
+x := 1;

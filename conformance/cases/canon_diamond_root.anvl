@@ -1,0 +1,3 @@
+include "canon/dia_b.anvl";
+include "./canon/../canon/dia_c.anvl";
+r := 1;

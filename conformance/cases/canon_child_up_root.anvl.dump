@@ -1,0 +1,6 @@
+anvil-dump 2
+mode document
+input-bytes 39
+status error
+dialect AML
+error code=4206 name=ANVL_ERR_INCLUDE_CYCLIC category=3 category-name=ANVIL_ERR_INCLUDE line=1 column=1 source="./canon/child_up.anvl" message="Cyclic include detected"

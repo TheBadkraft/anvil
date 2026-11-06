@@ -1,0 +1,2 @@
+include "../cases/canon_root_up_down.anvl";
+x := 1;
