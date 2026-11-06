@@ -91,3 +91,57 @@ enum {
    ANVL_ERR_RESOLVER_REFERENCE_CYCLE = 4054,
 
 };
+
+enum {
+   // Vars Errors (41xx)
+   ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101,
+   ANVL_ERR_VARS_NOT_FIRST = 4102,
+   ANVL_ERR_VARS_DUPLICATE_KEY = 4103,
+   ANVL_ERR_VARS_CIRCULAR_REF = 4104,
+   ANVL_ERR_VARS_KEY_NOT_FOUND = 4105,
+
+   // Include Errors (42xx)
+   ANVL_ERR_INCLUDE_NOT_FIRST = 4201,
+   ANVL_ERR_INCLUDE_AMP_FORBIDDEN = 4202,
+   ANVL_ERR_INCLUDE_DUPLICATE_ALIAS = 4203,
+   ANVL_ERR_INCLUDE_FILE_NOT_FOUND = 4204,
+   ANVL_ERR_INCLUDE_CYCLIC = 4206,
+
+   // Import Errors (43xx) -- reserved ahead of AnvlScript's own foreign-code-bridge feature
+   // (not yet implemented), same status the AML `include` mechanism's codes had before it
+   // shipped. Formerly reserved under "Using Errors" for the same not-yet-built construct,
+   // renamed alongside the keyword itself -- see FR-2609-anvl-public-api-002.
+   ANVL_ERR_IMPORT_MODULE_NOT_FOUND = 4305,
+   ANVL_ERR_IMPORT_IN_AMP = 4306,
+   ANVL_ERR_IMPORT_AFTER_STATEMENTS = 4307,
+
+   // AMP Dialect Errors (44xx)
+   ANVL_ERR_AMP_ARRAY_ELEMENT_NOT_SCALAR = 4401,
+
+   // Serializer Errors (45xx)
+   ANVL_ERR_SERIALIZER_AMP_OBJECT_NOT_ALLOWED = 4501,
+
+   // Schema Errors (46xx)
+   ANVL_ERR_SCHEMA_ATTR_MISSING = 4601,    // document lacks the required @[schema] module attribute
+   ANVL_ERR_SCHEMA_TYPE_UNRESOLVED = 4602, // schema field references an undefined type name
+   ANVL_ERR_SCHEMA_BASE_UNKNOWN =
+      4603, // schema statement base is not 'enum', 'flags', or a known type
+   ANVL_ERR_SCHEMA_VALIDATION_REQUIRED = 4604, // required field absent in data document
+   ANVL_ERR_SCHEMA_VALIDATION_TYPE_MISMATCH =
+      4605, // data field value type does not match schema field type
+   ANVL_ERR_SCHEMA_VALIDATION_UNKNOWN_FIELD =
+      4606, // data field not declared in schema type (strict mode)
+
+   // AnvlScript Function Errors (47xx)
+   ANVL_ERR_ASL_DUPLICATE_PARAMETER = 4701, // two parameters in the same function declaration
+                                             // share a name -- notes/anvilscript-design.md's
+                                             // "the ANVL parser... validates parameter
+                                             // uniqueness"
+   ANVL_ERR_ASL_VARARG_NOT_LAST = 4702, // a '[]' parameter-array marker appeared on a
+                                         // parameter that isn't the last one -- "a final
+                                         // parameter may be marked as a parameter-array",
+                                         // notes/anvilscript-design.md
+   ANVL_ERR_ASL_UNTERMINATED_BODY = 4703, // source ran out before the function body's
+                                           // matching '}' was found
+
+};
