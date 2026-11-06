@@ -47,7 +47,7 @@ class UnquotedBehaviourIsKept(unittest.TestCase):
         self.assertEqual(hook.heavy_use("FOO=1 node x.js"), "node")
 
     def test_inline_checks_and_version_queries_are_allowed(self):
-        for c in ("node -e '1'", 'python3 -c "print(1)"', "node --version", "python3 -", "make"):
+        for c in ("node -e '1'", 'python3 -c "print(1)"', "node --version", "python3 -", "make --version", "make -n all"):
             self.assertIsNone(hook.heavy_use(c), c)
 
     def test_heredoc_body_lines_only_count_when_they_start_with_a_runtime(self):
@@ -77,7 +77,7 @@ BASE = [
     ("! node x.js", "node"), ("{ node x.js; }", "node"), ("if true; then node x.js; fi", "node"),
     ("for f in a b; do python3 $f.py; done", "python3"), ("while true; do make all; done", "make"),
     ('echo "a|b" | node script.js', "node"), ('echo "a;b"; python3 run.py', "python3"),
-    ("node -e '1'", None), ('python3 -c "print(1)"', None), ("node --version", None), ("python3 -", None), ("make", None), ("npm -v", None),
+    ("node -e '1'", None), ('python3 -c "print(1)"', None), ("node --version", None), ("python3 -", None), ("npm -v", None),
     ("ls -l", None), ("git status", None), ("echo node x.js", None), ("cat node.js", None), ("grep -r node src", None),
     ('grep -E "a|node --test" file', None), ("grep -E 'a|python3 run.py' file", None), ('echo "x; node app.js"', None),
     ("echo 'a && python3 run.py'", None), ('git commit -m "tidy; python3 adapter notes"', None),
@@ -141,6 +141,37 @@ CAP_FORMS = [
     ("systemd-run --property MemoryMax=4G -- node x.js", None), ('systemd-run -p "MemoryMax=4G" -- node x.js', None),
 ]
 
+GRADLE = [
+    ("gradle build", "gradle"), ("./gradlew test", "gradlew"), ("gradlew build", "gradlew"), ("/opt/g/bin/gradle assemble", "gradle"),
+    ("gradle -q build", "gradle"), ("gradle -p java test", "gradle"), ("cd java && ./gradlew --no-daemon test", "gradlew"),
+    ("timeout 60 gradle build", "gradle"), ("bash -c './gradlew test'", "gradlew"),
+    ("gradle --version", None), ("./gradlew -v", None), ("gradle --help", None), ("gradle --stop", None), ("ls gradle", None),
+    ("echo gradle build", None), ("systemd-run -p MemoryMax=4G -- ./gradlew test", None), ("cat gradlew", None),
+]
+# A bare `make` runs the default target, which builds: it is heavy. `make -n`, `--version` and the like stay allowed.
+BARE_MAKE = [("make", "make"), ("ls && make", "make"), ("taskset -c 6-7 make", "make"), ("make -j8", "make"),
+             ("make --version", None), ("make -n", None), ("make -q all", None), ("systemd-run -p MemoryMax=1G -- make", None)]
+NO_CAP = [
+    ("systemd-run -p MemoryMax=0 -- node x.js", "node"), ("systemd-run -p MemoryMax=infinity -- node x.js", "node"),
+    ("systemd-run --property=MemoryMax=infinity -- python3 y.py", "python3"), ("systemd-run --property MemoryMax=0 -- make all", "make"),
+    ("systemd-run -pMemoryMax=0 -- node x.js", "node"), ("systemd-run -p MemoryMax= -- node x.js", "node"),
+    ("systemd-run -p MemoryMax=0G -- node x.js", "node"), ("systemd-run -p MemoryMax=max -- node x.js", "node"),
+    ("systemd-run -p MemoryMax=0 -p MemoryMax=4G -- node x.js", None), ("systemd-run -p MemoryMax=50% -- node x.js", None),
+    ("systemd-run -p MemoryMax=512M -- node x.js", None), ("systemd-run -p MemoryMax=1073741824 -- node x.js", None),
+]
+ENV_SPLIT = [
+    ('env -S "node x.js"', "node"), ("env -S 'FOO=1 python3 y.py'", "python3"), ('env -S"node x.js"', "node"),
+    ("env --split-string='make all'", "make"), ('env -S "node x.js" extra', "node"), ("env A=1 -S 'npm test'", "npm"),
+    ('env -S "ls -l"', None), ('env -S "node -e 1"', None), ("systemd-run -p MemoryMax=1G -- env -S 'node x.js'", None),
+]
+WHICH = [
+    ("$(which node) x.js", "node"), ("`which node` x.js", "node"), ("$(command -v python3) y.py", "python3"),
+    ('"$(which node)" x.js', "node"), ("$(which -a node) x.js", "node"), ("$(readlink -f $(which node)) x.js", "node"),
+    ("FOO=1 $(which make) all", "make"), ("x && $(type -p npm) test", "npm"), ("sudo $(which node) x.js", "node"),
+    ("$(which ls) -l", None), ("echo $(which node)", None), ("ls -l $(which node)", None), ("$(which node) -e 1", None),
+    ("systemd-run -p MemoryMax=1G -- $(which node) x.js", None),
+]
+
 
 class RegressionTable(unittest.TestCase):
     def table(self, rows):
@@ -170,6 +201,21 @@ class RegressionTable(unittest.TestCase):
 
     def test_only_a_property_memory_max_caps(self):
         self.table(CAP_FORMS)
+
+    def test_gradle_is_heavy(self):
+        self.table(GRADLE)
+
+    def test_a_bare_make_is_heavy(self):
+        self.table(BARE_MAKE)
+
+    def test_a_memory_max_that_does_not_limit_is_not_a_cap(self):
+        self.table(NO_CAP)
+
+    def test_env_split_string_is_a_command_line(self):
+        self.table(ENV_SPLIT)
+
+    def test_a_command_named_by_which_is_that_command(self):
+        self.table(WHICH)
 
 
 if __name__ == "__main__":
