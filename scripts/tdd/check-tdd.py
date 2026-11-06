@@ -1,0 +1,860 @@
+#!/usr/bin/env python3
+"""check-tdd: mechanical checker of the strict-TDD protocol (agents/STANDARDS.md section 3).
+
+    check-tdd.py <repo> <base>..<head> [options]
+
+Replays the commits of base..head (oldest first) in a scratch clone, runs the repo's test suite at
+each commit and at its parent, classifies each commit by its subject tag and checks the rules:
+
+  <ticket>: RED.       builds and runs; a test that passed (or did not exist) at the parent now fails,
+                       and every newly failing test fails on an ASSERTION (never a TypeError, a missing
+                       export, a build error or a crash). Test files change; product code only as stubs.
+  <ticket>: GREEN.     no test that passed at the parent fails; at least one that failed passes; the test
+                       files of the open REDs are unchanged. Name the targets: [tests: a, b]. Tests that
+                       flipped beyond the named ones are a FAIL (a batch).
+  <ticket>: PERF.      suite fully green before and after, no test file changed, and a gate record
+                       [gate: path] that says fail -> pass.
+  <ticket>: REFACTOR.  suite green before and after, no test file changed, the same set of tests.
+  anything else        must not touch product code.
+
+Run it under the memory cap, on your own cores (STANDARDS section 8):
+  systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 -p RuntimeMaxSec=900 -- \
+      taskset -c 6-7 python3 scripts/tdd/check-tdd.py ~/Projects/repos/anvil.js 8d484da..022aa4c
+
+Exit: 0 all PASS, 1 any FAIL, 2 usage or environment error, 3 incomplete (--budget reached; run again,
+results are cached per commit SHA).
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+ADAPTER_VERSION = "4"
+HERE = os.path.dirname(os.path.abspath(__file__))
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+TAG = re.compile(r"^(?P<ticket>[A-Za-z0-9._/-]+(?:,\s*[A-Za-z0-9._/-]+)*): (?P<kind>RED|GREEN|PERF|REFACTOR)\.")
+GATE_TAG = re.compile(r"\[gate:\s*([^\]\s]+)\s*\]")
+
+
+# ---------------------------------------------------------------------------------------------
+# git helpers
+# ---------------------------------------------------------------------------------------------
+def git(repo, *args, check=True, text=True):
+    p = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=text)
+    if check and p.returncode != 0:
+        raise RuntimeError("git %s failed: %s" % (" ".join(args), p.stderr.strip()))
+    return p.stdout
+
+
+def run_suite(cmd, timeout=None, **kw):
+    """subprocess.run in its own process group: whatever ends the run (timeout, SIGTERM, Ctrl-C), the suite's whole
+    tree is killed, not just the npm or make at its root."""
+    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=kw.get("text"),
+                         **{k: v for k, v in kw.items() if k in ("cwd", "env")})
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except BaseException:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        p.wait()
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
+def source_hash():
+    """The sources that decide what a run measures: this adapter, the python runner and the node reporter."""
+    h = hashlib.sha1()
+    for path in (os.path.abspath(__file__), os.path.join(HERE, "python-runner.py"), os.path.join(HERE, "node-reporter.js")):
+        try:
+            with open(path, "rb") as f:
+                h.update(f.read())
+        except OSError:
+            h.update(b"?")
+    return h.hexdigest()[:10]
+
+
+def under(path, prefixes):
+    for pre in prefixes:
+        if pre.endswith("/"):
+            if path.startswith(pre):
+                return True
+        elif path == pre or path.startswith(pre + "/"):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------------------------
+# test-output parsers (pure; unit-tested)
+# ---------------------------------------------------------------------------------------------
+def parse_node_events(lines, root=""):
+    """JSON lines from node-reporter.js -> {id: {s, k, m}}.
+
+    s: pass | fail | skip.  k (fails only): assertion | error | crash.  Children are reported before
+    their parent, so a record's path is completed when its parent arrives."""
+    done, pending = [], []
+    for line in lines:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        kids = [p for p in pending if p["nesting"] > ev["nesting"]]
+        pending = [p for p in pending if p["nesting"] <= ev["nesting"]]
+        for kid in kids:
+            kid["path"].insert(0, ev["name"])
+            done.append(kid)
+        ev["path"] = [ev["name"]]
+        ev["container"] = bool(kids)
+        pending.append(ev)
+    done.extend(pending)
+    tests, seen = {}, {}
+    for ev in done:
+        failed = ev["r"] == "fail"
+        if ev["container"] and (not failed or ev.get("failureType") == "subtestsFailed"):
+            continue
+        if failed and ev.get("failureType") == "subtestsFailed":
+            continue  # a suite that only reports its children's failures
+        f = ev.get("file") or ""
+        if root and f.startswith(root):
+            f = f[len(root):].lstrip("/")
+        is_file_crash = failed and ev["nesting"] == 0 and ev["name"] == f and not ev["container"]
+        tid = f if is_file_crash else (f + " > " if f else "") + " > ".join(ev["path"])
+        n = seen.get(tid, 0) + 1
+        seen[tid] = n
+        if n > 1:
+            tid += " #%d" % n
+        rec = {"s": ev["r"]}
+        if failed:
+            if is_file_crash:
+                rec["k"] = "crash"
+            elif ev.get("code") == "ERR_ASSERTION" or ev.get("errName") == "AssertionError":
+                rec["k"] = "assertion"
+            else:
+                rec["k"] = "error"
+            rec["m"] = "%s: %s" % (ev.get("errName") or ev.get("code") or "error", ev.get("message", ""))
+        tests[tid] = rec
+    return tests
+
+
+def parse_testbit(text, suite, exit_code, build_ok=True):
+    """Output of one native test binary built on testbit -> {id: {s, k, m}}.
+
+    A test with a [TEST] line and no outcome line, in a process that did not exit cleanly, crashed."""
+    tests = {}
+    cur = None
+    for line in ANSI.sub("", text).splitlines():
+        s = line.strip()
+        if s.startswith("[TEST]"):
+            if cur is not None:
+                tests[cur] = {"s": "fail", "k": "crash", "m": "no outcome (process ended)"}
+            cur = "%s::%s" % (suite, s[len("[TEST]"):].strip())
+        elif cur is not None and s.startswith("-- passed"):
+            tests[cur] = {"s": "pass"}
+            cur = None
+        elif cur is not None and s.startswith("-- skipped"):
+            tests[cur] = {"s": "skip"}
+            cur = None
+        elif cur is not None and s.startswith("-- FAILED"):
+            tests[cur] = {"s": "fail", "k": "assertion", "m": s}
+            cur = None
+    if cur is not None:
+        tests[cur] = {"s": "fail", "k": "crash", "m": "crashed or exited (status %s) inside the test" % exit_code}
+    if not tests and exit_code != 0:
+        tests["%s::<build>" % suite] = {"s": "fail", "k": "build", "m": "no test ran (build, link error or crash before the first test)"}
+    return tests
+
+
+# ---------------------------------------------------------------------------------------------
+# adapters: run the repo's suite at the checked-out commit
+# ---------------------------------------------------------------------------------------------
+class Adapter:
+    name = "?"
+    product = []
+    tests = []
+    test_inputs = []  # product-side paths that are also test input (a vendored corpus): moving them can make a RED
+
+    def run(self, work, opts):
+        """-> {"ran": bool, "tests": {id: {s,k,m}}, "note": str}"""
+        raise NotImplementedError
+
+    def is_test(self, path):
+        return under(path, self.tests)
+
+    def is_product(self, path):
+        return under(path, self.product)
+
+    def is_input(self, path):
+        return under(path, self.test_inputs)
+
+
+class PythonAdapter(Adapter):
+    """Tooling repos: scripts/ and .claude/hooks/. Tests are test_*.py files in those trees; everything else
+    in .claude/hooks/ and the .py/.js files under scripts/ are product."""
+    name = "python"
+    roots = ("scripts/", ".claude/hooks/")
+
+    def is_test(self, path):
+        return under(path, self.roots) and path.endswith(".py") and os.path.basename(path).startswith("test_")
+
+    def is_product(self, path):
+        if self.is_test(path) or not under(path, self.roots):
+            return False
+        return path.startswith(".claude/hooks/") or path.endswith((".py", ".js"))
+
+    def run(self, work, opts):
+        fd, dest = tempfile.mkstemp(prefix="ctdd-py-")
+        os.close(fd)
+        try:
+            p = run_suite([sys.executable, os.path.join(HERE, "python-runner.py"), work, dest],
+                               capture_output=True, text=True, timeout=opts.run_timeout)
+            with open(dest) as f:
+                recs = [json.loads(ln) for ln in f.read().splitlines() if ln.strip()]
+        finally:
+            os.unlink(dest)
+        tests = {r["id"]: {k: v for k, v in (("s", r["s"]), ("k", r["k"]), ("m", r["m"])) if v} for r in recs}
+        note = "" if tests else "no scripts/**/test_*.py ran (exit %d): %s" % (p.returncode, (p.stderr or p.stdout)[-300:].strip())
+        return {"ran": bool(tests), "tests": tests, "note": note}
+
+
+class NodeAdapter(Adapter):
+    """anvil.js and other node:test repos: `npm test`, and `npm run compat` when package.json has it (anvil-node's own
+    tests run against anvil.js; `npm test` does not cover them). Events come from the check-tdd reporter, written
+    to a file by NODE_OPTIONS, so the inner `node --test` that the compat script spawns is captured too."""
+    name = "node"
+    product = ["src/", "node/", "js/", "vendor/anvil"]
+    tests = ["test/"]
+    test_inputs = ["vendor/anvil"]
+
+    def _events(self, cmd, work, opts, root_strip, inner_tap=False):
+        reporter = os.path.join(HERE, "node-reporter.js")
+        fd, dest = tempfile.mkstemp(prefix="ctdd-ev-")
+        os.close(fd)
+        try:
+            # `--test-reporter=` after the files would be taken as a script argument, so it goes in NODE_OPTIONS
+            extra = "--test-reporter=%s --test-reporter-destination=%s" % (reporter, dest)
+            if inner_tap:  # a script that passes its own --test-reporter: node wants one destination per reporter
+                extra += " --test-reporter-destination=stdout"
+            env = dict(os.environ, NODE_OPTIONS=(os.environ.get("NODE_OPTIONS", "") + " " + extra).strip())
+            p = run_suite(cmd, cwd=work, capture_output=True, text=True, timeout=opts.run_timeout, env=env)
+            with open(dest) as f:
+                lines = f.read().splitlines()
+        finally:
+            os.unlink(dest)
+        tests = parse_node_events(lines, root=root_strip)
+        note = "" if tests else "%s produced no test events (exit %d): %s" % (" ".join(cmd), p.returncode, (p.stderr or p.stdout)[-300:].strip())
+        return tests, note
+
+    def run(self, work, opts):
+        tests, note = self._events(["npm", "test", "--silent"], work, opts, os.path.realpath(work))
+        try:
+            with open(os.path.join(work, "package.json")) as f:
+                scripts = json.load(f).get("scripts", {})
+        except (OSError, ValueError):
+            scripts = {}
+        if tests and "compat" in scripts and not opts.no_compat:
+            ctests, cnote = self._events(["npm", "run", "compat", "--silent"], work, opts, "", inner_tap=True)
+            if not ctests:
+                raise SetupError("`npm run compat` produced no test events, so its tests were not measured: %s" % cnote)
+            for tid, rec in ctests.items():
+                tests["compat:" + re.sub(r"^/[^ ]*?anvil-compat-[^/]+/", "", tid)] = rec
+            note = cnote
+        return {"ran": bool(tests), "tests": tests, "note": note}
+
+
+class NativeAdapter(Adapter):
+    """ANVL Native: each test/unit/test_<suite>.c through `make -C test/unit test_<suite>` (testbit)."""
+    name = "native"
+    product = ["src/", "include/"]
+    tests = ["test/"]
+
+    def run(self, work, opts):
+        unit = os.path.join(work, "test", "unit")
+        suites = sorted(f[5:-2] for f in os.listdir(unit) if f.startswith("test_") and f.endswith(".c")) if os.path.isdir(unit) else []
+        if not suites:
+            return {"ran": False, "tests": {}, "note": "no test/unit/test_*.c"}
+        shutil.rmtree(os.path.join(unit, "bin"), ignore_errors=True)
+        tests = {}
+        for s in suites:
+            cmd = native_make_cmd(unit, s, opts)
+            p = run_suite(cmd, capture_output=True, text=True, timeout=opts.run_timeout)
+            tests.update(parse_testbit(p.stdout, s, p.returncode))
+        return {"ran": True, "tests": tests, "note": ""}
+
+
+ADAPTERS = {"node": NodeAdapter, "native": NativeAdapter, "python": PythonAdapter}
+
+
+def detect_adapter(repo, changed, head=None):
+    """The adapter this repo needs for a range: node for a package.json repo, python for a range that only touches
+    tooling (scripts/, .claude/hooks/), native for a test/unit repo. With `head`, the tree of that commit is read, so
+    the answer does not depend on what is checked out. None when nothing decides."""
+    def has(path):
+        if head:
+            return subprocess.run(["git", "-C", repo, "cat-file", "-e", "%s:%s" % (head, path)], capture_output=True).returncode == 0
+        return os.path.exists(os.path.join(repo, path))
+    if has("package.json"):
+        return "node"
+    native_paths = ("src/", "include/", "test/")
+    if changed and not any(under(f, native_paths) for f in changed) and any(under(f, PythonAdapter.roots) for f in changed):
+        return "python"
+    return "native" if has("test/unit") else None
+
+
+def pick_adapter(repo, name, changed=None, head=None):
+    detected = detect_adapter(repo, changed, head)
+    if name == "auto":
+        if not detected:
+            raise SystemExit("check-tdd: cannot pick an adapter for %s (use --adapter node|native|python)" % repo)
+        return ADAPTERS[detected]()
+    if detected and detected != name:
+        raise SystemExit("check-tdd: --adapter %s contradicts the detection: this repo and range need %s. Running %s here would "
+                         "measure the wrong suite." % (name, detected, name))
+    return ADAPTERS[name]()
+
+
+# ---------------------------------------------------------------------------------------------
+# the rules (pure: parent result, commit result, facts -> verdict)
+# ---------------------------------------------------------------------------------------------
+def parse_tests_tag(msg):
+    """Names in every `[tests: a, b]` of the message. The tag ends at its matching `]`: brackets inside names
+    (`@[schema]`) nest. An unbalanced tag takes the rest of the line."""
+    names = []
+    for m in re.finditer(r"\[tests:", msg):
+        depth, i, body = 1, m.end(), []
+        while i < len(msg) and depth:
+            c = msg[i]
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    break
+            elif c == "\n" and depth:
+                break
+            body.append(c)
+            i += 1
+        parts, cur, d = [], [], 0
+        for c in "".join(body):
+            if c == "[":
+                d += 1
+            elif c == "]":
+                d -= 1
+            if c == "," and d <= 0:
+                parts.append("".join(cur))
+                cur = []
+            else:
+                cur.append(c)
+        parts.append("".join(cur))
+        names += [x.strip() for x in parts if x.strip()]
+    return names
+
+
+def resolve_testbit(repo, given, fallbacks=()):
+    """--testbit if given (it must exist), else ../testbit beside the repo, else the fallbacks; None if absent."""
+    if given:
+        return given if os.path.isdir(given) else None
+    for c in [os.path.join(os.path.dirname(repo), "testbit")] + list(fallbacks):
+        if os.path.isdir(c):
+            return c
+    return None
+
+
+def native_make_cmd(unit, suite, opts):
+    return ["make", "-C", unit, "test_" + suite, "TESTBIT=" + opts.testbit] + list(opts.make_var)
+
+
+def cache_key(adapter_name, sha, opts, repo_id=""):
+    """Everything that changes what a run measures is in the key, so a bad-setup run cannot poison later ones."""
+    parts = [adapter_name, "v" + ADAPTER_VERSION, "s" + source_hash()]
+    if adapter_name == "native":
+        h = hashlib.sha1(("\0".join([os.path.realpath(opts.testbit or "")] + list(opts.make_var))).encode()).hexdigest()[:10]
+        parts.append("m" + h)
+    elif getattr(opts, "no_compat", False):
+        parts.append("nc")
+    if repo_id:
+        parts.append("r" + hashlib.sha1(repo_id.encode()).hexdigest()[:10])
+    return "-".join(parts) + "-" + sha
+
+
+def summarize(ids, cap=4):
+    ids = sorted(ids)
+    s = "; ".join(i if len(i) < 90 else i[:87] + "..." for i in ids[:cap])
+    return s + (" (+%d more)" % (len(ids) - cap) if len(ids) > cap else "")
+
+
+def test_names(tid):
+    """What `[tests: ...]` may call a test: its full id, its own name, or its test file's path (all its tests)."""
+    base = re.sub(r" #\d+$", "", tid)
+    names = {tid, base}
+    if " > " in base:
+        names |= {base.split(" > ", 1)[0], base.rsplit(" > ", 1)[-1]}
+    elif "::" in base:
+        file, rest = base.split("::", 1)
+        names |= {file, rest, rest.rsplit(".", 1)[-1]}
+    return names
+
+
+def join_names(parts, tests):
+    """`[tests: a, b]` splits on commas, but a test name may hold ', ': join neighbouring parts while the joined text
+    is the name of a test (the longest join first)."""
+    known = set()
+    for t in tests:
+        known |= test_names(t)
+    out, i = [], 0
+    while i < len(parts):
+        for j in range(len(parts), i, -1):
+            if ", ".join(parts[i:j]) in known:
+                out.append(", ".join(parts[i:j]))
+                i = j
+                break
+        else:
+            out.append(parts[i])
+            i += 1
+    return out
+
+
+def name_matches(name, tid):
+    return name in test_names(tid)
+
+
+def judge(kind, parent, cur, facts, state, opts):
+    """Return (reasons, notes, data). `parent`/`cur` are {"ran", "tests"}; `facts` has changed test
+    files, product diff size, tests named, gate record. `state["open_reds"]` is updated."""
+    reasons, notes, data = [], [], {}
+    pt, ct = parent["tests"], cur["tests"]
+    p_pass = {t for t, r in pt.items() if r["s"] == "pass"}
+    p_fail = {t for t, r in pt.items() if r["s"] == "fail"}
+    c_fail = {t for t, r in ct.items() if r["s"] == "fail"}
+    c_pass = {t for t, r in ct.items() if r["s"] == "pass"}
+    regress = {t for t in p_pass if t not in ct or ct[t]["s"] == "fail"}
+    removed = {t for t in pt if t not in ct}
+    newfail = {t for t in c_fail if t not in pt or pt[t]["s"] != "fail"}
+    flipped = {t for t in p_fail if t in ct and ct[t]["s"] == "pass"}
+    data.update(newly_failing=len(newfail), flipped=len(flipped), regressed=len(regress),
+                product_lines=facts["product_lines"], test_files=len(facts["test_files"]))
+
+    if kind in ("RED", "GREEN", "PERF", "REFACTOR") and not cur["ran"]:
+        reasons.append("the suite did not run at this commit (%s)" % cur.get("note", ""))
+        return reasons, notes, data
+
+    if kind == "RED":
+        if not facts["test_files"] and not facts["input_files"]:
+            reasons.append("RED changes no test file")
+        elif not facts["test_files"]:
+            notes.append("RED moves a vendored test input (%s), no test file" % ", ".join(facts["input_files"]))
+        if not newfail:
+            reasons.append("no test newly fails (all tests that passed or were new still pass)")
+        bad = {t for t in newfail if ct[t].get("k") != "assertion"}
+        if bad:
+            kinds = sorted({ct[t].get("k", "?") for t in bad})
+            ex = "; ".join("%s [%s]" % (t if len(t) < 70 else t[:67] + "...", ct[t].get("m", "")[:70]) for t in sorted(bad)[:3])
+            reasons.append("%d newly failing test(s) do not fail on an assertion (%s): %s" % (len(bad), "/".join(kinds), ex))
+        if removed:
+            notes.append("RED replaces tests: %d from the parent no longer run: %s" % (len(removed), summarize(removed)))
+        if facts["product_lines"]:
+            notes.append("product code changed (%d lines): stubs only?" % facts["product_lines"])
+        # Every pending test of an open RED must still exist and still fail. A pending test that now passes (its assertion
+        # emptied, `assertTrue(True)`) is as good as deleted. A pending test that still fails with a different expectation
+        # is allowed on purpose: the checker sees outcomes, not intent, and a RED may correct a wrong expectation; the test
+        # diff is what the reviewer reads. A RED that weakens a test that already passes is out of scope (it is no open RED's).
+        weakened = {t for r in state["open_reds"] for t in r["pending"] if t not in ct or ct[t]["s"] != "fail"}
+        if weakened:
+            reasons.append("RED weakens an open RED: %d of its still failing test(s) are gone, renamed or now pass: %s" % (len(weakened), summarize(weakened)))
+        if newfail and not bad:
+            state["open_reds"].append({"sha": facts["sha"], "files": set(facts["test_files"]), "pending": set(newfail)})
+
+    if kind in ("GREEN", "PERF") and removed:
+        reasons.append("%s reduces the test set: %d test(s) gone: %s" % (kind, len(removed), summarize(removed)))
+
+    if kind == "GREEN":
+        if regress:
+            reasons.append("%d test(s) that passed at the parent fail or are gone: %s" % (len(regress), summarize(regress)))
+        if not flipped:
+            reasons.append("no test that failed at the parent passes now")
+        locked = set()
+        for r in state["open_reds"]:
+            locked |= {f for f in facts["test_files"] if f in r["files"]}
+        if locked:
+            reasons.append("test file(s) of an open RED changed: %s" % ", ".join(sorted(locked)))
+        names = join_names(facts["named"], ct)
+        if not names:
+            msg = "no [tests: ...] named"
+            if opts.lenient_tests:
+                notes.append(msg)
+            else:
+                reasons.append(msg)
+        else:
+            unmatched = [n for n in names if not any(name_matches(n, t) for t in flipped)]
+            if unmatched:
+                reasons.append("named test(s) did not flip: %s" % ", ".join(unmatched))
+            extra = {t for t in flipped if not any(name_matches(n, t) for n in names)}
+            data["flipped_beyond_named"] = len(extra)
+            if extra:
+                reasons.append("batch: %d test(s) flipped beyond the named: %s" % (len(extra), summarize(extra)))
+        if len(flipped) > opts.batch_limit:  # naming a whole test file does not escape the batch rule
+            reasons.append("batch: %d tests flipped at once (limit %d)" % (len(flipped), opts.batch_limit))
+        if facts["product_lines"] > opts.max_green_lines:
+            reasons.append("batch: product diff of %d lines (limit %d) for %d flipped test(s)" % (facts["product_lines"], opts.max_green_lines, len(flipped)))
+        notes.append("flipped %d, product diff %d lines" % (len(flipped), facts["product_lines"]))
+
+    elif kind == "PERF":
+        if p_fail or any(r["s"] == "fail" for r in pt.values()):
+            reasons.append("suite not green at the parent (%d failing)" % len(p_fail))
+        if c_fail:
+            reasons.append("suite not green at the commit (%d failing)" % len(c_fail))
+        if facts["test_files"]:
+            reasons.append("test file(s) changed: %s" % ", ".join(sorted(facts["test_files"])[:4]))
+        g = facts["gate"]
+        if not g["path"]:
+            reasons.append("no [gate: path] named")
+        elif not g["exists"]:
+            reasons.append("gate record %s not found" % g["path"])
+        elif g["verdict"] != "fail->pass":
+            reasons.append("gate record %s does not say fail -> pass (%s)" % (g["path"], g["verdict"] or "unreadable"))
+
+    elif kind == "REFACTOR":
+        if p_fail or c_fail:
+            reasons.append("suite not green (parent %d, commit %d failing)" % (len(p_fail), len(c_fail)))
+        if facts["test_files"]:
+            reasons.append("test file(s) changed: %s" % ", ".join(sorted(facts["test_files"])[:4]))
+        if set(pt) != set(ct):
+            reasons.append("the test set differs (%d removed, %d added)" % (len(set(pt) - set(ct)), len(set(ct) - set(pt))))
+
+    # update the open REDs: a RED stays open until every test it made fail passes
+    for r in state["open_reds"]:
+        r["pending"] = {t for t in r["pending"] if t in ct and ct[t]["s"] == "fail"}
+    state["open_reds"] = [r for r in state["open_reds"] if r["pending"]]
+    return reasons, notes, data
+
+
+def judge_untagged(facts):
+    out = []
+    if facts["product_files"]:
+        out.append("touches product code without a RED/GREEN/PERF/REFACTOR tag: %s" % summarize(facts["product_files"], 3))
+    if facts["test_files"]:
+        out.append("touches test files without a RED/REFACTOR tag: %s" % summarize(facts["test_files"], 3))
+    return out
+
+
+def read_gate(text):
+    """A gate record says fail -> pass: JSON {before|parent: fail, after|commit: pass}, or text with 'fail -> pass'."""
+    try:
+        d = json.loads(text)
+        if isinstance(d, dict):
+            b = d.get("before", d.get("parent"))
+            a = d.get("after", d.get("commit"))
+            if str(b).lower() == "fail" and str(a).lower() == "pass":
+                return "fail->pass"
+            return "%s->%s" % (str(b).lower(), str(a).lower())
+    except ValueError:
+        pass
+    if re.search(r"fail\w*\s*(->|=>|→)\s*pass", text, re.I):
+        return "fail->pass"
+    return "no fail->pass"
+
+
+# ---------------------------------------------------------------------------------------------
+# the run
+# ---------------------------------------------------------------------------------------------
+class Runner:
+    def __init__(self, repo, adapter, opts, scratch):
+        self.repo, self.adapter, self.opts, self.scratch = repo, adapter, opts, scratch
+        self.work = os.path.join(scratch, "work")
+        self.cache = opts.cache
+        self.started = time.time()
+        self.cloned = False
+        self.runs = 0
+        self.hits = 0      # results read from files of an earlier invocation, in --cache
+        self.reused = 0    # results computed or read earlier in this invocation (a commit's parent, mostly)
+        self.memo = {}
+        self.repo_id = os.path.realpath(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
+
+    def _clone(self):
+        if self.cloned:
+            return
+        subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", self.repo, self.work], check=True, capture_output=True)
+        self.cloned = True
+
+    def _submodule_source(self, sha):
+        for c in (os.path.join(self.repo, ".git", "modules", "vendor", "anvil"), os.path.join(self.repo, "vendor", "anvil"),
+                  os.path.join(os.path.dirname(self.repo), "anvil")):
+            if os.path.isdir(c) and subprocess.run(["git", "-C", c, "cat-file", "-e", sha + "^{commit}"], capture_output=True).returncode == 0:
+                return c
+        return None
+
+    def _populate_submodule(self, sha):
+        """vendor/anvil is a gitlink: fill it offline, as a shared clone (a real git checkout, as some tests read its history)."""
+        out = git(self.work, "ls-tree", sha, "vendor/anvil", check=False).split()
+        if len(out) < 3 or out[0] != "160000":
+            return ""
+        src = self._submodule_source(out[2])
+        dest = os.path.join(self.work, "vendor", "anvil")
+        os.makedirs(dest, exist_ok=True)
+        if not src:
+            return ("vendor/anvil pin %s not available: give the repo a pin source, either by copying the owner's .git/modules "
+                    "(cp -r <anvil>/.git/modules <repo>/.git/modules, so .git/modules/vendor/anvil exists) or by putting a "
+                    "checkout of anvil beside it as ../anvil" % out[2][:7])
+        shutil.rmtree(dest, ignore_errors=True)
+        c = subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", src, dest], capture_output=True)
+        if c.returncode == 0:
+            c = subprocess.run(["git", "-C", dest, "checkout", "-q", "--detach", out[2]], capture_output=True)
+        if c.returncode != 0:
+            return "vendor/anvil pin %s not found in %s" % (out[2][:7], src)
+        return ""
+
+    def result(self, sha):
+        if sha in self.memo:
+            self.reused += 1
+            return self.memo[sha]
+        key = os.path.join(self.cache, cache_key(self.adapter.name, sha, self.opts, self.repo_id) + ".json")
+        if os.path.exists(key):
+            self.hits += 1
+            with open(key) as f:
+                self.memo[sha] = json.load(f)
+            return self.memo[sha]
+        if self.opts.budget and time.time() - self.started > self.opts.budget:
+            raise BudgetReached()
+        self._clone()
+        git(self.work, "checkout", "-q", "-f", "--detach", sha)
+        git(self.work, "clean", "-fdxq")
+        miss = self._populate_submodule(sha)
+        t0 = time.time()
+        try:
+            res = self.adapter.run(self.work, self.opts)
+        except subprocess.TimeoutExpired:
+            res = {"ran": False, "tests": {}, "note": "suite timed out (%ds)" % self.opts.run_timeout}
+        if miss:
+            raise SetupError("%s (at %s)" % (miss, sha[:7]))
+        res["seconds"] = round(time.time() - t0, 1)
+        res["sha"] = sha
+        self.runs += 1
+        self.memo[sha] = res
+        if res["ran"]:  # a bad-setup result (suite did not run, pin missing) must not poison later runs
+            os.makedirs(self.cache, exist_ok=True)
+            with open(key + ".tmp", "w") as f:
+                json.dump(res, f)
+            os.replace(key + ".tmp", key)
+        return res
+
+
+class BudgetReached(Exception):
+    pass
+
+
+class SetupError(Exception):
+    """The checker cannot measure here (a missing pin or suite input): no verdict, exit 2."""
+
+
+def commit_facts(repo, adapter, sha, parent):
+    base = parent if parent else git(repo, "hash-object", "-t", "tree", "/dev/null").strip()  # the empty tree
+    files = [f for f in git(repo, "diff", "--name-only", "--no-renames", base, sha).splitlines() if f]
+    test_files = [f for f in files if adapter.is_test(f)]
+    input_files = [f for f in files if adapter.is_input(f)]
+    product_files = [f for f in files if adapter.is_product(f)]
+    lines = 0
+    if product_files:
+        for ln in git(repo, "diff", "--numstat", "--no-renames", base, sha).splitlines():
+            a, d, path = (ln.split("\t") + ["", "", ""])[:3]
+            if adapter.is_product(path):
+                lines += (int(a) if a.isdigit() else 0) + (int(d) if d.isdigit() else 0)
+        if lines == 0:
+            lines = 1  # a gitlink or binary change
+    msg = git(repo, "log", "-1", "--format=%B", sha)
+    named = []
+    named = parse_tests_tag(msg)
+    gm = GATE_TAG.search(msg)
+    gate = {"path": gm.group(1) if gm else None, "exists": False, "verdict": None}
+    return {"sha": sha, "test_files": test_files, "input_files": input_files, "product_files": product_files, "product_lines": lines,
+            "named": named, "gate": gate, "subject": msg.splitlines()[0] if msg else ""}
+
+
+def resolve_gate(repo, sha, gate, gate_root):
+    if not gate["path"]:
+        return
+    p = subprocess.run(["git", "-C", repo, "show", "%s:%s" % (sha, gate["path"])], capture_output=True, text=True)
+    text = p.stdout if p.returncode == 0 else None
+    if text is None:
+        for root in (gate_root, repo):
+            if root and os.path.isfile(os.path.join(root, gate["path"])):
+                with open(os.path.join(root, gate["path"])) as f:
+                    text = f.read()
+                break
+    if text is not None:
+        gate["exists"] = True
+        gate["verdict"] = read_gate(text)
+
+
+CHECKER_VERSION = "2"
+
+
+def pass_dir(repo):
+    """<git-common-dir>/check-tdd/pass: shared by every worktree of the repo, outside the working tree."""
+    common = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+    return os.path.join(common, "check-tdd", "pass")
+
+
+def has_pass(repo, ref):
+    """0 if a pass record exists for the commit `ref` names, else 1. Reads no suite and no history."""
+    try:
+        sha = git(repo, "rev-parse", "--verify", "-q", ref + "^{commit}").strip()
+        return 0 if sha and os.path.isfile(os.path.join(pass_dir(repo), sha + ".json")) else 1
+    except RuntimeError:
+        return 1
+
+
+def write_pass_record(repo, base_sha, head_sha, opts, adapter, count):
+    try:
+        commit = subprocess.run(["git", "-C", HERE, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or "unknown"
+    except OSError:
+        commit = "unknown"
+    rec = {"head": head_sha, "base": base_sha, "range": opts.range, "adapter": adapter.name, "checker_version": CHECKER_VERSION,
+           "checker_commit": commit, "date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "commits": count, "result": "pass",
+           "options": {"lenient_tests": bool(opts.lenient_tests), "batch_limit": opts.batch_limit,
+                       "max_green_lines": opts.max_green_lines, "no_compat": bool(opts.no_compat), "first_parent": bool(opts.first_parent)}}
+    d = pass_dir(repo)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, head_sha + ".json.tmp"), "w") as f:
+        json.dump(rec, f, indent=1)
+    os.replace(os.path.join(d, head_sha + ".json.tmp"), os.path.join(d, head_sha + ".json"))
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["--has-pass"]:
+        if len(argv) != 3:
+            print("usage: check-tdd.py --has-pass <repo> <sha>", file=sys.stderr)
+            return 2
+        return has_pass(os.path.realpath(argv[1]), argv[2])
+    ap = argparse.ArgumentParser(prog="check-tdd", description="Mechanical checker of the strict-TDD protocol (STANDARDS section 3).")
+    ap.add_argument("repo")
+    ap.add_argument("range", help="<base>..<head>: the commits reachable from head and not from base")
+    ap.add_argument("--adapter", default="auto", choices=["auto", "node", "native", "python"])
+    ap.add_argument("--first-parent", action="store_true", help="walk first-parent commits only (default: every non-merge commit in the range, oldest first)")
+    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--cache", default=os.path.join(tempfile.gettempdir(), "check-tdd-cache-%d" % os.getuid()))
+    ap.add_argument("--scratch", help="parent directory for the scratch clone (default: a fresh temp dir, removed afterwards)")
+    ap.add_argument("--budget", type=int, default=0, help="stop starting new suite runs after this many seconds (exit 3; rerun resumes from the cache)")
+    ap.add_argument("--run-timeout", type=int, default=900, help="per suite run, seconds")
+    ap.add_argument("--no-compat", action="store_true", help="node: skip `npm run compat` (anvil-node's tests against anvil.js)")
+    ap.add_argument("--lenient-tests", action="store_true", help="a GREEN without [tests: ...] is a note, not a FAIL (for history that predates the syntax)")
+    ap.add_argument("--batch-limit", type=int, default=10, help="GREEN with no [tests:] fails when more than this many tests flip")
+    ap.add_argument("--max-green-lines", type=int, default=150, help="a GREEN whose product diff is larger than this is a batch")
+    ap.add_argument("--make-var", action="append", default=[], metavar="NAME=VALUE", help="native: extra make variable, repeatable (e.g. BUILD_NUM=500)")
+    ap.add_argument("--testbit", default=None, help="native: testbit checkout (default: ../testbit beside the repo, then ~/Projects/repos/testbit; not found is an error)")
+    ap.add_argument("--gate-root", default=None, help="directory to look for [gate: path] records not committed to the repo")
+    opts = ap.parse_args(argv)
+
+    repo = os.path.realpath(opts.repo)
+    if ".." not in opts.range or opts.range.count("..") != 1:
+        print("check-tdd: range must be <base>..<head>", file=sys.stderr)
+        return 2
+    base, head = opts.range.split("..")
+    try:
+        base_sha = git(repo, "rev-parse", base + "^{commit}").strip()
+        adapter = pick_adapter(repo, opts.adapter, git(repo, "diff", "--name-only", base_sha, head).split(), git(repo, "rev-parse", head + "^{commit}").strip())
+        walk = ["rev-list", "--reverse"] + (["--first-parent"] if opts.first_parent else ["--no-merges", "--topo-order"]) + ["%s..%s" % (base_sha, head)]
+        shas = git(repo, *walk).split()
+    except (RuntimeError, SystemExit) as e:
+        print("check-tdd: %s" % e, file=sys.stderr)
+        return 2
+    if adapter.name == "native":
+        opts.testbit = resolve_testbit(repo, opts.testbit, [os.path.expanduser("~/Projects/repos/testbit")])
+        if not opts.testbit:
+            print("check-tdd: testbit not found (looked beside the repo and in ~/Projects/repos/testbit); pass --testbit DIR", file=sys.stderr)
+            return 2
+        opts.testbit = os.path.realpath(opts.testbit)
+    if adapter.name == "node" and opts.no_compat:
+        shown = subprocess.run(["git", "-C", repo, "show", head + ":package.json"], capture_output=True, text=True).stdout
+        try:
+            has_compat = "compat" in json.loads(shown or "{}").get("scripts", {})
+        except ValueError:
+            has_compat = False
+        if has_compat:
+            print("check-tdd: --no-compat is refused: package.json has a compat script, and skipping it can hide a failure", file=sys.stderr)
+            return 2
+    os.makedirs(opts.cache, exist_ok=True)
+
+    for sig in (signal.SIGTERM, signal.SIGHUP):  # run the finally blocks: remove the scratch clone, kill the suite
+        signal.signal(sig, lambda signum, frame: sys.exit(128 + signum))
+    scratch = tempfile.mkdtemp(prefix="check-tdd-", dir=opts.scratch)
+    runner = Runner(repo, adapter, opts, scratch)
+    state = {"open_reds": []}
+    records, incomplete = [], False
+    t_start = time.time()
+    try:
+        for sha in shas:
+            parents = git(repo, "rev-list", "--parents", "-n", "1", sha).split()[1:]
+            msg = git(repo, "log", "-1", "--format=%B", sha)
+            subject = msg.splitlines()[0] if msg else ""
+            rec = {"sha": sha[:7], "subject": subject}
+            m = TAG.match(subject)
+            kind = m.group("kind") if m else None
+            parent = parents[0] if parents else None
+            facts = commit_facts(repo, adapter, sha, parent)
+            if len(parents) > 1:
+                rec.update(status="PASS", kind="MERGE", reasons=[], notes=["merge commit, not classified"])
+                records.append(rec)
+                continue
+            if kind is None:
+                reasons = judge_untagged(facts)
+                rec.update(status="FAIL" if reasons else "PASS", kind="-", reasons=reasons, notes=[] if reasons else ["no product code touched"])
+                records.append(rec)
+                continue
+            try:
+                pres = runner.result(parent) if parent else {"ran": True, "tests": {}}
+                cres = runner.result(sha)
+            except BudgetReached:
+                incomplete = True
+                break
+            resolve_gate(repo, sha, facts["gate"], opts.gate_root)
+            reasons, notes, data = judge(kind, pres, cres, facts, state, opts)
+            if not pres.get("ran", True) and kind != "RED":
+                notes.append("parent suite did not run")
+            rec.update(status="FAIL" if reasons else "PASS", kind=kind, reasons=reasons, notes=notes, data=data,
+                       seconds=cres.get("seconds"))
+            records.append(rec)
+    except SetupError as e:
+        print("check-tdd: setup error, no verdict: %s" % e, file=sys.stderr)
+        return 2
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+    fails = [r for r in records if r["status"] == "FAIL"]
+    summary = {"repo": repo, "range": opts.range, "adapter": adapter.name, "commits": len(shas), "checked": len(records),
+               "pass": len(records) - len(fails), "fail": len(fails), "incomplete": incomplete,
+               "suite_runs": runner.runs, "cache_hits": runner.hits, "reused": runner.reused, "seconds": round(time.time() - t_start, 1)}
+    if opts.json:
+        json.dump({"summary": summary, "commits": records}, sys.stdout, indent=1)
+        print()
+    else:
+        for r in records:
+            detail = "; ".join(r["reasons"] + ([] if r["status"] == "FAIL" else r["notes"]))
+            print("%s %s %-8s %s%s" % (r["status"], r["sha"], r["kind"], r["subject"][:70], (" | " + detail) if detail else ""))
+        print("-- %(pass)d PASS, %(fail)d FAIL of %(checked)d/%(commits)d commits; %(suite_runs)d suite runs, %(cache_hits)d from --cache, %(reused)d reused in the run, %(seconds)ss%(inc)s" %
+              dict(summary, inc="; INCOMPLETE (budget reached, rerun)" if incomplete else ""))
+    if fails:
+        try:  # a FAIL at this head withdraws any earlier pass record for it
+            os.remove(os.path.join(pass_dir(repo), git(repo, "rev-parse", head + "^{commit}").strip() + ".json"))
+        except OSError:
+            pass
+        return 1
+    if incomplete:
+        return 3
+    if records:
+        write_pass_record(repo, base_sha, git(repo, "rev-parse", head + "^{commit}").strip(), opts, adapter, len(records))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
