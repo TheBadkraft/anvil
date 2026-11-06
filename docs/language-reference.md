@@ -318,8 +318,8 @@ grammar would otherwise need.
 
 ## 12. Errors
 
-A failed operation reports one of a small set of stable categories, never a raw internal error
-code (so internal churn is never a public API break):
+A failed operation reports two things. The **category** is one of a small set of stable values, the coarse phase
+that failed. The **specific code** is the exact reason (see "Specific error codes" below). Both are stable public API.
 
 | Category | Meaning |
 |---|---|
@@ -334,14 +334,37 @@ code (so internal churn is never a public API break):
 A failed `anvil_load`/`anvil_load_buffer` still returns a real, non-NULL document handle
 (`anvil_has_errors`/`anvil_get_error` report the failure) — `NULL` is reserved for the one truly
 foundational case, the handle itself failing to allocate. Where available, `anvil_document_get_error`
-gives a richer detail object (message text, line, column) beyond the stable category alone.
+gives a richer detail object (message text, line, column, specific code and name) beyond the stable category alone.
 
-### Specific error codes (internal)
+### Specific error codes
 
-The categories above are the public contract. Underneath, the reader records one specific code per reason, and
-`anvil_document_get_error` and the conformance dumps carry it. The codes below were made specific for the grammar
-rules in §3 to §7 (a rejected input keeps its category and place; only the code is sharper). The three IO codes are a
-behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code 0 and an empty message; the category is unchanged. The names were spelled `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH` until v0.13.1-rc, which changed them to the `errors.h` identifiers below (the codes did not change), so every error name now equals its identifier:
+The categories above say which phase failed. Underneath, the reader records one specific code per reason. The codes are
+public and stable (`anvl_err_code`, declared in `include/anvil_error_codes.h`, which `anvil_types.h` includes), so a
+caller can compare against `ANVL_ERR_*` and a binding can mirror the table.
+
+**Stability rule.** A code that has shipped keeps its number for ever. It is never renumbered, never reused for another
+reason and never removed. New codes are only appended, inside the range of their category (100x file I/O, 2xxx to 3xxx
+parsing, 4xxx semantic and resolver, 41xx vars, 42xx include, 43xx import, 44xx AMP, 45xx serializer, 46xx schema, 47xx
+AnvilScript functions, 50xx lexer, 51xx AnvilScript, 70xx memory, 90xx generic). A code may be reserved (declared, but no
+input produces it); it stays declared. A committed table of every number and name is checked by the test suite, so a
+change to one fails the build. The category above is separate and equally stable.
+
+**Reading the code and the name.** Get the error from a failed document, then ask it:
+
+- Flat calls: `anvil_error_get_code(error)` returns the `anvl_err_code` value, for example 4054, or `ANVL_ERR_NONE` (0)
+  when no specific reason was recorded. `anvil_error_get_name(error, buf, buflen)` copies the symbolic name, exactly the
+  enum identifier, for example `ANVL_ERR_RESOLVER_REFERENCE_CYCLE` (`"ANVL_ERR_NONE"` when there is no code). The name
+  follows the buffer convention of `anvil_error_get_message`: it always returns the full length of the name, copies at
+  most `buflen - 1` bytes and NUL-terminates, and writes nothing when `buf` is `NULL` or `buflen` is 0. A `NULL` error
+  gives `ANVL_ERR_NONE`, an empty string and a length of 0.
+- Vtable: `Error.get_code` and `Error.get_name`, the same functions, appended after `get_source` in `anvil_error_i`.
+- anvil.js: `lastError().code` and `lastError().name`.
+
+The other bindings do not expose the code yet.
+
+The codes below were made specific for the grammar rules in §3 to §7 (a rejected input keeps its category and place; only
+the code is sharper). The three IO codes are a behaviour change in v0.13.0-rc: a file that cannot be loaded used to report
+code 0 and an empty message; the category is unchanged. The names were spelled `ANVL_ERR_FILE_READ`, `ANVL_ERR_FILE_NOT_FOUND` and `ANVL_ERR_FILE_INVALID_PATH` until v0.13.1-rc, which changed them to the identifiers below (the codes did not change), so every error name now equals its identifier:
 
 | Code | Name | Reported for |
 |---|---|---|
@@ -373,7 +396,7 @@ behaviour change in v0.13.0-rc: a file that cannot be loaded used to report code
 | 4206 | `ANVL_ERR_INCLUDE_CYCLIC` | an include cycle, found by normalised path |
 | 5001 | `ANVL_ERR_PARSER_UNEXPECTED_CHAR` | a control character where a token belongs |
 
-**Reserved, never reported.** These codes are declared in `include/errors.h` and have names, but no input produces
+**Reserved, never reported.** These codes are declared in `include/anvil_error_codes.h` and have names, but no input produces
 them, so a consumer can't see one:
 
 - 2007 `ANVL_ERR_PARSER_INVALID_IDENTIFIER`: an invalid attribute key is now 4012, and an empty block 2008.

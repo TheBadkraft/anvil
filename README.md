@@ -87,9 +87,10 @@ anvil/
 │   ├── anvil_types.h            ← public ABI types (opaque handles, stable enums)
 │   ├── anvil_type_registry.h    ← public API — opt-in type registry
 │   ├── anvil_schema.h           ← public API — AnvilSchema
-│   ├── errors.h                 ← internal only, despite living here — ~90 granular parser/
-│   │                               resolver codes, deliberately not exposed (the small,
-│   │                               stable public category lives in anvil_types.h instead)
+│   ├── anvil_error_codes.h      ← public ABI — the specific error codes (`anvl_err_code`), stable:
+│   │                               a shipped number is never changed or reused
+│   ├── errors.h                 ← internal — includes anvil_error_codes.h and adds the internal
+│   │                               error-recording helpers
 │   ├── internal/                ← internal-only headers (module, parser, source, ...)
 │   └── sigma/                   ← vendored Sigma collections subset (types, allocator, list, map, ...)
 ├── src/
