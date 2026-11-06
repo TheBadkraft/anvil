@@ -1,7 +1,7 @@
 /* anvil_error_codes.h - the specific error codes (public, stable ABI); SPDX-License-Identifier: Proprietary */
 #pragma once
 
-enum {
+typedef enum {
    ANVL_ERR_NONE = 0,
 
    // File I/O Errors (100x)
@@ -47,9 +47,6 @@ enum {
    ANVL_ERR_PARSER_EXPECTED_COLON = 3016,
    ANVL_ERR_PARSER_UNEXPECTED_TOKEN = 3100,
 
-};
-
-enum {
    // Semantic Errors (400x)
    ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT = 4001,
    ANVL_ERR_PARSER_INVALID_KEY_IN_OBJECT = 4002,
@@ -90,9 +87,6 @@ enum {
    // (`a := $b; b := $a;`) is not this error: it stays unresolved.
    ANVL_ERR_RESOLVER_REFERENCE_CYCLE = 4054,
 
-};
-
-enum {
    // Vars Errors (41xx)
    ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101,
    ANVL_ERR_VARS_NOT_FIRST = 4102,
@@ -144,4 +138,42 @@ enum {
    ANVL_ERR_ASL_UNTERMINATED_BODY = 4703, // source ran out before the function body's
                                            // matching '}' was found
 
-};
+   // Lexer/Scanner Errors (50xx)
+   ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001,
+   ANVL_ERR_PARSER_UNTERMINATED_STRING = 5002,
+   ANVL_ERR_PARSER_UNTERMINATED_BLOB = 5003,
+   ANVL_ERR_PARSER_IO_ERROR = 5004,
+   ANVL_ERR_PARSER_EXPECTED_BACKTICK = 5005,
+   ANVL_ERR_PARSER_UNTERMINATED_FREEFORM = 5006,
+   ANVL_ERR_PARSER_INVALID_HEX_LITERAL = 5007,
+   ANVL_ERR_PARSER_INVALID_EXPONENT = 5008,
+   ANVL_ERR_PARSER_INVALID_NUMBER = 5009,
+   // '$' not immediately followed by a syntactically well-formed reference (identifier-shaped
+   // target name) — missing entirely, or whitespace between '$' and it. Purely syntactic: the
+   // parser never checks whether the reference's target actually exists as a declared
+   // identifier (an unmatched reference is a Resolver-phase concern, resolved to `null`, not a
+   // parse error) — "identifier" here would wrongly suggest that check happens at parse time.
+   ANVL_ERR_VARS_INVALID_VARREF = 5010,
+   ANVL_ERR_VARS_UNTERMINATED_INTERP = 5011,        // $"…{ref" missing closing '}'
+   ANVL_ERR_VARS_UNTERMINATED_BRACED_VARREF = 5012, // '${' missing closing '}'
+
+   // ASL Errors (51xx)
+   ANVL_ERR_ASL_PARSE_ERROR = 5101,           // ASL script parse failure
+   ANVL_ERR_ASL_RUNTIME_ERROR = 5102,         // ASL runtime failure
+   ANVL_ERR_ASL_CALL_DEPTH_EXCEEDED = 5103,   // call depth limit exceeded
+   ANVL_ERR_ASL_BREAK_OUTSIDE_LOOP = 5104,    // break outside loop
+   ANVL_ERR_ASL_CONTINUE_OUTSIDE_LOOP = 5105, // continue outside loop
+   ANVL_ERR_ASL_NESTING_TOO_DEEP = 5106,      // expression nesting past ASL_MAX_NESTING_DEPTH (parse time)
+
+   // Memory Errors (70xx)
+   ANVL_ERR_MEMORY_ALLOC_FAILED = 7001,
+   ANVL_ERR_ARENA_NOT_INITIALIZED = 7002,
+
+   // Generic Errors (90xx)
+   ANVL_ERR_INVALID_OPERATION = 9001,
+   ANVL_ERR_INVALID_ARGUMENT = 9002,
+   ANVL_ERR_SOURCE_NOT_FOUND = 9003,
+   ANVL_ERR_CONTEXT_INVALID = 9004,
+   ANVL_ERR_SOURCE_ALREADY_LOADED = 9005, // a document with identical content is already loaded
+   ANVL_ERR_NOT_IMPLEMENTED = 9999,
+} anvl_err_code;

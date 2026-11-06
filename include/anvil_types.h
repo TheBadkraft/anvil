@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "anvil_error_codes.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

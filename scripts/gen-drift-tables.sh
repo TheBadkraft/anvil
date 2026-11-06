@@ -50,7 +50,7 @@ enums() {
 }
 
 echo "drift-tables 1"
-for h in include/errors.h include/types.h include/anvil_types.h include/anvil_schema.h include/anvil_type_registry.h \
+for h in include/anvil_error_codes.h include/types.h include/anvil_types.h include/anvil_schema.h include/anvil_type_registry.h \
          include/anvil_writer_types.h include/anvil_builder_types.h include/internal/module.h; do
    [ -f "$h" ] && enums "$h"
 done
