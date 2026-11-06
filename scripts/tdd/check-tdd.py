@@ -464,9 +464,13 @@ def judge(kind, parent, cur, facts, state, opts):
             notes.append("RED replaces tests: %d from the parent no longer run: %s" % (len(removed), summarize(removed)))
         if facts["product_lines"]:
             notes.append("product code changed (%d lines): stubs only?" % facts["product_lines"])
-        weakened = {t for r in state["open_reds"] for t in r["pending"] if t not in ct}
+        # Every pending test of an open RED must still exist and still fail. A pending test that now passes (its assertion
+        # emptied, `assertTrue(True)`) is as good as deleted. A pending test that still fails with a different expectation
+        # is allowed on purpose: the checker sees outcomes, not intent, and a RED may correct a wrong expectation; the test
+        # diff is what the reviewer reads. A RED that weakens a test that already passes is out of scope (it is no open RED's).
+        weakened = {t for r in state["open_reds"] for t in r["pending"] if t not in ct or ct[t]["s"] != "fail"}
         if weakened:
-            reasons.append("RED weakens an open RED: %d of its still failing test(s) are gone or renamed: %s" % (len(weakened), summarize(weakened)))
+            reasons.append("RED weakens an open RED: %d of its still failing test(s) are gone, renamed or now pass: %s" % (len(weakened), summarize(weakened)))
         if newfail and not bad:
             state["open_reds"].append({"sha": facts["sha"], "files": set(facts["test_files"]), "pending": set(newfail)})
 
