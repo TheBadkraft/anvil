@@ -111,8 +111,22 @@ class MergeTargetsPipes(unittest.TestCase):
         self.assertEqual([t[2] for t in unknown if len(t) == 3], ["unknown"])
         self.assertEqual(self.targets("xargs git merge feat/x"), [("/w", "feat/x")])
 
+    def test_printf_escapes_are_decoded_before_the_command_line_is_read(self):
+        for c in (r"printf 'git merge feat/x\n' | bash", r"printf 'git merge feat/x\n' | sh -s", r"printf '%s\n' 'git merge feat/x' | bash",
+                  r"echo -e 'git merge feat/x\n' | bash", r"printf 'git\x20merge\040feat/x\n' | sh"):
+            self.assertEqual(self.targets(c), [("/w", "feat/x")], c)
+
+    def test_a_printf_of_several_lines_is_several_commands(self):
+        self.assertEqual(self.targets(r"printf 'cd /r\ngit merge fix/y\n' | sh"), [("/r", "fix/y")])
+        self.assertEqual(self.targets(r"printf '%s\n' 'cd /r' 'git merge fix/y' | bash"), [("/r", "fix/y")])
+
+    def test_xargs_reading_a_file_has_unknown_refs(self):
+        for c in ("xargs -a refs.txt git merge", "xargs git merge < refs.txt", "xargs -a refs.txt -n1 git merge --no-ff"):
+            unknown = self.targets(c)
+            self.assertEqual([t[2] for t in unknown if len(t) == 3], ["unknown"], c)
+
     def test_harmless_pipes_name_nothing(self):
-        for c in ("printf 'hello' | sh", "echo feat/x | xargs echo", "echo 'git merge feat/x' | cat", "ls | xargs git status", "echo hi | bash script.sh"):
+        for c in ("printf 'hello' | sh", r"printf 'hello\n' | sh", r"printf '%s\n' hello | bash", "echo -e 'hello\\n' | bash", "echo feat/x | xargs echo", "xargs -a refs.txt echo", "echo 'git merge feat/x' | cat", "ls | xargs git status", "echo hi | bash script.sh"):
             self.assertEqual(self.targets(c), [], c)
 
 
@@ -302,6 +316,12 @@ class Decision(unittest.TestCase):
             self.assertEqual(self.decide(c)[0], "deny", c)
         self.record()
         self.assertEqual(self.decide("printf 'git merge feat/x' | sh")[0], "allow")
+
+    def test_a_merge_printed_with_escapes_into_a_shell_is_judged(self):
+        for c in (r"printf 'git merge feat/x\n' | bash", r"printf '%s\n' 'git merge feat/x' | sh", "xargs -a refs.txt git merge"):
+            self.assertEqual(self.decide(c)[0], "deny", c)
+        self.record()
+        self.assertEqual(self.decide(r"printf 'git merge feat/x\n' | bash")[0], "allow")
 
     def test_a_first_parent_record_is_refused(self):
         good = {"lenient_tests": False, "batch_limit": 10, "max_green_lines": 150, "no_compat": False}
