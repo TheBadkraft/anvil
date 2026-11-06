@@ -1,0 +1,2 @@
+include "./canon/child_dot.anvl";
+r := 1;

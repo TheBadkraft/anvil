@@ -1,0 +1,2 @@
+include "dia_d.anvl";
+b := 1;

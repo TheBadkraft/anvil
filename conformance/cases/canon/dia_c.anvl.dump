@@ -1,0 +1,12 @@
+anvil-dump 2
+mode document
+input-bytes 41
+status ok
+dialect AML
+doc 0 path="<root>" dialect=AML bytes=41
+  include decl-span=0-31 decl="include \"../canon/./dia_d.anvl\"" path-span=8-31 path="\"../canon/./dia_d.anvl\"" resolved=1
+  stmt kind=ASSIGN name="c" name-span=33-34 base="" base-span=none attrs=0
+    value type=NUMERIC span=38-39 text="1" kind=integer overflow=0 i64=1
+doc 1 path="../canon/./dia_d.anvl" dialect=AML bytes=8
+  stmt kind=ASSIGN name="d" name-span=0-1 base="" base-span=none attrs=0
+    value type=NUMERIC span=5-6 text="1" kind=integer overflow=0 i64=1

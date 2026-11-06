@@ -1,0 +1,2 @@
+include "../canon/child_up.anvl";
+c := 1;

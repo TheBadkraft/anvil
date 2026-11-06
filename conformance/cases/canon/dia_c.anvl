@@ -1,0 +1,2 @@
+include "../canon/./dia_d.anvl";
+c := 1;

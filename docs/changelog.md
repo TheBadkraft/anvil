@@ -38,6 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same labels: parse floats 1.006x, ints 1.008x, mixed 0.995x, validate floats 0.991x, validate small 0.989x, reference chain of 100k
   1.001x, ladder 0.996x, hub 0.986x, base inherited by 20k statements 0.971x, wide array 0.998x, wide object 1.000x, inherited
   references 1.001x, mixed rows with a reference 1.001x, ring of 100k 1.004x.
+- **BR-2611-anvl-include-001 (an include cycle is found whatever the spelling of the path).** A root document that included
+  itself by its absolute path loaded with status ok, and the include tree then contained itself, so a walker over it never
+  ended; the relative spelling gave `ANVL_ERR_INCLUDE_CYCLIC` (4206). Cycle detection compared lexically normalised paths,
+  so a root named `root.anvl` and the same file reached as `/abs/dir/root.anvl`, as `../dir/root.anvl` or through a symbolic
+  link were different documents. A loaded file's identity is now also its (device, inode), read with the `fstat` the
+  loader already makes on the descriptor it reads through (no path walk, no `realpath`: that slowed every load 1.7x), and an
+  include whose file is the file of a document still being loaded (the root included) is a cycle, whatever path or symbolic
+  link led to it. The lexical path test stays as the cheap first check. Two distinct files with equal bytes remain two
+  documents. A document loaded from a buffer has no file and no identity; it is never matched. Every spelling now reports
+  what the plain one does: error 4206, public category `ANVIL_ERR_INCLUDE`, positioned at the `include` keyword. No public
+  API change. New reader corpus cases under `conformance/cases/canon*` (`conformance/seed/gen_canon.py`; absolute and
+  symbolic-link spellings cannot be held by a relative, regular-file corpus and are unit tests ANV86-ANV91 and ANV94).
+  Windows is not a native target (no `_WIN32` code in the library); a port would use `GetFileInformationByHandle`.
+  Also pinned by tests ANV95-ANV97 (a buffer load after a file load, a hard-link self-include, a failed read leaves no stale
+  identity) and a `cycle` mode of `make check-tsan` (concurrent cycle and diamond loads). New `bench/include_load.c`
+  measures file loads with includes (the other benches load buffers and never reach include processing). Subject (this
+  branch) vs baseline v0.14.1-rc (064831d), ms per load, lower is faster, median of 9 runs pinned to one CPU: file load with
+  no include 0.00180 vs 0.00179 (1.006x), 10 includes 0.01983 vs 0.01978 (1.003x), 100 includes 0.18128 vs 0.18038
+  (1.005x), a 20-deep chain 0.03815 vs 0.03796 (1.005x). The 15 `bench/parse_validate.c` workloads, ms per run, are
+  between 0.994x and 1.022x of v0.14.1-rc (validate_small 0.994x, validate_floats 0.996x), apart from the plain-chain row,
+  which is 0.011x because of the linear `$` chain (FR-2611-anvl-resolver-001), not this change.
 
 ### Added
 

@@ -1,3 +1,6 @@
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700 /* realpath, symlink: the canonical-path tests of BR-2611-anvl-include-001 */
+#endif
 /* ********************************************************************** *
  * Copyright (c) 2026 Quantum Override. All rights reserved.              *
  * SPDX-License-Identifier: Proprietary                                   *
@@ -2480,6 +2483,345 @@ static void test_anv85_resolver_errors_name_their_document(void) {
                    "ANV85: the same error in the root has an empty source");
 }
 
+/* ---------------------------------------------------------------------- *
+ * ANV86-83 (BR-2611-anvl-include-001) - document identity is the canonical (symbolic-link-free)
+ * path, the root's included: a root that reaches itself by another spelling (absolute, ./, ../, a
+ * symbolic link) is the same include cycle, with the position the relative spelling reports.
+ * ---------------------------------------------------------------------- */
+typedef struct {
+   int category;
+   int code;
+   usize line, col;
+   bool errored;
+} include_outcome;
+
+static include_outcome load_outcome(const char *root) {
+   include_outcome o = {0, 0, 0, 0, false};
+   anvil_document doc = anvil_load(root);
+   if (!doc) {
+      return o;
+   }
+   o.category = anvil_get_error(doc);
+   anvil_error err = anvil_document_get_error(doc);
+   if (err) {
+      o.errored = true;
+      char msg[128] = "";
+      anvil_error_get_message(err, msg, sizeof msg);
+      if (strcmp(msg, anvl_error_code_message(ANVL_ERR_INCLUDE_CYCLIC)) == 0) {
+         o.code = (int)ANVL_ERR_INCLUDE_CYCLIC;
+      } else if (strcmp(msg, anvl_error_code_message(ANVL_ERR_INCLUDE_FILE_NOT_FOUND)) == 0) {
+         o.code = (int)ANVL_ERR_INCLUDE_FILE_NOT_FOUND;
+      } else {
+         o.code = -1;
+      }
+      o.line = (usize)anvil_error_get_line(err);
+      o.col = (usize)anvil_error_get_column(err);
+   }
+   anvil_dispose(doc);
+   return o;
+}
+
+static void expect_cycle_at(include_outcome o, usize line, const char *tag) {
+   TestBit.is_equal_int(ANVIL_ERR_INCLUDE, o.category, tag);
+   TestBit.is_true(o.errored, tag);
+   TestBit.is_equal_int((int)ANVL_ERR_INCLUDE_CYCLIC, o.code, tag);
+   TestBit.is_equal_int((int)line, (int)o.line, tag);
+   TestBit.is_equal_int(1, (int)o.col, tag);
+}
+
+// A fresh directory with sub/ (resolved through realpath, so /tmp being a link does not matter).
+static bool make_dir(char *dir, usize size) {
+   char t[] = "/tmp/anvl_canon_XXXXXX";
+   if (!mkdtemp(t) || !realpath(t, dir) || strlen(dir) + 8 >= size) {
+      return false;
+   }
+   char sub[700];
+   snprintf(sub, sizeof sub, "%s/sub", dir);
+   return mkdir(sub, 0755) == 0;
+}
+
+static void rm_all(const char *dir, const char *const *names) {
+   char p[800];
+   for (; *names; names++) {
+      snprintf(p, sizeof p, "%s/%s", dir, *names);
+      unlink(p);
+   }
+   snprintf(p, sizeof p, "%s/sub", dir);
+   rmdir(p);
+   rmdir(dir);
+}
+
+static void put_at(const char *dir, const char *name, const char *text) {
+   put_file(dir, name, text);
+}
+
+static void test_anv86_root_includes_itself_by_absolute_path(void) {
+   char dir[600], abs[700], rel[700], text[800];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV86: dir");
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   snprintf(text, sizeof text, "include \"%s\";\na := 1;\n", abs);
+   put_at(dir, "root.anvl", text);
+   expect_cycle_at(load_outcome(abs), 1, "ANV86: absolute root, absolute include");
+   char cwd[512];
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV86: cwd");
+   TestBit.is_equal_int(0, chdir(dir), "ANV86: chdir");
+   snprintf(rel, sizeof rel, "root.anvl");
+   expect_cycle_at(load_outcome(rel), 1, "ANV86: relative root, absolute include");
+   expect_cycle_at(load_outcome("./root.anvl"), 1, "ANV86: ./ root, absolute include");
+   expect_cycle_at(load_outcome("sub/../root.anvl"), 1, "ANV86: sub/../ root, absolute include");
+   (void)chdir(cwd);
+   const char *names[] = {"root.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv87_absolute_spelling_reports_what_the_relative_one_does(void) {
+   char dir[600], abs[700], text[800], cwd[512];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV87: dir");
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   put_at(dir, "root.anvl", "include \"root.anvl\";\nx := 1;\n");
+   put_at(dir, "other.anvl", "x := 1;\n");
+   include_outcome by_abs = load_outcome(abs);
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV87: cwd");
+   TestBit.is_equal_int(0, chdir(dir), "ANV87: chdir");
+   include_outcome by_rel = load_outcome("root.anvl");
+   (void)chdir(cwd);
+   expect_cycle_at(by_rel, 1, "ANV87: relative root, relative include");
+   expect_cycle_at(by_abs, 1, "ANV87: absolute root, relative include: same error, same position");
+   // a root whose include is on line 3: the position is the include keyword's
+   snprintf(text, sizeof text, "#!aml\n\ninclude \"%s\";\ny := 1;\n", abs);
+   put_at(dir, "root.anvl", text);
+   expect_cycle_at(load_outcome(abs), 3, "ANV87: the include keyword's line");
+   const char *names[] = {"root.anvl", "other.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv88_dot_dot_spelling_of_the_root(void) {
+   char dir[600], abs[700], text[900], cwd[512], dirname[100];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV88: dir");
+   const char *slash = strrchr(dir, '/');
+   snprintf(dirname, sizeof dirname, "%s", slash + 1);
+   // from inside sub/, "../root.anvl" is the root, spelled with a leading ..
+   snprintf(text, sizeof text, "include \"sub/../../%s/root.anvl\";\nx := 1;\n", dirname);
+   put_at(dir, "root.anvl", text);
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV88: cwd");
+   TestBit.is_equal_int(0, chdir(dir), "ANV88: chdir");
+   expect_cycle_at(load_outcome("root.anvl"), 1, "ANV88: bare root, include goes up and back down");
+   (void)chdir(cwd);
+   put_at(dir, "root.anvl", "include \"root.anvl\";\nx := 1;\n");
+   TestBit.is_equal_int(0, chdir(dir), "ANV88: chdir sub");
+   expect_cycle_at(load_outcome("./sub/../root.anvl"), 1, "ANV88: root spelled ./sub/../root.anvl, include root.anvl");
+   (void)chdir("sub");
+   expect_cycle_at(load_outcome("../root.anvl"), 1, "ANV88: root spelled ../root.anvl from sub");
+   (void)chdir(cwd);
+   const char *names[] = {"root.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv89_a_child_reaching_itself_by_another_spelling(void) {
+   char dir[600], text[900];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV89: dir");
+   char root[700];
+   snprintf(root, sizeof root, "%s/root.anvl", dir);
+   put_at(dir, "root.anvl", "include \"sub/c.anvl\";\nr := 1;\n");
+   snprintf(text, sizeof text, "include \"%s/sub/c.anvl\";\nc := 1;\n", dir);
+   put_at(dir, "sub/c.anvl", text);
+   include_outcome o = load_outcome(root);
+   TestBit.is_equal_int(ANVIL_ERR_INCLUDE, o.category, "ANV89: child includes itself by absolute path");
+   TestBit.is_equal_int((int)ANVL_ERR_INCLUDE_CYCLIC, o.code, "ANV89: code");
+   put_at(dir, "sub/c.anvl", "include \"../sub/./c.anvl\";\nc := 1;\n");
+   o = load_outcome(root);
+   TestBit.is_equal_int((int)ANVL_ERR_INCLUDE_CYCLIC, o.code, "ANV89: child includes itself by ../sub/./c.anvl");
+   const char *names[] = {"root.anvl", "sub/c.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv90_mutual_cycle_with_mixed_spellings(void) {
+   char dir[600], text[900], a[700];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV90: dir");
+   snprintf(a, sizeof a, "%s/a.anvl", dir);
+   snprintf(text, sizeof text, "include \"b.anvl\";\na := 1;\n");
+   put_at(dir, "a.anvl", text);
+   snprintf(text, sizeof text, "include \"%s\";\nb := 1;\n", a);
+   put_at(dir, "b.anvl", text);
+   expect_cycle_at(load_outcome(a), 1, "ANV90: a (absolute) -> b -> /abs/a");
+   char cwd[512];
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV90: cwd");
+   TestBit.is_equal_int(0, chdir(dir), "ANV90: chdir");
+   expect_cycle_at(load_outcome("a.anvl"), 1, "ANV90: a (relative) -> b -> /abs/a");
+   (void)chdir(cwd);
+   const char *names[] = {"a.anvl", "b.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv91_symbolic_link_spellings(void) {
+   char dir[600], p[800], q[800], abs[700], cwd[512];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV91: dir");
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   put_at(dir, "root.anvl", "include \"link.anvl\";\nx := 1;\n");
+   snprintf(p, sizeof p, "%s/link.anvl", dir);
+   TestBit.is_equal_int(0, symlink("root.anvl", p), "ANV91: file link");
+   expect_cycle_at(load_outcome(abs), 1, "ANV91: root includes a link to itself");
+   TestBit.is_true(getcwd(cwd, sizeof cwd) != NULL, "ANV91: cwd");
+   TestBit.is_equal_int(0, chdir(dir), "ANV91: chdir");
+   expect_cycle_at(load_outcome("root.anvl"), 1, "ANV91: same, relative root");
+   // the root itself is reached through the link
+   put_at(dir, "root.anvl", "include \"root.anvl\";\nx := 1;\n");
+   expect_cycle_at(load_outcome("link.anvl"), 1, "ANV91: root named by the link, include names the target");
+   (void)chdir(cwd);
+   // a directory link: sub2 -> sub, root in sub includes ../sub2/c.anvl (itself)
+   snprintf(q, sizeof q, "%s/sub2", dir);
+   TestBit.is_equal_int(0, symlink("sub", q), "ANV91: dir link");
+   put_at(dir, "sub/c.anvl", "include \"../sub2/c.anvl\";\nc := 1;\n");
+   snprintf(abs, sizeof abs, "%s/sub/c.anvl", dir);
+   expect_cycle_at(load_outcome(abs), 1, "ANV91: a directory link spells the same file");
+   unlink(q);
+   unlink(p);
+   const char *names[] = {"root.anvl", "sub/c.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv92_no_false_cycles_by_canonical_identity(void) {
+   char dir[600], text[900], abs[700];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV92: dir");
+   // a diamond whose branches spell the shared document differently is no cycle
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   snprintf(text, sizeof text, "include \"b.anvl\";\ninclude \"%s/c.anvl\";\nr := 1;\n", dir);
+   put_at(dir, "root.anvl", text);
+   put_at(dir, "b.anvl", "include \"sub/../d.anvl\";\nb := 1;\n");
+   snprintf(text, sizeof text, "include \"%s/d.anvl\";\nc := 1;\n", dir);
+   put_at(dir, "c.anvl", text);
+   put_at(dir, "d.anvl", "d := 1;\n");
+   include_outcome o = load_outcome(abs);
+   TestBit.is_equal_int(0, o.category, "ANV92: mixed-spelling diamond loads");
+   TestBit.is_false(o.errored, "ANV92: no error");
+   // same name in two directories stays two documents
+   put_at(dir, "root.anvl", "include \"sub/root.anvl\";\nr := 1;\n");
+   put_at(dir, "sub/root.anvl", "s := 1;\n");
+   o = load_outcome(abs);
+   TestBit.is_false(o.errored, "ANV92: sub/root.anvl is not root.anvl");
+   const char *names[] = {"root.anvl", "sub/root.anvl", "b.anvl", "c.anvl", "d.anvl", NULL};
+   rm_all(dir, names);
+}
+
+static void test_anv93_missing_include_still_not_found(void) {
+   char dir[600], abs[700];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV93: dir");
+   snprintf(abs, sizeof abs, "%s/root.anvl", dir);
+   put_at(dir, "root.anvl", "include \"nope.anvl\";\nx := 1;\n");
+   include_outcome o = load_outcome(abs);
+   TestBit.is_equal_int((int)ANVL_ERR_INCLUDE_FILE_NOT_FOUND, o.code, "ANV93: a missing include is still 'not found'");
+   TestBit.is_equal_int(1, (int)o.line, "ANV93: at its include keyword");
+   const char *names[] = {"root.anvl", NULL};
+   rm_all(dir, names);
+}
+
+
+// Two distinct files with the same bytes are two documents (not a cycle), while a symbolic link to an
+// ancestor is that ancestor's file (a cycle): identity is the file, not the spelling and not the content.
+static void test_anv94_identical_files_are_no_cycle_but_a_link_to_an_ancestor_is(void) {
+   char dir[600], p[800], q[800];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV94: dir");
+   snprintf(p, sizeof p, "%s/d1", dir);
+   snprintf(q, sizeof q, "%s/d2", dir);
+   TestBit.is_equal_int(0, mkdir(p, 0755), "ANV94: d1");
+   TestBit.is_equal_int(0, mkdir(q, 0755), "ANV94: d2");
+   put_at(dir, "d1/a.anvl", "include \"x.anvl\";\na := 1;\n");
+   put_at(dir, "d2/a.anvl", "include \"x.anvl\";\na := 1;\n"); // the same bytes, another file
+   put_at(dir, "d1/x.anvl", "p := 1;\n");
+   put_at(dir, "d2/x.anvl", "q := 2;\n");
+   put_at(dir, "root.anvl", "include \"d1/a.anvl\";\ninclude \"d2/a.anvl\";\nr := 1;\n");
+   char root[700];
+   snprintf(root, sizeof root, "%s/root.anvl", dir);
+   include_outcome o = load_outcome(root);
+   TestBit.is_equal_int(0, o.category, "ANV94: two files with identical bytes load clean");
+   TestBit.is_false(o.errored, "ANV94: no error");
+   const char *names[] = {"root.anvl", "d1/a.anvl", "d2/a.anvl", "d1/x.anvl", "d2/x.anvl", NULL};
+   rm_all(dir, names);
+   rmdir(p);
+   rmdir(q);
+   rmdir(dir);
+   // and a symbolic link to the root, included by the root, is the root itself
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV94: dir 2");
+   snprintf(root, sizeof root, "%s/root.anvl", dir);
+   put_at(dir, "root.anvl", "include \"link.anvl\";\nx := 1;\n");
+   snprintf(p, sizeof p, "%s/link.anvl", dir);
+   TestBit.is_equal_int(0, symlink("root.anvl", p), "ANV94: link");
+   expect_cycle_at(load_outcome(root), 1, "ANV94: a link to the root is the root: a cycle");
+   unlink(p);
+   const char *names2[] = {"root.anvl", NULL};
+   rm_all(dir, names2);
+}
+// A buffer has no file identity: a file loaded earlier on this thread must not make a buffer that
+// includes that same file a cycle (the identity the file load left behind is cleared by a buffer load).
+static void test_anv95_buffer_load_after_a_file_load_is_no_cycle(void) {
+   char dir[600], f[700], text[900];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV95: dir");
+   snprintf(f, sizeof f, "%s/f.anvl", dir);
+   put_at(dir, "f.anvl", "leaf := 1;\n");
+   include_outcome first = load_outcome(f);
+   TestBit.is_false(first.errored, "ANV95: the file loads clean");
+   snprintf(text, sizeof text, "include \"%s\";\nx := 1;\n", f);
+   anvil_document d = anvil_load_buffer(text, strlen(text));
+   TestBit.is_true(d != NULL, "ANV95: buffer loaded");
+   if (d) {
+      TestBit.is_false(anvil_has_errors(d), "ANV95: a buffer that includes the file just loaded is no cycle");
+      anvil_dispose(d);
+   }
+   const char *names[] = {"f.anvl", NULL};
+   rm_all(dir, names);
+}
+
+// A hard link is another name for the same file: including it is a cycle, like a symbolic link.
+static void test_anv96_hard_link_self_include_is_a_cycle(void) {
+   char dir[600], a[700], b[700], root[700];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV96: dir");
+   put_at(dir, "a.anvl", "include \"b.anvl\";\nx := 1;\n");
+   snprintf(a, sizeof a, "%s/a.anvl", dir);
+   snprintf(b, sizeof b, "%s/b.anvl", dir);
+   TestBit.is_equal_int(0, link(a, b), "ANV96: hard link");
+   snprintf(root, sizeof root, "%s/a.anvl", dir);
+   expect_cycle_at(load_outcome(root), 1, "ANV96: a includes b, a hard link to a");
+   const char *names[] = {"a.anvl", "b.anvl", NULL};
+   rm_all(dir, names);
+}
+
+// A load that fails to read leaves no identity that a later load on the same thread could match.
+static void test_anv97_failed_read_leaves_no_stale_identity(void) {
+   char dir[600], f[700], text[900], gone[700];
+   TestBit.is_true(make_dir(dir, sizeof dir), "ANV97: dir");
+   snprintf(f, sizeof f, "%s/f.anvl", dir);
+   snprintf(gone, sizeof gone, "%s/missing.anvl", dir);
+   put_at(dir, "f.anvl", "leaf := 1;\n");
+   TestBit.is_false(load_outcome(f).errored, "ANV97: the file loads clean");
+   anvil_document bad = anvil_load(gone); // a failed read
+   TestBit.is_true(bad == NULL || anvil_has_errors(bad), "ANV97: a missing root fails");
+   if (bad) {
+      anvil_dispose(bad);
+   }
+   anvil_document dirdoc = anvil_load(dir); // a directory: opens but cannot be read
+   TestBit.is_true(dirdoc == NULL || anvil_has_errors(dirdoc), "ANV97: a directory as a root fails");
+   if (dirdoc) {
+      anvil_dispose(dirdoc);
+   }
+   snprintf(text, sizeof text, "include \"%s\";\nx := 1;\n", f);
+   anvil_document d = anvil_load_buffer(text, strlen(text));
+   TestBit.is_true(d && !anvil_has_errors(d), "ANV97: after failed reads a buffer including the file is clean");
+   if (d) {
+      anvil_dispose(d);
+   }
+   // and a file root that includes a missing file, then a good root including f: no stale match either
+   put_at(dir, "r.anvl", "include \"nope.anvl\";\nx := 1;\n");
+   snprintf(text, sizeof text, "%s/r.anvl", dir);
+   include_outcome o = load_outcome(text);
+   TestBit.is_equal_int((int)ANVL_ERR_INCLUDE_FILE_NOT_FOUND, o.code, "ANV97: a missing include is not found");
+   put_at(dir, "g.anvl", "include \"f.anvl\";\ny := 2;\n");
+   snprintf(text, sizeof text, "%s/g.anvl", dir);
+   TestBit.is_false(load_outcome(text).errored, "ANV97: a clean include after the failures");
+   const char *names[] = {"f.anvl", "r.anvl", "g.anvl", NULL};
+   rm_all(dir, names);
+}
+
 int main(void) {
    TestBit.run_ex("ANV01_load_clean_document", NULL, test_anv01_load_clean_document, th);
    TestBit.run_ex("ANV02_body_syntax_error", NULL, test_anv02_body_syntax_error, th);
@@ -2616,6 +2958,24 @@ int main(void) {
    TestBit.run_ex("ANV84_source_buffer_convention", NULL, test_anv84_source_buffer_convention, th);
    TestBit.run_ex("ANV85_resolver_errors_name_their_document", NULL,
                   test_anv85_resolver_errors_name_their_document, th);
+   TestBit.run_ex("ANV86_root_includes_itself_by_absolute_path", NULL, test_anv86_root_includes_itself_by_absolute_path, th);
+   TestBit.run_ex("ANV87_absolute_spelling_reports_what_the_relative_one_does", NULL,
+                  test_anv87_absolute_spelling_reports_what_the_relative_one_does, th);
+   TestBit.run_ex("ANV88_dot_dot_spelling_of_the_root", NULL, test_anv88_dot_dot_spelling_of_the_root, th);
+   TestBit.run_ex("ANV89_a_child_reaching_itself_by_another_spelling", NULL,
+                  test_anv89_a_child_reaching_itself_by_another_spelling, th);
+   TestBit.run_ex("ANV90_mutual_cycle_with_mixed_spellings", NULL, test_anv90_mutual_cycle_with_mixed_spellings, th);
+   TestBit.run_ex("ANV91_symbolic_link_spellings", NULL, test_anv91_symbolic_link_spellings, th);
+   TestBit.run_ex("ANV92_no_false_cycles_by_canonical_identity", NULL,
+                  test_anv92_no_false_cycles_by_canonical_identity, th);
+   TestBit.run_ex("ANV93_missing_include_still_not_found", NULL, test_anv93_missing_include_still_not_found, th);
+   TestBit.run_ex("ANV94_identical_files_are_no_cycle_but_a_link_to_an_ancestor_is", NULL,
+                  test_anv94_identical_files_are_no_cycle_but_a_link_to_an_ancestor_is, th);
 
+   TestBit.run_ex("ANV95_buffer_load_after_a_file_load_is_no_cycle", NULL,
+                  test_anv95_buffer_load_after_a_file_load_is_no_cycle, th);
+   TestBit.run_ex("ANV96_hard_link_self_include_is_a_cycle", NULL, test_anv96_hard_link_self_include_is_a_cycle, th);
+   TestBit.run_ex("ANV97_failed_read_leaves_no_stale_identity", NULL,
+                  test_anv97_failed_read_leaves_no_stale_identity, th);
    return TestBit.report();
 }

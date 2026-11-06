@@ -1,0 +1,2 @@
+include "root_self.anvl";
+x := 1;

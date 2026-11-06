@@ -1,0 +1,2 @@
+include "canon/child_self.anvl";
+r := 1;

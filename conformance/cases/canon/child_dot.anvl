@@ -1,0 +1,2 @@
+include "./child_dot.anvl";
+c := 1;
