@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bench/parse_validate.c`: the `shapes_*` workloads (`BENCH_SHAPES=1`) for the shapes above, and `RSV16`-`RSV24` in `test/unit/test_resolver.c`
   (merge order, 4022, 4054 positions, plain chains, 4050, and four time bounds).
 
+- **FR-2611-anvl-errors-002 (the specific error code is public, stable ABI).** A failed load's `anvil_error` now reports the
+  specific reason, not only its category: `anvil_error_get_code(error)` returns the `anvl_err_code` value (for example 4054) and
+  `anvil_error_get_name(error, buf, buflen)` the symbolic name, exactly the enum identifier (for example
+  `ANVL_ERR_RESOLVER_REFERENCE_CYCLE`); both are also `Error.get_code` and `Error.get_name`, appended after `get_source` in the
+  `anvil_error_i` vtable (existing offsets unchanged). `get_name` follows the buffer convention of `anvil_error_get_message`: the full
+  length is returned whatever the buffer size, the text is truncated to `buflen - 1` bytes and NUL-terminated, `NULL` or a zero
+  `buflen` writes nothing, and a `NULL` error returns `ANVL_ERR_NONE` / an empty string. When no specific reason was recorded the code
+  is `ANVL_ERR_NONE` (0) and the name `"ANVL_ERR_NONE"`. Exports: 174 to 176.
+- **The codes are now stable public ABI.** `anvl_err_code` moved to the public header `include/anvil_error_codes.h` (included by
+  `anvil_types.h`), so a consumer can compare against `ANVL_ERR_*`. The rule: a shipped code is never renumbered, never reused
+  for another reason and never removed; new codes are only appended inside their category's range (1xxx file I/O, 2xxx-3xxx
+  parsing, 4xxx semantic and resolver, 41xx vars, 42xx include, 43xx import, 44xx AMP, 45xx serializer, 46xx schema, 47xx
+  AnvilScript functions, 50xx lexer, 51xx AnvilScript, 70xx memory, 90xx generic). The public category enum (`anvil_err_code`)
+  is unchanged and stays the coarse answer. This reverses the 2026-09-05 decision that the codes were internal, which anvil.js,
+  the language reference's code tables and `conformance/drift-tables.txt` had already overtaken. The numbers are locked by a committed, hand-maintained pin table, `test/unit/error_code_pins.h`: the unit suite fails when a header constant differs from its pin (E7), when the name table differs (E6), or when the header has a code that is not pinned (E9), so a new code must be added to the pins on purpose. The pins are never generated, so regenerating `conformance/drift-tables.txt` cannot move one, and `check-drift-tables` (also `make update-conformance`) now refuses to proceed when a pinned code was changed or removed. Names match anvil.js (`lastError().name`) and the language reference for all 109 codes. No parse path changed.
+
 ---
 
 ## [v0.14.1-rc] — (2026-11-05)

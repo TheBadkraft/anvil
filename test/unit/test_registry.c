@@ -221,29 +221,60 @@ static void test_reg09_ownerless_source_is_handled_cleanly(void) {
    Debug.dispose_ctx(ctx);
 }
 
+// 1 when the header file holds a line containing every one of the (NULL-terminated) fragments.
+static bool public_header_has(const char *const *needles) {
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   if (!f) {
+      return false;
+   }
+   char line[256];
+   bool all = true;
+   for (size_t i = 0; needles[i]; i++) {
+      bool found = false;
+      rewind(f);
+      while (fgets(line, sizeof line, f)) {
+         if (strstr(line, needles[i])) {
+            found = true;
+            break;
+         }
+      }
+      all = all && found;
+   }
+   fclose(f);
+   return all;
+}
+
+static bool errors_h_defines_the_enum(void) {
+   FILE *f = fopen("../../include/errors.h", "rb");
+   char line[256];
+   bool found = false;
+   while (f && fgets(line, sizeof line, f)) {
+      if (strstr(line, "} anvl_err_code;")) {
+         found = true;
+      }
+   }
+   if (f) {
+      fclose(f);
+   }
+   return found;
+}
+
 /* REG10 (BR-2610-anvl-errors-001) - the message and name tables are COMPLETE: every anvl_err_code
- * declared in errors.h has a specific message and a name. The errors analogue of VT11: the codes are
+ * declared in anvil_error_codes.h has a specific message and a name. The errors analogue of VT11: the codes are
  * read from the header, so a code added without a table entry fails here. */
 static void test_reg10_error_tables_are_complete(void) {
-   FILE *f = fopen("../../include/errors.h", "rb");
-   TestBit.is_not_null(f, "REG10: errors.h readable");
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   TestBit.is_not_null(f, "REG10: anvil_error_codes.h readable");
    if (!f) {
       return;
    }
    char line[256];
    int checked = 0;
-   bool in_enum = false;
    while (fgets(line, sizeof(line), f)) {
-      if (strstr(line, "typedef enum")) {
-         in_enum = true;
-      }
-      if (in_enum && strstr(line, "} anvl_err_code;")) {
-         break;
-      }
       char name[96];
       unsigned long value;
       const char *p = strstr(line, "ANVL_ERR_");
-      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+      if (p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
          const char *msg = anvl_error_code_message((anvl_err_code)value);
          const char *nm = anvl_error_code_name((anvl_err_code)value);
          bool ok = msg && *msg && strcmp(msg, "Unknown error") != 0 && nm &&
@@ -264,25 +295,18 @@ static void test_reg10_error_tables_are_complete(void) {
 
 /* REG11 - every code's name string is its enum identifier, spelled exactly (BR-2610-anvl-errors-002). */
 static void test_reg11_error_names_are_the_identifiers(void) {
-   FILE *f = fopen("../../include/errors.h", "rb");
-   TestBit.is_not_null(f, "REG11: errors.h readable");
+   FILE *f = fopen("../../include/anvil_error_codes.h", "rb");
+   TestBit.is_not_null(f, "REG11: anvil_error_codes.h readable");
    if (!f) {
       return;
    }
    char line[256];
    int checked = 0;
-   bool in_enum = false;
    while (fgets(line, sizeof(line), f)) {
-      if (strstr(line, "typedef enum")) {
-         in_enum = true;
-      }
-      if (in_enum && strstr(line, "} anvl_err_code;")) {
-         break;
-      }
       char name[96];
       unsigned long value;
       const char *p = strstr(line, "ANVL_ERR_");
-      if (in_enum && p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
+      if (p && sscanf(p, "%95[A-Z0-9_] = %lu", name, &value) == 2) {
          const char *nm = anvl_error_code_name((anvl_err_code)value);
          bool ok = nm && strcmp(nm, name) == 0;
          if (!ok) {
@@ -294,6 +318,41 @@ static void test_reg11_error_names_are_the_identifiers(void) {
    }
    fclose(f);
    TestBit.is_true(checked > 90, "REG11: the header scan found the whole enum");
+}
+
+/* REG12 to REG17 (FR-2611-anvl-errors-002) - the codes are public ABI: include/anvil_error_codes.h is the one
+ * definition of anvl_err_code. The enum moves there in parts; each part has its test. */
+static void test_reg12_public_header_has_the_first_codes(void) {
+   const char *const needles[] = {"ANVL_ERR_NONE = 0", "ANVL_ERR_IO_FILE_NOT_FOUND = 1002",
+                                  "ANVL_ERR_PARSER_UNEXPECTED_TOKEN = 3100", NULL};
+   TestBit.is_true(public_header_has(needles), "REG12: codes 0 to 3100 are in the public header");
+}
+
+static void test_reg13_public_header_has_the_semantic_and_resolver_codes(void) {
+   const char *const needles[] = {"ANVL_ERR_PARSER_DUPLICATE_FIELD_IN_OBJECT = 4001", "ANVL_ERR_PARSER_NESTED_BASE = 4022",
+                                  "ANVL_ERR_RESOLVER_REFERENCE_CYCLE = 4054", NULL};
+   TestBit.is_true(public_header_has(needles), "REG13: codes 4001 to 4054 are in the public header");
+}
+
+static void test_reg14_public_header_has_the_vars_include_and_schema_codes(void) {
+   const char *const needles[] = {"ANVL_ERR_VARS_BLOCK_ALREADY_DEFINED = 4101", "ANVL_ERR_INCLUDE_CYCLIC = 4206",
+                                  "ANVL_ERR_SCHEMA_ATTR_MISSING = 4601", "ANVL_ERR_ASL_UNTERMINATED_BODY = 4703", NULL};
+   TestBit.is_true(public_header_has(needles), "REG14: codes 4101 to 4703 are in the public header");
+}
+
+static void test_reg15_public_header_has_the_lexer_and_generic_codes(void) {
+   const char *const needles[] = {"ANVL_ERR_PARSER_UNEXPECTED_CHAR = 5001", "ANVL_ERR_ASL_NESTING_TOO_DEEP = 5106",
+                                  "ANVL_ERR_MEMORY_ALLOC_FAILED = 7001", "ANVL_ERR_NOT_IMPLEMENTED = 9999", NULL};
+   TestBit.is_true(public_header_has(needles), "REG15: codes 5001 to 9999 are in the public header");
+}
+
+static void test_reg16_public_header_declares_the_type(void) {
+   const char *const needles[] = {"typedef enum {", "} anvl_err_code;", NULL};
+   TestBit.is_true(public_header_has(needles), "REG16: the public header declares anvl_err_code");
+}
+
+static void test_reg17_errors_h_does_not_define_the_enum(void) {
+   TestBit.is_true(!errors_h_defines_the_enum(), "REG17: errors.h has no second definition of anvl_err_code");
 }
 
 int main(void) {
@@ -313,6 +372,15 @@ int main(void) {
    TestBit.run_ex("REG10_error_tables_are_complete", NULL, test_reg10_error_tables_are_complete, NULL);
    TestBit.run_ex("REG11_error_names_are_the_identifiers", NULL,
                   test_reg11_error_names_are_the_identifiers, NULL);
+   TestBit.run_ex("REG12_public_header_has_the_first_codes", NULL, test_reg12_public_header_has_the_first_codes, NULL);
+   TestBit.run_ex("REG13_public_header_has_the_semantic_and_resolver_codes", NULL,
+                  test_reg13_public_header_has_the_semantic_and_resolver_codes, NULL);
+   TestBit.run_ex("REG14_public_header_has_the_vars_include_and_schema_codes", NULL,
+                  test_reg14_public_header_has_the_vars_include_and_schema_codes, NULL);
+   TestBit.run_ex("REG15_public_header_has_the_lexer_and_generic_codes", NULL,
+                  test_reg15_public_header_has_the_lexer_and_generic_codes, NULL);
+   TestBit.run_ex("REG16_public_header_declares_the_type", NULL, test_reg16_public_header_declares_the_type, NULL);
+   TestBit.run_ex("REG17_errors_h_does_not_define_the_enum", NULL, test_reg17_errors_h_does_not_define_the_enum, NULL);
 
    return TestBit.report();
 }

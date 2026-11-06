@@ -149,6 +149,24 @@ size_t anvil_error_get_line(anvil_error err);
 size_t anvil_error_get_column(anvil_error err);
 
 /**
+ * @brief The specific reason for this error: its anvl_err_code (anvil_error_codes.h), for example
+ * ANVL_ERR_RESOLVER_REFERENCE_CYCLE (4054). Stable public ABI: a shipped code keeps its number for
+ * ever, and new codes are only appended. ANVL_ERR_NONE (0) when no specific reason was recorded for
+ * the failure.
+ * @param err The error to read. NULL returns ANVL_ERR_NONE.
+ */
+anvl_err_code anvil_error_get_code(anvil_error err);
+
+/**
+ * @brief The symbolic name of this error's code, exactly the enum identifier: "ANVL_ERR_NONE" when no
+ * specific reason was recorded. Same buffer-sizing convention as anvil_error_get_message: the full
+ * length is returned whatever the buffer size, and the text is copied NUL-terminated up to buflen - 1
+ * bytes.
+ * @param err The error to read. NULL writes an empty string and returns 0.
+ */
+size_t anvil_error_get_name(anvil_error err, char *buf, size_t buflen);
+
+/**
  * @brief The document this error occurred in, as the path it was opened by: the including document's
  * directory, a `/`, and the include string as written (not normalised), so a document in `sub/` that
  * includes `"../x.anvl"` is `<root dir>/sub/../x.anvl`. Empty when the error is in the root document

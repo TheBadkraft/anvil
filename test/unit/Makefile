@@ -406,9 +406,10 @@ test_attribute_grammar: $(BIN)/test_version $(BIN)/test_attribute_grammar
 		$(BIN)/test_version; \
 	fi
 
-$(BIN)/test_error_codes: test_error_codes.c $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
+# error_code_pins.h is the committed, hand-maintained pin table of the stable error codes. Nothing generates it.
+$(BIN)/test_error_codes: test_error_codes.c error_code_pins.h $(ANVIL_SRCS) $(TESTBIT_SRC) $(TEST_HELPER) $(TEST_DEBUG)
 	@mkdir -p $(BIN)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(filter-out %.h,$^) -o $@
 
 build_test_error_codes: $(BIN)/test_error_codes
 

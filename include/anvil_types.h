@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "anvil_error_codes.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -98,14 +100,15 @@ typedef struct anvil_attribute_t *anvil_attribute;
 
 /**
  * @brief Opaque handle to the diagnostic detail behind a document's
- * recorded error, if any — richer than the stable anvil_err_code category
+ * recorded error, if any - richer than the stable anvil_err_code category
  * alone (a specific message, plus source line/column), pushed the moment
  * the pipeline phase that produced anvil_get_error()'s category actually
- * failed. Deliberately does not expose the specific internal anvl_err_code
- * number itself, only its static message text — internal code churn still
- * can never become a public ABI break through this handle.
+ * failed. It also carries the specific reason: anvil_error_get_code() gives
+ * the anvl_err_code value and anvil_error_get_name() its symbolic name. Those
+ * codes are stable public ABI (see anvil_error_codes.h): a shipped code is
+ * never renumbered or reused, new ones are only appended.
  *
- * Lifetime is tied to the anvil_document it came from — never valid after
+ * Lifetime is tied to the anvil_document it came from - never valid after
  * that document is disposed.
  */
 typedef struct anvil_error_t *anvil_error;
@@ -150,11 +153,11 @@ typedef struct anvil_numeric_t {
  * @brief Stable, deliberately small public error category.
  *
  * One category per document-pipeline phase, plus the cross-cutting
- * infrastructure cases. Distinct from (and never numerically tied to) the
- * internal anvl_err_code enum, which carries ~90 granular parser/resolver
- * codes that are free to change as the implementation evolves without
- * that ever being a public ABI break. Full detail (message text, line/
- * column) is reachable through separate accessors, not this enum.
+ * infrastructure cases. This is the coarse answer; the specific reason is
+ * the anvl_err_code (anvil_error_codes.h), reachable through
+ * anvil_error_get_code() and anvil_error_get_name(). A category is never
+ * numerically tied to a code. Full detail (message text, line/column) is
+ * reachable through separate accessors, not this enum.
  */
 typedef enum {
    ANVIL_OK = 0,

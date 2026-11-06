@@ -88,6 +88,35 @@ if (anvil_has_errors(doc)) {
 }
 ```
 
+The error also carries the specific reason. `anvil_error_get_code` returns its number and `anvil_error_get_name`
+its symbolic name (both are in `anvil_error_codes.h`'s stable set). This document refers to itself, which is a reference
+cycle:
+
+<!-- example: setup cycle-doc -->
+```c
+const char *cyclic = "#!aml\ns := { a := $s; };\n";
+anvil_document doc = anvil_load_buffer(cyclic, strlen(cyclic));
+```
+
+<!-- example: uses cycle-doc -->
+```c
+anvil_error err = anvil_document_get_error(doc);
+char name[64] = {0};
+anvil_error_get_name(err, name, sizeof(name));
+printf("%d %s\n", (int)anvil_error_get_code(err), name);
+if (anvil_error_get_code(err) == ANVL_ERR_RESOLVER_REFERENCE_CYCLE) {
+   printf("category %d\n", (int)anvil_error_get_category(err));
+}
+```
+
+<!-- example: output -->
+```
+4054 ANVL_ERR_RESOLVER_REFERENCE_CYCLE
+category 5
+```
+
+A name buffer that is too small is safe: the call still returns the full length, and copies as much as fits, NUL-terminated.
+
 `anvil_get_error(doc)` alone gives you the stable category (`ANVIL_ERR_SYNTAX`,
 `ANVIL_ERR_INCLUDE`, ...) without the detail object — see `language-reference.md`'s §12 for the
 full category table.
