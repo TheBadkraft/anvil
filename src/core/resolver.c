@@ -209,9 +209,50 @@ static list own_fields(anvl_statement stmt) {
    return NULL;
 }
 
-// True if `fields` already has a statement named `name`.
-static bool fields_has_name(list fields, anvl_slice name) {
-   usize count = List.size(fields);
+/* ---------------------------------------------------------------------- *
+ * Inheritance merge (BR-2611-anvl-resolver-003)
+ *
+ * A statement with a base gets, appended to its own field list in place, the fields of its ancestors: own fields first,
+ * then each ancestor's fields nearest ancestor first, a field skipped when a field of that name is already in the list.
+ * The result for one statement is the same whether the ancestor's own list is read before or after the ancestor itself
+ * was merged (the ancestor's merged list is its own fields followed by exactly the fields the walk up the chain would
+ * add, and the names the deriving statement already holds filter both alike). So the statements are merged base first
+ * and each one reads only its base's finished list: the cost is the size of the own fields plus the size of the base's
+ * merged list, and the total is O(the document + the merged members). Before, every statement walked the whole chain
+ * and searched its growing list for each candidate name, which was quadratic in the fields and cubic along a chain.
+ *
+ * Names already present are found by a linear scan when the lists are short (the common case: no allocation, no
+ * hashing) and by a stamped open-addressing table otherwise. A chain of bases that leads back to itself is
+ * ANVL_ERR_RESOLVER_CYCLE_DETECTED (4050), found while walking up to the first merged ancestor.
+ * ---------------------------------------------------------------------- */
+typedef struct {
+   const char *key;
+   usize len;
+   uint32_t stamp;
+} mg_slot;
+
+typedef struct {
+   anvl_statement stmt, base;
+} mg_step;
+
+typedef struct {
+   mg_step *walk; // the statements on the walk up a chain, derived first (stack_walk until it is outgrown)
+   usize walk_cap;
+   mg_slot *slots; // names present in the list being merged
+   usize slot_cap;
+   uint32_t stamp;
+} mg_state;
+
+static usize mg_hash_name(const char *s, usize len) {
+   unsigned long long h = 1469598103934665603ull;
+   for (usize i = 0; i < len; i++) {
+      h = (h ^ (unsigned char)s[i]) * 1099511628211ull;
+   }
+   return (usize)(h ^ (h >> 29));
+}
+
+// True if `fields` has a statement named `name`, scanning the first `count` of them.
+static bool fields_has_name(list fields, usize count, anvl_slice name) {
    for (usize i = 0; i < count; i++) {
       anvl_statement s = NULL;
       List.get(fields, i, (object *)&s);
@@ -222,76 +263,155 @@ static bool fields_has_name(list fields, anvl_slice name) {
    return false;
 }
 
-// Merges inherited fields into `stmt`'s own field list, in place — appending an *aliased*
-// pointer (never a copy) for each of an ancestor's fields not already present by name in
-// `stmt`'s current set, walking the base chain nearest-ancestor-first so a closer override
-// always wins over a farther one, and a transitive chain (`c : b : a`) falls out naturally
-// without needing recursion. Mutating `stmt`'s own list directly, rather than building a
-// separate merged view, was a deliberate call: two representations of the same field (an
-// original and a shadow copy in some other list) is exactly the risk to avoid, not something
-// to introduce here — after this runs, `stmt`'s own field list *is* its complete, correct
-// field set.
-//
-// Cycle-safe via the same hop-counter technique resolve_varref_chain uses: since `base` is a
-// single slice per statement, the "inherits from" relation never branches, so with N distinct
-// names in `identifiers`, a non-cyclic chain can't need more than N hops — exceeding that is a
-// cycle. Unlike a VarRef, an inheritance cycle is a hard error here (ANVL_ERR_RESOLVER_CYCLE_
-// DETECTED) — a cyclic chain can't produce a sensible merged object at all, matching the
-// legacy anvl.bak resolver's own policy on inheritance cycles specifically.
-static anvl_result merge_inherited_fields(module_context ctx, anvl_statement stmt,
-                                          anvl_err_code *out_err_code) {
-   list fields = own_fields(stmt);
-   if (!fields) {
-      return ANVL_RES_OK;
+// Returns true when `name` is in the table; otherwise inserts it and returns false. `mask` is the table size in use.
+static bool mg_seen_or_add(mg_state *m, usize mask, anvl_slice name) {
+   usize len = Source.slice_length(name);
+   usize at = mg_hash_name(name.start, len) & mask;
+   while (m->slots[at].stamp == m->stamp) {
+      if (m->slots[at].len == len && (len == 0 || memcmp(m->slots[at].key, name.start, len) == 0)) {
+         return true;
+      }
+      at = (at + 1) & mask;
    }
-
-   usize max_hops = Map.count(ctx->identifiers) + 1;
-   anvl_slice current_base = stmt->base;
-
-   for (usize hop = 0; hop < max_hops; hop++) {
-      usize len = Source.slice_length(current_base);
-      addr val = 0;
-      if (!Map.get(ctx->identifiers, current_base.start, len, &val)) {
-         return ANVL_RES_OK; // unreachable - validate_bases already confirmed this exists
-      }
-      anvl_statement ancestor = (anvl_statement)val;
-      list ancestor_fields = own_fields(ancestor);
-      if (ancestor_fields) {
-         usize count = List.size(ancestor_fields);
-         for (usize i = 0; i < count; i++) {
-            anvl_statement field = NULL;
-            List.get(ancestor_fields, i, (object *)&field);
-            if (field && !fields_has_name(fields, field->name)) {
-               List.append(fields, field);
-            }
-         }
-      }
-      if (Source.slice_length(ancestor->base) == 0) {
-         return ANVL_RES_OK; // reached the root of the chain
-      }
-      current_base = ancestor->base;
-   }
-
-   anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, NULL, NULL);
-   *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
-   return ANVL_RES_ERR;
+   m->slots[at] = (mg_slot){name.start, len, m->stamp};
+   return false;
 }
 
-// Runs merge_inherited_fields for every statement in the context that has a non-empty base (only
-// top-level statements do; the parser rejects a base on a nested one).
-static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
-   usize stmt_count = List.size(ctx->statements);
-   for (usize i = 0; i < stmt_count; i++) {
-      anvl_statement stmt = NULL;
-      List.get(ctx->statements, i, (object *)&stmt);
-      if (!stmt || Source.slice_length(stmt->base) == 0) {
-         continue;
+// Appends to `fields` the fields of `from` whose names it does not hold. ANVL_RES_ERR on running out of memory.
+static anvl_result mg_merge_one(mg_state *m, list fields, list from) {
+   usize own = List.size(fields), count = List.size(from);
+   if (own + count <= 16) {
+      for (usize i = 0; i < count; i++) {
+         anvl_statement field = NULL;
+         List.get(from, i, (object *)&field);
+         if (field && !fields_has_name(fields, List.size(fields), field->name)) {
+            List.append(fields, field);
+         }
       }
-      if (ANVL_RES_OK != merge_inherited_fields(ctx, stmt, out_err_code)) {
+      return ANVL_RES_OK;
+   }
+   usize need = 16;
+   while (need < (own + count) * 2) {
+      need *= 2;
+   }
+   if (need > m->slot_cap) {
+      free(m->slots);
+      m->slots = calloc(need, sizeof *m->slots);
+      m->slot_cap = m->slots ? need : 0;
+      m->stamp = 0;
+      if (!m->slots) {
          return ANVL_RES_ERR;
       }
    }
+   if (++m->stamp == 0) { // wrapped: no slot may keep a stamp from 2^32 merges ago
+      memset(m->slots, 0, m->slot_cap * sizeof *m->slots);
+      m->stamp = 1;
+   }
+   usize mask = need - 1;
+   for (usize i = 0; i < own; i++) {
+      anvl_statement s = NULL;
+      List.get(fields, i, (object *)&s);
+      if (s) {
+         (void)mg_seen_or_add(m, mask, s->name);
+      }
+   }
+   for (usize i = 0; i < count; i++) {
+      anvl_statement field = NULL;
+      List.get(from, i, (object *)&field);
+      if (field && !mg_seen_or_add(m, mask, field->name)) {
+         List.append(fields, field);
+      }
+   }
    return ANVL_RES_OK;
+}
+
+// Merges `stmt` and, first, every ancestor that is not merged yet. A statement's own field list is its merged list once
+// it is merged, so a statement reads its base's own list. Iterative: a chain of 100000 is as safe as one of three.
+// ANVL_ERR_RESOLVER_CYCLE_DETECTED when the chain leads back to a statement on the walk.
+static anvl_result mg_merge_chain(module_context ctx, mg_state *m, mg_step *stack_walk, anvl_statement stmt,
+                                  anvl_err_code *out_err_code) {
+   usize depth = 0;
+   anvl_statement cur = stmt;
+   for (;;) {
+      if (cur->merge_state == 2) {
+         break;
+      }
+      if (cur->merge_state == 1) {
+         anvl_error_set(ctx->errors, ANVL_ERR_RESOLVER_CYCLE_DETECTED, 0, 0, NULL, NULL);
+         *out_err_code = ANVL_ERR_RESOLVER_CYCLE_DETECTED;
+         return ANVL_RES_ERR;
+      }
+      addr val = 0;
+      if (!Map.get(ctx->identifiers, cur->base.start, Source.slice_length(cur->base), &val)) {
+         cur->merge_state = 2; // unreachable - validate_bases already confirmed this exists
+         break;
+      }
+      anvl_statement base_stmt = (anvl_statement)val;
+      if (depth == m->walk_cap) {
+         usize cap = m->walk_cap * 2;
+         mg_step *grown = malloc(cap * sizeof *grown);
+         if (!grown) {
+            anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
+            *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+            return ANVL_RES_ERR;
+         }
+         memcpy(grown, m->walk, depth * sizeof *grown);
+         if (m->walk != stack_walk) {
+            free(m->walk);
+         }
+         m->walk = grown;
+         m->walk_cap = cap;
+      }
+      cur->merge_state = 1;
+      m->walk[depth++] = (mg_step){cur, base_stmt};
+      if (Source.slice_length(base_stmt->base) == 0) {
+         break; // the root of the chain
+      }
+      cur = base_stmt;
+   }
+   while (depth > 0) {
+      mg_step step = m->walk[--depth];
+      list fields = own_fields(step.stmt);
+      // a base without a field list (not reachable: a base is an object) contributes what its own base does
+      anvl_statement from = step.base;
+      list base_fields = own_fields(from);
+      while (!base_fields && Source.slice_length(from->base) != 0) {
+         addr val = 0;
+         if (!Map.get(ctx->identifiers, from->base.start, Source.slice_length(from->base), &val)) {
+            break;
+         }
+         from = (anvl_statement)val;
+         base_fields = own_fields(from);
+      }
+      if (fields && base_fields && ANVL_RES_OK != mg_merge_one(m, fields, base_fields)) {
+         anvl_error_set(ctx->errors, ANVL_ERR_MEMORY_ALLOC_FAILED, 0, 0, NULL, NULL);
+         *out_err_code = ANVL_ERR_MEMORY_ALLOC_FAILED;
+         return ANVL_RES_ERR;
+      }
+      step.stmt->merge_state = 2;
+   }
+   return ANVL_RES_OK;
+}
+
+// Merges the inherited fields into every statement of the context that has a non-empty base (only top-level statements
+// do; the parser rejects a base on a nested one), bases first. See the comment above.
+static anvl_result merge_all_inheritance(module_context ctx, anvl_err_code *out_err_code) {
+   mg_step stack_walk[32];
+   mg_state m = {.walk = stack_walk, .walk_cap = 32};
+   anvl_result res = ANVL_RES_OK;
+   usize stmt_count = List.size(ctx->statements);
+   for (usize i = 0; res == ANVL_RES_OK && i < stmt_count; i++) {
+      anvl_statement stmt = NULL;
+      List.get(ctx->statements, i, (object *)&stmt);
+      if (stmt && Source.slice_length(stmt->base) != 0) {
+         res = mg_merge_chain(ctx, &m, stack_walk, stmt, out_err_code);
+      }
+   }
+   if (m.walk != stack_walk) {
+      free(m.walk);
+   }
+   free(m.slots);
+   return res;
 }
 
 // Chases a VarRef target to its final concrete value, following a chain of VarRefs
@@ -325,21 +445,135 @@ static anvl_value resolve_varref_chain(module_context ctx, anvl_slice target) {
    return NULL; // exceeded max_hops without terminating - a cycle
 }
 
+// The end of the reference chain through a top-level statement whose value is a reference, remembered
+// (FR-2611-anvl-resolver-001, part 2). The end of a chain is the same for every reference on it, so a plain chain of N
+// statements is chased once, not N times; a chain that leads into a cycle ends in NULL for every statement on or before it.
+typedef struct {
+   anvl_statement stmt; // a statement whose value is a VarRef
+   anvl_value end;      // the concrete value at the end of its chain, NULL for a cycle, a miss or nothing to alias
+   uint8_t state;       // 1 on the walk being made, 2 known
+} vc_entry;
+
+typedef struct {
+   vc_entry *entries; // open addressing by statement pointer
+   usize cap, count;  // cap is a power of two, or 0 before the first reference to a reference
+   anvl_statement *walk;
+   usize walk_cap;
+   bool failed; // out of memory: the caller falls back to resolve_varref_chain
+} vc_memo;
+
+static vc_entry *vc_find(vc_memo *m, anvl_statement stmt, bool insert) {
+   if (insert && (m->count + 1) * 2 > m->cap) {
+      usize cap = m->cap ? m->cap * 2 : 64;
+      vc_entry *grown = calloc(cap, sizeof *grown);
+      if (!grown) {
+         m->failed = true;
+         return NULL;
+      }
+      for (usize i = 0; i < m->cap; i++) {
+         if (m->entries[i].stmt) {
+            usize at = (usize)((((unsigned long long)(usize)m->entries[i].stmt >> 4) * 0x9E3779B97F4A7C15ull) >> 24) & (cap - 1);
+            while (grown[at].stmt) {
+               at = (at + 1) & (cap - 1);
+            }
+            grown[at] = m->entries[i];
+         }
+      }
+      free(m->entries);
+      m->entries = grown;
+      m->cap = cap;
+   }
+   if (!m->cap) {
+      return NULL;
+   }
+   usize at = (usize)((((unsigned long long)(usize)stmt >> 4) * 0x9E3779B97F4A7C15ull) >> 24) & (m->cap - 1);
+   while (m->entries[at].stmt && m->entries[at].stmt != stmt) {
+      at = (at + 1) & (m->cap - 1);
+   }
+   if (m->entries[at].stmt == stmt) {
+      return &m->entries[at];
+   }
+   if (!insert) {
+      return NULL;
+   }
+   m->entries[at].stmt = stmt;
+   m->count++;
+   return &m->entries[at];
+}
+
+// resolve_varref_chain with the ends of the chains remembered. Same result for every reference.
+static anvl_value resolve_varref_chain_memo(module_context ctx, vc_memo *m, anvl_slice target) {
+   usize depth = 0;
+   anvl_value end = NULL;
+   anvl_slice current = target;
+   for (;;) {
+      addr val = 0;
+      if (!Map.get(ctx->identifiers, current.start, Source.slice_length(current), &val)) {
+         break; // missing target
+      }
+      anvl_statement stmt = (anvl_statement)val;
+      if (!stmt->value) {
+         break; // nothing to alias
+      }
+      if (stmt->value->type != ANVL_VALUE_VARREF) {
+         end = stmt->value; // final concrete value
+         break;
+      }
+      vc_entry *known = vc_find(m, stmt, false);
+      if (known) {
+         if (known->state == 2) {
+            end = known->end;
+         }
+         break; // known end, or a statement already on this walk: a cycle
+      }
+      if (depth == m->walk_cap) {
+         usize cap = m->walk_cap ? m->walk_cap * 2 : 64;
+         anvl_statement *grown = realloc(m->walk, cap * sizeof *grown);
+         if (!grown) {
+            m->failed = true;
+            return NULL;
+         }
+         m->walk = grown;
+         m->walk_cap = cap;
+      }
+      vc_entry *e = vc_find(m, stmt, true);
+      if (!e) {
+         return NULL;
+      }
+      e->state = 1;
+      m->walk[depth++] = stmt;
+      current = stmt->value->varref.target; // keep chasing
+   }
+   while (depth > 0) {
+      vc_entry *e = vc_find(m, m->walk[--depth], false);
+      e->end = end;
+      e->state = 2;
+   }
+   return end;
+}
+
 // Finds every ANVL_VALUE_VARREF in one flat pass over ctx->values (already indexes every
 // anvl_value at any nesting depth - see mod_ctx_dispose's own use of the same index) and sets
 // .varref.resolved on each. Never fails - see resolve_varref_chain.
 static usize resolve_varrefs(module_context ctx) {
    usize resolved = 0;
    usize value_count = List.size(ctx->values);
+   vc_memo memo = {0};
    for (usize i = 0; i < value_count; i++) {
       anvl_value v = NULL;
       List.get(ctx->values, i, (object *)&v);
       if (!v || v->type != ANVL_VALUE_VARREF) {
          continue;
       }
-      v->varref.resolved = resolve_varref_chain(ctx, v->varref.target);
+      v->varref.resolved = memo.failed ? resolve_varref_chain(ctx, v->varref.target)
+                                       : resolve_varref_chain_memo(ctx, &memo, v->varref.target);
+      if (memo.failed && !v->varref.resolved) { // the memo gave up part-way: redo this one without it
+         v->varref.resolved = resolve_varref_chain(ctx, v->varref.target);
+      }
       resolved += v->varref.resolved != NULL;
    }
+   free(memo.entries);
+   free(memo.walk);
    return resolved;
 }
 
@@ -348,7 +582,7 @@ static usize resolve_varrefs(module_context ctx) {
  *
  * A `$` reference that leads back to a container holding it is an error. Treat the resolved document as a
  * graph. A walker standing on a value reaches (1) a container's own members (object fields, array and tuple
- * elements), (2) the fields it inherits from a base, which merge_inherited_fields aliased into the member list
+ * elements), (2) the fields it inherits from a base, which merge_all_inheritance aliased into the member list
  * so they are members too, and (3) through a resolved `$` reference, the target statement's value. A cycle in
  * that graph is the error. A plain reference chain cycle (`a := $b; b := $a;`) is not part of it: it stays
  * unresolved (`.resolved` NULL), so a walker has no edge to follow.

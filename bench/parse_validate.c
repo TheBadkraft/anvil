@@ -12,6 +12,9 @@
  * each hold a reference, and a ring of 100k statements (a reference cycle: loaded clean before BR-2611-anvl-resolver-002,
  * refused since; timed either way, so the cost of finding it is in the number). Each is timed as the median of SAMPLES
  * samples; one sample is REPS back-to-back calls. Output: "name median_ms_per_call".
+ * The shapes_* workloads (BR-2611-anvl-resolver-003, FR-2611-anvl-resolver-001 part 2) are the inheritance merge and the plain
+ * reference chase at the sizes where a superlinear merge was seen (13 s to 23 s on v0.14.1-rc): they run alone, with
+ * BENCH_SHAPES=1 (and BENCH_SAMPLES=3 BENCH_REPS=1 for a build that is still superlinear), because v0.14.1-rc needs minutes for them.
  * Use bench/compare.sh to interleave several builds, pin the CPU and compare medians. */
 #define _POSIX_C_SOURCE 200809L
 #include "anvil_flat.h"
@@ -291,6 +294,68 @@ static void bench_references(void) {
    free(t);
 }
 
+/* BR-2611-anvl-resolver-003 shapes. b0 := { f0 }, then b_i : b_(i-1) := { f_i }, n deep; every level holds one field */
+static char *gen_shape_chain(size_t n, size_t root_refs, size_t *len) {
+   size_t cap = 256 + n * 48 + root_refs * 8;
+   char *b = malloc(cap);
+   size_t p = (size_t)snprintf(b, cap, "#!aml\nt := 1;\nb0 := { f0 := 0; ");
+   if (root_refs) {
+      p += (size_t)snprintf(b + p, cap - p, "refs := [ ");
+      for (size_t i = 0; i < root_refs; i++) {
+         p += (size_t)snprintf(b + p, cap - p, "$t, ");
+      }
+      p += (size_t)snprintf(b + p, cap - p, "1 ]; ");
+   }
+   p += (size_t)snprintf(b + p, cap - p, "};\n");
+   for (size_t i = 1; i < n; i++) {
+      p += (size_t)snprintf(b + p, cap - p, "b%zu : b%zu := { f%zu := %zu; };\n", i, i - 1, i, i);
+   }
+   *len = p;
+   return b;
+}
+
+/* a base with `fields` fields (each a reference, or when `nested`, a small object holding one) inherited by `derived` statements */
+static char *gen_shape_wide(size_t fields, size_t derived, int nested, size_t *len) {
+   size_t cap = 256 + fields * 40 + derived * 40;
+   char *b = malloc(cap);
+   size_t p = (size_t)snprintf(b, cap, "#!aml\nt := 1;\nbase := {\n");
+   for (size_t i = 0; i < fields; i++) {
+      p += (size_t)snprintf(b + p, cap - p, nested ? "r%zu := { v := $t; };\n" : "r%zu := $t;\n", i);
+   }
+   p += (size_t)snprintf(b + p, cap - p, "};\n");
+   for (size_t i = 0; i < derived; i++) {
+      p += (size_t)snprintf(b + p, cap - p, "d%zu : base := { p := %zu; };\n", i, i);
+   }
+   *len = p;
+   return b;
+}
+
+static void bench_shapes(void) {
+   size_t len;
+   char *t;
+   t = gen_shape_chain(200, 0, &len);
+   bench_load("shapes_chain_200", t, len);
+   free(t);
+   t = gen_shape_chain(400, 0, &len);
+   bench_load("shapes_chain_400", t, len);
+   free(t);
+   t = gen_shape_chain(300, 300, &len);
+   bench_load("shapes_chain_300_refs_300", t, len);
+   free(t);
+   t = gen_shape_wide(2000, 2000, 0, &len);
+   bench_load("shapes_wide_2000x2000", t, len);
+   free(t);
+   t = gen_shape_wide(1500, 1500, 1, &len);
+   bench_load("shapes_inherit_1500x1500", t, len);
+   free(t);
+   t = gen_ref_plain_chain(20000, &len);
+   bench_load("shapes_plain_chain_20k", t, len);
+   free(t);
+   /* a plain cycle and a chain into it still resolve to null (no error) */
+   const char *cyc = "#!aml\na := $b;\nb := $a;\nc := $a;\n";
+   bench_load("shapes_plain_cycle", cyc, strlen(cyc));
+}
+
 static void bench_validate_small(void) {
    anvil_document sdoc = anvil_load_buffer(SMALL_SCHEMA, sizeof SMALL_SCHEMA - 1);
    anvil_schema schema = anvil_schema_load(sdoc);
@@ -315,6 +380,12 @@ static void bench_validate_small(void) {
 }
 
 int main(void) {
+   if (getenv("BENCH_SHAPES")) {
+      if (getenv("BENCH_SAMPLES")) { SAMPLES = atoi(getenv("BENCH_SAMPLES")); if (SAMPLES > 63) SAMPLES = 63; }
+      if (getenv("BENCH_REPS")) REPS = atoi(getenv("BENCH_REPS"));
+      bench_shapes();
+      return 0;
+   }
    if (getenv("BENCH_ROWS")) ROWS = atoi(getenv("BENCH_ROWS"));
    if (getenv("BENCH_SAMPLES")) { SAMPLES = atoi(getenv("BENCH_SAMPLES")); if (SAMPLES > 63) SAMPLES = 63; }
    if (getenv("BENCH_REPS")) REPS = atoi(getenv("BENCH_REPS"));
